@@ -48,8 +48,6 @@ export function validateStoryScenes(rawScenes) {
     }
     if (index > 0) {
       const previous = scenes[index - 1];
-      // Compare visual descriptions and actions independently so different prose
-      // cannot hide the same repeated action between adjacent scenes.
       const promptScore = similarity(scene.prompt, previous.prompt);
       const actionScore = similarity(scene.visibleAction, previous.visibleAction);
       const fallbackScore = similarity(scene.prompt || scene.visibleAction, previous.prompt || previous.visibleAction);
@@ -58,7 +56,11 @@ export function validateStoryScenes(rawScenes) {
     }
     for (let earlier = 0; earlier < index - 1; earlier++) {
       const prior = scenes[earlier];
-      const score = similarity(scene.prompt || scene.visibleAction, prior.prompt || prior.visibleAction);
+      // Check prompt and action separately so changed prose cannot hide a reused action.
+      const promptScore = similarity(scene.prompt, prior.prompt);
+      const actionScore = similarity(scene.visibleAction, prior.visibleAction);
+      const fallbackScore = similarity(scene.prompt || scene.visibleAction, prior.prompt || prior.visibleAction);
+      const score = Math.max(promptScore, actionScore, fallbackScore);
       if (score >= 0.9) {
         issues.push(issue('info', 'repeated-content', scene.id, `Similar content also appears in scene ${earlier + 1}.`, prior.id));
         break;
