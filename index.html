@@ -11,6 +11,22 @@
 button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;padding:12px 16px;background:var(--accent);color:#171326;font-weight:750;cursor:pointer}button.secondary{background:#292d40;color:var(--text);border:1px solid var(--line)}
 .app{max-width:1000px;margin:auto;padding:20px 15px 44px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:25px}.brand{font-weight:900;letter-spacing:.12em}.brand span{color:var(--cyan)}.tag{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:5px 9px;border-radius:999px}
 .hero h1{font-size:clamp(32px,6vw,54px);line-height:1.05;margin:8px 0 12px;letter-spacing:-.04em}.hero p,.muted{color:var(--muted)}.layout{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:23px}.panel{background:#191b28ed;border:1px solid var(--line);border-radius:21px;padding:17px;box-shadow:0 18px 50px #0002}.panel h2{font-size:17px;margin:0 0 13px}.field{display:grid;gap:7px;margin:13px 0}.field label{font-size:13px;color:#c6c9da;font-weight:650}textarea,input,select{width:100%;background:#11131e;border:1px solid var(--line);color:var(--text);border-radius:12px;padding:12px;outline-color:var(--accent)}textarea{min-height:100px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.stage{background:linear-gradient(150deg,#30284d,#151c31 60%,#142d3a);border:1px solid #45415f;border-radius:18px;min-height:250px;display:grid;place-items:center;overflow:hidden;position:relative}.stage canvas{width:100%;max-height:340px;display:block}.hint{position:absolute;bottom:9px;left:12px;color:#d7d8e8;font-size:12px}.editorFields{display:grid;gap:10px;margin-top:13px}.editorFields .field{margin:0}.scenes{display:grid;gap:8px;margin-top:12px}.scene{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#11131e;border:1px solid var(--line);border-radius:12px;padding:10px 12px}.scene strong{font-size:13px}.scene small{display:block;color:var(--muted)}.status{min-height:24px;color:var(--cyan);font-size:13px;margin-top:10px}.foot{margin-top:24px;color:var(--muted);font-size:12px;text-align:center}
+/* Storyboard QA status panel */
+.qa-report{--qa-accent:#60a5fa;box-sizing:border-box;width:100%;min-width:0;margin-top:8px;padding:14px 16px;border:1px solid #374151;border-left:4px solid var(--qa-accent);border-radius:12px;background:#111827;color:#e5e7eb;font-size:13px;line-height:1.5;overflow-wrap:anywhere;transition:background-color .2s ease,border-color .2s ease}
+.qa-report--ok{--qa-accent:#34d399;background:#10231f;border-color:#285b49;color:#d1fae5}
+.qa-report--warning{--qa-accent:#fbbf24;background:#292315;border-color:#665126;color:#fef3c7}
+.qa-report--error{--qa-accent:#f87171;background:#2b191d;border-color:#71333b;color:#fee2e2}
+.qa-report__summary{margin:0;font-size:13px;font-weight:750;line-height:1.5}
+.qa-report__list{display:flex;flex-direction:column;gap:8px;margin:10px 0 0;padding-left:20px}
+.qa-report__item{padding-left:2px;overflow-wrap:anywhere}
+.qa-report__item--error{color:#fca5a5}
+.qa-report__item--warning{color:#fcd34d}
+.qa-report__item--more{list-style:none;margin-left:-20px;opacity:.8;font-style:italic}
+.qa-badge{display:inline-block;vertical-align:middle;margin-right:6px;padding:2px 7px;border:1px solid currentColor;border-radius:5px;font-size:10px;font-weight:800;line-height:1.4;letter-spacing:.04em;text-transform:uppercase}
+.qa-report[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){.qa-report{transition:none}}
+@media(max-width:420px){.qa-report{padding:12px;border-radius:10px;font-size:12px}.qa-report__summary{font-size:12px}.qa-report__list{gap:6px;padding-left:18px}}
+
 @media(max-width:720px){.layout{grid-template-columns:1fr}.app{padding:16px 12px 32px}.panel{padding:14px}.stage{min-height:220px}.top{margin-bottom:20px}}
 </style>
 </head>
@@ -52,7 +68,72 @@ function storyLanguage(){return $('language').value||'en'}
 const sceneEditorLabels={en:{title:'Selected scene title',description:'Selected scene description',apply:'Apply scene edits',add:'Add scene',del:'Delete scene',titlePlaceholder:'Scene title',descriptionPlaceholder:'Describe what happens in this scene',limit:'You can add up to 12 scenes in this prototype.',minimum:'Keep at least one scene.',updated:'Scene updated.',added:'New scene added.',deleted:'Scene deleted.'},ru:{title:'Название выбранной сцены',description:'Описание выбранной сцены',apply:'Применить изменения',add:'Добавить сцену',del:'Удалить сцену',titlePlaceholder:'Название сцены',descriptionPlaceholder:'Опиши, что происходит в этой сцене',limit:'В этой версии можно добавить не более 12 сцен.',minimum:'Нужно оставить хотя бы одну сцену.',updated:'Сцена обновлена.',added:'Новая сцена добавлена.',deleted:'Сцена удалена.'}};
 function applySceneEditorLanguage(){const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;$('sceneTitleLabel').textContent=t.title;$('sceneDescriptionLabel').textContent=t.description;$('applyScene').textContent=t.apply;$('addScene').textContent=t.add;$('deleteScene').textContent=t.del;$('sceneTitle').placeholder=t.titlePlaceholder;$('sceneDescription').placeholder=t.descriptionPlaceholder}
 function syncSceneEditor(){ $('sceneTitle').value=titles[sceneIndex]||''; $('sceneDescription').value=descriptions[sceneIndex]||''; $('sceneTitleLabel').textContent=(sceneEditorLabels[uiLang]||sceneEditorLabels.en).title; }
-function updateStoryQA(){const qa=validateStoryScenes(titles.map((title,index)=>({id:'scene_'+(index+1),order:index+1,title,prompt:descriptions[index],visibleAction:descriptions[index],duration:Number($('duration').value)||3})));const report=$('qaReport');report.textContent=(uiLang==='ru'?'Проверка раскадровки: ':'Storyboard QA: ')+(qa.ok?(uiLang==='ru'?'ошибок нет':'no errors'):(uiLang==='ru'?'есть ошибки':'errors found'))+' · '+(uiLang==='ru'?'предупреждений: ':'warnings: ')+qa.warningCount+(qa.issues.length?' — '+qa.issues.slice(0,3).map(issue=>issue.message).join(' '):'');return qa;}
+function updateStoryQA(){
+  const safeText=value=>{
+    if(value===null||value===undefined)return '';
+    if(typeof value==='string'||typeof value==='number')return String(value).trim();
+    return '';
+  };
+  const sourceTitles=Array.isArray(titles)?titles:[];
+  const sourceDescriptions=Array.isArray(descriptions)?descriptions:[];
+  const rawDuration=Number($('duration')?.value);
+  const duration=Number.isFinite(rawDuration)&&rawDuration>=0.25&&rawDuration<=30?rawDuration:3;
+  const scenes=sourceTitles.map((title,index)=>({
+    id:'scene_'+(index+1),order:index+1,title:safeText(title),
+    prompt:safeText(sourceDescriptions[index]),visibleAction:safeText(sourceDescriptions[index]),duration
+  }));
+  let qa;
+  try{qa=validateStoryScenes(scenes)}
+  catch(error){
+    console.error('Storyboard QA failed:',error);
+    qa={ok:false,errorCount:1,warningCount:0,totalDurationSeconds:0,issues:[{severity:'error',message:'Could not validate the storyboard.'}]};
+  }
+  const issues=Array.isArray(qa.issues)?qa.issues:[];
+  const report=$('qaReport');
+  const errors=Number.isFinite(qa.errorCount)?qa.errorCount:1;
+  const warnings=Number.isFinite(qa.warningCount)?qa.warningCount:0;
+  const statusClass=errors>0?'qa-report--error':warnings>0?'qa-report--warning':'qa-report--ok';
+  const visibleIssues=issues.filter(issue=>issue&&safeText(issue.message));
+  if(report){
+    report.replaceChildren();
+    report.classList.add('qa-report');
+    report.classList.remove('qa-report--ok','qa-report--warning','qa-report--error');
+    report.classList.add(statusClass);
+    const heading=document.createElement('p');
+    heading.className='qa-report__summary';
+    heading.textContent=(uiLang==='ru'?'Проверка раскадровки: ':'Storyboard QA: ')+
+      (errors===0?(uiLang==='ru'?'критических ошибок нет':'no critical errors'):(uiLang==='ru'?'ошибок: ':'errors: ')+errors)+
+      ' · '+(uiLang==='ru'?'предупреждений: ':'warnings: ')+warnings+
+      ' · '+(uiLang==='ru'?'сцен: ':'scenes: ')+scenes.length;
+    report.appendChild(heading);
+    if(visibleIssues.length){
+      const list=document.createElement('ul');
+      list.className='qa-report__list';
+      visibleIssues.slice(0,5).forEach(issue=>{
+        const item=document.createElement('li');
+        const severity=issue.severity==='error'?'error':issue.severity==='warning'?'warning':'info';
+        item.className='qa-report__item'+(severity==='error'?' qa-report__item--error':severity==='warning'?' qa-report__item--warning':'');
+        const badge=document.createElement('span');
+        badge.className='qa-badge';
+        badge.textContent=severity==='error'?(uiLang==='ru'?'Ошибка':'Error'):severity==='warning'?(uiLang==='ru'?'Внимание':'Warning'):(uiLang==='ru'?'Совет':'Info');
+        item.appendChild(badge);
+        item.appendChild(document.createTextNode(safeText(issue.message)));
+        list.appendChild(item);
+      });
+      if(visibleIssues.length>5){
+        const more=document.createElement('li');
+        more.className='qa-report__item qa-report__item--more';
+        more.textContent=uiLang==='ru'?'И ещё замечаний: '+(visibleIssues.length-5):'And '+(visibleIssues.length-5)+' more issue(s).';
+        list.appendChild(more);
+      }
+      report.appendChild(list);
+    }
+    report.dataset.errorCount=String(errors);
+    report.dataset.warningCount=String(warnings);
+    report.setAttribute('aria-live','polite');
+  }
+  return {...qa,issues,scenes,canContinue:errors===0};
+}
 $('applyScene').onclick=()=>{const title=$('sceneTitle').value.trim(),description=$('sceneDescription').value.trim();if(!title||!description){$('status').textContent=uiLang==='ru'?'Заполни название и описание сцены.':'Please enter both a scene title and description.';return}titles[sceneIndex]=title;descriptions[sceneIndex]=description;$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+title;renderScenes();updateStoryQA();$('status').textContent=(sceneEditorLabels[uiLang]||sceneEditorLabels.en).updated};
 $('addScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length>=12){$('status').textContent=t.limit;return}titles.push(uiLang==='ru'?'Новая сцена':'New scene');descriptions.push(uiLang==='ru'?'Добавь описание этой сцены.':'Add a description for this scene.');sceneIndex=titles.length-1;$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();$('status').textContent=t.added};
 $('deleteScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length<=1){$('status').textContent=t.minimum;return}titles.splice(sceneIndex,1);descriptions.splice(sceneIndex,1);sceneIndex=Math.min(sceneIndex,titles.length-1);$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();$('status').textContent=t.deleted};
@@ -114,7 +195,7 @@ b[4][1]+' '+(lang==='ru'?'Заверши историю визуальным р�
 ];
 return {titles:titlesOut,descriptions:descriptionsOut};
 }
-$('make').addEventListener('click',()=>{const status=$('status');try{const idea=$('idea').value.trim();if(!idea){status.textContent=tr('emptyIdea');$('idea').focus();return}const lang=storyLanguage();const plan=buildStoryboardFromText(idea,lang,$('character').value.trim()||(lang==='ru'?'Главный герой':'Foxy'));titles=plan.titles;descriptions=plan.descriptions;sceneIndex=0;$('sceneLabel').textContent=(storyLabels[lang]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();const qa=validateStoryScenes(titles.map((title,index)=>({id:'scene_'+(index+1),order:index+1,title,prompt:descriptions[index],visibleAction:descriptions[index],duration:Number($('duration').value)||3})));const qaReport=$('qaReport');qaReport.textContent=(uiLang==='ru'?'Проверка раскадровки: ':'Storyboard QA: ')+(qa.ok?(uiLang==='ru'?'ошибок нет':'no errors'):(uiLang==='ru'?'есть ошибки':'errors found'))+' · '+(uiLang==='ru'?'предупреждений: ':'warnings: ')+qa.warningCount+(qa.issues.length?' — '+qa.issues.slice(0,3).map(issue=>issue.message).join(' '):'');status.textContent=uiLang==='ru'?'Создана 5-сценная сюжетная раскадровка. Это локальный планировщик, не ИИ-генерация; проверь и отредактируй каждую сцену.':'Created a five-beat story outline locally. This is not AI generation yet; review and edit each scene.';status.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(error){console.error('DRAVEX storyboard error:',error);status.textContent=(uiLang==='ru'?'Не удалось создать сцены. Обнови страницу и попробуй ещё раз.':'Could not create scenes. Refresh the page and try again.')+' ('+(error&&error.message?error.message:'unknown error')+')';}});
+$('make').addEventListener('click',()=>{const status=$('status');try{const idea=$('idea').value.trim();if(!idea){status.textContent=tr('emptyIdea');$('idea').focus();return}const lang=storyLanguage();const plan=buildStoryboardFromText(idea,lang,$('character').value.trim()||(lang==='ru'?'Главный герой':'Foxy'));titles=plan.titles;descriptions=plan.descriptions;sceneIndex=0;$('sceneLabel').textContent=(storyLabels[lang]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();updateStoryQA();status.textContent=uiLang==='ru'?'Создана 5-сценная сюжетная раскадровка. Это локальный планировщик, не ИИ-генерация; проверь и отредактируй каждую сцену.':'Created a five-beat story outline locally. This is not AI generation yet; review and edit each scene.';status.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(error){console.error('DRAVEX storyboard error:',error);status.textContent=(uiLang==='ru'?'Не удалось создать сцены. Обнови страницу и попробуй ещё раз.':'Could not create scenes. Refresh the page and try again.')+' ('+(error&&error.message?error.message:'unknown error')+')';}});
 $('play').onclick=()=>{playing=!playing;$('play').textContent=playing?tr('pauseButton'):tr('playButton');if(playing&&!raf)draw()};
 $('save').onclick=()=>{try{localStorage.setItem('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneIndex}));$('status').textContent=tr('saved')}catch(e){$('status').textContent=tr('storageError')}};
 $('export').onclick=async()=>{
