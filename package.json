@@ -1,0 +1,14 @@
+{
+  "name": "dx-studio-ai-cartoon-studio",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "DRAVEX/DX Studio prototype with a testable scene-model and storyboard QA foundation",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/scene-model.js && node --check src/story-qa.js && node --check tests/story-qa.test.js",
+    "build": "vite build",
+    "dev": "vite"
+  },
+  "devDependencies": { "vite": "^6.4.0" }
+}
