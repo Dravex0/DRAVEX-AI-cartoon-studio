@@ -1,0 +1,70 @@
+import { normalizeScenes, SCENE_DURATION_MIN, SCENE_DURATION_MAX } from './scene-model.js';
+
+const STOP_WORDS = new Set(['the','and','for','with','from','into','that','this','then','they','their','while','after','before','over','under','his','her','its','are','was','were','onto','through','very','same','shot','scene']);
+const VAGUE_ACTION = /^(?:looks? around|stands? there|is standing|waits?|nothing happens|looks? at (?:the )?(?:camera|viewer)|(?:персонаж )?(?:стоит|смотрит вокруг|жд[её]т)\.?)[.!?]?$/i;
+
+function tokens(value) {
+  return String(value ?? '').toLowerCase().normalize('NFKC')
+    .match(/[\p{L}\p{N}]+/gu)?.filter((word) => word.length > 2 && !STOP_WORDS.has(word)) ?? [];
+}
+function similarity(left, right) {
+  const a = new Set(tokens(left)); const b = new Set(tokens(right));
+  if (!a.size || !b.size) return 0;
+  let overlap = 0; for (const token of a) if (b.has(token)) overlap++;
+  return overlap / (a.size + b.size - overlap);
+}
+function issue(severity, code, sceneId, message, otherSceneId) {
+  return { severity, code, sceneId, ...(otherSceneId ? { otherSceneId } : {}), message };
+}
+
+/** Deterministic text checks only; this does not analyze frames or call a model. */
+export function validateStoryScenes(rawScenes) {
+  const scenes = normalizeScenes(rawScenes);
+  const issues = [];
+  if (!scenes.length) return {
+    sceneCount: 0, totalDurationSeconds: 0, errorCount: 1, warningCount: 0,
+    issues: [issue('error', 'no-scenes', '', 'Add at least one scene before continuing.')], ok: false
+  };
+  const seenIds = new Map();
+  scenes.forEach((scene, index) => {
+    if (seenIds.has(scene.id)) {
+      const firstIndex = seenIds.get(scene.id);
+      issues.push(issue('error', 'duplicate-scene-id', scene.id, `Scene ID is duplicated; it first appeared at position ${firstIndex + 1}.`, scenes[firstIndex].id));
+    } else seenIds.set(scene.id, index);
+    const rawScene = rawScenes[index] && typeof rawScenes[index] === 'object' ? rawScenes[index] : {};
+    if (!scene.prompt && !scene.visibleAction) issues.push(issue('error', 'missing-visual-direction', scene.id, 'Add a visual prompt or a visible action.'));
+    if (!scene.visibleAction) issues.push(issue('warning', 'action-not-structured', scene.id, 'Visible action is not separated from the prompt yet.'));
+    else if (VAGUE_ACTION.test(scene.visibleAction.trim())) issues.push(issue('warning', 'vague-action', scene.id, 'Action is vague; describe a visible change, movement, or outcome.'));
+    let duration = NaN;
+    try { duration = Number(rawScene.durationSeconds ?? rawScene.duration); } catch {}
+    if (!Number.isFinite(duration) || duration < SCENE_DURATION_MIN || duration > SCENE_DURATION_MAX) {
+      issues.push(issue('warning', 'duration-normalized', scene.id, `Duration must be ${SCENE_DURATION_MIN}–${SCENE_DURATION_MAX} seconds; fallback preview duration is ${scene.durationSeconds}s.`));
+    }
+    if (!scene.startState || !scene.endState) issues.push(issue('info', 'continuity-state-missing', scene.id, 'Add start/end state notes to make continuity checks more specific.'));
+    for (const line of scene.dialogue) {
+      if (!line.characterId) continue;
+      if (!scene.characters.length) issues.push(issue('warning', 'dialogue-character-list-missing', scene.id, `Dialogue names speaker "${line.characterId}", but this scene has no character list to validate against.`));
+      else if (!scene.characters.includes(line.characterId)) issues.push(issue('warning', 'dialogue-speaker-not-in-scene', scene.id, `Dialogue speaker "${line.characterId}" is not listed among this scene's characters.`));
+    }
+    if (index > 0) {
+      const previous = scenes[index - 1];
+      const score = similarity(scene.prompt || scene.visibleAction, previous.prompt || previous.visibleAction);
+      if (score >= 0.78) issues.push(issue('warning', 'adjacent-repeat', scene.id, `This scene is very similar to the previous scene (${Math.round(score * 100)}% token overlap).`, previous.id));
+    }
+    for (let earlier = 0; earlier < index - 1; earlier++) {
+      const prior = scenes[earlier];
+      const score = similarity(scene.prompt || scene.visibleAction, prior.prompt || prior.visibleAction);
+      if (score >= 0.9) {
+        issues.push(issue('info', 'repeated-content', scene.id, `Similar content also appears in scene ${earlier + 1}.`, prior.id));
+        break;
+      }
+    }
+  });
+  const errorCount = issues.filter((entry) => entry.severity === 'error').length;
+  const warningCount = issues.filter((entry) => entry.severity === 'warning').length;
+  return {
+    sceneCount: scenes.length,
+    totalDurationSeconds: Number(scenes.reduce((total, scene) => total + scene.durationSeconds, 0).toFixed(2)),
+    errorCount, warningCount, issues, ok: errorCount === 0
+  };
+}
