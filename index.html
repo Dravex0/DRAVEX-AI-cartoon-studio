@@ -218,6 +218,7 @@ $('export').onclick=async()=>{
   const wasPlaying=playing;
   playing=true;
   $('play').textContent=tr('pauseButton');
+  if(!raf)draw();
   let stream=null,recorder=null,timer=null;
   const chunks=[];
   const cleanup=()=>{
@@ -225,6 +226,7 @@ $('export').onclick=async()=>{
     if(stream)stream.getTracks().forEach(track=>track.stop());
     playing=wasPlaying;
     $('play').textContent=playing?tr('pauseButton'):tr('playButton');
+    if(playing&&!raf)draw();
     button.disabled=false;
   };
   try{
