@@ -55,7 +55,40 @@ $('applyScene').onclick=()=>{const title=$('sceneTitle').value.trim(),descriptio
 $('addScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length>=12){$('status').textContent=t.limit;return}titles.push(uiLang==='ru'?'Новая сцена':'New scene');descriptions.push(uiLang==='ru'?'Добавь описание этой сцены.':'Add a description for this scene.');sceneIndex=titles.length-1;$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();$('status').textContent=t.added};
 $('deleteScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length<=1){$('status').textContent=t.minimum;return}titles.splice(sceneIndex,1);descriptions.splice(sceneIndex,1);sceneIndex=Math.min(sceneIndex,titles.length-1);$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();$('status').textContent=t.deleted};
 
-function renderScenes(){const box=$('scenes');box.innerHTML='';titles.forEach((title,i)=>{const b=document.createElement('button');b.className='scene';b.style.textAlign='left';b.style.color='var(--text)';b.style.width='100%';b.style.background=i===sceneIndex?'#28243f':'#11131e';b.innerHTML='<span><strong>'+tr('sceneLabel')+' '+(i+1)+' · '+title+'</strong><small>'+descriptions[i]+'</small></span><span>›</span>';b.onclick=()=>{sceneIndex=i;$('sceneLabel').textContent=storyLabels[storyLanguage()]+' '+(i+1)+' · '+title;renderScenes()};box.appendChild(b)})}
+function renderScenes(){
+  const box=$('scenes');
+  box.replaceChildren();
+  titles.forEach((title,i)=>{
+    const button=document.createElement('button');
+    button.type='button';
+    button.className='scene';
+    button.style.textAlign='left';
+    button.style.color='var(--text)';
+    button.style.width='100%';
+    button.style.background=i===sceneIndex?'#28243f':'#11131e';
+
+    const content=document.createElement('span');
+    const heading=document.createElement('strong');
+    heading.textContent=tr('sceneLabel')+' '+(i+1)+' · '+String(title??'');
+    const description=document.createElement('small');
+    description.textContent=String(descriptions[i]??'');
+    content.append(heading,description);
+
+    const arrow=document.createElement('span');
+    arrow.setAttribute('aria-hidden','true');
+    arrow.textContent='›';
+    button.append(content,arrow);
+
+    button.setAttribute('aria-pressed',String(i===sceneIndex));
+    button.onclick=()=>{
+      sceneIndex=i;
+      $('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(i+1)+' · '+String(titles[i]??'');
+      renderScenes();
+      syncSceneEditor();
+    };
+    box.appendChild(button);
+  });
+}
 function buildStoryboardFromText(idea,lang,character){
 const beats={
 en:[['Opening','Establish the world and introduce '+character+'.'],['Inciting incident','A surprising event interrupts the ordinary moment.'],['Attempt and obstacle',character+' takes action, but a new obstacle makes the goal harder.'],['Climax','The biggest choice or action changes the outcome.'],['Resolution','Show the consequence, emotional payoff, and a clear final image.']],
