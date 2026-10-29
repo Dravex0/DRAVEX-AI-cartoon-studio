@@ -1,0 +1,104 @@
+name: DRAVEX CI / Unit & QA Tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify required project files
+        run: |
+          test -f index.html
+          test -f package.json
+          test -f src/scene-model.js
+          test -f src/story-qa.js
+          test -f tests/story-qa.test.js
+
+      - name: Validate JavaScript syntax
+        id: syntax_check
+        run: npm run check
+
+      - name: Run unit and QA tests
+        id: run_tests
+        run: npm test
+
+      - name: Build production version
+        id: build
+        run: npm run build
+
+      - name: Generate ChatGPT review packet
+        if: always() && github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          SYNTAX_STATUS: ${{ steps.syntax_check.outcome }}
+          TEST_STATUS: ${{ steps.run_tests.outcome }}
+          BUILD_STATUS: ${{ steps.build.outcome }}
+        run: |
+          mkdir -p review-pack
+          if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null &&
+             git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
+            git diff "${BASE_SHA}...${HEAD_SHA}" > review-pack/pr_changes.diff
+          else
+            git diff "origin/${BASE_BRANCH}...HEAD" > review-pack/pr_changes.diff
+          fi
+
+          DIFF_SIZE=$(wc -c < review-pack/pr_changes.diff)
+          cat > review-pack/chatgpt_prompt.md <<'PROMPT'
+          Ты — ведущий QA-архитектор DRAVEX AI Cartoon Studio.
+          Проведи аудит приложенного diff. Не утверждай, что тесты прошли, если это не подтверждено результатами.
+          Проверь обратную совместимость, Android/Canvas/MediaRecorder, платные API и сетевые передачи, граничные случаи, пустые сценарии, паузу плеера и обработку ошибок.
+          Раздели выводы на подтверждённые факты, риски и проверки, требующие реального устройства.
+          Дай вердикт APPROVED или CHANGES_REQUESTED только на основании предоставленных доказательств.
+          PROMPT
+          {
+            echo
+            echo "PR #${PR_NUMBER}: ${PR_TITLE}"
+            echo "Syntax check: ${SYNTAX_STATUS}"
+            echo "Unit tests: ${TEST_STATUS}"
+            echo "Build: ${BUILD_STATUS}"
+            echo "Diff size: ${DIFF_SIZE} bytes"
+            echo
+            echo "Diff is attached separately as pr_changes.diff."
+          } >> review-pack/chatgpt_prompt.md
+
+          {
+            echo "## DRAVEX Review Packet"
+            echo "- PR: #${PR_NUMBER} — ${PR_TITLE}"
+            echo "- Syntax: ${SYNTAX_STATUS}"
+            echo "- Unit tests: ${TEST_STATUS}"
+            echo "- Build: ${BUILD_STATUS}"
+            echo "- Diff size: ${DIFF_SIZE} bytes"
+            echo "- Download the artifact and attach both files to ChatGPT for manual review."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload review packet
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dravex-review-packet
+          path: review-pack/
+          if-no-files-found: warn
+          retention-days: 7
