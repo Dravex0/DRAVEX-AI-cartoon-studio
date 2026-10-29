@@ -181,27 +181,57 @@ function renderScenes(){
     box.appendChild(button);
   });
 }
-function buildStoryboardFromText(idea,lang,character){
+function buildStoryboardFromText(idea,lang='ru',character='Foxy'){
+const locale=['ru','uk','es','en'].includes(lang)?lang:'en';
+const subject=String(character||'').trim()||(locale==='ru'?'Персонаж':locale==='uk'?'Персонаж':locale==='es'?'Personaje':'Character');
+const cleanIdea=String(idea||'').replace(/\\s+/g,' ').trim();
+const sentences=cleanIdea.split(/(?<=[.!?。！？])\\s+/).map(s=>s.trim()).filter(Boolean);
+const fallback={ru:'Новое приключение начинается.',uk:'Починається нова пригода.',es:'Comienza una nueva aventura.',en:'A new adventure begins.'}[locale];
+const source=sentences.length?sentences:[fallback];
 const beats={
-en:[['Opening','Establish the world and introduce '+character+'.'],['Inciting incident','A surprising event interrupts the ordinary moment.'],['Attempt and obstacle',character+' takes action, but a new obstacle makes the goal harder.'],['Climax','The biggest choice or action changes the outcome.'],['Resolution','Show the consequence, emotional payoff, and a clear final image.']],
-ru:[['Завязка','Покажи мир истории и познакомь зрителя с персонажем '+character+'.'],['Событие','Неожиданное событие нарушает привычный ход жизни.'],['Попытка и препятствие',character+' действует, но новая преграда усложняет задачу.'],['Кульминация','Самый важный поступок или выбор меняет исход истории.'],['Развязка','Покажи последствия, эмоцию и запоминающийся финальный кадр.']],
-uk:[['Зав’язка','Покажи світ історії та познайом глядача з персонажем '+character+'.'],['Подія','Несподівана подія порушує звичний перебіг життя.'],['Спроба й перешкода',character+' діє, але нова перешкода ускладнює завдання.'],['Кульмінація','Найважливіший вчинок або вибір змінює результат історії.'],['Розв’язка','Покажи наслідки, емоцію та виразний фінальний кадр.']],
-es:[['Inicio','Presenta el mundo y al personaje '+character+'.'],['Incidente','Un suceso inesperado cambia la situación.'],['Intento y obstáculo',character+' actúa, pero aparece una dificultad nueva.'],['Clímax','La decisión o acción más importante cambia el resultado.'],['Desenlace','Muestra las consecuencias, la emoción y una imagen final memorable.']]
+ru:[
+['Завязка','Покажи место действия и исходное положение героя. Герой осматривается и делает первое заметное движение.'],
+['Событие','Покажи, что меняется: герой замечает или слышит важную деталь и явно реагирует на неё.'],
+['Препятствие','Герой приближается к цели, пробует действовать и сталкивается с конкретным препятствием.'],
+['Кульминация','Покажи самое важное физическое действие, реакцию окружения и заметное последствие.'],
+['Развязка','Покажи результат действия, эмоциональную реакцию героя и новый финальный образ.']],
+uk:[
+['Зав’язка','Покажи місце події та початкове положення героя. Герой озирається й робить перший помітний рух.'],
+['Подія','Покажи зміну: герой помічає або чує важливу деталь і виразно реагує.'],
+['Перешкода','Герой наближається до мети, пробує діяти й стикається з конкретною перешкодою.'],
+['Кульмінація','Покажи головну фізичну дію, реакцію оточення та помітний наслідок.'],
+['Розв’язка','Покажи результат дії, емоційну реакцію героя та новий фінальний образ.']],
+es:[
+['Inicio','Establece el lugar y la posición inicial. El personaje observa el entorno y realiza un primer movimiento visible.'],
+['Incidente','Muestra el cambio: el personaje percibe un detalle importante y reacciona claramente.'],
+['Obstáculo','El personaje se acerca a su objetivo, intenta actuar y encuentra un obstáculo concreto.'],
+['Clímax','Muestra la acción física principal, la reacción del entorno y una consecuencia visible.'],
+['Desenlace','Muestra el resultado, la reacción emocional y una imagen final nueva.']],
+en:[
+['Introduction','Establish the location and starting position. The character scans the surroundings and makes a clear first movement.'],
+['Inciting event','Show what changes: the character notices or hears an important detail and visibly reacts.'],
+['Obstacle','The character moves toward the goal, tries an action, and meets a concrete obstacle.'],
+['Climax','Show the main physical action, the environment reacting, and a visible consequence.'],
+['Resolution','Show the result, the character’s emotional reaction, and a distinct final image.']]
 };
-const b=beats[lang]||beats.en;
-const sentences=idea.split(/(?<=[.!?。！？])\s+/).map(s=>s.trim()).filter(Boolean);
-const premise=sentences.join(' ');
-const compact=premise.length>210?premise.slice(0,207)+'…':premise;
-const actionWords=/(find|discovers?|meet|save|rescue|escape|journey|fight|help|lost|magic|star|dragon|monster|friend|люб|наход|обнаруж|встреч|спас|помог|потер|волшеб|звезд|драк|монстр|путеше|бор|укра|злод|друг|знай|зустр|рят|допом|втра|чарів|зірк|дракон|подорож|бороть|друг|encuent|descubr|salv|ayud|perdid|mágic|estrella|dragón|viaj|lucha|amig)/i;
-const event=actionWords.test(premise)?(lang==='ru'?'История развивается по заданной идее: '+compact:lang==='uk'?'Історія розвивається за заданою ідеєю: '+compact:lang==='es'?'La historia sigue la idea propuesta: '+compact:'Continue the specific story premise: '+compact):(lang==='ru'?'Сохрани исходную идею и покажи событие, которое запускает действие: '+compact:lang==='uk'?'Збережи початкову ідею та покажи подію, що запускає дію: '+compact:lang==='es'?'Conserva la idea original y muestra el suceso que inicia la acción: '+compact:'Preserve the original premise and show the event that starts the action: '+compact);
-const titlesOut=b.map((x,i)=>x[0]);
-const descriptionsOut=[
-(lang==='ru'?'Установочный кадр: ':lang==='uk'?'Вступний кадр: ':lang==='es'?'Plano de apertura: ':'Opening shot: ')+b[0][1]+' '+compact,
-b[1][1]+' '+event,
-b[2][1]+' '+(lang==='ru'?'Покажи реакцию персонажа и конкретное действие, а не повторяй предыдущий кадр.':lang==='uk'?'Покажи реакцію персонажа й конкретну дію, а не повторюй попередній кадр.':lang==='es'?'Muestra una reacción y una acción concreta, no repitas el plano anterior.':'Show a visible reaction and a concrete action; do not repeat the previous shot.'),
-b[3][1]+' '+(lang==='ru'?'Используй самый выразительный ракурс и действие с наибольшими последствиями.':lang==='uk'?'Використай найвиразніший ракурс і дію з найбільшими наслідками.':lang==='es'?'Usa el encuadre más expresivo y la acción con mayores consecuencias.':'Use the most expressive framing and the action with the greatest consequence.'),
-b[4][1]+' '+(lang==='ru'?'Заверши историю визуальным результатом, который связан с начальной идеей.':lang==='uk'?'Заверши історію візуальним результатом, пов’язаним із початковою ідеєю.':lang==='es'?'Cierra la historia con un resultado visual conectado con la idea inicial.':'End with a visual payoff connected to the original premise.')
-];
+const beatsForLocale=beats[locale]||beats.en;
+const titlesOut=[],descriptionsOut=[];
+for(let idx=0;idx<5;idx++){
+ const beat=beatsForLocale[idx];
+ const sentenceIndex=source.length===1?0:Math.round(idx*(source.length-1)/4);
+ const sourceLine=source[sentenceIndex];
+ const continuity=idx===0
+  ?({ru:'Начни с общего плана.',uk:'Почни із загального плану.',es:'Empieza con un plano general.',en:'Begin with a wide establishing shot.'}[locale])
+  :idx===1
+  ?({ru:'Перейди к среднему плану и покажи реакцию.',uk:'Перейди до середнього плану й покажи реакцію.',es:'Pasa a un plano medio y muestra la reacción.',en:'Cut to a medium shot and show the reaction.'}[locale])
+  :idx===2
+  ?({ru:'Используй движение камеры вслед за героем.',uk:'Використай рух камери за героєм.',es:'Mueve la cámara siguiendo al personaje.',en:'Track the character with the camera.'}[locale])
+  :idx===3
+  ?({ru:'Используй крупный план действия и покажи его последствия.',uk:'Використай крупний план дії та покажи її наслідки.',es:'Usa un primer plano de la acción y muestra sus consecuencias.',en:'Use a close-up of the action and show its consequence.'}[locale])
+  :({ru:'Заверши отдельным спокойным кадром, не копируя кульминацию.',uk:'Заверши окремим спокійним кадром, не копіюючи кульмінацію.',es:'Termina con un plano tranquilo distinto, sin repetir el clímax.',en:'Finish on a distinct, quieter shot rather than repeating the climax.'}[locale]);
+ titlesOut.push(beat[0]);
+ descriptionsOut.push(beat[1]+' '+continuity+' '+sourceLine);
+}
 return {titles:titlesOut,descriptions:descriptionsOut};
 }
 $('make').addEventListener('click',()=>{const status=$('status');try{const idea=$('idea').value.trim();if(!idea){status.textContent=tr('emptyIdea');$('idea').focus();return}const lang=storyLanguage();const plan=buildStoryboardFromText(idea,lang,$('character').value.trim()||(lang==='ru'?'Главный герой':'Foxy'));titles=plan.titles;descriptions=plan.descriptions;sceneIndex=0;$('sceneLabel').textContent=(storyLabels[lang]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();updateStoryQA();status.textContent=uiLang==='ru'?'Создана 5-сценная сюжетная раскадровка. Это локальный планировщик, не ИИ-генерация; проверь и отредактируй каждую сцену.':'Created a five-beat story outline locally. This is not AI generation yet; review and edit each scene.';status.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(error){console.error('DRAVEX storyboard error:',error);status.textContent=(uiLang==='ru'?'Не удалось создать сцены. Обнови страницу и попробуй ещё раз.':'Could not create scenes. Refresh the page and try again.')+' ('+(error&&error.message?error.message:'unknown error')+')';}});
