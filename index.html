@@ -157,7 +157,12 @@ function renderScenes(){
     heading.textContent=tr('sceneLabel')+' '+(i+1)+' · '+String(title??'');
     const description=document.createElement('small');
     description.textContent=String(descriptions[i]??'');
-    content.append(heading,description);
+    const actionLabel=document.createElement('small');
+    const actionNames={en:{idle:'Action: still moment',run:'Action: running / chase',jump:'Action: jump',float:'Action: floating',vanish:'Action: disappear',magic:'Action: magic effect',sad:'Mood: sad / afraid',happy:'Mood: happy'},ru:{idle:'Действие: спокойный момент',run:'Действие: бег / погоня',jump:'Действие: прыжок',float:'Действие: парение',vanish:'Действие: исчезновение',magic:'Действие: магический эффект',sad:'Эмоция: грусть / страх',happy:'Эмоция: радость'},uk:{idle:'Дія: спокійний момент',run:'Дія: біг / погоня',jump:'Дія: стрибок',float:'Дія: ширяння',vanish:'Дія: зникнення',magic:'Дія: магічний ефект',sad:'Емоція: сум / страх',happy:'Емоція: радість'},es:{idle:'Acción: momento tranquilo',run:'Acción: correr / perseguir',jump:'Acción: saltar',float:'Acción: flotar',vanish:'Acción: desaparecer',magic:'Acción: efecto mágico',sad:'Emoción: tristeza / miedo',happy:'Emoción: alegría'}};
+    const actionLanguage=actionNames[storyLanguage()]||actionNames.en;
+    actionLabel.textContent=actionLanguage[getSceneAction(i)]||actionLanguage.idle;
+    actionLabel.style.opacity='.78';
+    content.append(heading,description,actionLabel);
 
     const arrow=document.createElement('span');
     arrow.setAttribute('aria-hidden','true');
