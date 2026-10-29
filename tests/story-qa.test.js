@@ -50,6 +50,20 @@ test('flags repeated non-adjacent actions even when visual prompts differ', () =
   ]);
   assert.ok(result.issues.some((entry) => entry.code === 'repeated-content' && entry.sceneId === 'action-c' && entry.otherSceneId === 'action-a'));
 });
+test('flags repeated adjacent camera framing when shot descriptions use different wording', () => {
+  const result = validateStoryScenes([
+    { id: 'close-a', duration: 3, prompt: 'Aster notices a silver symbol.', motion: 'His fingers tremble.', camera: 'Close-up on his hand' },
+    { id: 'close-b', duration: 3, prompt: 'Aster looks toward the doorway.', motion: 'His eyes shift left.', camera: 'Slow close up, slight push-in' }
+  ]);
+  assert.ok(result.issues.some((entry) => entry.code === 'camera-shot-repeat' && entry.sceneId === 'close-b' && entry.otherSceneId === 'close-a'));
+});
+test('does not treat extreme close-up and macro close-up as the same shot size', () => {
+  const result = validateStoryScenes([
+    { id: 'macro', duration: 3, prompt: 'A mark glows.', motion: 'Silver cracks spread.', camera: 'Macro close-up' },
+    { id: 'extreme', duration: 3, prompt: 'Aster reacts.', motion: 'His iris darkens.', camera: 'Extreme close-up' }
+  ]);
+  assert.equal(result.issues.some((entry) => entry.code === 'camera-shot-repeat'), false);
+});
 test('normalizes invalid duration and reports correction', () => {
   const result = validateStoryScenes([{ id: 'too-long', duration: 60, prompt: 'A bird flies over a lake.' }]);
   assert.equal(result.totalDurationSeconds, 3); assert.ok(result.issues.some((entry) => entry.code === 'duration-normalized'));
