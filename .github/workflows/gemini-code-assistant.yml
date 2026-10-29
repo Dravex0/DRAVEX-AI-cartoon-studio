@@ -85,7 +85,7 @@ jobs:
               except (ValueError, AttributeError):
                   message = "No readable API error details returned"
               message = message.replace(api_key, "[REDACTED]")[:500]
-              message = re.sub(r"https?://\\S+", "[URL REDACTED]", message)
+              message = re.sub(r"https?://\S+", "[URL REDACTED]", message)
               raise SystemExit(f"Gemini API request failed: model={model}, HTTP {exc.code}; {message}")
           except (urllib.error.URLError, TimeoutError, ValueError, RuntimeError) as exc:
               raise SystemExit(f"Gemini proposal failed: {type(exc).__name__}. Check network, API response, and quota.")
