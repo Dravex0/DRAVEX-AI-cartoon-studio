@@ -202,8 +202,8 @@ function renderScenes(){
 function buildStoryboardFromText(idea,lang='ru',character='Foxy'){
 const locale=['ru','uk','es','en'].includes(lang)?lang:'en';
 const subject=String(character||'').trim()||(locale==='ru'?'Персонаж':locale==='uk'?'Персонаж':locale==='es'?'Personaje':'Character');
-const cleanIdea=String(idea||'').replace(/\\s+/g,' ').trim();
-const sentences=cleanIdea.split(/(?<=[.!?。！？])\\s+/).map(s=>s.trim()).filter(Boolean);
+const cleanIdea=String(idea||'').replace(/\s+/g,' ').trim();
+const sentences=cleanIdea.split(/(?<=[.!?。！？])\s+/).map(s=>s.trim()).filter(Boolean);
 const fallback={ru:'Новое приключение начинается.',uk:'Починається нова пригода.',es:'Comienza una nueva aventura.',en:'A new adventure begins.'}[locale];
 const source=sentences.length?sentences:[fallback];
 const beats={
