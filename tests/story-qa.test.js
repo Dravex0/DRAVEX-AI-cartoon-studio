@@ -41,6 +41,15 @@ test('flags repeated adjacent actions even when visual prompts differ', () => {
   ]);
   assert.ok(result.issues.some((entry) => entry.code === 'adjacent-repeat' && entry.sceneId === 'action-b' && entry.otherSceneId === 'action-a'));
 });
+test('flags repeated non-adjacent actions even when visual prompts differ', () => {
+  const visibleAction = 'Aster slowly turns his head toward the doorway.';
+  const result = validateStoryScenes([
+    { id: 'action-a', duration: 3, prompt: 'Moonlight spills across the ancient cathedral columns.', visibleAction },
+    { id: 'action-b', duration: 3, prompt: 'Aster touches the glowing symbol and pulls his hand away.', visibleAction: 'Aster kneels and touches the symbol.' },
+    { id: 'action-c', duration: 3, prompt: 'Blue magical sparks illuminate the ruined stone floor.', visibleAction }
+  ]);
+  assert.ok(result.issues.some((entry) => entry.code === 'repeated-content' && entry.sceneId === 'action-c' && entry.otherSceneId === 'action-a'));
+});
 test('normalizes invalid duration and reports correction', () => {
   const result = validateStoryScenes([{ id: 'too-long', duration: 60, prompt: 'A bird flies over a lake.' }]);
   assert.equal(result.totalDurationSeconds, 3); assert.ok(result.issues.some((entry) => entry.code === 'duration-normalized'));
