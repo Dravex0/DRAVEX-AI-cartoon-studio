@@ -59,7 +59,9 @@ function applyLanguage(){document.documentElement.lang=uiLang;$('uiLanguage').va
 $('uiLanguage').addEventListener('change',()=>{uiLang=$('uiLanguage').value;writeLocalStorage('dravex-ui-language',uiLang);applyLanguage()});
 $('style').addEventListener('change',()=>{if(!playing)draw()});
 const canvas=$('canvas'),ctx=canvas.getContext('2d');let frame=0,playing=true,raf=0,sceneIndex=0;let titles=[...translations[uiLang].sceneTitles];let descriptions=[...translations[uiLang].sceneDescriptions];
-function getSceneAction(index){const text=((titles[index]||'')+' '+(descriptions[index]||'')).toLowerCase();const has=pattern=>pattern.test(text);if(has(/исчез|пропад|vanish|disappear|fade out|desaparec/))return 'vanish';if(has(/прыга|jump|salta|подпрыг/))return 'jump';if(has(/беж|побеж|run|chase|corre|гонится/))return 'run';if(has(/лет|парит|взлет|fly|float|вознос|vuela/))return 'float';if(has(/свет|сия|вспыш|маг|glow|shine|flash|magic|brilla|magia/))return 'magic';if(has(/плач|груст|страх|cry|sad|afraid|llora|triste/))return 'sad';if(has(/радост|улыб|счаст|улыба|happy|smile|feliz|sonríe/))return 'happy';return 'idle'}\nclass ParticleEmitter{
+function getSceneAction(index){const text=((titles[index]||'')+' '+(descriptions[index]||'')).toLowerCase();const has=pattern=>pattern.test(text);if(has(/исчез|пропад|vanish|disappear|fade out|desaparec/))return 'vanish';if(has(/прыга|jump|salta|подпрыг/))return 'jump';if(has(/беж|побеж|run|chase|corre|гонится/))return 'run';if(has(/лет|парит|взлет|fly|float|вознос|vuela/))return 'float';if(has(/свет|сия|вспыш|маг|glow|shine|flash|magic|brilla|magia/))return 'magic';if(has(/плач|груст|страх|cry|sad|afraid|llora|triste/))return 'sad';if(has(/радост|улыб|счаст|улыба|happy|smile|feliz|sonríe/))return 'happy';return 'idle';
+}
+class ParticleEmitter {
 constructor(){this.particles=[];this.maxParticles=160}
 emit(x,y,count=5,color='#ffe58a'){
 const amount=Math.max(0,Math.min(Math.floor(count)||0,this.maxParticles-this.particles.length));
@@ -200,8 +202,8 @@ function renderScenes(){
 function buildStoryboardFromText(idea,lang='ru',character='Foxy'){
 const locale=['ru','uk','es','en'].includes(lang)?lang:'en';
 const subject=String(character||'').trim()||(locale==='ru'?'Персонаж':locale==='uk'?'Персонаж':locale==='es'?'Personaje':'Character');
-const cleanIdea=String(idea||'').replace(/\\s+/g,' ').trim();
-const sentences=cleanIdea.split(/(?<=[.!?。！？])\\s+/).map(s=>s.trim()).filter(Boolean);
+const cleanIdea=String(idea||'').replace(/\s+/g,' ').trim();
+const sentences=cleanIdea.split(/(?<=[.!?。！？])\s+/).map(s=>s.trim()).filter(Boolean);
 const fallback={ru:'Новое приключение начинается.',uk:'Починається нова пригода.',es:'Comienza una nueva aventura.',en:'A new adventure begins.'}[locale];
 const source=sentences.length?sentences:[fallback];
 const beats={
@@ -246,7 +248,19 @@ for(let idx=0;idx<5;idx++){
   ?({ru:'Используй крупный план действия и покажи его последствия.',uk:'Використай крупний план дії та покажи її наслідки.',es:'Usa un primer plano de la acción y muestra sus consecuencias.',en:'Use a close-up of the action and show its consequence.'}[locale])
   :({ru:'Заверши отдельным спокойным кадром, не копируя кульминацию.',uk:'Заверши окремим спокійним кадром, не копіюючи кульмінацію.',es:'Termina con un plano tranquilo distinto, sin repetir el clímax.',en:'Finish on a distinct, quieter shot rather than repeating the climax.'}[locale]);
  titlesOut.push(beat[0]);
- descriptionsOut.push(beat[1]+' '+continuity+(idx===0?' '+sourceLine:''));
+ const characterContext={
+  ru:`Главный персонаж: ${subject}.`,
+  uk:`Головний персонаж: ${subject}.`,
+  es:`Personaje principal: ${subject}.`,
+  en:`Main character: ${subject}.`
+ }[locale];
+ const storyContext={
+  ru:`Связь с исходной историей: ${sourceLine}`,
+  uk:`Зв’язок з початковою історією: ${sourceLine}`,
+  es:`Conexión con la historia original: ${sourceLine}`,
+  en:`Story detail to preserve: ${sourceLine}`
+ }[locale];
+ descriptionsOut.push(characterContext+' '+beat[1]+' '+continuity+' '+storyContext);
 }
 return {titles:titlesOut,descriptions:descriptionsOut};
 }
