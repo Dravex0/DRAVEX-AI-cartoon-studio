@@ -91,5 +91,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '🤖 **Предложение Gemini (непроверенный черновик):**\n\n' + body
+              body: '🤖 **Предложение Gemini (непроверенный черновик; код не изменён):**\n\n' + body
             });
