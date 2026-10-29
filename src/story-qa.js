@@ -48,7 +48,12 @@ export function validateStoryScenes(rawScenes) {
     }
     if (index > 0) {
       const previous = scenes[index - 1];
-      const score = similarity(scene.prompt || scene.visibleAction, previous.prompt || previous.visibleAction);
+      // Compare visual descriptions and actions independently so different prose
+      // cannot hide the same repeated action between adjacent scenes.
+      const promptScore = similarity(scene.prompt, previous.prompt);
+      const actionScore = similarity(scene.visibleAction, previous.visibleAction);
+      const fallbackScore = similarity(scene.prompt || scene.visibleAction, previous.prompt || previous.visibleAction);
+      const score = Math.max(promptScore, actionScore, fallbackScore);
       if (score >= 0.78) issues.push(issue('warning', 'adjacent-repeat', scene.id, `This scene is very similar to the previous scene (${Math.round(score * 100)}% token overlap).`, previous.id));
     }
     for (let earlier = 0; earlier < index - 1; earlier++) {
