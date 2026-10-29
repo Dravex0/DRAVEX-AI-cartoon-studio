@@ -59,7 +59,9 @@ function applyLanguage(){document.documentElement.lang=uiLang;$('uiLanguage').va
 $('uiLanguage').addEventListener('change',()=>{uiLang=$('uiLanguage').value;writeLocalStorage('dravex-ui-language',uiLang);applyLanguage()});
 $('style').addEventListener('change',()=>{if(!playing)draw()});
 const canvas=$('canvas'),ctx=canvas.getContext('2d');let frame=0,playing=true,raf=0,sceneIndex=0;let titles=[...translations[uiLang].sceneTitles];let descriptions=[...translations[uiLang].sceneDescriptions];
-function getSceneAction(index){const text=((titles[index]||'')+' '+(descriptions[index]||'')).toLowerCase();const has=pattern=>pattern.test(text);if(has(/исчез|пропад|vanish|disappear|fade out|desaparec/))return 'vanish';if(has(/прыга|jump|salta|подпрыг/))return 'jump';if(has(/беж|побеж|run|chase|corre|гонится/))return 'run';if(has(/лет|парит|взлет|fly|float|вознос|vuela/))return 'float';if(has(/свет|сия|вспыш|маг|glow|shine|flash|magic|brilla|magia/))return 'magic';if(has(/плач|груст|страх|cry|sad|afraid|llora|triste/))return 'sad';if(has(/радост|улыб|счаст|улыба|happy|smile|feliz|sonríe/))return 'happy';return 'idle'}\nclass ParticleEmitter{
+function getSceneAction(index){const text=((titles[index]||'')+' '+(descriptions[index]||'')).toLowerCase();const has=pattern=>pattern.test(text);if(has(/исчез|пропад|vanish|disappear|fade out|desaparec/))return 'vanish';if(has(/прыга|jump|salta|подпрыг/))return 'jump';if(has(/беж|побеж|run|chase|corre|гонится/))return 'run';if(has(/лет|парит|взлет|fly|float|вознос|vuela/))return 'float';if(has(/свет|сия|вспыш|маг|glow|shine|flash|magic|brilla|magia/))return 'magic';if(has(/плач|груст|страх|cry|sad|afraid|llora|triste/))return 'sad';if(has(/радост|улыб|счаст|улыба|happy|smile|feliz|sonríe/))return 'happy';return 'idle';
+}
+class ParticleEmitter {
 constructor(){this.particles=[];this.maxParticles=160}
 emit(x,y,count=5,color='#ffe58a'){
 const amount=Math.max(0,Math.min(Math.floor(count)||0,this.maxParticles-this.particles.length));
