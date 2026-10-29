@@ -248,7 +248,19 @@ for(let idx=0;idx<5;idx++){
   ?({ru:'Используй крупный план действия и покажи его последствия.',uk:'Використай крупний план дії та покажи її наслідки.',es:'Usa un primer plano de la acción y muestra sus consecuencias.',en:'Use a close-up of the action and show its consequence.'}[locale])
   :({ru:'Заверши отдельным спокойным кадром, не копируя кульминацию.',uk:'Заверши окремим спокійним кадром, не копіюючи кульмінацію.',es:'Termina con un plano tranquilo distinto, sin repetir el clímax.',en:'Finish on a distinct, quieter shot rather than repeating the climax.'}[locale]);
  titlesOut.push(beat[0]);
- descriptionsOut.push(beat[1]+' '+continuity+(idx===0?' '+sourceLine:''));
+ const characterContext={
+  ru:`Главный персонаж: ${subject}.`,
+  uk:`Головний персонаж: ${subject}.`,
+  es:`Personaje principal: ${subject}.`,
+  en:`Main character: ${subject}.`
+ }[locale];
+ const storyContext={
+  ru:`Связь с исходной историей: ${sourceLine}`,
+  uk:`Зв’язок з початковою історією: ${sourceLine}`,
+  es:`Conexión con la historia original: ${sourceLine}`,
+  en:`Story detail to preserve: ${sourceLine}`
+ }[locale];
+ descriptionsOut.push(characterContext+' '+beat[1]+' '+continuity+' '+storyContext);
 }
 return {titles:titlesOut,descriptions:descriptionsOut};
 }
