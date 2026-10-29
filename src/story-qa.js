@@ -13,6 +13,17 @@ function similarity(left, right) {
   let overlap = 0; for (const token of a) if (b.has(token)) overlap++;
   return overlap / (a.size + b.size - overlap);
 }
+function cameraShotType(camera) {
+  const value = String(camera ?? '').toLowerCase();
+  if (/extreme close|extreme close-up|ecu/.test(value)) return 'extreme-close-up';
+  if (/\bmacro\b|\bclose[- ]?up\b|\bclose shot\b/.test(value)) return 'close-up';
+  if (/\bwide\b|establishing shot/.test(value)) return 'wide';
+  if (/\bmedium\b|\bmid shot\b/.test(value)) return 'medium';
+  if (/over[- ]the[- ]shoulder|over-shoulder|\bots\b/.test(value)) return 'over-shoulder';
+  if (/\bpoint of view\b|\bpov\b/.test(value)) return 'point-of-view';
+  if (/\baerial\b|\bdrone shot\b/.test(value)) return 'aerial';
+  return '';
+}
 function issue(severity, code, sceneId, message, otherSceneId) {
   return { severity, code, sceneId, ...(otherSceneId ? { otherSceneId } : {}), message };
 }
@@ -53,6 +64,11 @@ export function validateStoryScenes(rawScenes) {
       const fallbackScore = similarity(scene.prompt || scene.visibleAction, previous.prompt || previous.visibleAction);
       const score = Math.max(promptScore, actionScore, fallbackScore);
       if (score >= 0.78) issues.push(issue('warning', 'adjacent-repeat', scene.id, `This scene is very similar to the previous scene (${Math.round(score * 100)}% token overlap).`, previous.id));
+      const currentShot = cameraShotType(scene.camera);
+      const previousShot = cameraShotType(previous.camera);
+      if (currentShot && currentShot === previousShot) {
+        issues.push(issue('info', 'camera-shot-repeat', scene.id, `The ${currentShot.replaceAll('-', ' ')} framing repeats the previous scene; consider changing shot size or angle.`, previous.id));
+      }
     }
     for (let earlier = 0; earlier < index - 1; earlier++) {
       const prior = scenes[earlier];
