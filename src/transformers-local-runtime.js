@@ -81,13 +81,13 @@ export function createLocalTransformersRuntime({
         const capabilities = await detectDeviceCapabilities(environment);
         assertNotAborted(signal);
         const selectedBackend = backend === 'auto'
-          ? (capabilities.adapterAvailable ? 'webgpu' : 'wasm')
+          ? (capabilities.secureContext && capabilities.adapterAvailable ? 'webgpu' : 'wasm')
           : backend;
         if (!['webgpu', 'wasm'].includes(selectedBackend)) {
           throw new TypeError('Backend must be auto, webgpu, or wasm.');
         }
-        if (selectedBackend === 'webgpu' && !capabilities.adapterAvailable) {
-          throw new Error('WebGPU is not available on this device. Choose the WASM backend.');
+        if (selectedBackend === 'webgpu' && (!capabilities.secureContext || !capabilities.adapterAvailable)) {
+          throw new Error('WebGPU requires a secure context and a compatible adapter. Choose the WASM backend.');
         }
         if (selectedBackend === 'wasm' && !capabilities.wasmAvailable) {
           throw new Error('WebAssembly is unavailable in this browser.');
