@@ -86,6 +86,62 @@ test('rejects a local director candidate that breaks scene-to-scene state contin
   assert.deepEqual(result.scenes, basePlan.scenes);
 });
 
+
+test('locks multiple assigned characters and evaluates their visual reference profiles', async () => {
+  const multiCharacterPlan = {
+    ...basePlan,
+    scenes: basePlan.scenes.map((scene, index) => ({
+      ...scene,
+      characters: index < 2 ? ['Foxy'] : ['Foxy', 'Bird']
+    }))
+  };
+  const characterBible = [
+    { characterId: 'Foxy', visualDescription: 'Small orange fox with amber eyes', clothing: 'Blue scarf', colors: 'Orange and cream', distinctiveFeatures: 'White tail tip' },
+    { characterId: 'Bird', visualDescription: 'Tiny blue songbird', clothing: 'None', colors: 'Blue and yellow', distinctiveFeatures: 'Golden chest' }
+  ];
+  let capturedPrompt = '';
+  const runtime = runtimeReturning(goodScenes, {
+    generate: async prompt => {
+      capturedPrompt = prompt;
+      return { text: JSON.stringify({ scenes: goodScenes }), modelId: 'mock-local-model', backend: 'wasm' };
+    }
+  });
+  const result = await directStoryboardWithLocalAI({
+    runtime,
+    basePlan: multiCharacterPlan,
+    character: 'Foxy',
+    characterBible
+  });
+  assert.equal(result.usedLocalModel, true);
+  assert.deepEqual(result.scenes[2].characters, ['Foxy', 'Bird']);
+  assert.equal(result.evaluation.metrics.characterReferenceCoverage, 100);
+  assert.ok(capturedPrompt.includes('Tiny blue songbird'));
+  assert.ok(capturedPrompt.includes('White tail tip'));
+  assert.ok(capturedPrompt.includes('"assignedCharacters":["Foxy","Bird"]'));
+});
+
+test('rejects multi-character direction when an assigned character has no reference profile', async () => {
+  const multiCharacterPlan = {
+    ...basePlan,
+    scenes: basePlan.scenes.map((scene, index) => ({
+      ...scene,
+      characters: index === 2 ? ['Foxy', 'Bird'] : ['Foxy']
+    }))
+  };
+  const result = await directStoryboardWithLocalAI({
+    runtime: runtimeReturning(goodScenes),
+    basePlan: multiCharacterPlan,
+    character: 'Foxy',
+    characterBible: [{ characterId: 'Foxy', visualDescription: 'Orange fox' }]
+  });
+  assert.equal(result.usedLocalModel, false);
+  assert.equal(result.fallbackReason, 'candidate-failed-story-quality-gate');
+  assert.ok(result.evaluation.continuityReport.issues.some(issue =>
+    issue.code === 'character-reference-missing' && issue.characterId === 'Bird'
+  ));
+  assert.deepEqual(result.scenes, multiCharacterPlan.scenes);
+});
+
 test('rejects a candidate that omits production-ready image or motion prompts', async () => {
   const incomplete = goodScenes.map(scene => ({ ...scene, imagePrompt: '', motionPrompt: '' }));
   const result = await directStoryboardWithLocalAI({ runtime: runtimeReturning(incomplete), basePlan });
