@@ -86,3 +86,39 @@ export function getSceneObjectHandoffs(scene = {}, timeSeconds = 0) {
   }
   return results;
 }
+
+
+/**
+ * Scene-local arm pose for explicit character interactions.
+ * Angles follow the Canvas renderer convention: 0 points down, +90 right.
+ */
+export function getSceneCharacterGesturePose(scene = {}, timeSeconds = 0, characterId = '') {
+  scene = scene && typeof scene === 'object' && !Array.isArray(scene) ? scene : {};
+  const id = clean(characterId);
+  const pose = { leftArm: 0, rightArm: 0, active: false, interaction: '' };
+  const time = Number.isFinite(Number(timeSeconds)) ? Math.max(0, Number(timeSeconds)) : 0;
+  for (const event of Array.isArray(scene.interactions) ? scene.interactions : []) {
+    if (!event || !Array.isArray(event.participants)) continue;
+    const participantIndex = event.participants.map(clean).indexOf(id);
+    if (!id || participantIndex < 0) continue;
+    const start = Number(event.startSeconds ?? event.start);
+    const end = Number(event.endSeconds ?? event.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || time < start || time > end) continue;
+    const progress = clamp((time - start) / (end - start), 0, 1);
+    const eased = progress * progress * (3 - 2 * progress);
+    const reach = participantIndex === 0 ? 1 : Math.max(0, Math.min(1, (progress - 0.35) / 0.55));
+    const angle = 82 * (participantIndex === 0 ? eased : reach);
+    if (['gesture_to', 'give_object', 'receive_object', 'touch'].includes(event.type)) {
+      if (participantIndex === 0) pose.rightArm = angle;
+      else pose.leftArm = -angle;
+      pose.active = true;
+      pose.interaction = event.type;
+    } else if (event.type === 'react_to') {
+      pose.leftArm = -58 * eased;
+      pose.rightArm = 58 * eased;
+      pose.active = true;
+      pose.interaction = event.type;
+    }
+  }
+  return pose;
+}
