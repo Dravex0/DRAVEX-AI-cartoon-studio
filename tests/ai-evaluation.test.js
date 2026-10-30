@@ -196,3 +196,32 @@ test('rejects state changes with invented source evidence or broken previous-sta
   assert.equal(report.metrics.stateChangeIntegrity, 50);
   assert.ok(report.issues.some(issue => issue.code === 'invalid-scene-state-change'));
 });
+
+
+test('flags an omitted causal link when the source explicitly states a consequence', () => {
+  const result = evaluateStoryboard({
+    scenes: [
+      { id: 'scene_1', storyDetail: 'The bridge collapses.', visibleAction: 'The bridge breaks apart and falls into the river.', camera: 'Wide shot.' },
+      { id: 'scene_2', storyDetail: 'As a result, the travelers take the forest path.', visibleAction: 'The travelers turn away from the river and enter the forest path.', camera: 'Tracking shot.' }
+    ],
+    expectedSceneCount: 2
+  });
+  assert.equal(result.metrics.causalIntegrity, 0);
+  assert.ok(result.issues.some(issue => issue.code === 'invalid-causal-link'));
+});
+
+test('rejects a fabricated causal link when the source has no explicit consequence marker', () => {
+  const result = evaluateStoryboard({
+    scenes: [
+      { id: 'scene_1', storyDetail: 'The bridge collapses.', visibleAction: 'The bridge breaks apart and falls into the river.', camera: 'Wide shot.' },
+      { id: 'scene_2', storyDetail: 'The travelers enter the forest.', visibleAction: 'The travelers enter the forest path.', camera: 'Tracking shot.', causalLink: {
+        type: 'consequence', causeSceneId: 'scene_1', effectSceneId: 'scene_2',
+        marker: 'Therefore', causeEvidence: 'The bridge collapses.',
+        evidence: 'The travelers enter the forest.'
+      } }
+    ],
+    expectedSceneCount: 2
+  });
+  assert.equal(result.metrics.causalIntegrity, 0);
+  assert.ok(result.issues.some(issue => issue.code === 'invalid-causal-link'));
+});
