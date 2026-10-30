@@ -53,3 +53,19 @@ test('ignores assignments belonging to deleted scenes or removed dialogue lines'
   assert.deepEqual([...mapped.keys()], ['0:active-line']);
   assert.equal(mapped.get('0:active-line'), activeFile);
 });
+
+
+test('prunes audio files after a scene or dialogue line is removed', async () => {
+  const { getDialogueAudioAssignmentKey, pruneDialogueAudioAssignments } = await import('../src/dialogue-audio-assets.js');
+  const keep = { name: 'keep.wav' };
+  const remove = { name: 'remove.wav' };
+  const assignments = new Map([
+    [getDialogueAudioAssignmentKey('scene-a', 'line-a'), keep],
+    [getDialogueAudioAssignmentKey('scene-b', 'line-b'), remove]
+  ]);
+  const remaining = pruneDialogueAudioAssignments(assignments, [
+    { id: 'scene-a', dialogueTimeline: [{ id: 'line-a' }] }
+  ]);
+  assert.deepEqual([...remaining.keys()], [getDialogueAudioAssignmentKey('scene-a', 'line-a')]);
+  assert.equal(remaining.get(getDialogueAudioAssignmentKey('scene-a', 'line-a')), keep);
+});
