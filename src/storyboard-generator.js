@@ -95,16 +95,23 @@ function inferSceneInteractions(sceneText, characters) {
   const source = String(sceneText ?? '').toLocaleLowerCase();
   const participants = characters.slice(0, 2);
   let type = 'look_at';
-  if (/(?:подход|приближа|ид[её]т к|approach|walks? toward)/iu.test(source)) type = 'approach';
+  let objectDescription = '';
+  const handoff = /(?:переда[её]т|передал|передала|да[её]т|дал|дала|отда[её]т|отдал|отдала|вручает|вручил|вручила|hands?\s+over|passes?\s+to|gives?\s+to)/iu.test(source);
+  const quotedObject = source.match(/[«“"]([^»”"]{1,60})[»”"]/u);
+  if (handoff) {
+    type = 'give_object';
+    objectDescription = quotedObject?.[1]?.trim() || '';
+  } else if (/(?:подход|приближа|ид[её]т к|approach|walks? toward)/iu.test(source)) type = 'approach';
   else if (/(?:отступ|уход|убега|move away|walks? away)/iu.test(source)) type = 'move_away';
   else if (/(?:говорит|сказал|сказала|ответил|ответила|спросил|спросила|диалог|говорят|says?|said|replies?|asks?|dialogue)/iu.test(source) || /[«“"][^»”"]{2,}[»”"]/u.test(source)) type = 'talk_to';
   return [{
     id: 'interaction_1',
     type,
     participants,
+    ...(objectDescription ? { objectDescription } : {}),
     startSeconds: 0.2,
     endSeconds: 2.8,
-    description: type === 'talk_to' ? 'The characters face each other during dialogue.' : type === 'approach' ? 'The first character gradually approaches the second.' : type === 'move_away' ? 'The first character gradually moves away from the second.' : 'The characters notice and look toward each other.'
+    description: type === 'give_object' ? 'The first character hands the explicitly described object to the second.' : type === 'talk_to' ? 'The characters face each other during dialogue.' : type === 'approach' ? 'The first character gradually approaches the second.' : type === 'move_away' ? 'The first character gradually moves away from the second.' : 'The characters notice and look toward each other.'
   }];
 }
 
