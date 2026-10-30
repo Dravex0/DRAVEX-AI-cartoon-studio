@@ -135,6 +135,40 @@ export function evaluateStoryboard({
     });
   }
 
+  const stateChangeScenes = scenes.filter(scene => scene.stateChanges.length);
+  const stateChangeCount = stateChangeScenes.reduce((sum, scene) => sum + scene.stateChanges.length, 0);
+  let stateChangeIntegrity = null;
+  if (stateChangeCount) {
+    const knownStates = new Map();
+    let validStateChanges = 0;
+    for (const scene of scenes) {
+      for (const change of scene.stateChanges) {
+        const actor = String(change.actorId ?? '').toLocaleLowerCase();
+        const cast = scene.characters.map(name => name.toLocaleLowerCase());
+        const key = String(change.entityType) + ':' + String(change.entityId).toLocaleLowerCase() + ':' + String(change.property);
+        const previousMatches = knownStates.has(key)
+          ? change.previousValue === knownStates.get(key)
+          : change.previousValue === null;
+        const validShape = ['prop', 'character'].includes(change.entityType)
+          && Boolean(change.entityId && change.property && actor && change.evidence)
+          && cast.includes(actor)
+          && scene.storyDetail.includes(change.evidence)
+          && (change.entityType !== 'prop' || ['holder', 'openState'].includes(change.property))
+          && (change.property !== 'openState' || ['open', 'closed'].includes(change.value))
+          && (change.property !== 'location' || /^(inside|outside):/u.test(String(change.value ?? '')))
+          && (change.property !== 'holder' || change.value === null || cast.includes(String(change.value).toLocaleLowerCase()));
+        if (validShape && previousMatches) validStateChanges += 1;
+        else issues.push({
+          skill: 'scene-state',
+          code: 'invalid-scene-state-change',
+          message: 'A scene state change has unsupported evidence, actor, value, or previous-state hand-off.'
+        });
+        if (validShape) knownStates.set(key, change.value);
+      }
+    }
+    stateChangeIntegrity = percentage(validStateChanges, stateChangeCount);
+  }
+
   const interactionScenes = scenes.filter(scene => scene.interaction);
   let interactionIntegrity = null;
   if (interactionScenes.length) {
@@ -186,6 +220,7 @@ export function evaluateStoryboard({
     characterConsistency,
     interactionIntegrity,
     causalIntegrity,
+    stateChangeIntegrity,
     productionCompleteness,
     stateCoverage: continuityReport?.metrics.stateCoverage ?? null,
     stateTransitionConsistency: continuityReport?.metrics.stateTransitionConsistency ?? null,

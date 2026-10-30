@@ -26,3 +26,10 @@ test('local AI director receives and preserves the saved character bible', () =>
   assert.match(html, /function ensureMainCharacterReference\(character\)/);
   assert.doesNotMatch(html, /characterBible=upsertCharacterReference\(\[\],\s*\{characterId:character\}\)/);
 });
+
+test('published page wires source-grounded state changes into storyboard scenes and local AI', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /from ["']\.\/src\/scene-state-changes\.js["']/);
+  assert.match(html, /inferStoryboardStateChanges\(preparedScenes,lang,character\)/);
+  assert.match(html, /inferStoryboardStateChanges\(castScenes,language,character\)/);
+});

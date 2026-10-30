@@ -164,3 +164,35 @@ test('rejects causal links that cite unsupported source evidence', () => {
   assert.equal(result.metrics.causalIntegrity, 0);
   assert.ok(result.issues.some(issue => issue.code === 'invalid-causal-link'));
 });
+
+test('accepts source-grounded character and prop state changes with consistent hand-off', () => {
+  const report = evaluateStoryboard({
+    scenes: [
+      { id: 's1', storyDetail: 'Foxy picks up the silver key.', characters: ['Foxy'], visibleAction: 'Foxy bends down and lifts the silver key from the moss.', camera: 'Low close-up.', stateChanges: [
+        { entityType: 'prop', entityId: 'silver key', property: 'holder', previousValue: null, value: 'Foxy', actorId: 'Foxy', evidence: 'Foxy picks up the silver key.' }
+      ] },
+      { id: 's2', storyDetail: 'Foxy drops the silver key.', characters: ['Foxy'], visibleAction: 'Foxy releases the silver key onto the stone path.', camera: 'Side medium shot.', stateChanges: [
+        { entityType: 'prop', entityId: 'silver key', property: 'holder', previousValue: 'Foxy', value: null, actorId: 'Foxy', evidence: 'Foxy drops the silver key.' }
+      ] }
+    ],
+    expectedSceneCount: 2
+  });
+  assert.equal(report.metrics.stateChangeIntegrity, 100);
+  assert.equal(report.issues.some(issue => issue.code === 'invalid-scene-state-change'), false);
+});
+
+test('rejects state changes with invented source evidence or broken previous-state hand-off', () => {
+  const report = evaluateStoryboard({
+    scenes: [
+      { id: 's1', storyDetail: 'Foxy picks up the silver key.', characters: ['Foxy'], visibleAction: 'Foxy lifts the silver key from the ground.', camera: 'Low close-up.', stateChanges: [
+        { entityType: 'prop', entityId: 'silver key', property: 'holder', previousValue: null, value: 'Foxy', actorId: 'Foxy', evidence: 'Foxy picks up the silver key.' }
+      ] },
+      { id: 's2', storyDetail: 'Foxy drops the silver key.', characters: ['Foxy'], visibleAction: 'Foxy drops the silver key onto the path.', camera: 'Side shot.', stateChanges: [
+        { entityType: 'prop', entityId: 'silver key', property: 'holder', previousValue: null, value: null, actorId: 'Foxy', evidence: 'Foxy drops an ancient crown.' }
+      ] }
+    ],
+    expectedSceneCount: 2
+  });
+  assert.equal(report.metrics.stateChangeIntegrity, 50);
+  assert.ok(report.issues.some(issue => issue.code === 'invalid-scene-state-change'));
+});
