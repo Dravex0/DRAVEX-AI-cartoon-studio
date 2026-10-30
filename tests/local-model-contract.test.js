@@ -82,3 +82,13 @@ test('honors cancellation before inference starts', async () => {
   const adapter = createLocalModelAdapter({ manifest, runner: async () => 'never' });
   await assert.rejects(adapter.generate({ task: 'story-planning', prompt: 'hello' }, { signal: controller.signal }), { name: 'AbortError' });
 });
+
+test('rejects path traversal and missing model file checksums', () => {
+  const unsafe = validateLocalModelManifest({
+    ...manifest,
+    files: [{ path: '../private/model.onnx', sizeBytes: 800_000_000, sha256: '' }]
+  });
+  assert.equal(unsafe.valid, false);
+  assert.ok(unsafe.issues.some(issue => issue.code === 'invalid-model-files'));
+  assert.ok(unsafe.issues.some(issue => issue.code === 'invalid-file-checksum'));
+});
