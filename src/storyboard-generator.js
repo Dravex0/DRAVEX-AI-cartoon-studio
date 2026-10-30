@@ -105,6 +105,38 @@ export function inferSceneEmotion(sceneText = '') {
   return 'neutral';
 }
 
+
+/** Build a deterministic, scene-local emotion timeline from sentence order. */
+export function inferSceneEmotionTimeline(sceneText = '', durationSeconds = 3) {
+  const duration = Number.isFinite(Number(durationSeconds)) && Number(durationSeconds) >= 0.25 && Number(durationSeconds) <= 30
+    ? Number(durationSeconds) : 3;
+  const sentences = splitSentences(String(sceneText ?? '').slice(0, 4000));
+  if (!sentences.length) return [{ startSeconds: 0, endSeconds: duration, emotion: 'neutral' }];
+  const sliceDuration = duration / sentences.length;
+  return sentences.map((sentence, index) => ({
+    startSeconds: Number((index * sliceDuration).toFixed(3)),
+    endSeconds: Number(((index + 1) * sliceDuration).toFixed(3)),
+    emotion: inferSceneEmotion(sentence)
+  }));
+}
+
+/** Return the emotion active at a scene-local playback time. */
+export function sampleSceneEmotion(timeline, timeSeconds = 0, fallback = 'neutral') {
+  if (!Array.isArray(timeline) || !timeline.length) return fallback;
+  const time = Number.isFinite(Number(timeSeconds)) ? Math.max(0, Number(timeSeconds)) : 0;
+  const valid = timeline.filter(item =>
+    item && Number.isFinite(Number(item.startSeconds)) &&
+    Number.isFinite(Number(item.endSeconds)) &&
+    Number(item.endSeconds) > Number(item.startSeconds) &&
+    ['neutral', 'happy', 'sad', 'fear', 'anger', 'surprised'].includes(item.emotion)
+  ).sort((a, b) => Number(a.startSeconds) - Number(b.startSeconds));
+  if (!valid.length) return fallback;
+  const active = valid.find(item => time >= Number(item.startSeconds) && time < Number(item.endSeconds));
+  if (active) return active.emotion;
+  if (time >= Number(valid[valid.length - 1].endSeconds)) return valid[valid.length - 1].emotion;
+  return valid[0].emotion;
+}
+
 function inferSceneInteractions(sceneText, characters) {
   if (!Array.isArray(characters) || characters.length < 2) return [];
   const source = String(sceneText ?? '').toLocaleLowerCase();
@@ -227,6 +259,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
       characters,
       interactions: inferSceneInteractions(storyDetail, characters),
       emotion: inferSceneEmotion(storyDetail),
+      emotionTimeline: inferSceneEmotionTimeline(storyDetail, brief.requestedDurationSeconds || 3),
       visibleAction,
       camera,
       imagePrompt,
