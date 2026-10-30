@@ -94,6 +94,7 @@ import { createAudioExportSession } from "./src/audio-export.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./src/scene-production.js";
 import { upsertCharacterReference } from "./src/character-reference.js";
 import { CHARACTER_MOTION_CLIPS, sampleCharacterMotion, resolveCharacterMotionAction } from "./src/character-motion.js";
+import { inferSceneEmotion } from "./src/storyboard-generator.js";
 import { getSceneTransitionProgress } from "./src/scene-transition.js";
 import { getSceneCharacterLayout, getSceneObjectHandoffs, getSceneCharacterGesturePose } from "./src/character-layout.js";
 const translations={
@@ -127,6 +128,7 @@ $('audioVolume').addEventListener('input',()=>{$('audioVolumeValue').textContent
 
 const canvas=$('canvas'),ctx=canvas.getContext('2d');let frame=0,playing=true,raf=0,sceneIndex=0;const transitionCanvas=document.createElement('canvas');transitionCanvas.width=canvas.width;transitionCanvas.height=canvas.height;const transitionCtx=transitionCanvas.getContext('2d');let sceneTransitionStartFrame=0,sceneTransitionActive=false;let sceneMotionSceneIndex=-1,sceneMotionStartFrame=0;let titles=[...translations[uiLang].sceneTitles];let descriptions=[...translations[uiLang].sceneDescriptions];let sceneMetadata=titles.map((title,index)=>({title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''}));let characterBible=[];
 function getSceneAction(index){return detectSceneAction((titles[index]||'')+' '+(descriptions[index]||''));}
+function getSceneEmotion(index){const scene=sceneMetadata[index]||{};return ['neutral','happy','sad','fear','anger','surprised'].includes(scene.emotion)?scene.emotion:inferSceneEmotion((titles[index]||'')+' '+(descriptions[index]||''));}
 class ParticleEmitter {
 constructor(){this.particles=[];this.maxParticles=160}
 emit(x,y,count=5,color='#ffe58a'){
@@ -160,7 +162,7 @@ sceneImageCache.set(key,entry);
 }
 return entry.state==='ready'&&entry.image.naturalWidth>0?entry.image:null;
 }
-function drawAdditionalCharacter(profile,x,y,scale,time,facing,interaction,gesturePose={}){
+function drawAdditionalCharacter(profile,x,y,scale,time,facing,interaction,gesturePose={},emotion='neutral'){
   const description=[profile?.visualDescription,profile?.colors,profile?.distinctiveFeatures].filter(Boolean).join(' ').toLowerCase();
   const rabbit=/(rabbit|bunny|крол|заяц|зайч)/u.test(description);
   const cat=/(cat|кот|кошка)/u.test(description);
@@ -177,6 +179,7 @@ function drawAdditionalCharacter(profile,x,y,scale,time,facing,interaction,gestu
   ctx.fillStyle=light;ctx.beginPath();ctx.ellipse(0,4,25,19,0,0,Math.PI*2);ctx.fill();
   const blink=Math.sin(time*1.7+1.2)>.997?.12:1;ctx.fillStyle='#242033';ctx.beginPath();ctx.ellipse(-10,-5,3.5,5*blink,0,0,Math.PI*2);ctx.ellipse(10,-5,3.5,5*blink,0,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#242033';ctx.beginPath();ctx.arc(0,7,3,0,Math.PI*2);ctx.fill();
+  if(emotion==='anger'){ctx.strokeStyle='#242033';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(-16,-13);ctx.lineTo(-5,-9);ctx.moveTo(5,-9);ctx.lineTo(16,-13);ctx.stroke()}
   ctx.strokeStyle='#242033';ctx.lineWidth=2;ctx.beginPath();if(interaction==='talk_to'||interaction==='gesture_to'){ctx.arc(0,13,4+Math.abs(Math.sin(time*8))*2,0,Math.PI)}else{ctx.moveTo(-4,13);ctx.quadraticCurveTo(0,16,4,13)}ctx.stroke();
   ctx.restore();ctx.restore();
 }
@@ -204,7 +207,7 @@ else if(action==='talk'){fy+=Math.sin(t*5)*2}
 else if(action==='surprised'){fy-=Math.abs(Math.sin(t*2))*5}
 else if(action==='sad'){fy+=Math.abs(Math.sin(t*1.5))*3}
 const toRadians=value=>value*Math.PI/180;
-const expression=['happy','sad','surprised','talk'].includes(action)?action:characterPose.expression;
+const emotion=getSceneEmotion(sceneIndex);const emotionExpression={happy:'happy',sad:'sad',fear:'surprised',anger:'neutral',surprised:'surprised',neutral:'neutral'}[emotion];const expression=['happy','sad','surprised','talk'].includes(action)?action:emotionExpression||characterPose.expression;
 ctx.save();
 ctx.translate(fx,fy);
 ctx.rotate(scenePose[2]+characterPose.rotation*Math.PI/180+(sceneIndex===2?Math.sin(t*1.8)*.04:0)+(action==='dance'?Math.sin(t*3.4)*.2:action==='turn'?Math.sin(t*2)*.5:0));
@@ -232,7 +235,7 @@ else if(expression==='surprised'){ctx.beginPath();ctx.ellipse(17,21,5,8,0,0,Math
 else if(expression==='talk'||expression==='talking'){ctx.beginPath();ctx.ellipse(17,21,4,Math.max(2,3+Math.abs(Math.sin(t*8))*4),0,0,Math.PI*2);ctx.fill()}
 else{ctx.beginPath();ctx.moveTo(11,22);ctx.quadraticCurveTo(17,25,23,22);ctx.stroke()}
 if(expression==='sad'){ctx.fillStyle='rgba(130,220,255,.85)';ctx.beginPath();ctx.ellipse(34,8,3,6,-.25,0,Math.PI*2);ctx.fill()}
-ctx.restore();ctx.restore();for(let characterIndex=1;characterIndex<Math.min(sceneCharacterIds.length,characterLayout.length);characterIndex++){const layout=characterLayout[characterIndex];const profile=characterBible.find(entry=>entry.characterId.toLowerCase()===layout.characterId.toLowerCase())||{};drawAdditionalCharacter(profile,layout.x*w,layout.y*h,.82,t,layout.facing,layout.interaction,getSceneCharacterGesturePose({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration,layout.characterId))}for(const handoff of getSceneObjectHandoffs({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration)){drawSceneObjectHandoff(handoff,t)}ctx.restore();const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
+ctx.restore();ctx.restore();for(let characterIndex=1;characterIndex<Math.min(sceneCharacterIds.length,characterLayout.length);characterIndex++){const layout=characterLayout[characterIndex];const profile=characterBible.find(entry=>entry.characterId.toLowerCase()===layout.characterId.toLowerCase())||{};drawAdditionalCharacter(profile,layout.x*w,layout.y*h,.82,t,layout.facing,layout.interaction,getSceneCharacterGesturePose({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration,layout.characterId),emotion)}for(const handoff of getSceneObjectHandoffs({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration)){drawSceneObjectHandoff(handoff,t)}ctx.restore();const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
 if(generatedFrame){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
 if(sceneTransitionActive){if(playing){const transitionProgress=getSceneTransitionProgress(sceneTransitionStartFrame,frame);if(transitionProgress<1){ctx.save();ctx.globalAlpha=1-transitionProgress;ctx.drawImage(transitionCanvas,0,0,w,h);ctx.restore()}else sceneTransitionActive=false}else sceneTransitionActive=false}
 ctx.fillStyle='#fff';ctx.font='bold 21px system-ui';ctx.fillText($('character').value||'Foxy',24,38);if(playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');magicParticles.updateAndDraw(ctx);if(playing){frame++;raf=requestAnimationFrame(draw)}else{raf=0}}
