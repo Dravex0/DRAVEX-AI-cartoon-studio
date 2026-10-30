@@ -31,6 +31,10 @@ A metric is `null` when the current sample does not provide enough evidence. The
 
 `src/learning-governor.js` compares baseline and candidate benchmark reports skill by skill. A candidate that improves the average but damages a measured skill is blocked. A proposal remains pending until a person explicitly approves it; only an approved proposal can create a version record, and older version records can be selected as rollback targets. This governs evaluation and approval; it does not itself fine-tune or train a neural network.
 
+## Local model integration contract
+
+`src/local-model-contract.js` defines the manifest and adapter boundary for a future WebGPU/WASM model: supported tasks, model files, license, declared local-only behavior, device-fit estimates, cancellation, and structured JSON output. The adapter accepts an injected inference runner; it does not bundle model weights or an inference runtime. The runner is trusted code, so this contract alone cannot prove that a third-party runner never uses the network. No neural model is installed or running yet.
+
 ## Training loop to build next
 
 1. **Collect examples:** user-approved story prompts and corrected storyboards, with private details removed.
