@@ -115,10 +115,12 @@ export async function directStoryboardWithLocalAI({
       stateChanges: base.stateChanges || [],
       visibleAction: clean(scene.visibleAction, 1_000),
       camera: clean(scene.camera, 1_000),
-      imagePrompt: clean(scene.imagePrompt, 4_000) || base.imagePrompt || base.prompt,
-      motionPrompt: clean(scene.motionPrompt, 3_000) || base.motionPrompt,
-      startState: clean(scene.startState, 1_000) || base.startState,
-      endState: clean(scene.endState, 1_000) || base.endState
+      // These four fields are model deliverables. Do not silently fill omissions from
+      // the deterministic baseline, otherwise the production gate cannot detect them.
+      imagePrompt: clean(scene.imagePrompt, 4_000),
+      motionPrompt: clean(scene.motionPrompt, 3_000),
+      startState: clean(scene.startState, 1_000),
+      endState: clean(scene.endState, 1_000)
     };
   }));
 
