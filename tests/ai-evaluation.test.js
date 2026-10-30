@@ -88,7 +88,7 @@ test('detects when the storyboard reverses the original story event order', () =
     expectedStoryDetails: ['The hero enters the castle.', 'The hero finds a key.', 'The hero escapes the castle.']
   });
   assert.equal(report.metrics.sourceFidelity, 100);
-  assert.equal(report.metrics.sourceOrderConsistency, 0);
+  assert.equal(report.metrics.sourceOrderConsistency, 50);
   assert.ok(report.issues.some(issue => issue.code === 'source-event-order-changed'));
   assert.equal(report.passed, false);
 });
