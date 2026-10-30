@@ -26,6 +26,44 @@ The base URL is restricted to loopback or private-network addresses. A normal Gi
 
 This adapter is a tested integration module, not yet wired into the Cartoon Studio UI. No model is bundled, no hosted video service is called, and no video is generated until the user explicitly configures a local workflow and starts a generation request. Hardware requirements depend on the selected ComfyUI model and workflow; Android browser alone is not expected to run large diffusion models.
 
+
+## Recommended starter workflow: Wan2.2 TI2V 5B
+
+The best first local model to evaluate is the official ComfyUI **Wan2.2 TI2V 5B** hybrid template. It supports both text-to-video and image-to-video; ComfyUI's documentation says it should fit on 8 GB VRAM with native offloading. This is a vendor-reported starting point, not a guarantee for every GPU, resolution, frame count or other running applications. The model family is Apache 2.0 licensed. See the [official ComfyUI Wan2.2 guide](https://docs.comfy.org/tutorials/video/wan/wan2_2) and [official workflow template](https://github.com/Comfy-Org/workflow_templates/blob/main/templates/video_wan2_2_5B_ti2v.json).
+
+The current official template uses these node IDs in its editable workflow:
+- Positive prompt: node `6`, input `text`
+- Negative prompt: node `7`, input `text`
+- Source image: node `56`, input `image`
+- Wan image-to-video latent length: node `55`, input `length`
+- Video frame rate: node `57`, input `fps`
+- Save video output: node `58`
+
+The source-image node is disabled in the template by default; enable it with **Ctrl+B** before exporting the workflow in API format. Check the exported API JSON still contains these node IDs and inputs before using the example mapping. ComfyUI template node IDs can change in later revisions.
+
+Example adapter configuration (the `workflow` value must be the API-format JSON exported from your own ComfyUI instance):
+
+```js
+const provider = createComfyUIVideoProvider({
+  baseUrl: 'http://127.0.0.1:8188',
+  workflow: exportedApiWorkflow,
+  nodeBindings: {
+    prompt: { nodeId: '6', input: 'text' },
+    negativePrompt: { nodeId: '7', input: 'text' },
+    image: { nodeId: '56', input: 'image' },
+    frameCount: { nodeId: '55', input: 'length' },
+    fps: { nodeId: '57', input: 'fps' }
+  },
+  outputNodeIds: ['58'],
+  frameCountStep: 8,
+  frameCountOffset: 1
+});
+```
+
+Wan's latent length uses the template's 1 + 8N frame cadence. The adapter's optional `frameCountStep` and `frameCountOffset` settings round requested duration upward to a valid frame count; for this workflow use step 8 and offset 1. Actual clip duration can therefore differ slightly from the requested duration. The `CreateVideo` node's FPS binding controls playback rate.
+
+The 14B Wan2.2 I2V workflow is a higher-compute alternative, not the default starter. LTX-2.5's current ComfyUI guide lists 32 GB+ VRAM and 100 GB+ free disk as prerequisites, so it is not the low-hardware option. Always check the exact model licence, weight downloads, VRAM and custom-node requirements before installation.
+
 ## Privacy and cost
 
 Local inference is intended to keep scene prompts and source images on the user's configured local/private ComfyUI server. Network traffic to that server is still sent over the user's LAN or loopback connection. No remote fallback is performed. Model licences, VRAM/RAM requirements and custom-node dependencies must be checked for the exact workflow before use.

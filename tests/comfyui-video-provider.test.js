@@ -127,6 +127,39 @@ test('uploads a source image, applies configured bindings and returns a complete
   assert.equal(progress.at(-1).stage, 'completed');
 });
 
+test('aligns frame counts for workflows that require 1 + N times 8 frames', async () => {
+  let submittedWorkflow;
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).endsWith('/upload/image')) return jsonResponse({ name: 'source.png', subfolder: '', type: 'input' });
+    if (String(url).endsWith('/prompt')) {
+      submittedWorkflow = JSON.parse(options.body).prompt;
+      return jsonResponse({ prompt_id: 'aligned-job' });
+    }
+    if (String(url).endsWith('/history/aligned-job')) {
+      return jsonResponse({
+        'aligned-job': {
+          status: { completed: true, status_str: 'success' },
+          outputs: { '90': { videos: [{ filename: 'aligned.mp4', type: 'output' }] } }
+        }
+      });
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow,
+    nodeBindings,
+    outputNodeIds: ['90'],
+    fetchImpl,
+    pollIntervalMs: 250,
+    frameCountStep: 8,
+    frameCountOffset: 1
+  });
+  await provider.generate(request);
+  assert.equal(submittedWorkflow['30'].inputs.frames, 97);
+});
+
 test('rejects an already-aborted generation before making network requests', async () => {
   let calls = 0;
   const provider = createComfyUIVideoProvider({
