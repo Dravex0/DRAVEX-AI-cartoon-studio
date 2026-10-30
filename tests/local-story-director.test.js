@@ -149,3 +149,30 @@ test('rejects a candidate that omits production-ready image or motion prompts', 
   assert.equal(result.fallbackReason, 'candidate-failed-story-quality-gate');
   assert.ok(result.evaluation.issues.some(issue => issue.code === 'production-fields-incomplete'));
 });
+
+test('locks directed character interaction and keeps actor-target direction in local AI output', async () => {
+  const interaction = {
+    type: 'guide',
+    actorId: 'Bird',
+    targetId: 'Foxy',
+    evidence: 'Bird guides Foxy home'
+  };
+  const interactionPlan = {
+    ...basePlan,
+    scenes: basePlan.scenes.map((scene, index) => index === 2
+      ? { ...scene, characters: ['Bird', 'Foxy'], interaction }
+      : scene)
+  };
+  let prompt = '';
+  const runtime = runtimeReturning(goodScenes, {
+    generate: async value => {
+      prompt = value;
+      return { text: JSON.stringify({ scenes: goodScenes }), modelId: 'mock-local-model', backend: 'wasm' };
+    }
+  });
+  const result = await directStoryboardWithLocalAI({ runtime, basePlan: interactionPlan });
+  assert.equal(result.usedLocalModel, true);
+  assert.deepEqual(result.scenes[2].interaction, interaction);
+  assert.ok(prompt.includes('"actorId":"Bird"'));
+  assert.ok(prompt.includes('"targetId":"Foxy"'));
+});
