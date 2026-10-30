@@ -36,3 +36,43 @@ test('parses explicit scene duration in seconds and clamps it to the supported r
   assert.equal(parseStoryBrief('Длительность: 90 секунд\nA fox finds a key.').requestedDurationSeconds, 30);
   assert.equal(parseStoryBrief('Duration: cinematic\nA fox finds a key.').requestedDurationSeconds, null);
 });
+
+test('parses compact production directions separated by middle dots', () => {
+  const brief = parseStoryBrief('Стиль: акварель · Количество сцен: 6 · Не добавлять: новых героев.');
+  assert.equal(brief.directives.style, 'акварель');
+  assert.equal(brief.directives.sceneCount, '6');
+  assert.equal(brief.directives.avoid, 'новых героев.');
+  assert.equal(brief.requestedSceneCount, 6);
+});
+
+test('parses numbered scene headings as separate blocks', () => {
+  const brief = parseStoryBrief('Сцена 1. Лес\nРыжик гуляет.\nСцена 2. Встреча\nСнежок появляется.');
+  assert.equal(brief.sceneBlocks.length, 2);
+  assert.equal(brief.sceneBlocks[0].title, 'Лес');
+  assert.equal(brief.sceneBlocks[0].text, 'Рыжик гуляет.');
+  assert.equal(brief.sceneBlocks[1].title, 'Встреча');
+  assert.equal(brief.sceneBlocks[1].text, 'Снежок появляется.');
+});
+
+test('extracts named character profiles from the character section', () => {
+  const brief = parseStoryBrief('Главные герои:\nРыжик — маленький рыжий лисёнок.\nСнежок — белый кролик.\n\nСцена 1. Лес\nРыжик гуляет.');
+  assert.deepEqual(brief.characters, ['Рыжик', 'Снежок']);
+  assert.equal(brief.characterProfiles.length, 2);
+  assert.match(brief.characterProfiles[1].visualDescription, /белый кролик/);
+});
+
+
+test('detects character names introduced naturally without a cast heading', () => {
+  const brief = parseStoryBrief('Маленький рыжий лисёнок по имени Рыжик гуляет по лесу. Из-за дерева выбегает маленький белый кролик по имени Снежок.');
+  assert.deepEqual(brief.characters, ['Рыжик', 'Снежок']);
+  assert.match(brief.characterProfiles[0].visualDescription, /рыжий лисёнок/);
+  assert.match(brief.characterProfiles[1].visualDescription, /белый кролик/);
+});
+
+
+test('accepts middle-dot scene heading separators', () => {
+  const brief = parseStoryBrief('Scene 1 · Opening\nA fox enters the forest.\nScene 2 · Discovery\nThe fox finds a crystal.');
+  assert.equal(brief.sceneBlocks.length, 2);
+  assert.equal(brief.sceneBlocks[0].title, 'Opening');
+  assert.equal(brief.sceneBlocks[1].title, 'Discovery');
+});

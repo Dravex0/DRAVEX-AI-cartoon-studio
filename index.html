@@ -36,7 +36,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <section class="hero"><div class="tag" data-i18n="previewTag">CARTOON WORKSPACE · EARLY PREVIEW</div><h1 data-i18n="headline">Turn your idea<br>into a story.</h1><p data-i18n="intro">Create a storyboard locally or use the optional Gemini Free Tier for AI-written scenes. Preview and export a simple WebM test with an optional local music track; full AI animation, generated voice and lip-sync are not implemented yet.</p></section>
 <div class="layout">
 <section class="panel"><h2 data-i18n="createTitle">01 · Create a story</h2>
-<div class="field"><label for="idea" data-i18n="ideaLabel">Story idea</label><textarea id="idea" placeholder="A curious fox discovers a glowing star in the forest..." data-i18n-placeholder="ideaPlaceholder">A curious fox discovers a glowing star in the forest.</textarea></div><small class="muted">Add production directions on separate lines: Стиль: акварель · Количество сцен: 6 · Не добавлять: новых героев. / Style: watercolor · Scenes: 6 · Avoid: extra characters.</small></div>
+<div class="field"><label for="idea" data-i18n="ideaLabel">Story idea</label><textarea id="idea" placeholder="A curious fox discovers a glowing star in the forest..." data-i18n-placeholder="ideaPlaceholder">A curious fox discovers a glowing star in the forest.</textarea></div><small class="muted">Optional production directions: Style: watercolor · Scenes: 6 · Avoid: extra characters. Numbered scene headings are detected automatically. / Дополнительные указания необязательны: Стиль: акварель · Количество сцен: 6 · Не добавлять: новых героев. Заголовки «Сцена 1», «Сцена 2» распознаются автоматически.</small></div>
 <div class="field"><label for="geminiKey">Gemini API key · Free Tier only / API-ключ Gemini · только бесплатный тариф</label><input id="geminiKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste your AI Studio key here"><small class="muted">Key stays in this page memory only; it is not saved. Do not enable Google Cloud billing. Free quota is limited; after quota exhaustion use the local generator.</small></div><div class="actions"><button class="secondary" id="testGemini">Test Gemini connection</button><button class="secondary" id="makeWithGemini">Create with Gemini (free quota)</button></div><div class="actions"><button class="secondary" id="checkLocalAI">Check local AI hardware / Проверить устройство</button></div><div class="muted" id="localAIStatus" role="status" aria-live="polite" style="font-size:12px;margin-top:8px">Optional check only. No model is downloaded and no media leaves this device.</div>
 <div class="row"><div class="field"><label for="character" data-i18n="characterLabel">Main character</label><input id="character" value="Foxy"></div><div class="field"><label for="style" data-i18n="styleLabel">Visual style</label><select id="style"><option>Storybook</option><option>Anime-inspired</option><option>Flat 2D</option><option>Pixel art</option></select></div></div>
 <div class="row"><div class="field"><label for="duration" data-i18n="durationLabel">Scene duration</label><select id="duration"><option value="3" data-i18n="seconds3">3 seconds</option><option value="5" data-i18n="seconds5">5 seconds</option><option value="8" data-i18n="seconds8">8 seconds</option></select></div><div class="field"><label for="language" data-i18n="storyLanguageLabel">Story language</label><select id="language"><option value="en">English</option><option value="ru">Русский</option><option value="uk">Українська</option><option value="es">Español</option></select></div></div>
@@ -74,14 +74,16 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="actions"><button class="secondary" id="applyScene">Apply scene edits</button><button class="secondary" id="addScene">Add scene</button><button class="secondary" id="deleteScene">Delete scene</button></div></div><div class="audio-panel">
 <div class="field"><label for="audioFile">Background music / Фоновая музыка (optional)</label><input id="audioFile" type="file" accept="audio/*"><small class="muted">Selected audio stays on this device and is mixed into the exported WebM. Nothing is uploaded. / Музыка остаётся на устройстве и добавляется в экспорт.</small></div>
 <div class="field"><label for="audioVolume">Music volume / Громкость музыки <output id="audioVolumeValue">70%</output></label><input id="audioVolume" type="range" min="0" max="100" value="70"></div>
-<audio id="audioPreview" controls preload="none" hidden></audio><div id="audioStatus" class="muted" role="status" aria-live="polite">No music selected / Музыка не выбрана</div>
+<div class="field"><label for="dialogueAudioFiles">Recorded dialogue / Записанные реплики (optional)</label><input id="dialogueAudioFiles" type="file" accept="audio/*" multiple><small class="muted">Choose a file beside each dialogue line below; no renaming is needed. Or use the optional bulk picker with names like scene1_dialogue_1.mp3. Files stay on this device and are included in WebM. / Выбери файл рядом с нужной репликой ниже — переименовывать его не нужно. Или используй общий выбор файлов с именами вида scene1_dialogue_1.mp3. Файлы остаются на устройстве и входят в WebM.</small><div id="dialogueAudioStatus" class="muted" role="status" aria-live="polite">No recorded dialogue selected / Записанные реплики не выбраны</div><div id="dialogueLineAssignments" class="field"></div></div>
+<audio id="audioPreview" controls preload="none" hidden></audio><div id="audioStatus" class="muted" role="status" aria-live="polite">No music selected / Музыка не выбрана</div><div class="field"><label><input id="voiceEnabled" type="checkbox" checked> Dialogue voice preview / Озвучивать реплики в предпросмотре</label><select id="voiceSelect" aria-label="Dialogue voice"><option value="">System default voice / Голос системы</option></select><div id="voiceStatus" class="muted" role="status" aria-live="polite">Uses voices installed in this browser/device. Voice is preview-only and is not included in exported WebM. / Используются голоса устройства. Озвучка только в предпросмотре, в WebM не попадает.</div></div>
 </div>
-<div class="actions"><button class="secondary" id="play" data-i18n="playButton">Play preview</button><button class="secondary" id="export" data-i18n="exportButton">Export WebM test</button></div><p class="muted" style="font-size:12px"><span data-i18n="previewDisclaimer">Preview/export uses a simple canvas animation. Optional local music can be included; generated voice and lip-sync are not implemented yet.</span></p></section>
+<div class="actions"><button class="secondary" id="play" data-i18n="playButton">Play preview</button><button class="secondary" id="export" data-i18n="exportButton">Export WebM test</button></div><p class="muted" style="font-size:12px"><span data-i18n="previewDisclaimer">Preview uses Canvas animation and optional device speech synthesis. Dialogue voice is preview-only and is not included in exported WebM yet. / Предпросмотр использует анимацию Canvas и системную озвучку. Голос пока не входит в экспорт WebM.</span></p></section>
 </div><footer class="foot"><span data-i18n="footer">DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to</span></footer>
 </main>
 <script type="module">
 import { validateStoryScenes } from "./src/story-qa.js";
 import { buildStoryboardFromText } from "./src/storyboard-generator.js";
+import { getActiveSceneDialogue } from "./src/scene-model.js";
 import { buildGeminiStoryboard, testGeminiConnection } from "./src/gemini-client.js";
 import { calculateCinematicShot } from "./src/director-engine.js";
 import { detectDeviceCapabilities } from "./src/device-capabilities.js";
@@ -91,11 +93,19 @@ import { getPromptCameraTransform } from "./src/prompt-camera-motion.js";
 import { detectSceneAction } from "./src/scene-action.js";
 import { buildExportTimeline } from "./src/export-timeline.js";
 import { createAudioExportSession } from "./src/audio-export.js";
+import { buildDialogueAudioSchedule, getDialogueSpeakers } from "./src/dialogue-audio.js";
+import { parseDialogueAudioFilename, getDialogueAudioAssignmentKey, mapDialogueAudioAssignmentsToSchedule, pruneDialogueAudioAssignments } from "./src/dialogue-audio-assets.js";
+import { createDialogueMouthEnvelope, sampleDialogueMouthEnvelope } from "./src/dialogue-lip-sync.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./src/scene-production.js";
 import { upsertCharacterReference } from "./src/character-reference.js";
+import { CHARACTER_MOTION_CLIPS, sampleCharacterMotion, resolveCharacterMotionAction } from "./src/character-motion.js";
+import { inferSceneEmotion, sampleSceneEmotion } from "./src/storyboard-generator.js";
+import { getSceneTransitionProgress } from "./src/scene-transition.js";
+import { getSceneCharacterLayout, getSceneObjectHandoffs, getSceneCharacterGesturePose } from "./src/character-layout.js";
+import { getEmotionFacePose, sampleEmotionFaceTimeline } from "./src/emotion-face.js";
 const translations={
-en:{freeTag:'FREE · LOCAL-FIRST',previewTag:'CARTOON WORKSPACE · EARLY PREVIEW',headline:'Turn your idea<br>into a story.',intro:'Create a storyboard locally or use the optional Gemini Free Tier for AI-written scenes. Preview and export a simple silent WebM test; full AI animation, voice, music and lip-sync are not implemented yet.',createTitle:'01 · Create a story',ideaLabel:'Story idea',ideaPlaceholder:'A curious fox discovers a glowing star in the forest...',characterLabel:'Main character',styleLabel:'Visual style',durationLabel:'Scene duration',seconds3:'3 seconds',seconds5:'5 seconds',seconds8:'8 seconds',storyLanguageLabel:'Story language',createButton:'Create storyboard',saveButton:'Save draft',readyStatus:'Ready. Your idea stays in this browser unless you export it.',previewTitle:'02 · Preview',playButton:'Play preview',pauseButton:'Pause preview',exportButton:'Export WebM test',previewDisclaimer:'Preview/export uses a simple canvas animation. Optional local music can be included; generated voice and lip-sync are not implemented yet.',footer:'DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to',sceneTitles:['A discovery','A closer look','A new adventure'],sceneDescriptions:['The fox spots a glowing star.','The little star floats nearby.','The fox follows the light.'],sceneLabel:'Scene',ready:'Ready. Your idea stays in this browser unless you export it.',emptyIdea:'Add a story idea first.',created:'Local storyboard created. Optional Gemini AI scene generation is available when configured.',saved:'Draft saved in this browser.',storageError:'Browser storage is unavailable; you can still keep this page open.',restored:'Restored draft from this browser.',recording:'Recording a short preview…',exported:'WebM storyboard exported.',unsupported:'WebM recording is not supported by this browser.',exportFailed:'Export failed in this browser. Try Play preview first.'},
-ru:{freeTag:'БЕСПЛАТНО · ЛОКАЛЬНАЯ РАБОТА',previewTag:'РАБОЧЕЕ ПРОСТРАНСТВО МУЛЬТФИЛЬМОВ · РАННИЙ ПРЕДПРОСМОТР',headline:'Преврати идею<br>в историю.',intro:'Создавай раскадровку локально или используй бесплатную квоту Gemini для генерации сцен. Можно просмотреть и экспортировать простое видео WebM с локальной музыкальной дорожкой; полноценной ИИ-анимации, генерации голоса и синхронизации губ пока нет.',createTitle:'01 · Создание истории',ideaLabel:'Идея истории',ideaPlaceholder:'Любопытный лисёнок находит светящуюся звезду в лесу…',characterLabel:'Главный персонаж',styleLabel:'Визуальный стиль',durationLabel:'Длительность сцены',seconds3:'3 секунды',seconds5:'5 секунд',seconds8:'8 секунд',storyLanguageLabel:'Язык истории',createButton:'Создать раскадровку',saveButton:'Сохранить черновик',readyStatus:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',previewTitle:'02 · Предпросмотр',playButton:'Воспроизвести',pauseButton:'Пауза',exportButton:'Экспорт тестового WebM',previewDisclaimer:'Предпросмотр и экспорт используют простую анимацию Canvas. Можно добавить локальную музыку; генерации голоса и синхронизации губ пока нет.',footer:'DRAVEX AI Cartoon Studio · Прототип · Платный API не требуется · Используй только материалы, на которые у тебя есть права',sceneTitles:['Открытие','Поближе','Новое приключение'],sceneDescriptions:['Лисёнок замечает светящуюся звезду.','Маленькая звезда парит рядом.','Лисёнок следует за светом.'],sceneLabel:'Сцена',ready:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',emptyIdea:'Сначала добавь идею истории.',created:'Локальная раскадровка создана. При настройке доступна дополнительная генерация сцен через Gemini.',saved:'Черновик сохранён в этом браузере.',storageError:'Хранилище браузера недоступно; можно оставить страницу открытой.',restored:'Черновик восстановлен из этого браузера.',recording:'Записываем короткий предпросмотр…',exported:'Раскадровка экспортирована в WebM.',unsupported:'Этот браузер не поддерживает запись WebM.',exportFailed:'Не удалось экспортировать видео. Сначала попробуй запустить предпросмотр.'}
+en:{freeTag:'FREE · LOCAL-FIRST',previewTag:'CARTOON WORKSPACE · EARLY PREVIEW',headline:'Turn your idea<br>into a story.',intro:'Create a storyboard locally or use the optional Gemini Free Tier for AI-written scenes. Preview and export a simple silent WebM test; full AI animation, voice, music and lip-sync are not implemented yet.',createTitle:'01 · Create a story',ideaLabel:'Story idea',ideaPlaceholder:'A curious fox discovers a glowing star in the forest...',characterLabel:'Main character',styleLabel:'Visual style',durationLabel:'Scene duration',seconds3:'3 seconds',seconds5:'5 seconds',seconds8:'8 seconds',storyLanguageLabel:'Story language',createButton:'Create storyboard',saveButton:'Save draft',readyStatus:'Ready. Your idea stays in this browser unless you export it.',previewTitle:'02 · Preview',playButton:'Play preview',pauseButton:'Pause preview',exportButton:'Export WebM test',previewDisclaimer:'Preview uses Canvas animation and optional device speech synthesis. Local recorded dialogue and music can be mixed into exported WebM; phoneme-level lip-sync is not implemented yet.',footer:'DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to',sceneTitles:['A discovery','A closer look','A new adventure'],sceneDescriptions:['The fox spots a glowing star.','The little star floats nearby.','The fox follows the light.'],sceneLabel:'Scene',ready:'Ready. Your idea stays in this browser unless you export it.',emptyIdea:'Add a story idea first.',created:'Local storyboard created. Optional Gemini AI scene generation is available when configured.',saved:'Draft saved in this browser.',storageError:'Browser storage is unavailable; you can still keep this page open.',restored:'Restored draft from this browser.',recording:'Recording a short preview…',exported:'WebM storyboard exported.',unsupported:'WebM recording is not supported by this browser.',exportFailed:'Export failed in this browser. Try Play preview first.'},
+ru:{freeTag:'БЕСПЛАТНО · ЛОКАЛЬНАЯ РАБОТА',previewTag:'РАБОЧЕЕ ПРОСТРАНСТВО МУЛЬТФИЛЬМОВ · РАННИЙ ПРЕДПРОСМОТР',headline:'Преврати идею<br>в историю.',intro:'Создавай раскадровку локально или используй бесплатную квоту Gemini для генерации сцен. Можно просмотреть и экспортировать простое видео WebM с локальной музыкальной дорожкой; полноценной ИИ-анимации, генерации голоса и синхронизации губ пока нет.',createTitle:'01 · Создание истории',ideaLabel:'Идея истории',ideaPlaceholder:'Любопытный лисёнок находит светящуюся звезду в лесу…',characterLabel:'Главный персонаж',styleLabel:'Визуальный стиль',durationLabel:'Длительность сцены',seconds3:'3 секунды',seconds5:'5 секунд',seconds8:'8 секунд',storyLanguageLabel:'Язык истории',createButton:'Создать раскадровку',saveButton:'Сохранить черновик',readyStatus:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',previewTitle:'02 · Предпросмотр',playButton:'Воспроизвести',pauseButton:'Пауза',exportButton:'Экспорт тестового WebM',previewDisclaimer:'Предпросмотр использует Canvas-анимацию и системную озвучку устройства. Локальные записи реплик и музыка могут войти в экспорт WebM; точная синхронизация губ по фонемам пока не реализована.',footer:'DRAVEX AI Cartoon Studio · Прототип · Платный API не требуется · Используй только материалы, на которые у тебя есть права',sceneTitles:['Открытие','Поближе','Новое приключение'],sceneDescriptions:['Лисёнок замечает светящуюся звезду.','Маленькая звезда парит рядом.','Лисёнок следует за светом.'],sceneLabel:'Сцена',ready:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',emptyIdea:'Сначала добавь идею истории.',created:'Локальная раскадровка создана. При настройке доступна дополнительная генерация сцен через Gemini.',saved:'Черновик сохранён в этом браузере.',storageError:'Хранилище браузера недоступно; можно оставить страницу открытой.',restored:'Черновик восстановлен из этого браузера.',recording:'Записываем короткий предпросмотр…',exported:'Раскадровка экспортирована в WebM.',unsupported:'Этот браузер не поддерживает запись WebM.',exportFailed:'Не удалось экспортировать видео. Сначала попробуй запустить предпросмотр.'}
 };
 function readLocalStorage(key){try{return window.localStorage.getItem(key)}catch(error){return null}}
 function writeLocalStorage(key,value){try{window.localStorage.setItem(key,value);return true}catch(error){return false}}
@@ -106,6 +116,135 @@ function applyLanguage(){document.documentElement.lang=uiLang;$('uiLanguage').va
 $('uiLanguage').addEventListener('change',()=>{uiLang=$('uiLanguage').value;writeLocalStorage('dravex-ui-language',uiLang);applyLanguage()});
 $('style').addEventListener('change',()=>{if(!playing)draw()});
 let selectedMusicUrl='';
+const dialogueAudioAssignments=new Map();
+const dialogueCharacterVolumes=new Map();
+function dialogueCharacterVolumeKey(characterId){return String(characterId||'').trim().toLowerCase()}
+function getDialogueCharacterVolumeMap(){return new Map([...dialogueCharacterVolumes.entries()].map(([key,value])=>[key,Math.max(0,Math.min(1,Number(value)||0))]))}
+let exportLipSyncState=null;
+let dialogueMouthEnvelopes=new Map();
+function getDialogueMouthOpen(dialogue,index){
+  if(!exportLipSyncState||!dialogue||typeof exportLipSyncState.audioSession?.getCurrentTime!=='function')return null;
+  const cue=exportLipSyncState.schedule.find(item=>item.sceneIndex===index&&item.lineId===dialogue.id);
+  if(!cue)return null;
+  const buffer=exportLipSyncState.buffers.get(index+':'+cue.lineId);
+  if(!buffer)return null;
+  const elapsed=(exportLipSyncState.audioSession.getCurrentTime()-exportLipSyncState.startedAt)*1000-cue.startMs;
+  if(elapsed<0||elapsed>cue.endMs-cue.startMs)return 0;
+  return sampleDialogueMouthEnvelope(exportLipSyncState.envelopes.get(index+':'+cue.lineId),elapsed);
+}
+function renderDialogueAudioAssignments(){
+  const box=$('dialogueLineAssignments');
+  if(!box)return;
+  box.replaceChildren();
+  const lines=Array.isArray(sceneMetadata[sceneIndex]?.dialogueTimeline)?sceneMetadata[sceneIndex].dialogueTimeline:[];
+  const heading=document.createElement('strong');
+  heading.textContent=uiLang==='ru'?'Озвучка реплик этой сцены':'Voice recordings for this scene';
+  box.appendChild(heading);
+  const speakers=getDialogueSpeakers(sceneMetadata);
+  if(speakers.length){
+    const volumeGroup=document.createElement('div');
+    volumeGroup.className='field';
+    const volumeHeading=document.createElement('strong');
+    volumeHeading.textContent=uiLang==='ru'?'Громкость голоса персонажей':'Character voice levels';
+    volumeGroup.appendChild(volumeHeading);
+    speakers.forEach(speaker=>{
+      const key=dialogueCharacterVolumeKey(speaker);
+      const control=document.createElement('label');
+      control.className='field';
+      const caption=document.createElement('span');
+      caption.textContent=speaker;
+      const slider=document.createElement('input');
+      slider.type='range';slider.min='0';slider.max='100';slider.step='5';
+      slider.value=String(Math.round((dialogueCharacterVolumes.get(key)??1)*100));
+      const value=document.createElement('small');
+      value.className='muted';value.textContent=slider.value+'%';
+      slider.setAttribute('aria-label',(uiLang==='ru'?'Громкость голоса: ':'Voice volume: ')+speaker);
+      slider.addEventListener('input',()=>{
+        const level=Number(slider.value)/100;
+        dialogueCharacterVolumes.set(key,level);
+        value.textContent=slider.value+'%';
+      });
+      control.append(caption,slider,value);
+      volumeGroup.appendChild(control);
+    });
+    box.appendChild(volumeGroup);
+  }
+  if(!lines.length){
+    const empty=document.createElement('small');
+    empty.className='muted';
+    empty.textContent=uiLang==='ru'?'В этой сцене пока нет реплик. Громкость всех персонажей можно настроить выше.':'No dialogue lines in this scene yet. All character levels can be adjusted above.';
+    box.appendChild(empty);
+    return;
+  }
+  lines.slice(0,20).forEach((line,index)=>{
+    const key=getDialogueAudioAssignmentKey(sceneMetadata[sceneIndex]?.id,String(line.id||'dialogue_'+(index+1)));
+    const row=document.createElement('label');
+    row.className='field';
+    const caption=document.createElement('span');
+    caption.textContent=(index+1)+'. '+String(line.characterId||'Speaker')+': '+String(line.text||'').slice(0,180);
+    const input=document.createElement('input');
+    input.type='file';
+    input.accept='audio/*';
+    input.setAttribute('aria-label',uiLang==='ru'?'Аудиофайл для реплики '+(index+1):'Audio file for dialogue line '+(index+1));
+    input.addEventListener('change',()=>{
+      const file=input.files?.[0];
+      if(!file){dialogueAudioAssignments.delete(key);return}
+      if(file.size>20*1024*1024){
+        input.value='';
+        $('dialogueAudioStatus').textContent=uiLang==='ru'?'Файл должен быть не больше 20 МБ.':'Audio file must be 20 MB or smaller.';
+        return;
+      }
+      dialogueAudioAssignments.set(key,file);
+      $('dialogueAudioStatus').textContent=uiLang==='ru'
+        ?'Назначено записей: '+dialogueAudioAssignments.size+' · файлы остаются на устройстве.'
+        :'Assigned recordings: '+dialogueAudioAssignments.size+' · files stay on this device.';
+    });
+    const existing=dialogueAudioAssignments.get(key);
+    if(existing){const selected=document.createElement('small');selected.className='muted';selected.textContent=existing.name;row.appendChild(caption);row.append(input,selected)}
+    else row.append(caption,input);
+    box.appendChild(row);
+  });
+}
+async function decodeDialogueAudioFiles(files, schedule){
+  const selected=files instanceof Map?[...files.entries()].map(([key,file])=>({key,file})):Array.from(files||[]).map(file=>({file}));
+  const buffers=new Map();
+  if(!selected.length)return buffers;
+  if(selected.length>40)throw new Error('Select no more than 40 dialogue audio files.');
+  if(selected.some(item=>!item.file||!Number.isFinite(item.file.size)||item.file.size>20*1024*1024))throw new Error('Each dialogue audio file must be 20 MB or smaller.');
+  const totalBytes=selected.reduce((sum,item)=>sum+item.file.size,0);
+  if(totalBytes>100*1024*1024)throw new Error('Total dialogue audio size must be 100 MB or smaller for reliable mobile export.');
+  const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+  if(!AudioContextClass)throw new Error('Web Audio decoding is not supported in this browser.');
+  const context=new AudioContextClass();
+  const expected=new Set(schedule.map(cue=>cue.sceneIndex+':'+cue.lineId));
+  const unmatched=[];
+  try{
+    for(const item of selected){
+      const file=item.file;
+      if(!file)continue;
+      let key=typeof item.key==='string'?item.key:'';
+      if(!key){
+        const parsed=parseDialogueAudioFilename(file.name);
+        if(!parsed){unmatched.push(file.name);continue}
+        key=parsed.sceneIndex+':'+parsed.lineId;
+      }
+      if(!expected.has(key)){unmatched.push(file.name);continue}
+      try{const decoded=await context.decodeAudioData((await file.arrayBuffer()).slice(0));buffers.set(key,decoded);dialogueMouthEnvelopes.set(key,createDialogueMouthEnvelope(decoded))}
+      catch(error){unmatched.push(file.name)}
+    }
+  }finally{if(context.state!=='closed')await context.close()}
+  $('dialogueAudioStatus').textContent=uiLang==='ru'
+    ?'Подготовлено реплик: '+buffers.size+' · пропущено файлов: '+unmatched.length+' · файлы остаются на устройстве.'
+    :'Prepared dialogue lines: '+buffers.size+' · skipped files: '+unmatched.length+' · files stay on this device.';
+  return buffers;
+}
+$('dialogueAudioFiles').addEventListener('change',()=>{
+  const count=$('dialogueAudioFiles').files?.length||0;
+  $('dialogueAudioStatus').textContent=count
+    ?(uiLang==='ru'?'Выбрано файлов: ':'Files selected: ')+count+' · проверка при экспорте'
+    :(uiLang==='ru'?'Записанные реплики не выбраны':'No recorded dialogue selected');
+});
+
 $('audioFile').addEventListener('change',()=>{
   const file=$('audioFile').files?.[0]||null;
   if(selectedMusicUrl){URL.revokeObjectURL(selectedMusicUrl);selectedMusicUrl=''}
@@ -122,8 +261,25 @@ $('audioFile').addEventListener('change',()=>{
 });
 $('audioVolume').addEventListener('input',()=>{$('audioVolumeValue').textContent=$('audioVolume').value+'%'});
 
-const canvas=$('canvas'),ctx=canvas.getContext('2d');let frame=0,playing=true,raf=0,sceneIndex=0;let sceneMotionSceneIndex=-1,sceneMotionStartFrame=0;let titles=[...translations[uiLang].sceneTitles];let descriptions=[...translations[uiLang].sceneDescriptions];let sceneMetadata=titles.map((title,index)=>({title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''}));let characterBible=[];
+const canvas=$('canvas'),ctx=canvas.getContext('2d');let frame=0,playing=true,raf=0,sceneIndex=0;const transitionCanvas=document.createElement('canvas');transitionCanvas.width=canvas.width;transitionCanvas.height=canvas.height;const transitionCtx=transitionCanvas.getContext('2d');let sceneTransitionStartFrame=0,sceneTransitionActive=false;let sceneMotionSceneIndex=-1,sceneMotionStartFrame=0;let titles=[...translations[uiLang].sceneTitles];let descriptions=[...translations[uiLang].sceneDescriptions];let sceneMetadata=titles.map((title,index)=>({id:'scene-initial-'+(index+1),title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''}));let characterBible=[];
+function ensureStableSceneIds(scenes){
+  const seen=new Set();
+  return (Array.isArray(scenes)?scenes:[]).map((scene,index)=>{
+    const item=scene&&typeof scene==='object'?{...scene}:{};
+    let id=typeof item.id==='string'?item.id.trim():'';
+    if(!id||seen.has(id)){
+      id=globalThis.crypto?.randomUUID?.()||('scene-'+Date.now()+'-'+index+'-'+Math.random().toString(36).slice(2,10));
+    }
+    while(seen.has(id))id='scene-'+Date.now()+'-'+index+'-'+Math.random().toString(36).slice(2,10);
+    seen.add(id);
+    item.id=id;
+    return item;
+  });
+}
+sceneMetadata=ensureStableSceneIds(sceneMetadata);
 function getSceneAction(index){return detectSceneAction((titles[index]||'')+' '+(descriptions[index]||''));}
+function getActiveDialogue(index,timeSeconds=0){return getActiveSceneDialogue(sceneMetadata[index]||{},timeSeconds);}
+function getSceneEmotion(index,timeSeconds=0){const scene=sceneMetadata[index]||{};const fallback=['neutral','happy','sad','fear','anger','surprised'].includes(scene.emotion)?scene.emotion:inferSceneEmotion((titles[index]||'')+' '+(descriptions[index]||''));return sampleSceneEmotion(scene.emotionTimeline,timeSeconds,fallback);}
 class ParticleEmitter {
 constructor(){this.particles=[];this.maxParticles=160}
 emit(x,y,count=5,color='#ffe58a'){
@@ -157,9 +313,86 @@ sceneImageCache.set(key,entry);
 }
 return entry.state==='ready'&&entry.image.naturalWidth>0?entry.image:null;
 }
-function draw(){const w=canvas.width,h=canvas.height,t=frame/30;ctx.clearRect(0,0,w,h);const g=ctx.createLinearGradient(0,0,0,h);const paletteSets={ 'Storybook':[['#29274d','#132b3b'],['#49304e','#192b46'],['#193f45','#102735'],['#4b3440','#20243c'],['#243c55','#102c38']], 'Anime-inspired':[['#40265f','#132b4c'],['#702f62','#172d52'],['#124e67','#172044'],['#713b48','#211c46'],['#3b3978','#12394a']], 'Flat 2D':[['#83c5be','#277da1'],['#ffafcc','#6d597a'],['#90be6d','#277da1'],['#f9c74f','#577590'],['#bde0fe','#5e548e']], 'Pixel art':[['#312e2e','#1d3557'],['#6a4c93','#1982c4'],['#386641','#1d3557'],['#bc4749','#283618'],['#3a506b','#0b132b']]};const scenePalettes=paletteSets[$('style').value]||paletteSets['Storybook'];const palette=scenePalettes[sceneIndex%scenePalettes.length];g.addColorStop(0,palette[0]);g.addColorStop(1,palette[1]);ctx.fillStyle=g;ctx.fillRect(0,0,w,h);for(let i=0;i<45;i++){let x=(i*97+25)%w,y=(i*53+17)%220;ctx.fillStyle='rgba(255,255,255,'+(0.25+0.45*Math.abs(Math.sin(t+i)))+')';ctx.fillRect(x,y,2,2)}ctx.fillStyle=sceneIndex===1?'#25434a':sceneIndex===2?'#244c3b':'#183b38';ctx.beginPath();ctx.ellipse(320,370,290,100,0,0,Math.PI*2);ctx.fill();for(let i=0;i<7;i++){let x=25+i*100;ctx.fillStyle='#172d36';ctx.beginPath();ctx.moveTo(x,310);ctx.lineTo(x+45,155+(i%3)*25);ctx.lineTo(x+90,310);ctx.fill()}const currentSceneData=sceneMetadata[sceneIndex]||{title:titles[sceneIndex],visibleAction:descriptions[sceneIndex],prompt:descriptions[sceneIndex]};if(sceneMotionSceneIndex!==sceneIndex){sceneMotionSceneIndex=sceneIndex;sceneMotionStartFrame=frame}const sceneDurationRaw=Number(currentSceneData.durationSeconds??$('duration').value);const sceneDuration=Number.isFinite(sceneDurationRaw)&&sceneDurationRaw>=0.25&&sceneDurationRaw<=30?sceneDurationRaw:3;const sceneMotionProgress=Math.max(0,Math.min(1,(frame-sceneMotionStartFrame)/(sceneDuration*30)));const previousSceneData=sceneIndex>0?(sceneMetadata[sceneIndex-1]||{title:titles[sceneIndex-1],visibleAction:descriptions[sceneIndex-1],prompt:descriptions[sceneIndex-1]}):null;const previousScale=previousSceneData?calculateCinematicShot({...previousSceneData,beatIndex:sceneIndex-1}).shotScale:null;const directorShot=calculateCinematicShot({...currentSceneData,beatIndex:sceneIndex},previousScale);const cameraPlan=directorShot.cameraTransform;const focusX=directorShot.focusTarget==='prop'?starBase[0]:foxBase[0];const focusY=directorShot.focusTarget==='prop'?starBase[1]:foxBase[1];ctx.save();ctx.translate(w/2,h/2+cameraPlan.offsetY);ctx.scale(cameraPlan.zoom,cameraPlan.zoom);ctx.translate(-focusX,-focusY);const action=getSceneAction(sceneIndex);let sx=starBase[0]+Math.sin(t*1.5)*15,sy=starBase[1]+Math.cos(t*2)*12;if(action==='run'){sx+=Math.sin(t*2)*36;sy-=Math.abs(Math.sin(t*3))*10}else if(action==='float'){sy-=Math.abs(Math.sin(t*1.4))*24}else if(action==='vanish'){sx+=Math.sin(t)*4}const starPulse=1+Math.sin(t*3)*.08;const starScale=action==='magic'?1.35:action==='vanish'?Math.max(.08,1-((frame%45)/45)):action==='float'?.88:sceneIndex===1?1.18:sceneIndex===3?1.35:sceneIndex===4?.88:1; if(sceneIndex===3){ctx.save();ctx.translate(sx,sy);ctx.strokeStyle='rgba(255,229,138,'+(.35+.25*Math.abs(Math.sin(t*3)))+')';ctx.lineWidth=3;for(let ray=0;ray<8;ray++){const a=ray*Math.PI/4+t*.08;ctx.beginPath();ctx.moveTo(Math.cos(a)*34,Math.sin(a)*34);ctx.lineTo(Math.cos(a)*48,Math.sin(a)*48);ctx.stroke()}ctx.restore()}if(sceneIndex===4){for(let spark=0;spark<7;spark++){const a=spark*Math.PI*2/7+t*.35;const px=sx+Math.cos(a)*(24+Math.sin(t*2+spark)*5),py=sy+Math.sin(a)*(24+Math.sin(t*2+spark)*5);ctx.fillStyle='rgba(255,229,138,.8)';ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);ctx.fill()}}ctx.save();ctx.translate(sx,sy);ctx.scale(starScale*starPulse,starScale*starPulse);ctx.rotate(t*.25);ctx.shadowBlur=sceneIndex===3?38:25;ctx.shadowColor='#ffe58a';ctx.fillStyle='#ffe58a';ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?13:30;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.restore();const foxPositions=[[225,290],[270,300],[365,292],[190,295],[315,300]];const foxBase=foxPositions[sceneIndex%foxPositions.length];const poses=[[0,0,0],[18,0,-.08],[48,-12,.16],[12,-34,-.18],[-8,0,0]];const pose=poses[sceneIndex%poses.length];const actionPulse=Math.sin(t*2.4);let fx=foxBase[0]+pose[0]+Math.sin(t)*6,fy=foxBase[1]+pose[1]+Math.sin(t*2)*3+(sceneIndex===3?Math.abs(actionPulse)*7:0);if(action==='run'){fx+=Math.sin(t*4)*22;fy-=Math.abs(Math.sin(t*4))*8}else if(action==='jump'){fy-=Math.abs(Math.sin(t*3))*28}else if(action==='walk'){fx+=Math.sin(t*2.2)*13;fy-=Math.abs(Math.sin(t*2.2))*4}else if(action==='dance'){fx+=Math.sin(t*3.4)*12;fy-=Math.abs(Math.sin(t*3.4))*12}else if(action==='talk'){fy+=Math.sin(t*5)*2}else if(action==='surprised'){fy-=Math.abs(Math.sin(t*2))*5}else if(action==='sad'){fy+=Math.abs(Math.sin(t*1.5))*3}ctx.save();ctx.translate(fx,fy);ctx.rotate(pose[2]+(sceneIndex===2?Math.sin(t*1.8)*.04:0)+(action==='dance'?Math.sin(t*3.4)*.2:action==='turn'?Math.sin(t*2)*.5:0));ctx.fillStyle='#f18a48';ctx.beginPath();ctx.ellipse(0,10,55,42,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.moveTo(-38,-10);ctx.lineTo(-48,-68);ctx.lineTo(-10,-38);ctx.fill();ctx.beginPath();ctx.moveTo(5,-36);ctx.lineTo(32,-72);ctx.lineTo(42,-17);ctx.fill();ctx.fillStyle='#ffd0a1';ctx.beginPath();ctx.ellipse(8,17,31,23,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(4,-5,9,12,0,0,Math.PI*2);ctx.ellipse(28,-5,9,12,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#242033';ctx.beginPath();ctx.arc(7,-4,4,0,Math.PI*2);ctx.arc(29,-4,4,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(17,13,5,0,Math.PI*2);ctx.fill();if(action==='happy'||action==='sad'){ctx.strokeStyle='#242033';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(17,20,action==='happy'?8:7,action==='happy'?0:Math.PI,action==='happy'?Math.PI:Math.PI*2);ctx.stroke()}else if(action==='talk'||action==='surprised'){ctx.fillStyle='#242033';ctx.beginPath();ctx.ellipse(17,20,action==='surprised'?6:4,action==='surprised'?8:Math.max(2,4+Math.sin(t*8)*2),0,0,Math.PI*2);ctx.fill()}if(action==='sad'){ctx.fillStyle='rgba(130,220,255,.85)';ctx.beginPath();ctx.ellipse(34,8,3,6,-.25,0,Math.PI*2);ctx.fill()}if(sceneIndex===2||sceneIndex===3){ctx.strokeStyle='#242033';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-1,-20);ctx.lineTo(10,-17);ctx.stroke()}ctx.restore();ctx.restore();const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
+function drawAdditionalCharacter(profile,x,y,scale,time,facing,interaction,gesturePose={},emotion='neutral',speaking=false,mouthOpen=null,facePoseOverride=null){
+  const description=[profile?.visualDescription,profile?.colors,profile?.distinctiveFeatures].filter(Boolean).join(' ').toLowerCase();
+  const rabbit=/(rabbit|bunny|крол|заяц|зайч)/u.test(description);
+  const cat=/(cat|кот|кошка)/u.test(description);
+  const colors=String(profile?.colors||'').match(/#[0-9a-f]{6}/ig)||[];
+  const fur=colors[0]||(rabbit?'#f2eee7':cat?'#c9a2d5':'#d99555');
+  const light=colors[1]||(rabbit?'#ffffff':cat?'#f3d8ef':'#f6c18c');
+  ctx.save();ctx.translate(x,y);ctx.scale(scale*facing,scale);ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle=fur;ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(-22,22);ctx.lineTo(-25,43);ctx.moveTo(22,22);ctx.lineTo(25,43);ctx.stroke();
+  ctx.strokeStyle=fur;ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-29,-2);ctx.lineTo(-29+Math.sin((gesturePose.leftArm||0)*Math.PI/180)*24,-2+Math.cos((gesturePose.leftArm||0)*Math.PI/180)*23);ctx.moveTo(29,-2);ctx.lineTo(29+Math.sin((gesturePose.rightArm||0)*Math.PI/180)*24,-2+Math.cos((gesturePose.rightArm||0)*Math.PI/180)*23);ctx.stroke();
+  ctx.fillStyle=fur;ctx.beginPath();ctx.ellipse(0,8,37,31,0,0,Math.PI*2);ctx.fill();
+  ctx.save();ctx.translate(0,-25);
+  if(rabbit){ctx.fillStyle=fur;ctx.beginPath();ctx.ellipse(-12,-26,8,25,-.18,0,Math.PI*2);ctx.ellipse(12,-27,8,26,.18,0,Math.PI*2);ctx.fill();ctx.fillStyle=light;ctx.beginPath();ctx.ellipse(-12,-27,3.5,17,-.18,0,Math.PI*2);ctx.ellipse(12,-28,3.5,18,.18,0,Math.PI*2);ctx.fill()}
+  else{ctx.fillStyle=fur;ctx.beginPath();ctx.moveTo(-28,-2);ctx.lineTo(-31,-35);ctx.lineTo(-7,-17);ctx.lineTo(4,-18);ctx.lineTo(28,-38);ctx.lineTo(29,-2);ctx.closePath();ctx.fill()}
+  ctx.fillStyle=light;ctx.beginPath();ctx.ellipse(0,4,25,19,0,0,Math.PI*2);ctx.fill();
+  const facePose=facePoseOverride&&typeof facePoseOverride==='object'?facePoseOverride:getEmotionFacePose(emotion,time);const blink=Math.sin(time*1.7+1.2)>.997?.12:1;ctx.fillStyle='#242033';ctx.beginPath();ctx.ellipse(-10,-5,3.5,5*blink*facePose.eyeScale,0,0,Math.PI*2);ctx.ellipse(10,-5,3.5,5*blink*facePose.eyeScale,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#242033';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(-17,-14-facePose.browLift*4+facePose.browTilt*3);ctx.lineTo(-4,-14-facePose.browLift*4-facePose.browTilt*3);ctx.moveTo(4,-14-facePose.browLift*4+facePose.browTilt*3);ctx.lineTo(17,-14-facePose.browLift*4-facePose.browTilt*3);ctx.stroke();
+  if(facePose.cheek>0){ctx.fillStyle='rgba(255,125,145,'+facePose.cheek+')';ctx.beginPath();ctx.ellipse(-19,5,5,2.5,0,0,Math.PI*2);ctx.ellipse(19,5,5,2.5,0,0,Math.PI*2);ctx.fill();}
+  ctx.fillStyle='#242033';ctx.beginPath();ctx.arc(0,7,3,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#242033';ctx.fillStyle='#242033';ctx.lineWidth=2;if(speaking||facePose.mouthOpen>0){ctx.beginPath();ctx.ellipse(0,13,3.5,mouthOpen===null?2.5+facePose.mouthOpen*5+Math.abs(Math.sin(time*10))*2:1.5+mouthOpen*6,0,0,Math.PI*2);ctx.fill()}else if(interaction==='talk_to'||interaction==='gesture_to'){ctx.beginPath();ctx.arc(0,13,4+Math.abs(Math.sin(time*8))*2,0,Math.PI)}else{ctx.beginPath();ctx.moveTo(-4,13);ctx.quadraticCurveTo(0,13+facePose.mouthCurve*5,4,13);ctx.stroke()}ctx.stroke();
+  ctx.restore();ctx.restore();
+}
+function drawSceneObjectHandoff(handoff,time){
+  const x=handoff.x*canvas.width,y=handoff.y*canvas.height;
+  ctx.save();ctx.translate(x,y);ctx.shadowColor='#ffe7a3';ctx.shadowBlur=12;
+  ctx.fillStyle='#f6d58b';ctx.strokeStyle='#fff2c9';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(-9,-7);ctx.lineTo(0,-12);ctx.lineTo(9,-7);ctx.lineTo(9,6);ctx.lineTo(0,11);ctx.lineTo(-9,6);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.shadowBlur=0;ctx.strokeStyle='#a87538';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,-11);ctx.lineTo(0,10);ctx.moveTo(-9,-7);ctx.lineTo(0,-2);ctx.lineTo(9,-7);ctx.stroke();
+  ctx.fillStyle='#fff5d9';ctx.font='600 10px system-ui';ctx.textAlign='center';ctx.fillText(handoff.label.slice(0,22),0,25);
+  ctx.restore();
+}
+function draw(){const w=canvas.width,h=canvas.height,t=frame/30;if(sceneMotionSceneIndex!==sceneIndex){if(sceneMotionSceneIndex>=0&&playing){transitionCanvas.width=w;transitionCanvas.height=h;transitionCtx.drawImage(canvas,0,0,w,h);sceneTransitionStartFrame=frame;sceneTransitionActive=true}else{sceneTransitionActive=false}sceneMotionSceneIndex=sceneIndex;sceneMotionStartFrame=frame}ctx.clearRect(0,0,w,h);const g=ctx.createLinearGradient(0,0,0,h);const paletteSets={ 'Storybook':[['#29274d','#132b3b'],['#49304e','#192b46'],['#193f45','#102735'],['#4b3440','#20243c'],['#243c55','#102c38']], 'Anime-inspired':[['#40265f','#132b4c'],['#702f62','#172d52'],['#124e67','#172044'],['#713b48','#211c46'],['#3b3978','#12394a']], 'Flat 2D':[['#83c5be','#277da1'],['#ffafcc','#6d597a'],['#90be6d','#277da1'],['#f9c74f','#577590'],['#bde0fe','#5e548e']], 'Pixel art':[['#312e2e','#1d3557'],['#6a4c93','#1982c4'],['#386641','#1d3557'],['#bc4749','#283618'],['#3a506b','#0b132b']]};const scenePalettes=paletteSets[$('style').value]||paletteSets['Storybook'];const palette=scenePalettes[sceneIndex%scenePalettes.length];g.addColorStop(0,palette[0]);g.addColorStop(1,palette[1]);ctx.fillStyle=g;ctx.fillRect(0,0,w,h);for(let i=0;i<45;i++){let x=(i*97+25)%w,y=(i*53+17)%220;ctx.fillStyle='rgba(255,255,255,'+(0.25+0.45*Math.abs(Math.sin(t+i)))+')';ctx.fillRect(x,y,2,2)}ctx.fillStyle=sceneIndex===1?'#25434a':sceneIndex===2?'#244c3b':'#183b38';ctx.beginPath();ctx.ellipse(320,370,290,100,0,0,Math.PI*2);ctx.fill();for(let i=0;i<7;i++){let x=25+i*100;ctx.fillStyle='#172d36';ctx.beginPath();ctx.moveTo(x,310);ctx.lineTo(x+45,155+(i%3)*25);ctx.lineTo(x+90,310);ctx.fill()}const currentSceneData=sceneMetadata[sceneIndex]||{title:titles[sceneIndex],visibleAction:descriptions[sceneIndex],prompt:descriptions[sceneIndex]};const sceneDurationRaw=Number(currentSceneData.durationSeconds??$('duration').value);const sceneDuration=Number.isFinite(sceneDurationRaw)&&sceneDurationRaw>=0.25&&sceneDurationRaw<=30?sceneDurationRaw:3;const sceneMotionProgress=Math.max(0,Math.min(1,(frame-sceneMotionStartFrame)/(sceneDuration*30)));const sceneCharacterIds=Array.isArray(currentSceneData.characters)&&currentSceneData.characters.length?currentSceneData.characters:[$('character').value||'Foxy'];const characterLayout=getSceneCharacterLayout({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration);const previousSceneData=sceneIndex>0?(sceneMetadata[sceneIndex-1]||{title:titles[sceneIndex-1],visibleAction:descriptions[sceneIndex-1],prompt:descriptions[sceneIndex-1]}):null;const previousScale=previousSceneData?calculateCinematicShot({...previousSceneData,beatIndex:sceneIndex-1}).shotScale:null;const directorShot=calculateCinematicShot({...currentSceneData,beatIndex:sceneIndex},previousScale);const cameraPlan=directorShot.cameraTransform;const focusX=directorShot.focusTarget==='prop'?starBase[0]:(sceneCharacterIds.length>1?characterLayout[0].x*w:[225,270,365,190,315][sceneIndex%5]);const focusY=directorShot.focusTarget==='prop'?starBase[1]:(sceneCharacterIds.length>1?characterLayout[0].y*h:[290,300,292,295,300][sceneIndex%5]);ctx.save();ctx.translate(w/2,h/2+cameraPlan.offsetY);ctx.scale(cameraPlan.zoom,cameraPlan.zoom);ctx.translate(-focusX,-focusY);const action=getSceneAction(sceneIndex);const motionAction=resolveCharacterMotionAction(action);const motionProgress=CHARACTER_MOTION_CLIPS[motionAction].loop?(sceneMotionProgress*3)%1:sceneMotionProgress;const characterMotion=sampleCharacterMotion(motionAction,motionProgress);const leadGesture=getSceneCharacterGesturePose({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration,sceneCharacterIds[0]);const characterPose={...characterMotion.pose,leftArm:leadGesture.active?leadGesture.leftArm:characterMotion.pose.leftArm,rightArm:leadGesture.active?leadGesture.rightArm:characterMotion.pose.rightArm};let sx=starBase[0]+Math.sin(t*1.5)*15,sy=starBase[1]+Math.cos(t*2)*12;if(action==='run'){sx+=Math.sin(t*2)*36;sy-=Math.abs(Math.sin(t*3))*10}else if(action==='float'){sy-=Math.abs(Math.sin(t*1.4))*24}else if(action==='vanish'){sx+=Math.sin(t)*4}const starPulse=1+Math.sin(t*3)*.08;const starScale=action==='magic'?1.35:action==='vanish'?Math.max(.08,1-((frame%45)/45)):action==='float'?.88:sceneIndex===1?1.18:sceneIndex===3?1.35:sceneIndex===4?.88:1; if(sceneIndex===3){ctx.save();ctx.translate(sx,sy);ctx.strokeStyle='rgba(255,229,138,'+(.35+.25*Math.abs(Math.sin(t*3)))+')';ctx.lineWidth=3;for(let ray=0;ray<8;ray++){const a=ray*Math.PI/4+t*.08;ctx.beginPath();ctx.moveTo(Math.cos(a)*34,Math.sin(a)*34);ctx.lineTo(Math.cos(a)*48,Math.sin(a)*48);ctx.stroke()}ctx.restore()}if(sceneIndex===4){for(let spark=0;spark<7;spark++){const a=spark*Math.PI*2/7+t*.35;const px=sx+Math.cos(a)*(24+Math.sin(t*2+spark)*5),py=sy+Math.sin(a)*(24+Math.sin(t*2+spark)*5);ctx.fillStyle='rgba(255,229,138,.8)';ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);ctx.fill()}}ctx.save();ctx.translate(sx,sy);ctx.scale(starScale*starPulse,starScale*starPulse);ctx.rotate(t*.25);ctx.shadowBlur=sceneIndex===3?38:25;ctx.shadowColor='#ffe58a';ctx.fillStyle='#ffe58a';ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?13:30;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.restore();const foxPositions=[[225,290],[270,300],[365,292],[190,295],[315,300]];
+const foxBase=sceneCharacterIds.length>1?[(characterLayout[0]?.x||.35)*w,characterLayout[0]?.y*h||290]:foxPositions[sceneIndex%foxPositions.length];
+const poses=[[0,0,0],[18,0,-.08],[48,-12,.16],[12,-34,-.18],[-8,0,0]];
+const scenePose=poses[sceneIndex%poses.length];
+const actionPulse=Math.sin(t*2.4);
+let fx=foxBase[0]+scenePose[0]+Math.sin(t)*6+characterPose.x*100;
+let fy=foxBase[1]+scenePose[1]+Math.sin(t*2)*3+(sceneIndex===3?Math.abs(actionPulse)*7:0)+characterPose.y*100;
+if(action==='run'){fx+=Math.sin(t*4)*22;fy-=Math.abs(Math.sin(t*4))*8}
+else if(action==='jump'||action==='float'){fy-=Math.abs(Math.sin(t*3))*28}
+else if(action==='walk'){fx+=Math.sin(t*2.2)*13;fy-=Math.abs(Math.sin(t*2.2))*4}
+else if(action==='dance'){fx+=Math.sin(t*3.4)*12;fy-=Math.abs(Math.sin(t*3.4))*12}
+else if(action==='talk'){fy+=Math.sin(t*5)*2}
+else if(action==='surprised'){fy-=Math.abs(Math.sin(t*2))*5}
+else if(action==='sad'){fy+=Math.abs(Math.sin(t*1.5))*3}
+const toRadians=value=>value*Math.PI/180;
+const activeDialogue=getActiveDialogue(sceneIndex,sceneMotionProgress*sceneDuration);speakActiveDialogue(activeDialogue);const leadIsSpeaking=Boolean(activeDialogue&&activeDialogue.characterId.toLowerCase()===String(sceneCharacterIds[0]).toLowerCase());const emotion=getSceneEmotion(sceneIndex,sceneMotionProgress*sceneDuration);const emotionExpression={happy:'happy',sad:'sad',fear:'fear',anger:'anger',surprised:'surprised',neutral:'neutral'}[emotion];const expression=leadIsSpeaking?'talk':['happy','sad','surprised','talk'].includes(action)?action:emotionExpression||characterPose.expression;
+ctx.save();
+ctx.translate(fx,fy);
+ctx.rotate(scenePose[2]+characterPose.rotation*Math.PI/180+(sceneIndex===2?Math.sin(t*1.8)*.04:0)+(action==='dance'?Math.sin(t*3.4)*.2:action==='turn'?Math.sin(t*2)*.5:0));
+ctx.scale(characterPose.scaleX,characterPose.scaleY);
+ctx.lineCap='round';
+ctx.strokeStyle='#d96e38';ctx.lineWidth=12;ctx.beginPath();
+ctx.moveTo(-30,28);ctx.lineTo(-30+Math.sin(toRadians(characterPose.leftLeg))*24,52+Math.cos(toRadians(characterPose.leftLeg))*15);
+ctx.moveTo(30,28);ctx.lineTo(30+Math.sin(toRadians(characterPose.rightLeg))*24,52+Math.cos(toRadians(characterPose.rightLeg))*15);ctx.stroke();
+ctx.strokeStyle='#f18a48';ctx.lineWidth=11;ctx.beginPath();
+ctx.moveTo(-37,-2);ctx.lineTo(-37+Math.sin(toRadians(characterPose.leftArm))*27,-2+Math.cos(toRadians(characterPose.leftArm))*25);
+ctx.moveTo(37,-2);ctx.lineTo(37+Math.sin(toRadians(characterPose.rightArm))*27,-2+Math.cos(toRadians(characterPose.rightArm))*25);ctx.stroke();
+ctx.fillStyle='#f18a48';ctx.beginPath();ctx.ellipse(0,10,55,42,0,0,Math.PI*2);ctx.fill();
+ctx.save();ctx.translate(0,-23);ctx.rotate(toRadians(characterPose.headRotation));
+ctx.beginPath();ctx.moveTo(-38,0);ctx.lineTo(-48,-45);ctx.lineTo(-10,-22);ctx.fill();
+ctx.beginPath();ctx.moveTo(5,-22);ctx.lineTo(32,-55);ctx.lineTo(42,-3);ctx.fill();
+ctx.fillStyle='#ffd0a1';ctx.beginPath();ctx.ellipse(8,17,31,23,0,0,Math.PI*2);ctx.fill();
+const sceneFacePose=sampleEmotionFaceTimeline(sceneMetadata[sceneIndex]?.emotionTimeline,sceneMotionProgress*sceneDuration,.25,expression);const facePose=sceneFacePose;const blink=Math.sin(t*1.73+0.4)>.996?0.12:1;
+ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(4,-5,9,12*blink*facePose.eyeScale,0,0,Math.PI*2);ctx.ellipse(28,-5,9,12*blink*facePose.eyeScale,0,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#242033';ctx.beginPath();if(blink>.5){ctx.arc(7,-4,4,0,Math.PI*2);ctx.arc(29,-4,4,0,Math.PI*2)}ctx.fill();
+ctx.strokeStyle='#242033';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-2,-17-facePose.browLift*5+facePose.browTilt*4);ctx.lineTo(11,-17-facePose.browLift*5-facePose.browTilt*4);ctx.moveTo(23,-17-facePose.browLift*5+facePose.browTilt*4);ctx.lineTo(36,-17-facePose.browLift*5-facePose.browTilt*4);ctx.stroke();
+if(facePose.cheek>0){ctx.fillStyle='rgba(255,125,145,'+facePose.cheek+')';ctx.beginPath();ctx.ellipse(-1,9,5,3,0,0,Math.PI*2);ctx.ellipse(36,9,5,3,0,0,Math.PI*2);ctx.fill()}
+ctx.beginPath();ctx.arc(17,13,5,0,Math.PI*2);ctx.fill();
+ctx.strokeStyle='#242033';ctx.fillStyle='#242033';ctx.lineWidth=2.5;
+if(expression==='happy'||expression==='laughing'){ctx.beginPath();ctx.arc(17,19,8,0,Math.PI);ctx.stroke()}
+else if(expression==='sad'){ctx.beginPath();ctx.arc(17,28,7,Math.PI,Math.PI*2);ctx.stroke()}
+else if(expression==='surprised'||facePose.mouthOpen>0){ctx.beginPath();ctx.ellipse(17,21,5,Math.max(4,facePose.mouthOpen*10),0,0,Math.PI*2);ctx.fill()}
+else if(expression==='talk'||expression==='talking'){const audioMouthOpen=getDialogueMouthOpen(activeDialogue,sceneIndex);ctx.beginPath();ctx.ellipse(17,21,4,audioMouthOpen===null?Math.max(2,3+Math.abs(Math.sin(t*8))*4):2+audioMouthOpen*7,0,0,Math.PI*2);ctx.fill()}
+else{ctx.beginPath();ctx.moveTo(11,22);ctx.quadraticCurveTo(17,25,23,22);ctx.stroke()}
+if(facePose.tear>0){ctx.fillStyle='rgba(130,220,255,'+facePose.tear+')';ctx.beginPath();ctx.ellipse(34,8,3,6,-.25,0,Math.PI*2);ctx.fill()}
+ctx.restore();ctx.restore();for(let characterIndex=1;characterIndex<Math.min(sceneCharacterIds.length,characterLayout.length);characterIndex++){const layout=characterLayout[characterIndex];const profile=characterBible.find(entry=>entry.characterId.toLowerCase()===layout.characterId.toLowerCase())||{};drawAdditionalCharacter(profile,layout.x*w,layout.y*h,.82,t,layout.facing,layout.interaction,getSceneCharacterGesturePose({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration,layout.characterId),emotion,Boolean(activeDialogue&&activeDialogue.characterId.toLowerCase()===layout.characterId.toLowerCase()),activeDialogue&&activeDialogue.characterId.toLowerCase()===layout.characterId.toLowerCase()?getDialogueMouthOpen(activeDialogue,sceneIndex):null,sceneFacePose)}for(const handoff of getSceneObjectHandoffs({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration)){drawSceneObjectHandoff(handoff,t)}ctx.restore();const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
 if(generatedFrame){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
-ctx.fillStyle='#fff';ctx.font='bold 21px system-ui';ctx.fillText($('character').value||'Foxy',24,38);if(playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');magicParticles.updateAndDraw(ctx);if(playing){frame++;raf=requestAnimationFrame(draw)}else{raf=0}}
+if(sceneTransitionActive){if(playing){const transitionProgress=getSceneTransitionProgress(sceneTransitionStartFrame,frame);if(transitionProgress<1){ctx.save();ctx.globalAlpha=1-transitionProgress;ctx.drawImage(transitionCanvas,0,0,w,h);ctx.restore()}else sceneTransitionActive=false}else sceneTransitionActive=false}
+if(activeDialogue){ctx.save();const subtitleText=activeDialogue.text;ctx.font='600 15px system-ui';const maxWidth=w-48;const words=subtitleText.split(/\s+/);const rows=[];let row='';for(const word of words){const candidate=row?row+' '+word:word;if(ctx.measureText(candidate).width>maxWidth&&row){rows.push(row);row=word}else row=candidate}if(row)rows.push(row);const shown=rows.slice(0,2);const boxHeight=shown.length*21+18;ctx.fillStyle='rgba(8,10,18,.78)';ctx.beginPath();ctx.roundRect(16,h-boxHeight-16,w-32,boxHeight,10);ctx.fill();ctx.fillStyle='#fff';ctx.font='600 15px system-ui';ctx.textAlign='center';shown.forEach((line,i)=>ctx.fillText(line,w/2,h-25-(shown.length-1-i)*21));ctx.restore()}ctx.fillStyle='#fff';ctx.font='bold 21px system-ui';ctx.fillText($('character').value||'Foxy',24,38);if(playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');magicParticles.updateAndDraw(ctx);if(playing){frame++;raf=requestAnimationFrame(draw)}else{raf=0}}
 const storyTemplates={
 en:{titles:['The beginning','A turning point','The next step'],middle:'A new detail changes the moment.',ending:'The story moves forward.',status:'Local storyboard created. Optional Gemini AI scene generation is available when configured.'},
 ru:{titles:['Начало','Поворот','Продолжение'],middle:'Новая деталь меняет ход событий.',ending:'История продолжается.',status:'Локальная раскадровка создана. При настройке доступна дополнительная генерация сцен через Gemini.'},
@@ -237,6 +470,7 @@ $('generatedImageMeta').textContent=info.join(' · ');wrap.hidden=false;
 }
 function syncSceneEditor(){
 const meta=sceneMetadata[sceneIndex]||{};
+renderDialogueAudioAssignments();
 $('sceneTitle').value=titles[sceneIndex]||'';
 $('sceneDescription').value=descriptions[sceneIndex]||'';
 $('sceneCamera').value=meta.camera||'';
@@ -328,8 +562,8 @@ sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),title,description,
 $('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+title;
 renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=(sceneEditorLabels[uiLang]||sceneEditorLabels.en).updated
 };
-$('addScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length>=12){$('status').textContent=t.limit;return}titles.push(uiLang==='ru'?'Новая сцена':'New scene');descriptions.push(uiLang==='ru'?'Добавь описание этой сцены.':'Add a description for this scene.');sceneMetadata.push({title:titles[titles.length-1],description:descriptions[descriptions.length-1],prompt:descriptions[descriptions.length-1],visibleAction:descriptions[descriptions.length-1],camera:''});sceneIndex=titles.length-1;$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();$('status').textContent=t.added};
-$('deleteScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length<=1){$('status').textContent=t.minimum;return}titles.splice(sceneIndex,1);descriptions.splice(sceneIndex,1);sceneMetadata.splice(sceneIndex,1);sceneIndex=Math.min(sceneIndex,titles.length-1);$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=t.deleted};
+$('addScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length>=12){$('status').textContent=t.limit;return}titles.push(uiLang==='ru'?'Новая сцена':'New scene');descriptions.push(uiLang==='ru'?'Добавь описание этой сцены.':'Add a description for this scene.');sceneMetadata.push({id:globalThis.crypto?.randomUUID?.()||('scene-'+Date.now()+'-'+titles.length+'-'+Math.random().toString(36).slice(2,10)),title:titles[titles.length-1],description:descriptions[descriptions.length-1],prompt:descriptions[descriptions.length-1],visibleAction:descriptions[descriptions.length-1],camera:''});sceneIndex=titles.length-1;$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();$('status').textContent=t.added};
+$('deleteScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length<=1){$('status').textContent=t.minimum;return}titles.splice(sceneIndex,1);descriptions.splice(sceneIndex,1);sceneMetadata.splice(sceneIndex,1);dialogueAudioAssignments=pruneDialogueAudioAssignments(dialogueAudioAssignments,sceneMetadata);sceneIndex=Math.min(sceneIndex,titles.length-1);$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=t.deleted};
 
 function renderScenes(){
   const box=$('scenes');
@@ -377,7 +611,7 @@ function renderScenes(){
 }
 $('make').addEventListener('click',()=>createStoryboard(false));
 $('makeWithGemini').addEventListener('click',()=>createStoryboard(true));
-async function createStoryboard(useGemini){const status=$('status');const idea=$('idea').value.trim();if(!idea){status.textContent=tr('emptyIdea');$('idea').focus();return}const lang=storyLanguage();const character=$('character').value.trim()||(lang==='ru'?'Главный герой':'Foxy');try{status.textContent=useGemini?(uiLang==='ru'?'Gemini создаёт сцены…':'Gemini is creating scenes…'):(uiLang==='ru'?'Создаём раскадровку локально…':'Creating a local storyboard…');const plan=useGemini?await buildGeminiStoryboard({apiKey:$('geminiKey').value,idea,language:lang,character,style:$('style').value,duration:$('duration').value}):buildStoryboardFromText(idea,lang,character);titles=plan.titles;descriptions=plan.descriptions;sceneMetadata=Array.isArray(plan.scenes)?plan.scenes.map(scene=>({...scene,characters:Array.isArray(scene.characters)&&scene.characters.length?scene.characters:[character]})):[];const plannedBible=Array.isArray(plan.characterBible)?plan.characterBible.map(entry=>({...entry})):[];characterBible=plannedBible.some(entry=>String(entry.characterId||'').toLowerCase()===character.toLowerCase())?plannedBible:upsertCharacterReference(plannedBible,{characterId:character});sceneIndex=0;$('bibleCharacterId').value=character;$('bibleCharacterId').dataset.loaded='';$('sceneLabel').textContent=(storyLabels[lang]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();updateStoryQA();status.textContent=useGemini?(uiLang==='ru'?'Раскадровка создана Gemini на бесплатной квоте.':'Storyboard created by Gemini using the free-tier API.'):(uiLang==='ru'?'Создана локальная сюжетная раскадровка.':'Created a local storyboard.');status.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(error){console.error('DRAVEX storyboard error:',error);status.textContent=(uiLang==='ru'?'Gemini не сработал. Локальный режим остаётся доступен: ':'Gemini failed. Local mode is still available: ')+(error?.message||'Unknown error');}}
+async function createStoryboard(useGemini){const status=$('status');const idea=$('idea').value.trim();if(!idea){status.textContent=tr('emptyIdea');$('idea').focus();return}const lang=storyLanguage();const character=$('character').value.trim()||(lang==='ru'?'Главный герой':'Foxy');try{status.textContent=useGemini?(uiLang==='ru'?'Gemini создаёт сцены…':'Gemini is creating scenes…'):(uiLang==='ru'?'Создаём раскадровку локально…':'Creating a local storyboard…');const plan=useGemini?await buildGeminiStoryboard({apiKey:$('geminiKey').value,idea,language:lang,character,style:$('style').value,duration:$('duration').value}):buildStoryboardFromText(idea,lang,character);const resolvedCharacter=String(plan.mainCharacter||character).trim()||character;$('character').value=resolvedCharacter;titles=plan.titles;descriptions=plan.descriptions;sceneMetadata=ensureStableSceneIds(Array.isArray(plan.scenes)?plan.scenes.map(scene=>({...scene,characters:Array.isArray(scene.characters)&&scene.characters.length?scene.characters:[resolvedCharacter]})):[]);dialogueAudioAssignments.clear();const plannedBible=Array.isArray(plan.characterBible)?plan.characterBible.map(entry=>({...entry})):[];characterBible=plannedBible.length?plannedBible:upsertCharacterReference([],{characterId:resolvedCharacter});if(!characterBible.some(entry=>String(entry.characterId||'').toLowerCase()===resolvedCharacter.toLowerCase()))characterBible=upsertCharacterReference(characterBible,{characterId:resolvedCharacter});sceneIndex=0;$('bibleCharacterId').value=resolvedCharacter;$('bibleCharacterId').dataset.loaded='';$('sceneLabel').textContent=(storyLabels[lang]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();updateStoryQA();status.textContent=useGemini?(uiLang==='ru'?'Раскадровка создана Gemini на бесплатной квоте.':'Storyboard created by Gemini using the free-tier API.'):(uiLang==='ru'?'Создана локальная сюжетная раскадровка.':'Created a local storyboard.');status.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(error){console.error('DRAVEX storyboard error:',error);status.textContent=(uiLang==='ru'?'Gemini не сработал. Локальный режим остаётся доступен: ':'Gemini failed. Local mode is still available: ')+(error?.message||'Unknown error');}}
 $('checkLocalAI').addEventListener('click',async()=>{
 const button=$('checkLocalAI'),status=$('localAIStatus'),ru=uiLang==='ru';
 if(button.disabled)return;button.disabled=true;status.textContent=ru?'Проверяем возможности браузера и устройства…':'Checking browser and device capabilities…';
@@ -424,7 +658,36 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 }finally{button.disabled=!$('hordeConsent').checked}
 });
 $('testGemini').addEventListener('click',async()=>{const status=$('status');status.textContent=uiLang==='ru'?'Проверяем соединение Gemini…':'Testing Gemini connection…';try{await testGeminiConnection({apiKey:$('geminiKey').value});status.textContent=uiLang==='ru'?'Gemini подключён и отвечает.':'Gemini is connected and responding.';}catch(error){status.textContent=(uiLang==='ru'?'Проверка Gemini не пройдена: ':'Gemini connection test failed: ')+(error?.message||'Unknown error');}});
-$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?tr('pauseButton'):tr('playButton');if(playing&&!raf)draw()};
+let speechPlaybackArmed=false,lastSpokenDialogueKey='';
+let availableSpeechVoices=[];
+function refreshSpeechVoices(){
+  if(!('speechSynthesis' in window)){ $('voiceSelect').disabled=true;$('voiceEnabled').disabled=true;$('voiceStatus').textContent='Speech synthesis is unavailable in this browser. / В этом браузере нет системной озвучки.';return}
+  availableSpeechVoices=window.speechSynthesis.getVoices();
+  const selected=$('voiceSelect').value;
+  $('voiceSelect').innerHTML='';
+  const defaultOption=document.createElement('option');defaultOption.value='';defaultOption.textContent='System default voice / Голос системы';$('voiceSelect').appendChild(defaultOption);
+  for(const voice of availableSpeechVoices){const option=document.createElement('option');option.value=voice.voiceURI;option.textContent=voice.name+' · '+voice.lang;$('voiceSelect').appendChild(option)}
+  if(availableSpeechVoices.some(voice=>voice.voiceURI===selected))$('voiceSelect').value=selected;
+}
+function stopDialogueSpeech(){if('speechSynthesis' in window)window.speechSynthesis.cancel();lastSpokenDialogueKey=''}
+function speakActiveDialogue(dialogue){
+  if(!dialogue){if(lastSpokenDialogueKey)stopDialogueSpeech();return}
+  if(!speechPlaybackArmed||!playing||!$('voiceEnabled').checked||!('speechSynthesis' in window))return;
+  const key=[sceneIndex,dialogue.characterId,dialogue.startSeconds,dialogue.text].join('|');
+  if(key===lastSpokenDialogueKey)return;
+  window.speechSynthesis.cancel();lastSpokenDialogueKey=key;
+  const utterance=new SpeechSynthesisUtterance(dialogue.text);
+  const lang=$('language').value;utterance.lang={ru:'ru-RU',uk:'uk-UA',en:'en-US',es:'es-ES'}[lang]||lang;
+  const selectedVoice=availableSpeechVoices.find(voice=>voice.voiceURI===$('voiceSelect').value);
+  if(selectedVoice){utterance.voice=selectedVoice;utterance.lang=selectedVoice.lang||utterance.lang}
+  utterance.rate=1;utterance.pitch=1;
+  utterance.onerror=()=>{$('voiceStatus').textContent='The selected system voice could not speak this line. Try another installed voice. / Не удалось озвучить реплику выбранным голосом.'};
+  window.speechSynthesis.speak(utterance);
+}
+if('speechSynthesis' in window){refreshSpeechVoices();window.speechSynthesis.addEventListener?.('voiceschanged',refreshSpeechVoices)}
+$('voiceSelect').addEventListener('change',stopDialogueSpeech);
+$('voiceEnabled').addEventListener('change',()=>{if(!$('voiceEnabled').checked)stopDialogueSpeech()});
+$('play').onclick=()=>{playing=!playing;if(playing){speechPlaybackArmed=true;if(!raf)draw()}else{speechPlaybackArmed=false;stopDialogueSpeech()}$('play').textContent=playing?tr('pauseButton'):tr('playButton')};
 $('save').onclick=()=>{const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));$('status').textContent=saved?tr('saved'):tr('storageError')};
 $('export').onclick=async()=>{
   if(!canvas.captureStream||!window.MediaRecorder){
@@ -441,7 +704,9 @@ $('export').onclick=async()=>{
   button.disabled=true;
   $('audioFile').disabled=true;
   $('audioVolume').disabled=true;
+  $('dialogueAudioFiles').disabled=true;
   const wasPlaying=playing;
+  speechPlaybackArmed=false;stopDialogueSpeech();
   const originalSceneIndex=sceneIndex;
   const sceneTimers=[];
   let stream=null,recorder=null,stopTimer=null,cleaned=false,audioSession=null;
@@ -453,8 +718,11 @@ $('export').onclick=async()=>{
     sceneTimers.forEach(timer=>clearTimeout(timer));
     if(stream)stream.getTracks().forEach(track=>track.stop());
     if(audioSession)void audioSession.cleanup();
+    exportLipSyncState=null;
+    dialogueMouthEnvelopes=new Map();
     sceneIndex=originalSceneIndex;
     playing=wasPlaying;
+    speechPlaybackArmed=false;stopDialogueSpeech();
     $('play').textContent=playing?tr('pauseButton'):tr('playButton');
     renderScenes();
     syncSceneEditor();
@@ -462,6 +730,7 @@ $('export').onclick=async()=>{
     button.disabled=false;
     $('audioFile').disabled=false;
     $('audioVolume').disabled=false;
+    $('dialogueAudioFiles').disabled=false;
   };
   try{
     sceneIndex=timeline.segments[0].sceneIndex;
@@ -470,13 +739,30 @@ $('export').onclick=async()=>{
     if(!raf)draw();
     stream=canvas.captureStream(24);
     const musicFile=$('audioFile').files?.[0]||null;
+    const dialogueSchedule=buildDialogueAudioSchedule(sceneMetadata,timeline);
+    let dialogueBuffers=new Map();
+    try{dialogueBuffers=await decodeDialogueAudioFiles(new Map([...Array.from($('dialogueAudioFiles').files||[]).map(file=>{const parsed=parseDialogueAudioFilename(file.name);return [parsed?parsed.sceneIndex+':'+parsed.lineId:'',file]}),...mapDialogueAudioAssignmentsToSchedule(dialogueAudioAssignments,sceneMetadata,dialogueSchedule)]),dialogueSchedule)}catch(audioError){
+      console.warn('Dialogue audio was skipped:',audioError);
+      $('dialogueAudioStatus').textContent=(uiLang==='ru'?'Озвучка пропущена: ':'Dialogue audio skipped: ')+(audioError?.message||'Decode error');
+    }
+    const audioTracks=[];
     if(musicFile){
       const audioElement=new Audio(selectedMusicUrl);
       audioElement.loop=true;
       audioElement.preload='auto';
-      audioSession=await createAudioExportSession({videoStream:stream,audioElement,volume:Number($('audioVolume').value)/100});
+      audioTracks.push({audioElement,volume:Number($('audioVolume').value)/100});
+    }
+    if(musicFile||dialogueBuffers.size){
+      audioSession=await createAudioExportSession({
+        videoStream:stream,
+        audioTracks,
+        dialogueAudioSchedule:dialogueSchedule,
+        dialogueAudioBuffers:dialogueBuffers,
+        dialogueCharacterVolumes:getDialogueCharacterVolumeMap()
+      });
       stream=audioSession.stream;
-      await audioSession.start();
+      // Audio is started only after MediaRecorder begins, minimizing A/V start offset.
+      exportLipSyncState={audioSession,startedAt:0,schedule:dialogueSchedule,buffers:dialogueBuffers,envelopes:dialogueMouthEnvelopes};
     }
     const mimeTypes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
     const mimeType=mimeTypes.find(type=>MediaRecorder.isTypeSupported(type));
@@ -510,6 +796,7 @@ $('export').onclick=async()=>{
       }
     };
     recorder.start(250);
+    if(audioSession){exportLipSyncState.startedAt=await audioSession.start();}
     $('status').textContent=uiLang==='ru'
       ?'Записываем сцену 1 из '+timeline.segments.length+'…'
       :'Recording scene 1 of '+timeline.segments.length+'…';
@@ -531,7 +818,7 @@ $('export').onclick=async()=>{
     $('status').textContent=tr('exportFailed');
   }
 };
-try{const saved=JSON.parse(readLocalStorage('dravex-cartoon-draft')||'null');if(saved){$('idea').value=saved.idea||$('idea').value;$('uiLanguage').value=saved.uiLanguage||uiLang;uiLang=saved.uiLanguage||uiLang;$('character').value=saved.character||'Foxy';$('style').value=saved.style||'Storybook';$('duration').value=saved.duration||'3';$('language').value=saved.language||'en';if(Array.isArray(saved.titles)&&Array.isArray(saved.descriptions)&&saved.titles.length===saved.descriptions.length&&saved.titles.length>0&&saved.titles.length<=12){titles=saved.titles.map(v=>String(v).slice(0,80));descriptions=saved.descriptions.map(v=>String(v).slice(0,500));sceneMetadata=Array.isArray(saved.sceneMetadata)&&saved.sceneMetadata.length===titles.length?saved.sceneMetadata.map(item=>item&&typeof item==='object'?{...item}:{}):titles.map((title,index)=>({title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''}));characterBible=Array.isArray(saved.characterBible)?saved.characterBible.filter(entry=>entry&&typeof entry==='object').slice(0,20).map(entry=>({characterId:String(entry.characterId||'').slice(0,120),visualDescription:String(entry.visualDescription||'').slice(0,700),clothing:String(entry.clothing||'').slice(0,400),colors:String(entry.colors||'').slice(0,200),distinctiveFeatures:String(entry.distinctiveFeatures||'').slice(0,400)})):[];if(!characterBible.length)characterBible=upsertCharacterReference([],{characterId:$('character').value.trim()||'Foxy'});sceneIndex=Math.min(Math.max(0,Number(saved.sceneIndex)||0),titles.length-1)}$('status').textContent=tr('restored')}}catch(e){}
+try{const saved=JSON.parse(readLocalStorage('dravex-cartoon-draft')||'null');if(saved){$('idea').value=saved.idea||$('idea').value;$('uiLanguage').value=saved.uiLanguage||uiLang;uiLang=saved.uiLanguage||uiLang;$('character').value=saved.character||'Foxy';$('style').value=saved.style||'Storybook';$('duration').value=saved.duration||'3';$('language').value=saved.language||'en';if(Array.isArray(saved.titles)&&Array.isArray(saved.descriptions)&&saved.titles.length===saved.descriptions.length&&saved.titles.length>0&&saved.titles.length<=12){titles=saved.titles.map(v=>String(v).slice(0,80));descriptions=saved.descriptions.map(v=>String(v).slice(0,500));sceneMetadata=ensureStableSceneIds(Array.isArray(saved.sceneMetadata)&&saved.sceneMetadata.length===titles.length?saved.sceneMetadata.map(item=>item&&typeof item==='object'?{...item}:{}):titles.map((title,index)=>({title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''})));characterBible=Array.isArray(saved.characterBible)?saved.characterBible.filter(entry=>entry&&typeof entry==='object').slice(0,20).map(entry=>({characterId:String(entry.characterId||'').slice(0,120),visualDescription:String(entry.visualDescription||'').slice(0,700),clothing:String(entry.clothing||'').slice(0,400),colors:String(entry.colors||'').slice(0,200),distinctiveFeatures:String(entry.distinctiveFeatures||'').slice(0,400)})):[];if(!characterBible.length)characterBible=upsertCharacterReference([],{characterId:$('character').value.trim()||'Foxy'});sceneIndex=Math.min(Math.max(0,Number(saved.sceneIndex)||0),titles.length-1)}$('status').textContent=tr('restored')}}catch(e){}
 applyLanguage();renderScenes();applySceneEditorLanguage();syncSceneEditor();draw();
 </script>
 </body>

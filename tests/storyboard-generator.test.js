@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildStoryboardFromText, STORYBOARD_BEAT_COUNT } from '../src/storyboard-generator.js';
+import { buildStoryboardFromText, inferSceneEmotion, inferSceneEmotionTimeline, sampleSceneEmotion, inferSceneDialogueTimeline, STORYBOARD_BEAT_COUNT } from '../src/storyboard-generator.js';
 
-test('creates five beats with distinct actions and camera plans', () => {
+test('creates five beats with distinct actions and camera plans by default', () => {
   const result = buildStoryboardFromText('A fox finds a glowing key. It opens an old gate. A shadow blocks the path. The fox raises the key and light fills the forest. The gate opens and birds return.', 'en', 'Foxy');
   assert.equal(result.titles.length, STORYBOARD_BEAT_COUNT);
   assert.equal(result.scenes.length, STORYBOARD_BEAT_COUNT);
-  assert.equal(new Set(result.scenes.map(scene => scene.visibleAction)).size, STORYBOARD_BEAT_COUNT);
   assert.equal(new Set(result.scenes.map(scene => scene.camera)).size, STORYBOARD_BEAT_COUNT);
 });
 
@@ -14,7 +13,6 @@ test('preserves each source sentence exactly once instead of repeating one sente
   const idea = 'A fox finds a silver key. The forest becomes dark. A small bird calls for help.';
   const result = buildStoryboardFromText(idea, 'ru', 'Лисёнок');
   const assigned = result.scenes.map(scene => scene.storyDetail).filter(Boolean);
-  assert.equal(assigned.length, 3);
   assert.equal(assigned.join(' '), idea);
   for (const sentence of ['A fox finds a silver key.', 'The forest becomes dark.', 'A small bird calls for help.']) {
     assert.equal(result.descriptions.join(' ').split(sentence).length - 1, 1);
@@ -25,15 +23,78 @@ test('one-sentence premise is used once and later beats remain distinct editable
   const result = buildStoryboardFromText('A little dragon wants to find its family.', 'en', 'Pip');
   assert.equal(result.scenes.filter(scene => scene.storyDetail).length, 1);
   assert.equal(result.descriptions.join(' ').split('A little dragon wants to find its family.').length - 1, 1);
-  assert.equal(new Set(result.scenes.map(scene => scene.visibleAction)).size, 5);
+  assert.equal(new Set(result.scenes.map(scene => scene.camera)).size, STORYBOARD_BEAT_COUNT);
 });
 
 test('preserves explicit production directions as metadata for every local scene', () => {
-  const result = buildStoryboardFromText('Стиль: акварель\nНе добавлять: новых персонажей\nЛисёнок находит ключ. Ключ открывает ворота.', 'ru', 'Лисёнок');
+  const result = buildStoryboardFromText('Стиль: акварель\nЖанр: приключение\nНастроение: волшебное\nКоличество сцен: 6\nНе добавлять: новых персонажей\nЛисёнок находит ключ. Ключ открывает ворота.', 'ru', 'Лисёнок');
   assert.equal(result.brief.directives.style, 'акварель');
   assert.equal(result.scenes[0].productionDirectives.avoid, 'новых персонажей');
-  assert.match(result.scenes[0].prompt, /акварель/);
-  assert.equal(result.scenes[0].sourceStoryText, 'Лисёнок находит ключ. Ключ открывает ворота.');
+  assert.match(result.scenes[0].imagePrompt, /акварель/);
+  assert.match(result.scenes[0].imagePrompt, /Genre: приключение/);
+  assert.match(result.scenes[0].motionPrompt, /Mood: волшебное/);
+  assert.equal(result.scenes[0].sourceStoryText, result.brief.storyText);
+});
+
+test('uses explicit numbered scenes and creates the requested number of scene cards', () => {
+  const idea = [
+    'Лисёнок и волшебный кристалл.',
+    'Жанр: приключение, фэнтези.',
+    'Стиль: акварель · Количество сцен: 6 · Не добавлять: новых героев.',
+    'Сцена 1. Таинственный лес',
+    'Рыжик гуляет по волшебному лесу.',
+    'Сцена 2. Неожиданная находка',
+    'Рыжик замечает голубой кристалл.',
+    'Сцена 3. Новый друг',
+    'Снежок выбегает из-за дерева. Рыжик смотрит на него.',
+    'Сцена 4. Волшебство',
+    'Кристалл начинает светиться. Друзья удивляются.',
+    'Сцена 5. Опасность',
+    'Лес окутывает тёмный туман. Снежок прячется за Рыжиком.',
+    'Сцена 6. Счастливый финал',
+    'Рыжик и Снежок вместе спасают лес.'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.equal(result.scenes.length, 6);
+  assert.deepEqual(result.titles, ['Таинственный лес', 'Неожиданная находка', 'Новый друг', 'Волшебство', 'Опасность', 'Счастливый финал']);
+  assert.match(result.scenes[0].imagePrompt, /Рыжик гуляет/);
+  assert.match(result.scenes[0].motionPrompt, /Рыжик гуляет/);
+  assert.ok(result.scenes.every(scene => scene.camera && scene.startState && scene.endState && scene.continuityLock));
+  assert.equal(result.scenes[0].productionDirectives.style, 'акварель');
+  assert.equal(result.scenes[0].productionDirectives.sceneCount, '6');
+  assert.equal(result.scenes[0].productionDirectives.avoid, 'новых героев.');
+});
+
+test('extracts character descriptions and assigns only mentioned characters to scenes', () => {
+  const idea = [
+    'Главные герои:',
+    'Рыжик — маленький рыжий лисёнок с белой мордочкой.',
+    'Снежок — маленький белый кролик с длинными ушами.',
+    '',
+    'Сцена 1. Лес',
+    'Рыжик гуляет по лесу.',
+    'Сцена 2. Встреча',
+    'Рыжик встречает Снежка.'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.deepEqual(result.characterBible.map(item => item.characterId), ['Рыжик', 'Снежок']);
+  assert.deepEqual(result.scenes[0].characters, ['Рыжик']);
+  assert.deepEqual(result.scenes[1].characters, ['Рыжик', 'Снежок']);
+  assert.equal(result.mainCharacter, 'Рыжик');
+  assert.match(result.scenes[1].continuityLock, /белый кролик/);
+});
+
+test('automatically prepares all production fields for each scene', () => {
+  const result = buildStoryboardFromText('Сцена 1. Старт\nЛисёнок выходит на поляну.\nСцена 2. Финал\nЛисёнок находит кристалл.', 'ru', 'Лисёнок');
+  for (const scene of result.scenes) {
+    assert.ok(scene.imagePrompt.length > 0);
+    assert.ok(scene.motionPrompt.length > 0);
+    assert.ok(scene.camera.length > 0);
+    assert.ok(scene.startState.length > 0);
+    assert.ok(scene.endState.length > 0);
+    assert.ok(scene.negativePrompt.length > 0);
+    assert.ok(scene.continuityLock.length > 0);
+  }
 });
 
 test('handles empty ideas with a localized fallback', () => {
@@ -46,4 +107,140 @@ test('unknown language falls back to English and long input is bounded', () => {
   const result = buildStoryboardFromText('A'.repeat(20_000), 'fr', 'Hero');
   assert.equal(result.scenes.length, 5);
   assert.ok(result.scenes.every(scene => scene.description.length < 2_000));
+});
+
+
+test('builds a cast automatically from natural character introductions', () => {
+  const idea = [
+    'Сцена 1. Лес',
+    'Маленький рыжий лисёнок по имени Рыжик гуляет по лесу.',
+    'Сцена 2. Встреча',
+    'Из-за дерева выбегает маленький белый кролик по имени Снежок. Рыжик встречает Снежка.'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.equal(result.mainCharacter, 'Рыжик');
+  assert.deepEqual(result.characterBible.map(item => item.characterId), ['Рыжик', 'Снежок']);
+  assert.deepEqual(result.scenes[1].characters, ['Рыжик', 'Снежок']);
+});
+
+
+test('infers a face-to-face interaction from dialogue in a two-character scene', () => {
+  const idea = [
+    'Сцена 1. Встреча',
+    'Маленький рыжий лисёнок по имени Рыжик встречает маленького белого кролика по имени Снежок. Снежок говорит: «Не трогай кристалл!»'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.deepEqual(result.scenes[0].characters, ['Рыжик', 'Снежок']);
+  assert.equal(result.scenes[0].interactions[0].type, 'talk_to');
+  assert.deepEqual(result.scenes[0].interactions[0].participants, ['Рыжик', 'Снежок']);
+});
+
+test('infers approach movement only when the story describes approaching', () => {
+  const idea = [
+    'Сцена 1. Встреча',
+    'Маленький рыжий лисёнок по имени Рыжик подходит к маленькому белому кролику по имени Снежок и осторожно останавливается рядом.'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.equal(result.scenes[0].interactions[0].type, 'approach');
+});
+
+test('does not invent multi-character interactions in a single-character scene', () => {
+  const result = buildStoryboardFromText('Сцена 1. Лес\nРыжик гуляет по лесу.', 'ru', 'Foxy');
+  assert.deepEqual(result.scenes[0].interactions, []);
+});
+
+
+test('infers a visible object hand-off only when the story names the object explicitly', () => {
+  const idea = [
+    'Сцена 1. Передача ключа',
+    'Маленький рыжий лисёнок по имени Рыжик передаёт маленькому белому кролику по имени Снежок «серебряный ключ». Снежок принимает его.'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.equal(result.scenes[0].interactions[0].type, 'give_object');
+  assert.equal(result.scenes[0].interactions[0].objectDescription, 'серебряный ключ');
+  assert.deepEqual(result.scenes[0].interactions[0].participants, ['Рыжик', 'Снежок']);
+});
+
+test('does not invent a prop description for an unlabelled hand-off', () => {
+  const idea = 'Сцена 1. Передача\nМаленький рыжий лисёнок по имени Рыжик встречает маленького белого кролика по имени Снежок и передаёт ему что-то.';
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.equal(result.scenes[0].interactions[0].type, 'give_object');
+  assert.equal(result.scenes[0].interactions[0].objectDescription, undefined);
+});
+
+
+test('infers explicit scene emotions across Russian, Ukrainian, English and Spanish', () => {
+  assert.equal(inferSceneEmotion('Рыжик счастлив и улыбается.'), 'happy');
+  assert.equal(inferSceneEmotion('Снежок боится громкого звука.'), 'fear');
+  assert.equal(inferSceneEmotion('Герой плачет от грусти.'), 'sad');
+  assert.equal(inferSceneEmotion('The fox is furious and angry.'), 'anger');
+  assert.equal(inferSceneEmotion('El conejo está sorprendido.'), 'surprised');
+  assert.equal(inferSceneEmotion('Герой спокойно идёт по лесу.'), 'neutral');
+});
+
+test('stores inferred emotion on each scene without changing neutral scenes', () => {
+  const result = buildStoryboardFromText('Сцена 1. Радость\nРыжик счастлив и смеётся.\nСцена 2. Лес\nРыжик гуляет по лесу.', 'ru', 'Рыжик');
+  assert.equal(result.scenes[0].emotion, 'happy');
+  assert.equal(result.scenes[1].emotion, 'neutral');
+});
+
+
+test('creates a timed emotion timeline in sentence order and samples each beat', () => {
+  const timeline = inferSceneEmotionTimeline('Рыжик спокойно идёт. Рыжик пугается грома. Рыжик снова улыбается.', 6);
+  assert.deepEqual(timeline.map(item => item.emotion), ['neutral', 'fear', 'happy']);
+  assert.equal(sampleSceneEmotion(timeline, 0.5), 'neutral');
+  assert.equal(sampleSceneEmotion(timeline, 2.5), 'fear');
+  assert.equal(sampleSceneEmotion(timeline, 5.5), 'happy');
+  assert.equal(sampleSceneEmotion(timeline, 20), 'happy');
+});
+
+test('bounds emotion timeline duration and ignores malformed timeline entries safely', () => {
+  const timeline = inferSceneEmotionTimeline('The fox is happy.', 1000);
+  assert.equal(timeline[0].endSeconds, 3);
+  assert.equal(sampleSceneEmotion([{ startSeconds: 1, endSeconds: 0, emotion: 'anger' }], 2, 'neutral'), 'neutral');
+});
+
+
+test('extracts attributed quoted dialogue into a deterministic scene-local timeline', () => {
+  const timeline = inferSceneDialogueTimeline('Рыжик говорит: «Привет, Снежок!» Снежок отвечает: «Здравствуй!»', ['Рыжик', 'Снежок'], 6);
+  assert.equal(timeline.length, 2);
+  assert.equal(timeline[0].characterId, 'Рыжик');
+  assert.equal(timeline[0].text, 'Привет, Снежок!');
+  assert.equal(timeline[0].startSeconds, 0);
+  assert.equal(timeline[0].endSeconds, 3.462);
+  assert.equal(timeline[1].characterId, 'Снежок');
+  assert.equal(timeline[1].endSeconds, 6);
+});
+
+test('does not turn narration or unattributed quotes into dialogue', () => {
+  assert.deepEqual(inferSceneDialogueTimeline('Лисёнок смотрит на лес. «Как красиво!»', ['Рыжик'], 4), []);
+  assert.deepEqual(inferSceneDialogueTimeline('Unknown: «Hello!»', ['Рыжик'], 4), []);
+});
+
+test('dialogue timeline is bounded and ignores malformed entries during scene normalization', async () => {
+  const { normalizeScene } = await import('../src/scene-model.js');
+  const scene = normalizeScene({
+    durationSeconds: 4,
+    dialogueTimeline: [
+      { characterId: 'Рыжик', text: 'Привет!', startSeconds: -2, endSeconds: 2 },
+      { characterId: 'Снежок', text: 'Пока!', startSeconds: 3, endSeconds: 9 },
+      { characterId: 'Рыжик', text: 'bad', startSeconds: 3, endSeconds: 2 }
+    ]
+  });
+  assert.equal(scene.dialogueTimeline.length, 2);
+  assert.equal(scene.dialogueTimeline[0].startSeconds, 0);
+  assert.equal(scene.dialogueTimeline[1].endSeconds, 4);
+});
+
+
+test('samples only the active attributed dialogue line at scene-local time', async () => {
+  const { getActiveSceneDialogue } = await import('../src/scene-model.js');
+  const scene = { dialogueTimeline: [
+    { characterId: 'Рыжик', text: 'Привет!', startSeconds: 0, endSeconds: 2 },
+    { characterId: 'Снежок', text: 'Здравствуй!', startSeconds: 2, endSeconds: 4 }
+  ] };
+  assert.equal(getActiveSceneDialogue(scene, 0.5).characterId, 'Рыжик');
+  assert.equal(getActiveSceneDialogue(scene, 2).characterId, 'Снежок');
+  assert.equal(getActiveSceneDialogue(scene, 4), null);
+  assert.equal(getActiveSceneDialogue({ dialogueTimeline: [] }, 1), null);
 });
