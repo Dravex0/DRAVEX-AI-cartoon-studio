@@ -185,6 +185,7 @@ export function evaluateStoryboard({
     sourceOrderConsistency,
     characterConsistency,
     interactionIntegrity,
+    causalIntegrity,
     productionCompleteness,
     stateCoverage: continuityReport?.metrics.stateCoverage ?? null,
     stateTransitionConsistency: continuityReport?.metrics.stateTransitionConsistency ?? null,
