@@ -6,6 +6,7 @@ const clean = value => String(value ?? '').trim().slice(0, 120);
  * Coordinates are normalized (0..1); interaction times are scene-local seconds.
  */
 export function getSceneCharacterLayout(scene = {}, timeSeconds = 0) {
+  scene = scene && typeof scene === 'object' && !Array.isArray(scene) ? scene : {};
   const ids = [...new Set((Array.isArray(scene.characters) ? scene.characters : []).map(clean).filter(Boolean))].slice(0, 8);
   if (!ids.length) return [];
   const time = Number.isFinite(Number(timeSeconds)) ? Math.max(0, Number(timeSeconds)) : 0;
