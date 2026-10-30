@@ -159,6 +159,8 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
       ? (locale === 'ru' || locale === 'uk' ? `Анимируй только действия, описанные в этой сцене: ${storyDetail}` : `Animate only the actions described in this scene: ${storyDetail}`)
       : beat.action;
     const style = brief.directives.style ? `Visual style: ${brief.directives.style}.` : '';
+    const genre = brief.directives.genre ? `Genre: ${brief.directives.genre}.` : '';
+    const mood = brief.directives.mood ? `Mood: ${brief.directives.mood}.` : '';
     const format = brief.directives.format ? `Frame format: ${brief.directives.format}.` : '';
     const characterLock = characterBible
       .filter(profile => characters.some(id => id.toLowerCase() === profile.characterId.toLowerCase()))
@@ -169,9 +171,9 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
       brief.directives.avoid ? `Avoid: ${brief.directives.avoid}` : '',
       locale === 'ru' || locale === 'uk' ? 'Сохраняй одинаковую внешность и пропорции персонажей между сценами.' : 'Keep character appearance and proportions consistent across scenes.'
     ].filter(Boolean).join('\n');
-    const imagePrompt = [title, storyDetail, style, format, characterLock].filter(Boolean).join('\n');
-    const motionPrompt = action;
-    const description = [storyDetail || beat.action, style, format].filter(Boolean).join('\n');
+    const imagePrompt = [title, storyDetail, style, genre, mood, format, characterLock].filter(Boolean).join('\n');
+    const motionPrompt = [action, mood].filter(Boolean).join('\n');
+    const description = [storyDetail || beat.action, style, genre, mood, format].filter(Boolean).join('\n');
     const startState = sceneState(storyDetail, 'start', locale);
     const endState = sceneState(storyDetail, 'end', locale);
     const visibleAction = storyDetail || beat.action;
