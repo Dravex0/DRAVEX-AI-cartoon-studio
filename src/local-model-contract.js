@@ -87,7 +87,8 @@ export function assessLocalModelFit(manifestInput, capabilities = {}) {
   const hardBlock = issues.some(issue => [
     'webgpu-adapter-unavailable', 'wasm-unavailable', 'insufficient-device-memory', 'insufficient-storage'
   ].includes(issue.code));
-  const unknown = (model.minMemoryGB !== null && memoryGB === null) || storageBytes === null;
+  const backendUnknown = model.backend === 'wasm' && typeof capabilities.wasmAvailable !== 'boolean';
+  const unknown = backendUnknown || (model.minMemoryGB !== null && memoryGB === null) || storageBytes === null;
   return {
     status: hardBlock ? 'not-recommended' : unknown ? 'unknown' : 'eligible-to-test',
     issues,
