@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDialogueAudioSchedule, getActiveDialogueAudioCue } from '../src/dialogue-audio.js';
+import { buildDialogueAudioSchedule, getActiveDialogueAudioCue, getDialogueSpeakers } from '../src/dialogue-audio.js';
 
 test('converts scene-local dialogue times into global export offsets', () => {
   const schedule = buildDialogueAudioSchedule([
@@ -44,4 +44,13 @@ test('finds the active cue with an exclusive end boundary', () => {
 test('handles absent scenes, timelines and export segments safely', () => {
   assert.deepEqual(buildDialogueAudioSchedule(null, null), []);
   assert.deepEqual(buildDialogueAudioSchedule([{}], { segments: [{ sceneIndex: 0, startMs: 0, durationMs: 1000 }] }), []);
+});
+
+test('collects unique dialogue speakers across all scenes in first-seen order', () => {
+  assert.deepEqual(getDialogueSpeakers([
+    { dialogueTimeline: [{ characterId: 'Foxy' }, { characterId: 'Bird' }] },
+    { dialogueTimeline: [{ characterId: 'foxy' }, { characterId: '  Fox  ' }, { characterId: '' }] },
+    { dialogueTimeline: [{ characterId: 'Bird' }, { characterId: 'Fox' }] }
+  ]), ['Foxy', 'Bird', 'Fox']);
+  assert.deepEqual(getDialogueSpeakers(null), []);
 });
