@@ -30,6 +30,7 @@ export async function createAudioExportSession({
   const context = new AudioContextClass();
   let audioTrack = null;
   let closed = false;
+  let startPromise = null;
   try {
     const source = context.createMediaElementSource(audioElement);
     const gain = context.createGain();
@@ -44,10 +45,24 @@ export async function createAudioExportSession({
     const stream = new MediaStreamClass(tracks);
     return {
       stream,
-      async start() {
-        if (closed) throw new Error('Audio export session is already closed.');
-        await context.resume();
-        await audioElement.play();
+      start() {
+        if (closed) return Promise.reject(new Error('Audio export session is already closed.'));
+        if (startPromise) return startPromise;
+
+        startPromise = (async () => {
+          await context.resume();
+          if (closed) throw new Error('Audio export session is already closed.');
+          // Defer play() so synchronous browser exceptions follow the same rollback path
+          // as rejected play() promises.
+          await Promise.resolve().then(() => audioElement.play());
+        })().catch(error => {
+          try { audioElement.pause(); } catch {}
+          try { audioElement.currentTime = 0; } catch {}
+          startPromise = null;
+          throw error;
+        });
+
+        return startPromise;
       },
       async cleanup() {
         if (closed) return;
