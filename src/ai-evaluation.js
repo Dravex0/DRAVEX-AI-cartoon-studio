@@ -118,9 +118,10 @@ export function evaluateStoryboard({
     const validCausalLinks = causalScenes.filter(scene => {
       const link = scene.causalLink;
       const effectIndex = scenes.findIndex(item => item.id === scene.id);
-      const cause = scenes[effectIndex - 1];
-      return Boolean(link.type === 'consequence' && cause
-        && link.causeSceneId === cause.id && link.effectSceneId === scene.id
+      const causeIndex = scenes.findIndex(item => item.id === link.causeSceneId);
+      const cause = causeIndex >= 0 ? scenes[causeIndex] : null;
+      return Boolean(link.type === 'consequence' && cause && causeIndex < effectIndex
+        && link.effectSceneId === scene.id
         && link.marker && link.causeEvidence && link.evidence
         && cause.storyDetail.includes(link.causeEvidence)
         && scene.storyDetail.includes(link.evidence)
