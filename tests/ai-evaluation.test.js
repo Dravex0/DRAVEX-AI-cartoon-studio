@@ -75,3 +75,31 @@ test('integrates optional scene continuity and character reference checks', () =
   assert.equal(report.metrics.characterReferenceCoverage, 100);
   assert.ok(report.continuityReport);
 });
+
+test('detects when the storyboard reverses the original story event order', () => {
+  const report = evaluateStoryboard({
+    scenes: [
+      { id: 'scene_1', visibleAction: 'The hero opens the old door and steps inside.', camera: 'Wide shot', storyDetail: 'The hero finds a key.' },
+      { id: 'scene_2', visibleAction: 'The hero turns and runs down the corridor.', camera: 'Close-up', storyDetail: 'The hero escapes the castle.' },
+      { id: 'scene_3', visibleAction: 'The hero returns and unlocks the gate.', camera: 'Tracking shot', storyDetail: 'The hero enters the castle.' }
+    ],
+    expectedSceneCount: 3,
+    expectedStoryDetails: ['The hero enters the castle.', 'The hero finds a key.', 'The hero escapes the castle.']
+  });
+  assert.equal(report.metrics.sourceFidelity, 100);
+  assert.equal(report.metrics.sourceOrderConsistency, 0);
+  assert.ok(report.issues.some(issue => issue.code === 'source-event-order-changed'));
+  assert.equal(report.passed, false);
+});
+
+test('does not score event chronology when source details are missing or duplicated', () => {
+  const report = evaluateStoryboard({
+    scenes: [
+      { id: 'scene_1', visibleAction: 'The hero opens the old door and steps inside.', camera: 'Wide shot', storyDetail: 'The hero finds a key.' },
+      { id: 'scene_2', visibleAction: 'The hero turns and runs down the corridor.', camera: 'Close-up', storyDetail: 'The hero finds a key.' }
+    ],
+    expectedSceneCount: 2,
+    expectedStoryDetails: ['The hero enters the castle.', 'The hero finds a key.']
+  });
+  assert.equal(report.metrics.sourceOrderConsistency, null);
+});
