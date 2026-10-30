@@ -20,3 +20,16 @@ test('limits the cast to twelve unique characters and bounds each ID', () => {
   assert.equal(result.length, 12);
   assert.ok(result.every(name => name.length <= 120));
 });
+
+test('returns an empty cast when both input and fallback are empty', () => {
+  assert.deepEqual(normalizeSceneCast('  '), []);
+  assert.deepEqual(normalizeSceneCast([], []), []);
+});
+
+test('returns an empty cast for a non-array fallback instead of recursing', () => {
+  assert.deepEqual(normalizeSceneCast('', 'Foxy'), []);
+});
+
+test('normalizes fallback values with the same case-insensitive deduplication and limit', () => {
+  assert.deepEqual(normalizeSceneCast('', ['Foxy', 'foxy', 'Bird']), ['Foxy', 'Bird']);
+});
