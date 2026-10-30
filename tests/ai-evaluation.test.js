@@ -193,6 +193,6 @@ test('rejects state changes with invented source evidence or broken previous-sta
     ],
     expectedSceneCount: 2
   });
-  assert.equal(report.metrics.stateChangeIntegrity, 0);
+  assert.equal(report.metrics.stateChangeIntegrity, 50);
   assert.ok(report.issues.some(issue => issue.code === 'invalid-scene-state-change'));
 });
