@@ -97,6 +97,11 @@ export function getSceneCharacterGesturePose(scene = {}, timeSeconds = 0, charac
   const id = clean(characterId);
   const pose = { leftArm: 0, rightArm: 0, active: false, interaction: '' };
   const time = Number.isFinite(Number(timeSeconds)) ? Math.max(0, Number(timeSeconds)) : 0;
+  const smooth = value => { const t = clamp(value, 0, 1); return t * t * (3 - 2 * t); };
+  const envelope = (progress, attackStart, attackEnd, releaseStart, releaseEnd) =>
+    smooth((progress - attackStart) / (attackEnd - attackStart)) *
+    (1 - smooth((progress - releaseStart) / (releaseEnd - releaseStart)));
+
   for (const event of Array.isArray(scene.interactions) ? scene.interactions : []) {
     if (!event || !Array.isArray(event.participants)) continue;
     const participantIndex = event.participants.map(clean).indexOf(id);
@@ -105,16 +110,20 @@ export function getSceneCharacterGesturePose(scene = {}, timeSeconds = 0, charac
     const end = Number(event.endSeconds ?? event.end);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || time < start || time > end) continue;
     const progress = clamp((time - start) / (end - start), 0, 1);
-    const eased = progress * progress * (3 - 2 * progress);
-    const reach = participantIndex === 0 ? 1 : Math.max(0, Math.min(1, (progress - 0.35) / 0.55));
-    const angle = 82 * (participantIndex === 0 ? eased : reach);
+    let leftArm = 0, rightArm = 0;
     if (['gesture_to', 'give_object', 'receive_object', 'touch'].includes(event.type)) {
-      pose.rightArm = angle;
-      pose.active = true;
-      pose.interaction = event.type;
+      const reach = participantIndex === 0
+        ? envelope(progress, 0, 0.32, 0.68, 1)
+        : envelope(progress, 0.34, 0.68, 0.82, 1);
+      rightArm = 82 * reach;
     } else if (event.type === 'react_to') {
-      pose.leftArm = -58 * eased;
-      pose.rightArm = 58 * eased;
+      const reaction = envelope(progress, 0, 0.22, 0.72, 1);
+      leftArm = -58 * reaction;
+      rightArm = 58 * reaction;
+    } else continue;
+    if (Math.abs(leftArm) > Math.abs(pose.leftArm)) pose.leftArm = leftArm;
+    if (Math.abs(rightArm) > Math.abs(pose.rightArm)) pose.rightArm = rightArm;
+    if (Math.abs(leftArm) + Math.abs(rightArm) > 0) {
       pose.active = true;
       pose.interaction = event.type;
     }
