@@ -206,3 +206,79 @@ test('supports dialogue-only export without requiring a music element', async ()
   assert.deepEqual(scheduled, [[0, 0, 0.9]]);
   await session.cleanup();
 });
+
+
+test('start is idempotent and schedules dialogue only once', async () => {
+  const h = createHarness();
+  const scheduled = [];
+  class IdempotentContext extends h.FakeAudioContext {
+    createBufferSource() {
+      return {
+        connect() {},
+        start(...args) { scheduled.push(['start', ...args]); },
+        stop() { scheduled.push(['stop']); },
+        disconnect() {}
+      };
+    }
+  }
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioElement: h.audioElement,
+    dialogueAudioSchedule: [{ sceneIndex: 0, lineId: 'once', startMs: 0, endMs: 500 }],
+    dialogueAudioBuffers: new Map([['0:once', { duration: 1 }]]),
+    AudioContextClass: IdempotentContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  const firstStart = await session.start();
+  const secondStart = await session.start();
+  assert.equal(secondStart, firstStart);
+  assert.equal(scheduled.filter(event => event[0] === 'start').length, 1);
+  assert.equal(h.events.filter(event => event === 'play').length, 1);
+  await session.cleanup();
+});
+
+test('rolls back all audio when one track fails to play', async () => {
+  const h = createHarness();
+  const scheduled = [];
+  const firstTrack = {
+    currentTime: 3,
+    async play() { h.events.push('first-play'); },
+    pause() { h.events.push('first-pause'); }
+  };
+  const failingTrack = {
+    currentTime: 5,
+    async play() { h.events.push('failing-play'); throw new Error('Playback was blocked'); },
+    pause() { h.events.push('failing-pause'); }
+  };
+  class FailureContext extends h.FakeAudioContext {
+    createBufferSource() {
+      return {
+        connect() {},
+        start() { scheduled.push('start'); },
+        stop() { scheduled.push('stop'); },
+        disconnect() { scheduled.push('disconnect'); }
+      };
+    }
+  }
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioTracks: [
+      { audioElement: firstTrack, volume: 1 },
+      { audioElement: failingTrack, volume: 1 }
+    ],
+    dialogueAudioSchedule: [{ sceneIndex: 0, lineId: 'rollback', startMs: 0, endMs: 500 }],
+    dialogueAudioBuffers: new Map([['0:rollback', { duration: 1 }]]),
+    AudioContextClass: FailureContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  await assert.rejects(() => session.start(), /Playback was blocked/);
+  assert.deepEqual(scheduled, ['start', 'stop', 'disconnect']);
+  assert.equal(firstTrack.currentTime, 0);
+  assert.equal(failingTrack.currentTime, 0);
+  assert.ok(h.events.includes('first-pause'));
+  assert.ok(h.events.includes('failing-pause'));
+  await session.cleanup();
+  assert.ok(h.events.includes('close'));
+});
