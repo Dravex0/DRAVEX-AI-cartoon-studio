@@ -93,3 +93,44 @@ test('cleanup is safe to call more than once', async () => {
   await session.cleanup();
   assert.equal(h.events.filter(event => event === 'close').length, 1);
 });
+
+test('mixes multiple local audio tracks with independent volume and lifecycle', async () => {
+  const h = createHarness();
+  const dialogue = {
+    currentTime: 2,
+    async play() { h.events.push('dialogue-play'); },
+    pause() { h.events.push('dialogue-pause'); }
+  };
+  const music = {
+    currentTime: 7,
+    async play() { h.events.push('music-play'); },
+    pause() { h.events.push('music-pause'); }
+  };
+  const gains = [];
+  class MultiTrackContext extends h.FakeAudioContext {
+    createGain() {
+      const node = super.createGain();
+      gains.push(node);
+      return node;
+    }
+  }
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioTracks: [
+      { audioElement: dialogue, volume: 0.9 },
+      { audioElement: music, volume: 0.25 }
+    ],
+    AudioContextClass: MultiTrackContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  assert.deepEqual(gains.map(node => node.gain.value), [0.9, 0.25]);
+  await session.start();
+  assert.ok(h.events.includes('dialogue-play'));
+  assert.ok(h.events.includes('music-play'));
+  await session.cleanup();
+  assert.equal(dialogue.currentTime, 0);
+  assert.equal(music.currentTime, 0);
+  assert.ok(h.events.includes('dialogue-pause'));
+  assert.ok(h.events.includes('music-pause'));
+});
