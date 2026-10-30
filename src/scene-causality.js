@@ -3,10 +3,10 @@
  * Only explicit consequence markers are accepted; no implicit causality is guessed.
  */
 const MARKERS = {
-  ru: /\b(?:поэтому|в результате|вследствие этого|из-за этого|из за этого)\b/iu,
-  uk: /\b(?:тому|через це|унаслідок цього|внаслідок цього|завдяки цьому)\b/iu,
-  en: /\b(?:as a result|therefore|consequently|because of this|for this reason)\b/iu,
-  es: /\b(?:como resultado|por eso|por lo tanto|en consecuencia)\b/iu
+  ru: /(?<![\p{L}\p{N}])(?:поэтому|в результате|вследствие этого|из-за этого|из за этого)(?![\p{L}\p{N}])/iu,
+  uk: /(?<![\p{L}\p{N}])(?:тому|через це|унаслідок цього|внаслідок цього|завдяки цьому)(?![\p{L}\p{N}])/iu,
+  en: /(?<![\p{L}\p{N}])(?:as a result|therefore|consequently|because of this|for this reason)(?![\p{L}\p{N}])/iu,
+  es: /(?<![\p{L}\p{N}])(?:como resultado|por eso|por lo tanto|en consecuencia)(?![\p{L}\p{N}])/iu
 };
 
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
