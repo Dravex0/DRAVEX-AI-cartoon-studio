@@ -15,7 +15,7 @@ export function getSceneCharacterLayout(scene = {}, timeSeconds = 0) {
   const layout = ids.map((id, index) => ({
     characterId: id,
     x: count === 1 ? center : center + (index - (count - 1) / 2) * spacing,
-    y: 0.70 + (index % 2) * 0.015,
+    y: 0.61 + (index % 2) * 0.015,
     facing: index === 0 ? 1 : -1,
     gazeTargetCharacterId: '',
     interaction: ''
