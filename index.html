@@ -201,7 +201,7 @@ else if(expression==='surprised'){ctx.beginPath();ctx.ellipse(17,21,5,8,0,0,Math
 else if(expression==='talk'||expression==='talking'){ctx.beginPath();ctx.ellipse(17,21,4,Math.max(2,3+Math.abs(Math.sin(t*8))*4),0,0,Math.PI*2);ctx.fill()}
 else{ctx.beginPath();ctx.moveTo(11,22);ctx.quadraticCurveTo(17,25,23,22);ctx.stroke()}
 if(expression==='sad'){ctx.fillStyle='rgba(130,220,255,.85)';ctx.beginPath();ctx.ellipse(34,8,3,6,-.25,0,Math.PI*2);ctx.fill()}
-ctx.restore();ctx.restore();ctx.restore();ctx.restore();const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
+ctx.restore();ctx.restore();ctx.restore();const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
 if(generatedFrame){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
 ctx.fillStyle='#fff';ctx.font='bold 21px system-ui';ctx.fillText($('character').value||'Foxy',24,38);if(playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');magicParticles.updateAndDraw(ctx);if(playing){frame++;raf=requestAnimationFrame(draw)}else{raf=0}}
 const storyTemplates={
