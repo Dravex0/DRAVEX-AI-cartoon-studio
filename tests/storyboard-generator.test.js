@@ -111,3 +111,36 @@ test('storyboard scenes include isolated production prompts, matching cast and r
   assert.match(result.scenes[0].motionGenerationPrompt, /Foxy/i);
   assert.ok(result.scenes.every(scene => scene.productionReadiness && Array.isArray(scene.productionReadiness.issues)));
 });
+
+
+test('wires explicit character interactions into storyboard scenes and the event graph', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\\nBird — a small yellow bird.\\nFoxy — a small orange fox.\\n\\nScene 1: Guidance\\nBird guides Foxy home.',
+    'en',
+    'Foxy'
+  );
+  assert.deepEqual(result.scenes[0].characters, ['Bird', 'Foxy']);
+  assert.deepEqual(result.scenes[0].interaction, {
+    type: 'guide',
+    actorId: 'Bird',
+    targetId: 'Foxy',
+    evidence: 'Bird guides Foxy'
+  });
+  assert.ok(result.eventChain.edges.some(edge =>
+    edge.type === 'directed_interaction' &&
+    edge.fromSceneId === 'scene_1' &&
+    edge.actorId === 'Bird' &&
+    edge.targetId === 'Foxy'
+  ));
+});
+
+test('does not invent a storyboard interaction when the source only describes looking', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\\nBird — a small yellow bird.\\nFoxy — a small orange fox.\\n\\nScene 1: Meeting\\nBird looks toward Foxy.',
+    'en',
+    'Foxy'
+  );
+  assert.equal(result.scenes[0].interaction, null);
+  assert.equal(result.eventChain.nodes[0].action, null);
+  assert.equal(result.eventChain.edges.some(edge => edge.type === 'directed_interaction'), false);
+});
