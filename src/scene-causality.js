@@ -3,10 +3,10 @@
  * Only explicit consequence markers are accepted; no implicit causality is guessed.
  */
 const MARKERS = {
-  ru: /(?<![\p{L}\p{N}])(?:поэтому|в результате|вследствие этого|из-за этого|из за этого)(?![\p{L}\p{N}])/iu,
-  uk: /(?<![\p{L}\p{N}])(?:тому|через це|унаслідок цього|внаслідок цього|завдяки цьому)(?![\p{L}\p{N}])/iu,
-  en: /(?<![\p{L}\p{N}])(?:as a result|therefore|consequently|because of this|for this reason)(?![\p{L}\p{N}])/iu,
-  es: /(?<![\p{L}\p{N}])(?:como resultado|por eso|por lo tanto|en consecuencia)(?![\p{L}\p{N}])/iu
+  ru: /(?<![\p{L}\p{N}])(?:в результате этого|по этой причине|вследствие этого|из-за этого|из за этого|поэтому|в результате)(?![\p{L}\p{N}])/iu,
+  uk: /(?<![\p{L}\p{N}])(?:у результаті цього|з цієї причини|унаслідок цього|внаслідок цього|завдяки цьому|через це|тому)(?![\p{L}\p{N}])/iu,
+  en: /(?<![\p{L}\p{N}])(?:as a consequence|as a result|due to this|because of this|for this reason|consequently|therefore|thus|hence)(?![\p{L}\p{N}])/iu,
+  es: /(?<![\p{L}\p{N}])(?:como consecuencia|como resultado|debido a esto|por esta razón|por lo tanto|en consecuencia|por eso)(?![\p{L}\p{N}])/iu
 };
 
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);

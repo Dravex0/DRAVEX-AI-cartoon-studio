@@ -1,5 +1,6 @@
 import { normalizeScenes } from './scene-model.js';
 import { evaluateSceneContinuity } from './scene-continuity.js';
+import { inferSceneCausalLinks } from './scene-causality.js';
 
 const normalizeText = value => String(value ?? '').toLocaleLowerCase().normalize('NFKC')
   .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -112,26 +113,40 @@ export function evaluateStoryboard({
     });
   }
 
-  const causalScenes = scenes.filter(scene => scene.causalLink);
+  // Reconstruct expected links from source text in every supported language.
+  // This makes omissions and invented links fail the same gate as malformed evidence.
+  const causalLocales = ['en', 'ru', 'uk', 'es'];
+  const expectedCausalLinks = new Map();
+  for (const locale of causalLocales) {
+    for (const link of inferSceneCausalLinks(scenes, locale)) {
+      if (link && !expectedCausalLinks.has(link.effectSceneId)) {
+        expectedCausalLinks.set(link.effectSceneId, link);
+      }
+    }
+  }
+  const suppliedCausalScenes = scenes.filter(scene => scene.causalLink);
+  const causalLinkCount = Math.max(expectedCausalLinks.size, suppliedCausalScenes.length);
   let causalIntegrity = null;
-  if (causalScenes.length) {
-    const validCausalLinks = causalScenes.filter(scene => {
-      const link = scene.causalLink;
-      const effectIndex = scenes.findIndex(item => item.id === scene.id);
-      const causeIndex = scenes.findIndex(item => item.id === link.causeSceneId);
-      const cause = causeIndex >= 0 ? scenes[causeIndex] : null;
-      return Boolean(link.type === 'consequence' && cause && causeIndex < effectIndex
-        && link.effectSceneId === scene.id
-        && link.marker && link.causeEvidence && link.evidence
-        && cause.storyDetail.includes(link.causeEvidence)
-        && scene.storyDetail.includes(link.evidence)
-        && link.evidence.toLocaleLowerCase().includes(link.marker.toLocaleLowerCase()));
-    }).length;
-    causalIntegrity = percentage(validCausalLinks, causalScenes.length);
+  if (causalLinkCount) {
+    let validCausalLinks = 0;
+    for (const scene of scenes) {
+      const expected = expectedCausalLinks.get(scene.id) || null;
+      const supplied = scene.causalLink || null;
+      if (!expected && !supplied) continue;
+      const matches = Boolean(expected && supplied
+        && supplied.type === expected.type
+        && supplied.causeSceneId === expected.causeSceneId
+        && supplied.effectSceneId === expected.effectSceneId
+        && supplied.marker === expected.marker
+        && supplied.causeEvidence === expected.causeEvidence
+        && supplied.evidence === expected.evidence);
+      if (matches) validCausalLinks += 1;
+    }
+    causalIntegrity = percentage(validCausalLinks, causalLinkCount);
     if (causalIntegrity < 100) issues.push({
       skill: 'causal-reasoning',
       code: 'invalid-causal-link',
-      message: 'A causal link is not grounded in earlier source-story evidence.'
+      message: 'A causal link is missing, invented, or not grounded in the preceding source-story evidence.'
     });
   }
 
