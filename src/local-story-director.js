@@ -15,7 +15,7 @@ function parseModelScenes(text) {
   return Array.isArray(parsed?.scenes) ? parsed.scenes : null;
 }
 
-function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [] }) {
+function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null }) {
   const requiredDetails = basePlan.scenes.map((scene, index) => ({
     scene: index + 1,
     sourceDetail: clean(scene.storyDetail, 1_200),
@@ -47,6 +47,8 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'Keep startState and endState concrete, visible, and mutually compatible across every adjacent scene.',
     'The source details below are locked facts. Do not rewrite, reorder, omit, or duplicate them.',
     'LOCKED SOURCE DETAILS: ' + JSON.stringify(requiredDetails),
+    'LOCKED EVENT CHAIN: ' + JSON.stringify(eventChain),
+    'Treat the event chain as immutable source-grounded structure. Preserve actor-to-target direction, explicit consequences, and state changes. Do not invent a reaction-to link or causal edge when it is absent.',
     'ORIGINAL STORY: ' + clean(storyText, 12_000)
   ].join('\n\n');
 }
@@ -71,7 +73,8 @@ export async function directStoryboardWithLocalAI({
     scenes: fallback,
     evaluation,
     fallbackReason: reason,
-    modelId: runtime?.status?.modelId || null
+    modelId: runtime?.status?.modelId || null,
+    eventChain: basePlan?.eventChain || null
   });
 
   if (!runtime || typeof runtime.generate !== 'function') return fallbackResult('local-runtime-unavailable');
@@ -79,7 +82,7 @@ export async function directStoryboardWithLocalAI({
 
   let generated;
   try {
-    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible }), {
+    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: basePlan?.eventChain || null }), {
       maxNewTokens,
       temperature: 0.15
     });
@@ -133,6 +136,7 @@ export async function directStoryboardWithLocalAI({
   return {
     usedLocalModel: true,
     scenes: candidate,
+    eventChain: basePlan?.eventChain || null,
     evaluation,
     fallbackReason: null,
     modelId: generated.modelId || runtime.status?.modelId || null,
