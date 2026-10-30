@@ -162,7 +162,7 @@ test('infers a visible object hand-off only when the story names the object expl
 });
 
 test('does not invent a prop description for an unlabelled hand-off', () => {
-  const idea = 'Сцена 1. Передача. Маленький рыжий лисёнок по имени Рыжик передаёт что-то Снежку.';
+  const idea = 'Сцена 1. Передача. Маленький рыжий лисёнок по имени Рыжик встречает маленького белого кролика по имени Снежок и передаёт ему что-то.';
   const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
   assert.equal(result.scenes[0].interactions[0].type, 'give_object');
   assert.equal(result.scenes[0].interactions[0].objectDescription, undefined);
