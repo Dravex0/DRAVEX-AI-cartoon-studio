@@ -78,3 +78,19 @@ test('preserves source story details exactly once when the requested scene count
     assert.equal(result.descriptions.join(' ').split(sentence).length - 1, 1);
   }
 });
+
+test('story-specific source events drive different visible actions and camera plans', () => {
+  const result = buildStoryboardFromText(
+    'A fox finds a silver key. The forest becomes dark. A small bird guides Foxy home.',
+    'en',
+    'Foxy'
+  );
+  assert.equal(result.scenes[0].storyEventType, 'discovery');
+  assert.equal(result.scenes[1].storyEventType, 'transformation');
+  assert.equal(result.scenes[2].storyEventType, 'guidance_help');
+  assert.match(result.scenes[0].visibleAction, /noticing an important object/);
+  assert.match(result.scenes[1].visibleAction, /gradual change/);
+  assert.match(result.scenes[2].visibleAction, /following the guidance/);
+  assert.notEqual(result.scenes[0].camera, result.scenes[1].camera);
+  assert.notEqual(result.scenes[1].camera, result.scenes[2].camera);
+});
