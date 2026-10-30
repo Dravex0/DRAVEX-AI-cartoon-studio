@@ -3,6 +3,16 @@ name: Gemini Code Assistant (Free Tier)
 on:
   issues:
     types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_title:
+        description: "Краткое название задачи для анализа Gemini"
+        required: true
+        type: string
+      issue_body:
+        description: "Описание задачи и ожидаемого результата"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -10,7 +20,7 @@ permissions:
 
 jobs:
   generate-solution:
-    if: github.event.label.name == 'ai-task'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.label.name == 'ai-task')
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository source for evidence-based analysis
@@ -23,8 +33,8 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.5-flash-lite' }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event_name == 'issues' && github.event.issue.body || inputs.issue_body }}
+          ISSUE_TITLE: ${{ github.event_name == 'issues' && github.event.issue.title || inputs.issue_title }}
         run: |
           python3 - <<'PY'
           import json
@@ -148,7 +158,16 @@ jobs:
               raise SystemExit(f"Gemini proposal failed: {type(exc).__name__}. Check network, API response, and quota.")
           PY
 
+      - name: Save proposal as a downloadable artifact for manual test runs
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-source-grounded-proposal
+          path: gemini_proposal.md
+          retention-days: 7
+
       - name: Post proposal to Issue
+        if: github.event_name == 'issues'
         uses: actions/github-script@v7
         with:
           script: |
