@@ -56,3 +56,30 @@ test('readiness validator identifies missing production fields', () => {
 test('readiness validator accepts a complete scene', () => {
   assert.deepEqual(validateSceneProductionReadiness(scene), { ready: true, issues: [] });
 });
+
+test('character reference matching is case-insensitive and includes only characters in the scene', () => {
+  const profiles = [
+    { characterId: 'Foxy', visualDescription: 'Orange fox', clothing: 'Blue scarf' },
+    { characterId: 'Bird', visualDescription: 'Small yellow bird', clothing: 'Red cap' },
+    { characterId: 'Villain', visualDescription: 'Dark wolf' }
+  ];
+  const prompt = buildImageGenerationPrompt({ imagePrompt: 'Two friends meet.', characters: ['foXY', 'BIRD'] }, profiles);
+  assert.match(prompt, /Orange fox/);
+  assert.match(prompt, /Small yellow bird/);
+  assert.doesNotMatch(prompt, /Dark wolf/);
+});
+
+test('character prompt references are not duplicated when duplicate profiles are supplied', () => {
+  const profile = { characterId: 'Foxy', visualDescription: 'Orange fox' };
+  const prompt = buildMotionGenerationPrompt({ visibleAction: 'The fox waves.', characters: ['foxy'] }, [profile, profile]);
+  assert.equal(prompt.split('Orange fox').length - 1, 1);
+});
+
+test('empty scene character list keeps the existing all-profile fallback', () => {
+  const prompt = buildImageGenerationPrompt({ imagePrompt: 'A forest scene.' }, [
+    { characterId: 'Foxy', visualDescription: 'Orange fox' },
+    { characterId: 'Bird', visualDescription: 'Yellow bird' }
+  ]);
+  assert.match(prompt, /Orange fox/);
+  assert.match(prompt, /Yellow bird/);
+});
