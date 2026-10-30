@@ -176,3 +176,27 @@ test('does not start playback when cleanup happens during context resume', async
   assert.equal(h.events.includes('play'), false);
   assert.equal(h.audioTrack.stopped, true);
 });
+
+
+test('allows retry after a transient audio playback failure', async () => {
+  const h = createHarness();
+  let attempts = 0;
+  h.audioElement.play = async () => {
+    attempts += 1;
+    h.events.push(`play-${attempts}`);
+    if (attempts === 1) throw new Error('temporary playback failure');
+  };
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioElement: h.audioElement,
+    AudioContextClass: h.FakeAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  await assert.rejects(session.start(), /temporary playback failure/);
+  assert.equal(h.audioElement.currentTime, 0);
+  await session.start();
+  assert.equal(attempts, 2);
+  assert.equal(h.events.filter(event => event === 'resume').length, 2);
+  await session.cleanup();
+});
