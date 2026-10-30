@@ -74,9 +74,9 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="actions"><button class="secondary" id="applyScene">Apply scene edits</button><button class="secondary" id="addScene">Add scene</button><button class="secondary" id="deleteScene">Delete scene</button></div></div><div class="audio-panel">
 <div class="field"><label for="audioFile">Background music / Фоновая музыка (optional)</label><input id="audioFile" type="file" accept="audio/*"><small class="muted">Selected audio stays on this device and is mixed into the exported WebM. Nothing is uploaded. / Музыка остаётся на устройстве и добавляется в экспорт.</small></div>
 <div class="field"><label for="audioVolume">Music volume / Громкость музыки <output id="audioVolumeValue">70%</output></label><input id="audioVolume" type="range" min="0" max="100" value="70"></div>
-<audio id="audioPreview" controls preload="none" hidden></audio><div id="audioStatus" class="muted" role="status" aria-live="polite">No music selected / Музыка не выбрана</div>
+<audio id="audioPreview" controls preload="none" hidden></audio><div id="audioStatus" class="muted" role="status" aria-live="polite">No music selected / Музыка не выбрана</div><div class="field"><label><input id="voiceEnabled" type="checkbox" checked> Dialogue voice preview / Озвучивать реплики в предпросмотре</label><select id="voiceSelect" aria-label="Dialogue voice"><option value="">System default voice / Голос системы</option></select><div id="voiceStatus" class="muted" role="status" aria-live="polite">Uses voices installed in this browser/device. Voice is preview-only and is not included in exported WebM. / Используются голоса устройства. Озвучка только в предпросмотре, в WebM не попадает.</div></div>
 </div>
-<div class="actions"><button class="secondary" id="play" data-i18n="playButton">Play preview</button><button class="secondary" id="export" data-i18n="exportButton">Export WebM test</button></div><p class="muted" style="font-size:12px"><span data-i18n="previewDisclaimer">Preview/export uses a simple canvas animation. Optional local music can be included; generated voice and lip-sync are not implemented yet.</span></p></section>
+<div class="actions"><button class="secondary" id="play" data-i18n="playButton">Play preview</button><button class="secondary" id="export" data-i18n="exportButton">Export WebM test</button></div><p class="muted" style="font-size:12px"><span data-i18n="previewDisclaimer">Preview uses Canvas animation and optional device speech synthesis. Dialogue voice is preview-only and is not included in exported WebM yet. / Предпросмотр использует анимацию Canvas и системную озвучку. Голос пока не входит в экспорт WebM.</span></p></section>
 </div><footer class="foot"><span data-i18n="footer">DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to</span></footer>
 </main>
 <script type="module">
@@ -209,7 +209,7 @@ else if(action==='talk'){fy+=Math.sin(t*5)*2}
 else if(action==='surprised'){fy-=Math.abs(Math.sin(t*2))*5}
 else if(action==='sad'){fy+=Math.abs(Math.sin(t*1.5))*3}
 const toRadians=value=>value*Math.PI/180;
-const activeDialogue=getActiveDialogue(sceneIndex,sceneMotionProgress*sceneDuration);const leadIsSpeaking=Boolean(activeDialogue&&activeDialogue.characterId.toLowerCase()===String(sceneCharacterIds[0]).toLowerCase());const emotion=getSceneEmotion(sceneIndex,sceneMotionProgress*sceneDuration);const emotionExpression={happy:'happy',sad:'sad',fear:'surprised',anger:'neutral',surprised:'surprised',neutral:'neutral'}[emotion];const expression=leadIsSpeaking?'talk':['happy','sad','surprised','talk'].includes(action)?action:emotionExpression||characterPose.expression;
+const activeDialogue=getActiveDialogue(sceneIndex,sceneMotionProgress*sceneDuration);speakActiveDialogue(activeDialogue);const leadIsSpeaking=Boolean(activeDialogue&&activeDialogue.characterId.toLowerCase()===String(sceneCharacterIds[0]).toLowerCase());const emotion=getSceneEmotion(sceneIndex,sceneMotionProgress*sceneDuration);const emotionExpression={happy:'happy',sad:'sad',fear:'surprised',anger:'neutral',surprised:'surprised',neutral:'neutral'}[emotion];const expression=leadIsSpeaking?'talk':['happy','sad','surprised','talk'].includes(action)?action:emotionExpression||characterPose.expression;
 ctx.save();
 ctx.translate(fx,fy);
 ctx.rotate(scenePose[2]+characterPose.rotation*Math.PI/180+(sceneIndex===2?Math.sin(t*1.8)*.04:0)+(action==='dance'?Math.sin(t*3.4)*.2:action==='turn'?Math.sin(t*2)*.5:0));
@@ -506,7 +506,35 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 }finally{button.disabled=!$('hordeConsent').checked}
 });
 $('testGemini').addEventListener('click',async()=>{const status=$('status');status.textContent=uiLang==='ru'?'Проверяем соединение Gemini…':'Testing Gemini connection…';try{await testGeminiConnection({apiKey:$('geminiKey').value});status.textContent=uiLang==='ru'?'Gemini подключён и отвечает.':'Gemini is connected and responding.';}catch(error){status.textContent=(uiLang==='ru'?'Проверка Gemini не пройдена: ':'Gemini connection test failed: ')+(error?.message||'Unknown error');}});
-$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?tr('pauseButton'):tr('playButton');if(playing&&!raf)draw()};
+let speechPlaybackArmed=false,lastSpokenDialogueKey='';
+let availableSpeechVoices=[];
+function refreshSpeechVoices(){
+  if(!('speechSynthesis' in window)){ $('voiceSelect').disabled=true;$('voiceEnabled').disabled=true;$('voiceStatus').textContent='Speech synthesis is unavailable in this browser. / В этом браузере нет системной озвучки.';return}
+  availableSpeechVoices=window.speechSynthesis.getVoices();
+  const selected=$('voiceSelect').value;
+  $('voiceSelect').innerHTML='';
+  const defaultOption=document.createElement('option');defaultOption.value='';defaultOption.textContent='System default voice / Голос системы';$('voiceSelect').appendChild(defaultOption);
+  for(const voice of availableSpeechVoices){const option=document.createElement('option');option.value=voice.voiceURI;option.textContent=voice.name+' · '+voice.lang;$('voiceSelect').appendChild(option)}
+  if(availableSpeechVoices.some(voice=>voice.voiceURI===selected))$('voiceSelect').value=selected;
+}
+function stopDialogueSpeech(){if('speechSynthesis' in window)window.speechSynthesis.cancel();lastSpokenDialogueKey=''}
+function speakActiveDialogue(dialogue){
+  if(!speechPlaybackArmed||!playing||!$('voiceEnabled').checked||!dialogue||!('speechSynthesis' in window))return;
+  const key=[sceneIndex,dialogue.characterId,dialogue.startSeconds,dialogue.text].join('|');
+  if(key===lastSpokenDialogueKey)return;
+  window.speechSynthesis.cancel();lastSpokenDialogueKey=key;
+  const utterance=new SpeechSynthesisUtterance(dialogue.text);
+  const lang=$('language').value;utterance.lang={ru:'ru-RU',uk:'uk-UA',en:'en-US',es:'es-ES'}[lang]||lang;
+  const selectedVoice=availableSpeechVoices.find(voice=>voice.voiceURI===$('voiceSelect').value);
+  if(selectedVoice){utterance.voice=selectedVoice;utterance.lang=selectedVoice.lang||utterance.lang}
+  utterance.rate=1;utterance.pitch=1;
+  utterance.onerror=()=>{$('voiceStatus').textContent='The selected system voice could not speak this line. Try another installed voice. / Не удалось озвучить реплику выбранным голосом.'};
+  window.speechSynthesis.speak(utterance);
+}
+if('speechSynthesis' in window){refreshSpeechVoices();window.speechSynthesis.addEventListener?.('voiceschanged',refreshSpeechVoices)}
+$('voiceSelect').addEventListener('change',stopDialogueSpeech);
+$('voiceEnabled').addEventListener('change',()=>{if(!$('voiceEnabled').checked)stopDialogueSpeech()});
+$('play').onclick=()=>{playing=!playing;if(playing){speechPlaybackArmed=true;if(!raf)draw()}else{speechPlaybackArmed=false;stopDialogueSpeech()}$('play').textContent=playing?tr('pauseButton'):tr('playButton')};
 $('save').onclick=()=>{const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));$('status').textContent=saved?tr('saved'):tr('storageError')};
 $('export').onclick=async()=>{
   if(!canvas.captureStream||!window.MediaRecorder){
@@ -524,6 +552,7 @@ $('export').onclick=async()=>{
   $('audioFile').disabled=true;
   $('audioVolume').disabled=true;
   const wasPlaying=playing;
+  speechPlaybackArmed=false;stopDialogueSpeech();
   const originalSceneIndex=sceneIndex;
   const sceneTimers=[];
   let stream=null,recorder=null,stopTimer=null,cleaned=false,audioSession=null;
@@ -537,6 +566,7 @@ $('export').onclick=async()=>{
     if(audioSession)void audioSession.cleanup();
     sceneIndex=originalSceneIndex;
     playing=wasPlaying;
+    speechPlaybackArmed=false;stopDialogueSpeech();
     $('play').textContent=playing?tr('pauseButton'):tr('playButton');
     renderScenes();
     syncSceneEditor();
