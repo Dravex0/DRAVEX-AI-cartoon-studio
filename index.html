@@ -126,7 +126,7 @@ async function decodeDialogueAudioFiles(files, schedule){
   const unmatched=[];
   try{
     for(const file of selected){
-      const match=/^scene(\\d+)_(.+)\\.[^.]+$/i.exec(file.name);
+      const match=/^scene(\d+)_(.+)\.[^.]+$/i.exec(file.name);
       if(!match){unmatched.push(file.name);continue}
       const sceneIndex=Number(match[1])-1;
       const lineId=match[2];
