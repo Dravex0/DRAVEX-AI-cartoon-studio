@@ -70,7 +70,7 @@ test('cancels an unfinished request when the volunteer queue times out', async (
     throw new Error('Unexpected URL: ' + url);
   };
   await assert.rejects(() => generateImageWithHorde({
-    prompt: 'A fox.', fetchImpl, pollIntervalMs: 0, maxWaitMs: 1000
+    prompt: 'A fox.', fetchImpl, pollIntervalMs: 1000, maxWaitMs: 1000
   }), /took too long/);
   assert.ok(calls.some(call => call.url.endsWith('/generate/status/slow-request') && call.options.method === 'DELETE'));
 });
