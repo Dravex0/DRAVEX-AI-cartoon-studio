@@ -126,3 +126,24 @@ test('does not create a causal edge when cause or effect evidence is not present
   assert.equal(graph.nodes[1].consequence, null);
   assert.equal(graph.edges.some(edge => edge.type === 'causes'), false);
 });
+
+
+test('rejects state changes that break the previous-scene hand-off', () => {
+  const graph = buildStoryEventChain([
+    { id: 's1', storyEventType: 'discovery', storyDetail: 'Foxy picks up the silver key.', characters: ['Foxy'],
+      stateChanges: [{
+        entityType: 'prop', entityId: 'silver key', property: 'holder',
+        previousValue: null, value: 'Foxy', actorId: 'Foxy',
+        evidence: 'Foxy picks up the silver key.'
+      }] },
+    { id: 's2', storyEventType: 'general', storyDetail: 'Foxy drops the silver key.', characters: ['Foxy'],
+      stateChanges: [{
+        entityType: 'prop', entityId: 'silver key', property: 'holder',
+        previousValue: null, value: null, actorId: 'Foxy',
+        evidence: 'Foxy drops the silver key.'
+      }] }
+  ]);
+  assert.equal(graph.nodes[0].stateChanges.length, 1);
+  assert.equal(graph.nodes[1].stateChanges.length, 0);
+  assert.equal(graph.edges.filter(edge => edge.type === 'changes_state').length, 1);
+});
