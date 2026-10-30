@@ -93,7 +93,7 @@ import { getPromptCameraTransform } from "./src/prompt-camera-motion.js";
 import { detectSceneAction } from "./src/scene-action.js";
 import { buildExportTimeline } from "./src/export-timeline.js";
 import { createAudioExportSession } from "./src/audio-export.js";
-import { buildDialogueAudioSchedule } from "./src/dialogue-audio.js";
+import { buildDialogueAudioSchedule, getDialogueSpeakers } from "./src/dialogue-audio.js";
 import { parseDialogueAudioFilename, getDialogueAudioAssignmentKey, mapDialogueAudioAssignmentsToSchedule, pruneDialogueAudioAssignments } from "./src/dialogue-audio-assets.js";
 import { createDialogueMouthEnvelope, sampleDialogueMouthEnvelope } from "./src/dialogue-lip-sync.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./src/scene-production.js";
@@ -139,7 +139,7 @@ function renderDialogueAudioAssignments(){
   const heading=document.createElement('strong');
   heading.textContent=uiLang==='ru'?'Озвучка реплик этой сцены':'Voice recordings for this scene';
   box.appendChild(heading);
-  const speakers=[...new Set(lines.map(line=>String(line.characterId||'').trim()).filter(Boolean))];
+  const speakers=getDialogueSpeakers(sceneMetadata);
   if(speakers.length){
     const volumeGroup=document.createElement('div');
     volumeGroup.className='field';
@@ -171,7 +171,7 @@ function renderDialogueAudioAssignments(){
   if(!lines.length){
     const empty=document.createElement('small');
     empty.className='muted';
-    empty.textContent=uiLang==='ru'?'В этой сцене не найдены реплики с указанным говорящим.':'No attributed dialogue lines were detected in this scene.';
+    empty.textContent=uiLang==='ru'?'В этой сцене пока нет реплик. Громкость всех персонажей можно настроить выше.':'No dialogue lines in this scene yet. All character levels can be adjusted above.';
     box.appendChild(empty);
     return;
   }
