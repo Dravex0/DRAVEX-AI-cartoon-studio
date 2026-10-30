@@ -15,7 +15,11 @@ The current storyboard planner is deterministic and rule-based. It is not a trai
 - camera-plan variety;
 - source-story fidelity;
 - optional explicit character membership;
-- optional scene-production field completeness.
+- optional scene-production field completeness;
+- optional scene-state coverage and adjacent-scene state hand-offs;
+- optional character-reference ID coverage against the Character Bible.
+
+`src/scene-continuity.js` adds a separate continuity report and can be enabled inside `evaluateStoryboard` with `requireContinuity: true`. It checks written state notes and character IDs only; it does not compare rendered faces, clothing, or animation frames. Text similarity can miss valid paraphrases, so low scores are review flags rather than proof of a continuity error.
 
 A metric is `null` when the current sample does not provide enough evidence. The evaluator does not infer image quality, emotional truth, visual character identity, animation quality, or whether a generated video looks correct.
 
