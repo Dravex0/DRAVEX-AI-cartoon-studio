@@ -117,6 +117,8 @@ async function decodeDialogueAudioFiles(files, schedule){
   const selected=Array.from(files||[]);
   const buffers=new Map();
   if(!selected.length)return buffers;
+  if(selected.length>40)throw new Error('Select no more than 40 dialogue audio files.');
+  if(selected.some(file=>file.size>20*1024*1024))throw new Error('Each dialogue audio file must be 20 MB or smaller.');
   const AudioContextClass=window.AudioContext||window.webkitAudioContext;
   if(!AudioContextClass)throw new Error('Web Audio decoding is not supported in this browser.');
   const context=new AudioContextClass();
@@ -621,7 +623,11 @@ $('export').onclick=async()=>{
     stream=canvas.captureStream(24);
     const musicFile=$('audioFile').files?.[0]||null;
     const dialogueSchedule=buildDialogueAudioSchedule(sceneMetadata,timeline);
-    const dialogueBuffers=await decodeDialogueAudioFiles($('dialogueAudioFiles').files,dialogueSchedule);
+    let dialogueBuffers=new Map();
+    try{dialogueBuffers=await decodeDialogueAudioFiles($('dialogueAudioFiles').files,dialogueSchedule)}catch(audioError){
+      console.warn('Dialogue audio was skipped:',audioError);
+      $('dialogueAudioStatus').textContent=(uiLang==='ru'?'Озвучка пропущена: ':'Dialogue audio skipped: ')+(audioError?.message||'Decode error');
+    }
     const audioTracks=[];
     if(musicFile){
       const audioElement=new Audio(selectedMusicUrl);
