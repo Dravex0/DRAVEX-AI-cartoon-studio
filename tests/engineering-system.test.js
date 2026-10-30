@@ -47,3 +47,12 @@ test("audit does not expose file contents in findings", () => {
   const report = runEngineeringAudit({files:[{path:"src/leaky.js",content:"const API_KEY = 'sensitive-example-value';"}]});
   assert.ok(!JSON.stringify(report).includes("sensitive-example-value"));
 });
+
+test("audit recognizes configured shared test files", () => {
+  const report = runEngineeringAudit({ files: [
+    "package.json","README.md","index.html",".github/workflows/quality.yml",
+    "src/engineering/audit-engine.js","tests/engineering-system.test.js",
+    "src/scene-model.js","tests/story-qa.test.js"
+  ]});
+  assert.equal(report.findingCount, 0);
+});
