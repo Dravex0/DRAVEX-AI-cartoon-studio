@@ -15,7 +15,7 @@ function parseModelScenes(text) {
   return Array.isArray(parsed?.scenes) ? parsed.scenes : null;
 }
 
-function buildDirectorPrompt({ basePlan, storyText, language, character }) {
+function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [] }) {
   const requiredDetails = basePlan.scenes.map((scene, index) => ({
     scene: index + 1,
     sourceDetail: clean(scene.storyDetail, 1_200),
@@ -29,7 +29,10 @@ function buildDirectorPrompt({ basePlan, storyText, language, character }) {
     'Each visibleAction must describe one concrete, filmable physical action, not a vague feeling or a static pose.',
     'Make every scene action and camera plan distinct. Use specific shot size, angle, and camera movement.',
     'Do not add characters, events, locations, or props that are not supported by the story.',
-    'Keep the main character identity unchanged: ' + clean(character, 120) + '.',
+    'Keep every character identity unchanged. Use only the character IDs assigned to each locked scene.',
+    'CHARACTER BIBLE (locked visual references): ' + JSON.stringify(characterBible),
+    'Preserve each character\'s visual description, clothing, colors, and distinctive features in every image and motion prompt where that character appears.',
+    'Main character reference: ' + clean(character, 120) + '.',
     'Write all scene text in ' + clean(language, 30) + '.',
     'Keep imagePrompt focused on one still frame; keep motionPrompt focused on movement.',
     'Build a strict scene-to-scene hand-off: scene N+1 startState must continue scene N endState. Preserve the exact positions and states of characters, props, clothing, lighting, weather, and location unless the supplied story explicitly changes them.',
@@ -52,6 +55,7 @@ export async function directStoryboardWithLocalAI({
   storyText = '',
   language = 'English',
   character = 'Main character',
+  characterBible = [],
   maxNewTokens = 700
 } = {}) {
   const fallback = Array.isArray(basePlan?.scenes) ? basePlan.scenes : [];
@@ -68,7 +72,7 @@ export async function directStoryboardWithLocalAI({
 
   let generated;
   try {
-    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character }), {
+    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible }), {
       maxNewTokens,
       temperature: 0.15
     });
@@ -107,7 +111,9 @@ export async function directStoryboardWithLocalAI({
     scenes: candidate,
     expectedSceneCount: fallback.length,
     expectedStoryDetails,
-    characterRequirements: candidate.map(scene => ({ sceneId: scene.id, characterId: clean(character, 120) })),
+    characterRequirements: candidate.flatMap(scene => (scene.characters.length ? scene.characters : [clean(character, 120)])
+      .map(characterId => ({ sceneId: scene.id, characterId }))),
+    characterBible,
     requireProductionFields: true,
     requireContinuity: true
   });
