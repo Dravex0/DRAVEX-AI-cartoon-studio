@@ -149,7 +149,7 @@ $('sceneContinuityLock').value=meta.continuityLock||'';
 updateProductionPreview();
 renderCharacterBible();
 }
-['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock'].forEach(id=>$ (id).addEventListener('input',updateProductionPreview));
+['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock'].forEach(id=>$(id).addEventListener('input',updateProductionPreview));
 function updateStoryQA(){
   const safeText=value=>{
     if(value===null||value===undefined)return '';
