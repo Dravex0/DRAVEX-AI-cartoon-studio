@@ -2,12 +2,23 @@ const safe = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const list = values => Array.isArray(values) ? values.map(value => safe(value, 500)).filter(Boolean) : [];
 
 function characterDetails(scene, characterBible) {
-  const names = list(scene?.characters);
+  const names = new Set(list(scene?.characters).map(name => name.toLocaleLowerCase()));
   const entries = (Array.isArray(characterBible) ? characterBible : [])
-    .filter(entry => names.length === 0 || names.includes(entry?.characterId));
+    .filter(entry => {
+      const id = safe(entry?.characterId, 120).toLocaleLowerCase();
+      return id && (names.size === 0 || names.has(id));
+    });
+  const seen = new Set();
   return entries.map(entry => [
     entry.characterId, entry.visualDescription, entry.clothing, entry.colors, entry.distinctiveFeatures
-  ].map(value => safe(value, 700)).filter(Boolean).join(' — ')).filter(Boolean);
+  ].map(value => safe(value, 700)).filter(Boolean).join(' — '))
+    .filter(Boolean)
+    .filter(details => {
+      const key = details.toLocaleLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 /** Creates a provider-neutral still-image prompt without calling a paid or remote service. */
