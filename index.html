@@ -118,12 +118,12 @@ let selectedMusicUrl='';
 const dialogueAudioAssignments=new Map();
 let exportLipSyncState=null;
 function getDialogueMouthOpen(dialogue,index){
-  if(!exportLipSyncState||!dialogue||!Number.isFinite(exportLipSyncState.startedAt))return null;
+  if(!exportLipSyncState||!dialogue||typeof exportLipSyncState.audioSession?.getCurrentTime!=='function')return null;
   const cue=exportLipSyncState.schedule.find(item=>item.sceneIndex===index&&item.lineId===dialogue.id);
   if(!cue)return null;
   const buffer=exportLipSyncState.buffers.get(index+':'+cue.lineId);
   if(!buffer)return null;
-  const elapsed=performance.now()-exportLipSyncState.startedAt-cue.startMs;
+  const elapsed=(exportLipSyncState.audioSession.getCurrentTime()-exportLipSyncState.startedAt)*1000-cue.startMs;
   if(elapsed<0||elapsed>cue.endMs-cue.startMs)return 0;
   return sampleDialogueMouthOpen(buffer,elapsed);
 }
@@ -279,7 +279,7 @@ sceneImageCache.set(key,entry);
 }
 return entry.state==='ready'&&entry.image.naturalWidth>0?entry.image:null;
 }
-function drawAdditionalCharacter(profile,x,y,scale,time,facing,interaction,gesturePose={},emotion='neutral',speaking=false){
+function drawAdditionalCharacter(profile,x,y,scale,time,facing,interaction,gesturePose={},emotion='neutral',speaking=false,mouthOpen=null){
   const description=[profile?.visualDescription,profile?.colors,profile?.distinctiveFeatures].filter(Boolean).join(' ').toLowerCase();
   const rabbit=/(rabbit|bunny|крол|заяц|зайч)/u.test(description);
   const cat=/(cat|кот|кошка)/u.test(description);
@@ -297,7 +297,7 @@ function drawAdditionalCharacter(profile,x,y,scale,time,facing,interaction,gestu
   const blink=Math.sin(time*1.7+1.2)>.997?.12:1;ctx.fillStyle='#242033';ctx.beginPath();ctx.ellipse(-10,-5,3.5,5*blink,0,0,Math.PI*2);ctx.ellipse(10,-5,3.5,5*blink,0,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#242033';ctx.beginPath();ctx.arc(0,7,3,0,Math.PI*2);ctx.fill();
   if(emotion==='anger'){ctx.strokeStyle='#242033';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(-16,-13);ctx.lineTo(-5,-9);ctx.moveTo(5,-9);ctx.lineTo(16,-13);ctx.stroke()}
-  ctx.strokeStyle='#242033';ctx.fillStyle='#242033';ctx.lineWidth=2;if(speaking){ctx.beginPath();ctx.ellipse(0,13,3.5,2.5+Math.abs(Math.sin(time*10))*3,0,0,Math.PI*2);ctx.fill()}else if(interaction==='talk_to'||interaction==='gesture_to'){ctx.beginPath();ctx.arc(0,13,4+Math.abs(Math.sin(time*8))*2,0,Math.PI)}else{ctx.beginPath();ctx.moveTo(-4,13);ctx.quadraticCurveTo(0,16,4,13)}ctx.stroke();
+  ctx.strokeStyle='#242033';ctx.fillStyle='#242033';ctx.lineWidth=2;if(speaking){ctx.beginPath();ctx.ellipse(0,13,3.5,mouthOpen===null?2.5+Math.abs(Math.sin(time*10))*3:1.5+mouthOpen*6,0,0,Math.PI*2);ctx.fill()}else if(interaction==='talk_to'||interaction==='gesture_to'){ctx.beginPath();ctx.arc(0,13,4+Math.abs(Math.sin(time*8))*2,0,Math.PI)}else{ctx.beginPath();ctx.moveTo(-4,13);ctx.quadraticCurveTo(0,16,4,13)}ctx.stroke();
   ctx.restore();ctx.restore();
 }
 function drawSceneObjectHandoff(handoff,time){
@@ -353,7 +353,7 @@ else if(expression==='surprised'){ctx.beginPath();ctx.ellipse(17,21,5,8,0,0,Math
 else if(expression==='talk'||expression==='talking'){const audioMouthOpen=getDialogueMouthOpen(activeDialogue,sceneIndex);ctx.beginPath();ctx.ellipse(17,21,4,audioMouthOpen===null?Math.max(2,3+Math.abs(Math.sin(t*8))*4):2+audioMouthOpen*7,0,0,Math.PI*2);ctx.fill()}
 else{ctx.beginPath();ctx.moveTo(11,22);ctx.quadraticCurveTo(17,25,23,22);ctx.stroke()}
 if(expression==='sad'){ctx.fillStyle='rgba(130,220,255,.85)';ctx.beginPath();ctx.ellipse(34,8,3,6,-.25,0,Math.PI*2);ctx.fill()}
-ctx.restore();ctx.restore();for(let characterIndex=1;characterIndex<Math.min(sceneCharacterIds.length,characterLayout.length);characterIndex++){const layout=characterLayout[characterIndex];const profile=characterBible.find(entry=>entry.characterId.toLowerCase()===layout.characterId.toLowerCase())||{};drawAdditionalCharacter(profile,layout.x*w,layout.y*h,.82,t,layout.facing,layout.interaction,getSceneCharacterGesturePose({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration,layout.characterId),emotion,Boolean(activeDialogue&&activeDialogue.characterId.toLowerCase()===layout.characterId.toLowerCase()))}for(const handoff of getSceneObjectHandoffs({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration)){drawSceneObjectHandoff(handoff,t)}ctx.restore();const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
+ctx.restore();ctx.restore();for(let characterIndex=1;characterIndex<Math.min(sceneCharacterIds.length,characterLayout.length);characterIndex++){const layout=characterLayout[characterIndex];const profile=characterBible.find(entry=>entry.characterId.toLowerCase()===layout.characterId.toLowerCase())||{};drawAdditionalCharacter(profile,layout.x*w,layout.y*h,.82,t,layout.facing,layout.interaction,getSceneCharacterGesturePose({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration,layout.characterId),emotion,Boolean(activeDialogue&&activeDialogue.characterId.toLowerCase()===layout.characterId.toLowerCase()),activeDialogue&&activeDialogue.characterId.toLowerCase()===layout.characterId.toLowerCase()?getDialogueMouthOpen(activeDialogue,sceneIndex):null)}for(const handoff of getSceneObjectHandoffs({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration)){drawSceneObjectHandoff(handoff,t)}ctx.restore();const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
 if(generatedFrame){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
 if(sceneTransitionActive){if(playing){const transitionProgress=getSceneTransitionProgress(sceneTransitionStartFrame,frame);if(transitionProgress<1){ctx.save();ctx.globalAlpha=1-transitionProgress;ctx.drawImage(transitionCanvas,0,0,w,h);ctx.restore()}else sceneTransitionActive=false}else sceneTransitionActive=false}
 if(activeDialogue){ctx.save();const subtitleText=activeDialogue.text;ctx.font='600 15px system-ui';const maxWidth=w-48;const words=subtitleText.split(/\s+/);const rows=[];let row='';for(const word of words){const candidate=row?row+' '+word:word;if(ctx.measureText(candidate).width>maxWidth&&row){rows.push(row);row=word}else row=candidate}if(row)rows.push(row);const shown=rows.slice(0,2);const boxHeight=shown.length*21+18;ctx.fillStyle='rgba(8,10,18,.78)';ctx.beginPath();ctx.roundRect(16,h-boxHeight-16,w-32,boxHeight,10);ctx.fill();ctx.fillStyle='#fff';ctx.font='600 15px system-ui';ctx.textAlign='center';shown.forEach((line,i)=>ctx.fillText(line,w/2,h-25-(shown.length-1-i)*21));ctx.restore()}ctx.fillStyle='#fff';ctx.font='bold 21px system-ui';ctx.fillText($('character').value||'Foxy',24,38);if(playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');magicParticles.updateAndDraw(ctx);if(playing){frame++;raf=requestAnimationFrame(draw)}else{raf=0}}
@@ -723,8 +723,8 @@ $('export').onclick=async()=>{
         dialogueAudioBuffers:dialogueBuffers
       });
       stream=audioSession.stream;
-      await audioSession.start();
-      exportLipSyncState={startedAt:performance.now(),schedule:dialogueSchedule,buffers:dialogueBuffers};
+      const audioStartTime=await audioSession.start();
+      exportLipSyncState={audioSession,startedAt:audioStartTime,schedule:dialogueSchedule,buffers:dialogueBuffers};
     }
     const mimeTypes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
     const mimeType=mimeTypes.find(type=>MediaRecorder.isTypeSupported(type));
