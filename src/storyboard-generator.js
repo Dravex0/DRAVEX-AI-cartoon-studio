@@ -81,7 +81,12 @@ function splitSentences(text) {
 
 function sceneCharacters(sceneText, characterIds, fallback) {
   const source = String(sceneText ?? '').toLocaleLowerCase();
-  const matched = characterIds.filter(id => source.includes(id.toLocaleLowerCase()));
+  const matched = characterIds.filter(id => {
+    const name = id.toLocaleLowerCase();
+    const variants = new Set([name, name + 'а', name + 'у', name + 'ом']);
+    if (/(?:ок|ёк)$/u.test(name)) variants.add(name.replace(/(?:ок|ёк)$/u, 'ка'));
+    return [...variants].some(variant => variant && source.includes(variant));
+  });
   return matched.length ? matched : [fallback];
 }
 
