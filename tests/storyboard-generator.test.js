@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildStoryboardFromText, inferSceneEmotion, STORYBOARD_BEAT_COUNT } from '../src/storyboard-generator.js';
+import { buildStoryboardFromText, inferSceneEmotion, inferSceneEmotionTimeline, sampleSceneEmotion, STORYBOARD_BEAT_COUNT } from '../src/storyboard-generator.js';
 
 test('creates five beats with distinct actions and camera plans by default', () => {
   const result = buildStoryboardFromText('A fox finds a glowing key. It opens an old gate. A shadow blocks the path. The fox raises the key and light fills the forest. The gate opens and birds return.', 'en', 'Foxy');
@@ -182,4 +182,20 @@ test('stores inferred emotion on each scene without changing neutral scenes', ()
   const result = buildStoryboardFromText('Сцена 1. Радость\nРыжик счастлив и смеётся.\nСцена 2. Лес\nРыжик гуляет по лесу.', 'ru', 'Рыжик');
   assert.equal(result.scenes[0].emotion, 'happy');
   assert.equal(result.scenes[1].emotion, 'neutral');
+});
+
+
+test('creates a timed emotion timeline in sentence order and samples each beat', () => {
+  const timeline = inferSceneEmotionTimeline('Рыжик спокойно идёт. Рыжик пугается грома. Рыжик снова улыбается.', 6);
+  assert.deepEqual(timeline.map(item => item.emotion), ['neutral', 'fear', 'happy']);
+  assert.equal(sampleSceneEmotion(timeline, 0.5), 'neutral');
+  assert.equal(sampleSceneEmotion(timeline, 2.5), 'fear');
+  assert.equal(sampleSceneEmotion(timeline, 5.5), 'happy');
+  assert.equal(sampleSceneEmotion(timeline, 20), 'happy');
+});
+
+test('bounds emotion timeline duration and ignores malformed timeline entries safely', () => {
+  const timeline = inferSceneEmotionTimeline('The fox is happy.', 1000);
+  assert.equal(timeline[0].endSeconds, 3);
+  assert.equal(sampleSceneEmotion([{ startSeconds: 1, endSeconds: 0, emotion: 'anger' }], 2, 'neutral'), 'neutral');
 });
