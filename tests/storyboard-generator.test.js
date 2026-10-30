@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildStoryboardFromText, inferSceneEmotion, inferSceneEmotionTimeline, sampleSceneEmotion, STORYBOARD_BEAT_COUNT } from '../src/storyboard-generator.js';
+import { buildStoryboardFromText, inferSceneEmotion, inferSceneEmotionTimeline, sampleSceneEmotion, inferSceneDialogueTimeline, STORYBOARD_BEAT_COUNT } from '../src/storyboard-generator.js';
 
 test('creates five beats with distinct actions and camera plans by default', () => {
   const result = buildStoryboardFromText('A fox finds a glowing key. It opens an old gate. A shadow blocks the path. The fox raises the key and light fills the forest. The gate opens and birds return.', 'en', 'Foxy');
@@ -198,4 +198,36 @@ test('bounds emotion timeline duration and ignores malformed timeline entries sa
   const timeline = inferSceneEmotionTimeline('The fox is happy.', 1000);
   assert.equal(timeline[0].endSeconds, 3);
   assert.equal(sampleSceneEmotion([{ startSeconds: 1, endSeconds: 0, emotion: 'anger' }], 2, 'neutral'), 'neutral');
+});
+
+
+test('extracts attributed quoted dialogue into a deterministic scene-local timeline', () => {
+  const timeline = inferSceneDialogueTimeline('Рыжик говорит: «Привет, Снежок!» Снежок отвечает: «Здравствуй!»', ['Рыжик', 'Снежок'], 6);
+  assert.equal(timeline.length, 2);
+  assert.equal(timeline[0].characterId, 'Рыжик');
+  assert.equal(timeline[0].text, 'Привет, Снежок!');
+  assert.equal(timeline[0].startSeconds, 0);
+  assert.equal(timeline[0].endSeconds, 3.429);
+  assert.equal(timeline[1].characterId, 'Снежок');
+  assert.equal(timeline[1].endSeconds, 6);
+});
+
+test('does not turn narration or unattributed quotes into dialogue', () => {
+  assert.deepEqual(inferSceneDialogueTimeline('Лисёнок смотрит на лес. «Как красиво!»', ['Рыжик'], 4), []);
+  assert.deepEqual(inferSceneDialogueTimeline('Unknown: «Hello!»', ['Рыжик'], 4), []);
+});
+
+test('dialogue timeline is bounded and ignores malformed entries during scene normalization', async () => {
+  const { normalizeScene } = await import('../src/scene-model.js');
+  const scene = normalizeScene({
+    durationSeconds: 4,
+    dialogueTimeline: [
+      { characterId: 'Рыжик', text: 'Привет!', startSeconds: -2, endSeconds: 2 },
+      { characterId: 'Снежок', text: 'Пока!', startSeconds: 3, endSeconds: 9 },
+      { characterId: 'Рыжик', text: 'bad', startSeconds: 3, endSeconds: 2 }
+    ]
+  });
+  assert.equal(scene.dialogueTimeline.length, 2);
+  assert.equal(scene.dialogueTimeline[0].startSeconds, 0);
+  assert.equal(scene.dialogueTimeline[1].endSeconds, 4);
 });
