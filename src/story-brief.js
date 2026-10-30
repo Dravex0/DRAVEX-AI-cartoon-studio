@@ -87,7 +87,7 @@ export function parseStoryBrief(input) {
     for (const part of parts) {
       const match = part.match(/^\s*([^:：]{2,60})\s*[:：]\s*(.{1,1000})\s*$/u);
       const key = match ? ALIASES.get(normalizeLabel(match[1])) : null;
-      if (key && match[2].trim()) {
+      if (key && (match[2].trim() || key === 'characters')) {
         appendDirective(directives, key, match[2]);
         instructionLines.push(part.trim());
         foundDirective = true;
