@@ -65,17 +65,35 @@ export function evaluateStoryboard({
 
   const storyDetails = Array.isArray(expectedStoryDetails) ? expectedStoryDetails : [];
   let sourceFidelity = null;
+  let sourceOrderConsistency = null;
   if (storyDetails.length) {
     const assigned = scenes.map(scene => scene.storyDetail || '');
-    const preserved = storyDetails.filter(detail =>
-      assigned.reduce((count, value) => count + (value.includes(detail) ? 1 : 0), 0) === 1
-    ).length;
+    const sceneIndexes = storyDetails.map(detail => {
+      const matches = assigned.reduce((indexes, value, index) => {
+        if (value.includes(detail)) indexes.push(index);
+        return indexes;
+      }, []);
+      return matches.length === 1 ? matches[0] : null;
+    });
+    const preserved = sceneIndexes.filter(index => index !== null).length;
     sourceFidelity = percentage(preserved, storyDetails.length);
     if (sourceFidelity < 100) issues.push({
       skill: 'source-fidelity',
       code: 'source-detail-lost-or-repeated',
       message: 'A required source-story detail was lost or assigned more than once.'
     });
+    // Only score chronology when every required detail has exactly one unambiguous scene.
+    if (preserved === storyDetails.length) {
+      const orderedPairs = sceneIndexes.slice(1).filter((index, pair) => index > sceneIndexes[pair]).length;
+      sourceOrderConsistency = storyDetails.length < 2
+        ? 100
+        : percentage(orderedPairs, storyDetails.length - 1);
+      if (sourceOrderConsistency < 100) issues.push({
+        skill: 'story-structure',
+        code: 'source-event-order-changed',
+        message: 'The storyboard assigns required source events in a different order from the original story.'
+      });
+    }
   }
 
   let characterConsistency = null;
