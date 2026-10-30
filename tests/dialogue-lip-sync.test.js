@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sampleDialogueMouthOpen } from '../src/dialogue-lip-sync.js';
+import { sampleDialogueMouthOpen, createDialogueMouthEnvelope, sampleDialogueMouthEnvelope } from '../src/dialogue-lip-sync.js';
 
 function fakeBuffer(samples, sampleRate = 1000) {
   return { length: samples.length, sampleRate, numberOfChannels: 1, getChannelData: () => Float32Array.from(samples) };
@@ -24,4 +24,21 @@ test('supports stereo buffers and clamps offsets to the end', () => {
   const data = Float32Array.from(new Array(100).fill(0.1));
   const stereo = { length: 100, sampleRate: 1000, numberOfChannels: 2, getChannelData: () => data };
   assert.ok(sampleDialogueMouthOpen(stereo, 1000) > 0);
+});
+
+test('precomputes a smoothed mouth envelope and samples it at cue offsets', () => {
+  const samples = [...new Array(80).fill(0), ...new Array(80).fill(0.2), ...new Array(80).fill(0)];
+  const envelope = createDialogueMouthEnvelope(fakeBuffer(samples), { windowMs: 16, hopMs: 16 });
+  assert.ok(envelope);
+  assert.ok(sampleDialogueMouthEnvelope(envelope, 100) > 0);
+  assert.ok(sampleDialogueMouthEnvelope(envelope, 220) >= 0);
+  assert.equal(sampleDialogueMouthEnvelope(envelope, -1), 0);
+  assert.equal(sampleDialogueMouthEnvelope(null, 10), 0);
+});
+
+test('envelope stays closed for silence and clamps loud audio', () => {
+  const silence = createDialogueMouthEnvelope(fakeBuffer(new Array(100).fill(0)));
+  assert.equal(sampleDialogueMouthEnvelope(silence, 40), 0);
+  const loud = createDialogueMouthEnvelope(fakeBuffer(new Array(100).fill(1)));
+  assert.ok(sampleDialogueMouthEnvelope(loud, 40) <= 1);
 });
