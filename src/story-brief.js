@@ -181,7 +181,6 @@ export function parseStoryBrief(input) {
     : storyText;
   const sentences = (eventText.match(/[^.!?。！？]+[.!?。！？]?/gu) || []).map(part => part.trim()).filter(Boolean);
   const sceneCountMatch = directives.sceneCount?.match(/\d{1,2}/);
-  const explicitSceneCount = parsedSceneData.length;
   const requestedSceneCount = sceneData.length
     ? clampSceneCount(sceneData.length)
     : sceneCountMatch ? clampSceneCount(sceneCountMatch[0]) : null;
