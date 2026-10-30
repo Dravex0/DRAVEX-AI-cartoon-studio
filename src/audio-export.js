@@ -36,7 +36,8 @@ export async function createAudioExportSession({
   AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext,
   MediaStreamClass = globalThis.MediaStream,
   dialogueAudioSchedule = [],
-  dialogueAudioBuffers = new Map()
+  dialogueAudioBuffers = new Map(),
+  dialogueCharacterVolumes = new Map()
 } = {}) {
   if (!videoStream || typeof videoStream.getTracks !== 'function') {
     throw new TypeError('A video MediaStream is required.');
@@ -77,6 +78,7 @@ export async function createAudioExportSession({
             destination,
             schedule: dialogueAudioSchedule,
             audioBuffers: dialogueAudioBuffers,
+            characterVolumes: dialogueCharacterVolumes,
             startAt: audioStartTime
           });
         }
