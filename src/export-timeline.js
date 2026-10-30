@@ -1,5 +1,5 @@
 const MAX_SCENES = 12;
-const MIN_SCENE_SECONDS = 0.5;
+const MIN_SCENE_SECONDS = 0.25;
 const MAX_SCENE_SECONDS = 30;
 
 function duration(value, fallback) {
