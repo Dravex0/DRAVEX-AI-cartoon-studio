@@ -1,5 +1,7 @@
 import { sampleInteractionProgress } from './scene-interactions.js';
 
+import { sampleInteractionProgress } from './scene-interactions.js';
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const clean = value => String(value ?? '').trim().slice(0, 120);
 
