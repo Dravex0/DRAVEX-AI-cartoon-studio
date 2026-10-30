@@ -14,6 +14,7 @@ test('curriculum cases are evaluated consistently across supported languages', (
     });
     assert.equal(report.metrics.storyStructure, 100, sample.id);
     assert.equal(report.metrics.sourceFidelity, 100, sample.id);
+    assert.equal(report.metrics.sourceOrderConsistency, 100, sample.id);
     assert.equal(report.metrics.actionSpecificity, 100, sample.id);
     assert.equal(report.metrics.actionDiversity, 100, sample.id);
     assert.equal(report.metrics.cameraVariety, 100, sample.id);
