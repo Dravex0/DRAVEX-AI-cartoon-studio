@@ -15,13 +15,13 @@ function similarity(left, right) {
 }
 function cameraShotType(camera) {
   const value = String(camera ?? '').toLowerCase();
-  if (/extreme close|extreme close-up|\\becu\\b|экстремальн\\w*\\s+крупн\\w*\\s+план|сверхкрупн\\w*\\s+план/.test(value)) return 'extreme-close-up';
-  if (/\bmacro\b|\bclose[- ]?up\b|\bclose shot\b/.test(value)) return 'close-up';
-  if (/\bwide\b|establishing shot/.test(value)) return 'wide';
-  if (/\bmedium\b|\bmid shot\b/.test(value)) return 'medium';
-  if (/over[- ]the[- ]shoulder|over-shoulder|\bots\b/.test(value)) return 'over-shoulder';
-  if (/\bpoint of view\b|\bpov\b/.test(value)) return 'point-of-view';
-  if (/\baerial\b|\bdrone shot\b/.test(value)) return 'aerial';
+  if (/extreme close|extreme close-up|\becu\b|экстремальн\w*\s+крупн\w*\s+план|сверхкрупн\w*\s+план/.test(value)) return 'extreme-close-up';
+  if (/\bmacro\b|\bclose[- ]?up\b|\bclose shot\b|крупн\w*\s+план|перв\w*\s+план|primer plano/.test(value)) return 'close-up';
+  if (/\bwide\b|establishing shot|общ\w*\s+план|загальн\w*\s+план|plano general/.test(value)) return 'wide';
+  if (/\bmedium\b|\bmid shot\b|средн\w*\s+план|середн\w*\s+план|plano medio/.test(value)) return 'medium';
+  if (/over[- ]the[- ]shoulder|over-shoulder|\bots\b|через плечо|через плече/.test(value)) return 'over-shoulder';
+  if (/\bpoint of view\b|\bpov\b|от первого лица|від першої особи/.test(value)) return 'point-of-view';
+  if (/\baerial\b|\bdrone shot\b|с высоты|з висоти/.test(value)) return 'aerial';
   return '';
 }
 function issue(severity, code, sceneId, message, otherSceneId) {
