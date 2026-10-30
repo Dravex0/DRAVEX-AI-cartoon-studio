@@ -54,6 +54,7 @@ export function createLocalTransformersRuntime({
   let activeModelId = null;
   let activeBackend = null;
   let loading = null;
+  let loadingKey = null;
 
   return Object.freeze({
     get status() {
@@ -72,11 +73,18 @@ export function createLocalTransformersRuntime({
       signal
     } = {}) {
       assertNotAborted(signal);
+      if (modelId !== DEFAULT_LOCAL_TEXT_MODEL.id) {
+        throw new Error('This runtime only loads models in the approved local model registry.');
+      }
       if (pipe && activeModelId === modelId && (backend === 'auto' || backend === activeBackend)) {
         return this.status;
       }
-      if (loading) return loading;
-
+      const requestKey = modelId + ':' + backend;
+      if (loading) {
+        if (loadingKey !== requestKey) throw new Error('A different local model load is already in progress.');
+        return loading;
+      }
+      loadingKey = requestKey;
       loading = (async () => {
         const capabilities = await detectDeviceCapabilities(environment);
         assertNotAborted(signal);
@@ -116,6 +124,7 @@ export function createLocalTransformersRuntime({
         return await loading;
       } finally {
         loading = null;
+        loadingKey = null;
       }
     },
 

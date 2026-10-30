@@ -98,3 +98,30 @@ test('uses WASM rather than WebGPU in an insecure context', async () => {
   assert.equal(status.backend, 'wasm');
   assert.equal(options.device, undefined);
 });
+
+test('refuses model IDs outside the approved local model registry', async () => {
+  let downloads = 0;
+  const runtime = createLocalTransformersRuntime({
+    environment: wasmEnvironment,
+    pipelineFactory: async () => { downloads += 1; return async () => [{ generated_text: 'Should not run.' }]; }
+  });
+  await assert.rejects(runtime.load({ modelId: 'unknown/remote-model' }), /approved local model registry/);
+  assert.equal(downloads, 0);
+});
+
+test('rejects a conflicting concurrent load request', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const runtime = createLocalTransformersRuntime({
+    environment: wasmEnvironment,
+    pipelineFactory: async () => {
+      await gate;
+      return async () => [{ generated_text: 'Loaded.' }];
+    }
+  });
+  const first = runtime.load({ backend: 'wasm' });
+  await new Promise(resolve => setImmediate(resolve));
+  await assert.rejects(runtime.load({ backend: 'auto' }), /different local model load is already in progress/);
+  release();
+  await first;
+});
