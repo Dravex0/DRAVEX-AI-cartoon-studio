@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getSceneCharacterLayout, getSceneObjectHandoffs } from '../src/character-layout.js';
+import { getSceneCharacterLayout, getSceneObjectHandoffs, getSceneCharacterGesturePose } from '../src/character-layout.js';
 
 test('stages two or more stable character IDs at distinct positions', () => {
   const layout = getSceneCharacterLayout({ characters: ['Ryzhik', 'Snowball', 'Owl'] }, 0);
@@ -81,4 +81,30 @@ test('object hand-off moves an explicitly described prop from giver to receiver'
 test('does not invent a visible prop when an exchange has no explicit object description', () => {
   const scene = { characters: ['A', 'B'], interactions: [{ type: 'give_object', participants: ['A', 'B'], objectId: 'unknown', startSeconds: 0, endSeconds: 2 }] };
   assert.deepEqual(getSceneObjectHandoffs(scene, 1), []);
+});
+
+
+test('handoff gestures extend the giver arm and animate the receiver reach later', () => {
+  const scene = { characters: ['A', 'B'], interactions: [{ type: 'give_object', participants: ['A', 'B'], startSeconds: 0, endSeconds: 2 }] };
+  const giver = getSceneCharacterGesturePose(scene, 1, 'A');
+  const receiverEarly = getSceneCharacterGesturePose(scene, 0.5, 'B');
+  const receiverLate = getSceneCharacterGesturePose(scene, 1.8, 'B');
+  assert.equal(giver.active, true);
+  assert.ok(giver.rightArm > 70);
+  assert.equal(receiverEarly.rightArm, 0);
+  assert.ok(receiverLate.rightArm > receiverEarly.rightArm);
+});
+
+test('reaction gesture raises both arms and inactive or unknown actors stay neutral', () => {
+  const scene = { characters: ['A', 'B'], interactions: [{ type: 'react_to', participants: ['A', 'B'], startSeconds: 1, endSeconds: 3 }] };
+  const active = getSceneCharacterGesturePose(scene, 2, 'B');
+  const inactive = getSceneCharacterGesturePose(scene, 4, 'B');
+  const unknown = getSceneCharacterGesturePose(scene, 2, 'C');
+  assert.ok(active.leftArm < 0 && active.rightArm > 0);
+  assert.equal(inactive.active, false);
+  assert.deepEqual(unknown, { leftArm: 0, rightArm: 0, active: false, interaction: '' });
+});
+
+test('malformed gesture input safely returns a neutral pose', () => {
+  assert.deepEqual(getSceneCharacterGesturePose(null, NaN, 'A'), { leftArm: 0, rightArm: 0, active: false, interaction: '' });
 });
