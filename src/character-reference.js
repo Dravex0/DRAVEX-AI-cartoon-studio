@@ -29,3 +29,29 @@ export function upsertCharacterReference(references, input) {
   }
   return next;
 }
+
+
+/**
+ * Merge profiles extracted from a story into the user's character library.
+ * Existing entries win so a manually edited visual reference is never overwritten
+ * by a weaker text extraction. IDs are de-duplicated case-insensitively.
+ */
+export function mergeCharacterReferences(existing = [], discovered = []) {
+  const merged = [];
+  const seen = new Set();
+  const sources = [
+    ...(Array.isArray(existing) ? existing : []),
+    ...(Array.isArray(discovered) ? discovered : [])
+  ];
+
+  for (const source of sources) {
+    const profile = normalizeCharacterReference(source);
+    const key = profile.characterId.toLocaleLowerCase();
+    if (!key || seen.has(key)) continue;
+    if (merged.length >= CHARACTER_REFERENCE_LIMIT) break;
+    seen.add(key);
+    merged.push(profile);
+  }
+
+  return merged;
+}
