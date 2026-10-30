@@ -147,7 +147,11 @@ export function evaluateStoryboard({
     stateTransitionConsistency: continuityReport?.metrics.stateTransitionConsistency ?? null,
     characterReferenceCoverage: continuityReport?.metrics.characterReferenceCoverage ?? null
   };
-  const measured = Object.values(metrics).filter(value => value !== null);
+  // Lexical hand-off similarity is a diagnostic, not a quality score: paraphrases can be valid.
+  // Continuity issues still participate in the pass/fail gate when requireContinuity is enabled.
+  const measured = Object.entries(metrics)
+    .filter(([name, value]) => name !== 'stateTransitionConsistency' && value !== null)
+    .map(([, value]) => value);
   const overallScore = measured.length
     ? Math.round(measured.reduce((sum, value) => sum + value, 0) / measured.length)
     : 0;
