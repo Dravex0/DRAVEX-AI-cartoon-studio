@@ -68,7 +68,7 @@ function distributeStoryDetails(sentences, beatCount) {
     const bucketIndex = Math.min(beatCount - 1, Math.floor(index * beatCount / sentences.length));
     buckets[bucketIndex].push(sentence);
   });
-  return buckets.map((bucket) => bucket.join(' '));
+  return buckets.map((bucket) => bucket.join(' ').slice(0, 1_200));
 }
 
 /**
