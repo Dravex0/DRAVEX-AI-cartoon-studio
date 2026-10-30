@@ -1,0 +1,55 @@
+# DRAVEX AI Learning & Evaluation Plan — v1
+
+## Why evaluation comes before training
+
+The current storyboard planner is deterministic and rule-based. It is not a trained neural network. Before training or integrating any model, DRAVEX needs a repeatable benchmark so that improvements can be measured instead of guessed.
+
+## First curriculum
+
+`fixtures/ai-curriculum-v1.js` starts with Russian, Ukrainian, and English story examples. Each case identifies the expected scene count, source-story details that must survive exactly once, and the skills under test.
+
+`src/ai-evaluation.js` scores only verifiable text-level properties:
+- requested storyboard structure;
+- specific visible actions;
+- action diversity;
+- camera-plan variety;
+- source-story fidelity;
+- optional explicit character membership;
+- optional scene-production field completeness.
+
+A metric is `null` when the current sample does not provide enough evidence. The evaluator does not infer image quality, emotional truth, visual character identity, animation quality, or whether a generated video looks correct.
+
+## Training loop to build next
+
+1. **Collect examples:** user-approved story prompts and corrected storyboards, with private details removed.
+2. **Label target behavior:** plot beats, action, camera, character presence, dialogue intent, continuity states, and visual references.
+3. **Run the benchmark:** record baseline scores for every supported language and content category.
+4. **Improve one skill at a time:** update deterministic planning first; later evaluate a small open-weight model that can run locally on supported hardware.
+5. **Compare before/after:** reject changes that improve one category while damaging others.
+6. **Keep verified learning:** store approved examples and versioned evaluation reports; never silently train on user content.
+7. **Visual validation:** add human-reviewed reference frames and Android playback checks before claiming image/video understanding.
+
+## Target competency map
+
+- Story understanding and plot structure
+- Scene decomposition and pacing
+- Visible action and physical cause/effect
+- Camera framing, movement, and shot variety
+- Character Bible and appearance continuity
+- Environment, props, lighting, and style consistency
+- Dialogue, voice direction, and lip-sync timing
+- Animation timing, anticipation, action, and recovery
+- Music, sound effects, and scene rhythm
+- Render quality, editing, and final export
+
+## Constraints
+
+- Free-first and local-first; no mandatory paid API or cloud AI.
+- External inference is never silently enabled.
+- User media and corrections are not sent to a service or used for training without explicit consent.
+- A local rules engine, an open-weight model, and a trained DRAVEX model are different things; the project must label them accurately.
+- No self-training on production data without a curated dataset, evaluation, rollback, and user approval.
+
+## Verification
+
+Run `npm run check`, `npm test`, and `npm run build`. CI success verifies code behavior and bundle generation, not real visual quality or local model performance.
