@@ -3,6 +3,7 @@
  * This is a local fallback, not a generative model or visual scene-understanding system.
  */
 import { parseStoryBrief, formatProductionDirectives } from './story-brief.js';
+import { directStoryEvent } from './story-event-director.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -102,17 +103,20 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
 
   const scenes = beats.map((beat, index) => {
     const storyDetail = storyDetails[index];
+    const eventDirection = storyDetail ? directStoryEvent(storyDetail, locale, subject) : null;
+    const visibleAction = eventDirection?.visibleAction ?? beat.action;
+    const camera = eventDirection?.camera ?? beat.camera;
     const instruction = directiveText ? ` Production directions: ${directiveText}` : '';
     const description = [
       `${CHARACTER_LABEL[locale]}: ${subject}.`,
-      beat.action,
-      beat.camera,
+      visibleAction,
+      camera,
       storyDetail ? `${STORY_LABEL[locale]}: ${storyDetail}` : '',
       instruction
     ].filter(Boolean).join(' ');
     return {
       id: `scene_${index + 1}`, order: index + 1, title: beat.title,
-      visibleAction: beat.action, camera: beat.camera, storyDetail,
+      visibleAction, camera, storyEventType: eventDirection?.eventType ?? 'scaffolded-beat', storyDetail,
       prompt: description, description,
       productionDirectives: brief.directives, sourceStoryText: source,
       sourceEvents: brief.keyEvents
