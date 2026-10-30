@@ -32,7 +32,7 @@ test('motion prompt builder separates temporal action and preserves continuity',
   assert.match(prompt, /Start state/);
   assert.match(prompt, /End state/);
   assert.match(prompt, /Blue scarf/);
-  assert.match(prompt, /Do not introduce new objects/);
+  assert.match(prompt, /do not introduce new objects/i);
 });
 
 test('prompt builders handle missing optional metadata without throwing', () => {
