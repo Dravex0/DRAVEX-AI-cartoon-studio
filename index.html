@@ -131,8 +131,6 @@ async function decodeDialogueAudioFiles(files, schedule){
       if(!parsed){unmatched.push(file.name);continue}
       const key=parsed.sceneIndex+':'+parsed.lineId;
       if(!expected.has(key)){unmatched.push(file.name);continue}
-      const sceneIndex=parsed.sceneIndex;
-      const lineId=parsed.lineId;
       try{const decoded=await context.decodeAudioData((await file.arrayBuffer()).slice(0));buffers.set(key,decoded)}
       catch(error){unmatched.push(file.name)}
     }
