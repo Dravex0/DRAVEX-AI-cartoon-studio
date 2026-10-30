@@ -86,3 +86,18 @@ test('envelope averages independent stereo channels consistently', () => {
   const expectedRms = Math.sqrt((left.reduce((sum, value) => sum + value * value, 0)) / (left.length * 2));
   assert.ok(Math.abs(envelope.values[0] - expectedRms) < 1e-6);
 });
+
+test('sanitizes non-finite analysis options without producing NaN mouth values', () => {
+  const buffer = fakeBuffer(new Array(96).fill(0.2), 1000);
+  const envelope = createDialogueMouthEnvelope(buffer, {
+    windowMs: NaN, hopMs: Infinity, noiseFloor: NaN,
+    sensitivity: Infinity, attack: NaN, release: Infinity
+  });
+  assert.ok(envelope);
+  assert.ok(envelope.values.length > 0);
+  for (const value of envelope.values) {
+    assert.ok(Number.isFinite(value));
+    assert.ok(value >= 0 && value <= 1);
+  }
+  assert.ok(Number.isFinite(sampleDialogueMouthOpen(buffer, 24, NaN)));
+});
