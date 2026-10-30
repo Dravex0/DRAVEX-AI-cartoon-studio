@@ -32,7 +32,7 @@ jobs:
       - name: Generate a source-grounded proposal with Gemini
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ 'gemini-2.5-flash-lite' }}
+          GEMINI_MODEL: ${{ 'gemini-3.5-flash-lite' }}
           ISSUE_BODY: ${{ github.event_name == 'issues' && github.event.issue.body || inputs.issue_body }}
           ISSUE_TITLE: ${{ github.event_name == 'issues' && github.event.issue.title || inputs.issue_title }}
         run: |
