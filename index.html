@@ -120,7 +120,6 @@ const dialogueCharacterVolumes=new Map();
 function dialogueCharacterVolumeKey(characterId){return String(characterId||'').trim().toLowerCase()}
 function getDialogueCharacterVolumeMap(){return new Map([...dialogueCharacterVolumes.entries()].map(([key,value])=>[key,Math.max(0,Math.min(1,Number(value)||0))]))}
 let exportLipSyncState=null;
-    dialogueMouthEnvelopes=new Map();
 let dialogueMouthEnvelopes=new Map();
 function getDialogueMouthOpen(dialogue,index){
   if(!exportLipSyncState||!dialogue||typeof exportLipSyncState.audioSession?.getCurrentTime!=='function')return null;
@@ -717,6 +716,7 @@ $('export').onclick=async()=>{
     if(stream)stream.getTracks().forEach(track=>track.stop());
     if(audioSession)void audioSession.cleanup();
     exportLipSyncState=null;
+    dialogueMouthEnvelopes=new Map();
     sceneIndex=originalSceneIndex;
     playing=wasPlaying;
     speechPlaybackArmed=false;stopDialogueSpeech();
