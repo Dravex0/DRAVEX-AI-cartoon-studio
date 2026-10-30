@@ -77,7 +77,7 @@ test('records explicit state changes and explicit reactions without guessing the
     }]
   }]);
   assert.deepEqual(graph.nodes[0].reaction, {
-    type: 'emotional_reaction', evidence: 'Foxy smiles with relief.'
+    type: 'emotional_reaction', evidence: 'Foxy picks up the silver key, then smiles with relief.'
   });
   assert.ok(graph.edges.some(edge => edge.type === 'changes_state' && edge.actorId === 'Foxy'));
   assert.equal(graph.edges.some(edge => edge.type === 'reacts_to'), false);
