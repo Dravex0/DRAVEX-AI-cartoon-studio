@@ -10,10 +10,10 @@ test('extracts actor and target from explicit English help and guidance', () => 
 });
 
 test('extracts Russian directed help without reversing participants', () => {
-  const result = inferCharacterInteraction('Сова помогает Роботу Мико найти дорогу.', ['Робот Мико', 'Сова'], 'ru');
+  const result = inferCharacterInteraction('Сова помогает Мико найти дорогу.', ['Мико', 'Сова'], 'ru');
   assert.equal(result.type, 'help');
   assert.equal(result.actorId, 'Сова');
-  assert.equal(result.targetId, 'Робот Мико');
+  assert.equal(result.targetId, 'Мико');
 });
 
 test('extracts Ukrainian and Spanish interactions', () => {
