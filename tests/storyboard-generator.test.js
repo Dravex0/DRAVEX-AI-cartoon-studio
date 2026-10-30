@@ -115,7 +115,7 @@ test('storyboard scenes include isolated production prompts, matching cast and r
 
 test('wires explicit character interactions into storyboard scenes and the event graph', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nBird — a small yellow bird.\\nFoxy — a small orange fox.\\n\\nScene 1: Guidance\\nBird guides Foxy home.',
+    'Characters:\nBird — a small yellow bird.\nFoxy — a small orange fox.\n\nScene 1: Guidance\nBird guides Foxy home.',
     'en',
     'Foxy'
   );
@@ -136,7 +136,7 @@ test('wires explicit character interactions into storyboard scenes and the event
 
 test('does not invent a storyboard interaction when the source only describes looking', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nBird — a small yellow bird.\\nFoxy — a small orange fox.\\n\\nScene 1: Meeting\\nBird looks toward Foxy.',
+    'Characters:\nBird — a small yellow bird.\nFoxy — a small orange fox.\n\nScene 1: Meeting\nBird looks toward Foxy.',
     'en',
     'Foxy'
   );
