@@ -68,3 +68,11 @@ test('detects character names introduced naturally without a cast heading', () =
   assert.match(brief.characterProfiles[0].visualDescription, /рыжий лисёнок/);
   assert.match(brief.characterProfiles[1].visualDescription, /белый кролик/);
 });
+
+
+test('accepts middle-dot scene heading separators', () => {
+  const brief = parseStoryBrief('Scene 1 · Opening\nA fox enters the forest.\nScene 2 · Discovery\nThe fox finds a crystal.');
+  assert.equal(brief.sceneBlocks.length, 2);
+  assert.equal(brief.sceneBlocks[0].title, 'Opening');
+  assert.equal(brief.sceneBlocks[1].title, 'Discovery');
+});
