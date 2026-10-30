@@ -94,6 +94,7 @@ import { detectSceneAction } from "./src/scene-action.js";
 import { buildExportTimeline } from "./src/export-timeline.js";
 import { createAudioExportSession } from "./src/audio-export.js";
 import { buildDialogueAudioSchedule } from "./src/dialogue-audio.js";
+import { parseDialogueAudioFilename } from "./src/dialogue-audio-assets.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./src/scene-production.js";
 import { upsertCharacterReference } from "./src/character-reference.js";
 import { CHARACTER_MOTION_CLIPS, sampleCharacterMotion, resolveCharacterMotionAction } from "./src/character-motion.js";
@@ -126,12 +127,12 @@ async function decodeDialogueAudioFiles(files, schedule){
   const unmatched=[];
   try{
     for(const file of selected){
-      const match=/^scene(\d+)_(.+)\.[^.]+$/i.exec(file.name);
-      if(!match){unmatched.push(file.name);continue}
-      const sceneIndex=Number(match[1])-1;
-      const lineId=match[2];
-      const key=sceneIndex+':'+lineId;
-      if(!Number.isInteger(sceneIndex)||sceneIndex<0||!expected.has(key)){unmatched.push(file.name);continue}
+      const parsed=parseDialogueAudioFilename(file.name);
+      if(!parsed){unmatched.push(file.name);continue}
+      const key=parsed.sceneIndex+':'+parsed.lineId;
+      if(!expected.has(key)){unmatched.push(file.name);continue}
+      const sceneIndex=parsed.sceneIndex;
+      const lineId=parsed.lineId;
       try{const decoded=await context.decodeAudioData((await file.arrayBuffer()).slice(0));buffers.set(key,decoded)}
       catch(error){unmatched.push(file.name)}
     }
