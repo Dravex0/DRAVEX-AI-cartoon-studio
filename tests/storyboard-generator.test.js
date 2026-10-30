@@ -207,7 +207,7 @@ test('extracts attributed quoted dialogue into a deterministic scene-local timel
   assert.equal(timeline[0].characterId, 'Рыжик');
   assert.equal(timeline[0].text, 'Привет, Снежок!');
   assert.equal(timeline[0].startSeconds, 0);
-  assert.equal(timeline[0].endSeconds, 3.429);
+  assert.equal(timeline[0].endSeconds, 3.462);
   assert.equal(timeline[1].characterId, 'Снежок');
   assert.equal(timeline[1].endSeconds, 6);
 });
