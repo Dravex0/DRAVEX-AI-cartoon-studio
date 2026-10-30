@@ -234,7 +234,7 @@ function updateProductionPreview(){
 const meta=sceneMetadata[sceneIndex]||{};
 const scene={...meta,title:titles[sceneIndex],characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),imagePrompt:$('sceneImagePrompt').value,motionPrompt:$('sceneMotionPrompt').value,camera:$('sceneCamera').value,startState:$('sceneStartState').value,endState:$('sceneEndState').value,negativePrompt:$('sceneNegativePrompt').value,continuityLock:$('sceneContinuityLock').value};
 const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;
-const readiness=validateSceneProductionReadiness(scene);
+const readiness=validateSceneProductionReadiness(scene,characterBible);
 $('sceneReadiness').textContent=readiness.ready?t.ready:t.incomplete+readiness.issues.map(issue=>t.missing[issue.code]||issue.field).join(', ');
 $('imagePromptPreview').textContent=buildImageGenerationPrompt(scene,characterBible);
 $('motionPromptPreview').textContent=buildMotionGenerationPrompt(scene,characterBible);
