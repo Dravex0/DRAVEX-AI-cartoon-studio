@@ -20,7 +20,9 @@ export function inferSceneCausalLinks(scenes = [], language = 'en') {
   const list = Array.isArray(scenes) ? scenes : [];
   return list.map((scene, index) => {
     if (index === 0) return null;
-    const cause = list[index - 1];
+    let causeIndex = index - 1;
+    while (causeIndex >= 0 && !clean(list[causeIndex]?.storyDetail, 1_200)) causeIndex -= 1;
+    const cause = causeIndex >= 0 ? list[causeIndex] : null;
     const causeEvidence = clean(cause?.storyDetail, 1_200);
     const evidence = clean(scene?.storyDetail, 1_200);
     if (!causeEvidence || !evidence) return null;
