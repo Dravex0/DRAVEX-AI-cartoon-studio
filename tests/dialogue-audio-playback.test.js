@@ -7,6 +7,9 @@ function harness() {
   const destination = {};
   const context = {
     currentTime: 12,
+    createGain() {
+      return { gain: { value: 1 }, connect(target) { calls.push(['gain-connect', target]); }, disconnect() { calls.push(['gain-disconnect']); } };
+    },
     createBufferSource() {
       return {
         connect(target) { calls.push(['connect', target]); },
@@ -75,6 +78,32 @@ test('uses supplied startAt and stops scheduled sources safely once', () => {
   result.stop();
   assert.equal(h.calls.filter(call => call[0] === 'stop').length, 1);
   assert.equal(h.calls.filter(call => call[0] === 'disconnect').length, 1);
+});
+
+test('applies independent character voice volumes with safe clamping', () => {
+  const h = harness();
+  const result = scheduleDialogueAudioBuffers({
+    context: h.context,
+    destination: h.destination,
+    schedule: [
+      { sceneIndex: 0, lineId: 'fox', characterId: 'Foxy', startMs: 0, endMs: 1000 },
+      { sceneIndex: 0, lineId: 'rabbit', characterId: 'Rabbit', startMs: 1000, endMs: 2000 },
+      { sceneIndex: 0, lineId: 'bird', characterId: 'Bird', startMs: 2000, endMs: 3000 }
+    ],
+    audioBuffers: new Map([
+      ['0:fox', { duration: 1 }],
+      ['0:rabbit', { duration: 1 }],
+      ['0:bird', { duration: 1 }]
+    ]),
+    characterVolumes: new Map([['foxy', 0.35], ['rabbit', 1.8], ['bird', -2]])
+  });
+  assert.equal(result.scheduledCount, 3);
+  const gains = h.calls.filter(call => call[0] === 'gain-connect');
+  assert.equal(gains.length, 3);
+  // Gain values are inspected from the created nodes via the captured call target.
+  assert.deepEqual(h.calls.filter(call => call[0] === 'connect').map(call => call[1].gain.value), [0.35, 1, 0]);
+  result.stop();
+  assert.equal(h.calls.filter(call => call[0] === 'gain-disconnect').length, 3);
 });
 
 test('rejects missing Web Audio dependencies', () => {
