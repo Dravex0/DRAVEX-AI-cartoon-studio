@@ -38,3 +38,20 @@ export function mapDialogueAudioAssignmentsToSchedule(assignments, scenes, sched
   }
   return result;
 }
+
+
+/** Remove file references for scenes/lines that no longer exist in the storyboard. */
+export function pruneDialogueAudioAssignments(assignments, scenes) {
+  if (!(assignments instanceof Map)) return new Map();
+  const validKeys = new Set();
+  for (const scene of Array.isArray(scenes) ? scenes : []) {
+    for (const [index, line] of (Array.isArray(scene?.dialogueTimeline) ? scene.dialogueTimeline : []).entries()) {
+      const lineId = typeof line?.id === 'string' && line.id.trim() ? line.id.trim() : 'dialogue_' + (index + 1);
+      const key = getDialogueAudioAssignmentKey(scene?.id, lineId);
+      if (key) validKeys.add(key);
+    }
+  }
+  const retained = new Map();
+  for (const [key, file] of assignments) if (validKeys.has(key)) retained.set(key, file);
+  return retained;
+}
