@@ -47,19 +47,29 @@ export function scheduleDialogueAudioBuffers({
       skipped.push(key);
       continue;
     }
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    const characterKey = String(cue?.characterId || '').trim().toLowerCase();
-    const requestedVolume = characterVolumes instanceof Map ? Number(characterVolumes.get(characterKey)) : NaN;
-    const volume = Number.isFinite(requestedVolume) ? Math.max(0, Math.min(1, requestedVolume)) : 1;
-    const gain = context.createGain();
-    gain.gain.value = volume;
-    source.connect(gain);
-    gain.connect(destination);
-    gains.push(gain);
-    const when = baseTime + Math.max(0, startMs) / 1000;
-    source.start(when, 0, durationSeconds);
-    sources.push(source);
+    let source = null;
+    let gain = null;
+    try {
+      source = context.createBufferSource();
+      source.buffer = buffer;
+      const characterKey = String(cue?.characterId || '').trim().toLowerCase();
+      const requestedVolume = characterVolumes instanceof Map ? Number(characterVolumes.get(characterKey)) : NaN;
+      const volume = Number.isFinite(requestedVolume) ? Math.max(0, Math.min(1, requestedVolume)) : 1;
+      gain = context.createGain();
+      gain.gain.value = volume;
+      source.connect(gain);
+      gain.connect(destination);
+      const when = baseTime + Math.max(0, startMs) / 1000;
+      source.start(when, 0, durationSeconds);
+      sources.push(source);
+      gains.push(gain);
+    } catch {
+      // A malformed buffer or a Web Audio scheduling error must not abort other dialogue cues.
+      try { source?.stop(); } catch {}
+      try { source?.disconnect?.(); } catch {}
+      try { gain?.disconnect?.(); } catch {}
+      skipped.push(key || 'invalid-cue');
+    }
   }
 
   let stopped = false;
