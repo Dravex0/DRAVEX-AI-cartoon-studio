@@ -4,7 +4,7 @@
  */
 import { parseStoryBrief, formatProductionDirectives } from './story-brief.js';
 import { directStoryEvent } from './story-event-director.js';
-import { inferCharacterInteraction } from './character-interaction.js';
+import { inferCharacterInteractions } from './character-interaction.js';
 import { inferSceneCausalLinks } from './scene-causality.js';
 import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
@@ -153,8 +153,12 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
       ? characterMention(name, scene.storyDetail)
       : name.toLocaleLowerCase() === subject.toLocaleLowerCase());
     // Keep interaction inference source-grounded and limited to characters assigned to this scene.
-    scene.interaction = scene.storyDetail
-      ? inferCharacterInteraction(scene.storyDetail, scene.characters, locale)
+    scene.interactions = scene.storyDetail
+      ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
+      : [];
+    // Preserve the original single-interaction field for older UI and consumers.
+    scene.interaction = scene.interactions[0]
+      ? (({ type, actorId, targetId, evidence }) => ({ type, actorId, targetId, evidence }))(scene.interactions[0])
       : null;
     scene.durationSeconds = brief.requestedDurationSeconds ?? 3;
     scene.negativePrompt = brief.directives.avoid || '';
