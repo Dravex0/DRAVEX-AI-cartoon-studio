@@ -47,7 +47,7 @@ export async function detectDeviceCapabilities(environment = globalThis) {
 
   let recommendation = 'WebGPU adapter detected. Test the selected model separately; this does not guarantee enough memory.';
   if (!secureContext) recommendation = 'A secure HTTPS context is required for browser GPU features.';
-  else if (!adapterAvailable && wasmAvailable) recommendation = 'WebGPU is unavailable; local WASM inference may still work, but can be slower.';
+  else if (!adapterAvailable && wasmAvailable) recommendation = (gpuError ? gpuError + ' ' : 'WebGPU is unavailable. ') + 'Local WASM inference may still work, but can be slower.';
   else if (!adapterAvailable) recommendation = gpuError || 'No compatible WebGPU adapter was found and WebAssembly is unavailable.';
   else if (!wasmAvailable) recommendation = 'WebGPU is available, but WebAssembly fallback is unavailable.';
   else if (!wasmThreadsAvailable) recommendation += ' Multi-threaded WASM may be unavailable in this browser context.';
