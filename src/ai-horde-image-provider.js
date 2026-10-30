@@ -121,15 +121,9 @@ export async function generateImageWithHorde({
     const result = await readJson(resultResponse, 'result retrieval');
     const generation = Array.isArray(result?.generations) ? result.generations.find(item => item && !item.censored && item.img) : null;
     if (!generation) throw new Error('AI Horde finished, but returned no usable image. Try another prompt.');
-    const image = clean(generation.img, 5000);
-    const imageUrl = /^https:\/\//i.test(image)
-      ? image
-      : /^data:image\//i.test(image)
-        ? image
-        : /^[A-Za-z0-9+/=]+$/.test(image)
-          ? `data:image/webp;base64,${image}`
-          : '';
-    if (!imageUrl) throw new Error('AI Horde returned an unsupported image result.');
+    const imageUrl = clean(generation.img, 5000);
+    // r2:true asks AI Horde to return a hosted HTTPS image URL, not a large base64 payload.
+    if (!/^https:\/\//i.test(imageUrl)) throw new Error('AI Horde returned an unsupported image result.');
     return {
       requestId,
       imageUrl,
