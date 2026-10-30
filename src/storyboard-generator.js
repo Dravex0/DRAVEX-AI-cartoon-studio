@@ -98,19 +98,29 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
   const subject = String(character ?? '').trim().slice(0, 120) || (locale === 'ru' || locale === 'uk' ? 'Персонаж' : locale === 'es' ? 'Personaje' : 'Character');
   const brief = parseStoryBrief(idea);
   const source = brief.storyText;
+  const explicitScenes = Array.isArray(brief.sceneBlocks) ? brief.sceneBlocks : [];
   const sentences = source ? (source.match(/[^.!?。！？]+[.!?。！？]?/gu) || []).map(part => part.trim()).filter(Boolean) : [FALLBACK[locale]];
   const beatCount = brief.requestedSceneCount ?? STORYBOARD_BEAT_COUNT;
-  const storyDetails = distributeStoryDetails(sentences.length ? sentences : [FALLBACK[locale]], beatCount);
+  const storyDetails = explicitScenes.length
+    ? explicitScenes.map(scene => String(scene.text ?? '').trim())
+    : distributeStoryDetails(sentences.length ? sentences : [FALLBACK[locale]], beatCount);
   const beats = selectBeats(locale, beatCount);
   const directiveText = formatProductionDirectives(brief.directives);
 
   const scenes = beats.map((beat, index) => {
-    const storyDetail = storyDetails[index];
+    const explicitScene = explicitScenes[index] || null;
+    const storyDetail = explicitScene ? String(explicitScene.text ?? '').trim() : storyDetails[index];
     const eventDirection = storyDetail ? directStoryEvent(storyDetail, locale, subject) : null;
-    // Keep event-specific direction while adding a distinct beat-level variation.
-    const visibleAction = eventDirection ? `${eventDirection.visibleAction} ${beat.action}` : beat.action;
-    const camera = eventDirection ? `${eventDirection.camera} ${beat.camera}` : beat.camera;
+    // Explicit scene blocks are source material: do not append a generic beat action that
+    // could contradict or duplicate the action the user actually wrote.
+    const visibleAction = eventDirection
+      ? (explicitScene ? eventDirection.visibleAction : `${eventDirection.visibleAction} ${beat.action}`)
+      : beat.action;
+    const camera = eventDirection
+      ? (explicitScene ? eventDirection.camera : `${eventDirection.camera} ${beat.camera}`)
+      : beat.camera;
     const instruction = directiveText ? ` Production directions: ${directiveText}` : '';
+    const title = explicitScene?.title || beat.title;
     const description = [
       `${CHARACTER_LABEL[locale]}: ${subject}.`,
       visibleAction,
@@ -119,11 +129,11 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
       instruction
     ].filter(Boolean).join(' ');
     return {
-      id: `scene_${index + 1}`, order: index + 1, title: beat.title,
+      id: `scene_${index + 1}`, order: index + 1, title,
       visibleAction, camera, storyEventType: eventDirection?.eventType ?? 'scaffolded-beat', storyDetail,
       prompt: description, description,
       productionDirectives: brief.directives, sourceStoryText: source,
-      sourceEvents: brief.keyEvents
+      sourceEvents: explicitScene ? [storyDetail].filter(Boolean) : brief.keyEvents
     };
   });
 
