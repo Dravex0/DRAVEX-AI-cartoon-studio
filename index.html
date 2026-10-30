@@ -74,7 +74,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="actions"><button class="secondary" id="applyScene">Apply scene edits</button><button class="secondary" id="addScene">Add scene</button><button class="secondary" id="deleteScene">Delete scene</button></div></div><div class="audio-panel">
 <div class="field"><label for="audioFile">Background music / Фоновая музыка (optional)</label><input id="audioFile" type="file" accept="audio/*"><small class="muted">Selected audio stays on this device and is mixed into the exported WebM. Nothing is uploaded. / Музыка остаётся на устройстве и добавляется в экспорт.</small></div>
 <div class="field"><label for="audioVolume">Music volume / Громкость музыки <output id="audioVolumeValue">70%</output></label><input id="audioVolume" type="range" min="0" max="100" value="70"></div>
-<div class="field"><label for="dialogueAudioFiles">Recorded dialogue / Записанные реплики (optional)</label><input id="dialogueAudioFiles" type="file" accept="audio/*" multiple><small class="muted">Local files only. Name each file scene1_dialogue_1.mp3 (scene number starts at 1; dialogue_1 is the first detected line). Files are matched to the scene timeline and included in WebM. / Только локальные файлы. Имя: scene1_dialogue_1.mp3 (номер сцены с 1; dialogue_1 — первая найденная реплика). Файлы связываются с таймлайном и входят в WebM.</small><div id="dialogueAudioStatus" class="muted" role="status" aria-live="polite">No recorded dialogue selected / Записанные реплики не выбраны</div></div>
+<div class="field"><label for="dialogueAudioFiles">Recorded dialogue / Записанные реплики (optional)</label><input id="dialogueAudioFiles" type="file" accept="audio/*" multiple><small class="muted">Local files only. Name each file scene1_dialogue_1.mp3 (scene number starts at 1; dialogue_1 is the first detected line). Files are matched to the scene timeline and included in WebM. / Только локальные файлы. Имя: scene1_dialogue_1.mp3 (номер сцены с 1; dialogue_1 — первая найденная реплика). Файлы связываются с таймлайном и входят в WebM.</small><div id="dialogueAudioStatus" class="muted" role="status" aria-live="polite">No recorded dialogue selected / Записанные реплики не выбраны</div><div id="dialogueLineAssignments" class="field"></div></div>
 <audio id="audioPreview" controls preload="none" hidden></audio><div id="audioStatus" class="muted" role="status" aria-live="polite">No music selected / Музыка не выбрана</div><div class="field"><label><input id="voiceEnabled" type="checkbox" checked> Dialogue voice preview / Озвучивать реплики в предпросмотре</label><select id="voiceSelect" aria-label="Dialogue voice"><option value="">System default voice / Голос системы</option></select><div id="voiceStatus" class="muted" role="status" aria-live="polite">Uses voices installed in this browser/device. Voice is preview-only and is not included in exported WebM. / Используются голоса устройства. Озвучка только в предпросмотре, в WebM не попадает.</div></div>
 </div>
 <div class="actions"><button class="secondary" id="play" data-i18n="playButton">Play preview</button><button class="secondary" id="export" data-i18n="exportButton">Export WebM test</button></div><p class="muted" style="font-size:12px"><span data-i18n="previewDisclaimer">Preview uses Canvas animation and optional device speech synthesis. Dialogue voice is preview-only and is not included in exported WebM yet. / Предпросмотр использует анимацию Canvas и системную озвучку. Голос пока не входит в экспорт WebM.</span></p></section>
@@ -114,8 +114,53 @@ function applyLanguage(){document.documentElement.lang=uiLang;$('uiLanguage').va
 $('uiLanguage').addEventListener('change',()=>{uiLang=$('uiLanguage').value;writeLocalStorage('dravex-ui-language',uiLang);applyLanguage()});
 $('style').addEventListener('change',()=>{if(!playing)draw()});
 let selectedMusicUrl='';
+const dialogueAudioAssignments=new Map();
+function renderDialogueAudioAssignments(){
+  const box=$('dialogueLineAssignments');
+  if(!box)return;
+  box.replaceChildren();
+  const lines=Array.isArray(sceneMetadata[sceneIndex]?.dialogueTimeline)?sceneMetadata[sceneIndex].dialogueTimeline:[];
+  const heading=document.createElement('strong');
+  heading.textContent=uiLang==='ru'?'Озвучка реплик этой сцены':'Voice recordings for this scene';
+  box.appendChild(heading);
+  if(!lines.length){
+    const empty=document.createElement('small');
+    empty.className='muted';
+    empty.textContent=uiLang==='ru'?'В этой сцене не найдены реплики с указанным говорящим.':'No attributed dialogue lines were detected in this scene.';
+    box.appendChild(empty);
+    return;
+  }
+  lines.slice(0,20).forEach((line,index)=>{
+    const key=sceneIndex+':'+String(line.id||'dialogue_'+(index+1));
+    const row=document.createElement('label');
+    row.className='field';
+    const caption=document.createElement('span');
+    caption.textContent=(index+1)+'. '+String(line.characterId||'Speaker')+': '+String(line.text||'').slice(0,180);
+    const input=document.createElement('input');
+    input.type='file';
+    input.accept='audio/*';
+    input.setAttribute('aria-label',uiLang==='ru'?'Аудиофайл для реплики '+(index+1):'Audio file for dialogue line '+(index+1));
+    input.addEventListener('change',()=>{
+      const file=input.files?.[0];
+      if(!file){dialogueAudioAssignments.delete(key);return}
+      if(file.size>20*1024*1024){
+        input.value='';
+        $('dialogueAudioStatus').textContent=uiLang==='ru'?'Файл должен быть не больше 20 МБ.':'Audio file must be 20 MB or smaller.';
+        return;
+      }
+      dialogueAudioAssignments.set(key,file);
+      $('dialogueAudioStatus').textContent=uiLang==='ru'
+        ?'Назначено записей: '+dialogueAudioAssignments.size+' · файлы остаются на устройстве.'
+        :'Assigned recordings: '+dialogueAudioAssignments.size+' · files stay on this device.';
+    });
+    const existing=dialogueAudioAssignments.get(key);
+    if(existing){const selected=document.createElement('small');selected.className='muted';selected.textContent=existing.name;row.appendChild(caption);row.append(input,selected)}
+    else row.append(caption,input);
+    box.appendChild(row);
+  });
+}
 async function decodeDialogueAudioFiles(files, schedule){
-  const selected=Array.from(files||[]);
+  const selected=files instanceof Map?[...files.entries()].map(([key,file])=>({key,file})):Array.from(files||[]).map(file=>({file}));
   const buffers=new Map();
   if(!selected.length)return buffers;
   if(selected.length>40)throw new Error('Select no more than 40 dialogue audio files.');
@@ -126,10 +171,15 @@ async function decodeDialogueAudioFiles(files, schedule){
   const expected=new Set(schedule.map(cue=>cue.sceneIndex+':'+cue.lineId));
   const unmatched=[];
   try{
-    for(const file of selected){
-      const parsed=parseDialogueAudioFilename(file.name);
-      if(!parsed){unmatched.push(file.name);continue}
-      const key=parsed.sceneIndex+':'+parsed.lineId;
+    for(const item of selected){
+      const file=item.file;
+      if(!file)continue;
+      let key=typeof item.key==='string'?item.key:'';
+      if(!key){
+        const parsed=parseDialogueAudioFilename(file.name);
+        if(!parsed){unmatched.push(file.name);continue}
+        key=parsed.sceneIndex+':'+parsed.lineId;
+      }
       if(!expected.has(key)){unmatched.push(file.name);continue}
       try{const decoded=await context.decodeAudioData((await file.arrayBuffer()).slice(0));buffers.set(key,decoded)}
       catch(error){unmatched.push(file.name)}
@@ -355,6 +405,7 @@ $('generatedImageMeta').textContent=info.join(' · ');wrap.hidden=false;
 }
 function syncSceneEditor(){
 const meta=sceneMetadata[sceneIndex]||{};
+renderDialogueAudioAssignments();
 $('sceneTitle').value=titles[sceneIndex]||'';
 $('sceneDescription').value=descriptions[sceneIndex]||'';
 $('sceneCamera').value=meta.camera||'';
@@ -623,7 +674,7 @@ $('export').onclick=async()=>{
     const musicFile=$('audioFile').files?.[0]||null;
     const dialogueSchedule=buildDialogueAudioSchedule(sceneMetadata,timeline);
     let dialogueBuffers=new Map();
-    try{dialogueBuffers=await decodeDialogueAudioFiles($('dialogueAudioFiles').files,dialogueSchedule)}catch(audioError){
+    try{dialogueBuffers=await decodeDialogueAudioFiles(new Map([...dialogueAudioAssignments,...Array.from($('dialogueAudioFiles').files||[]).map(file=>{const parsed=parseDialogueAudioFilename(file.name);return [parsed?parsed.sceneIndex+':'+parsed.lineId:'',file]})]),dialogueSchedule)}catch(audioError){
       console.warn('Dialogue audio was skipped:',audioError);
       $('dialogueAudioStatus').textContent=(uiLang==='ru'?'Озвучка пропущена: ':'Dialogue audio skipped: ')+(audioError?.message||'Decode error');
     }
