@@ -55,8 +55,15 @@ const escapeRegExp = value => [...String(value)].map(char => '.*+?^$|{}()[]'.inc
 const boundary = '(?<![\\p{L}\\p{N}])';
 const tailBoundary = '(?![\\p{L}\\p{N}])';
 const cutTail = value => clean(String(value ?? '')
-  .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+|[.!?,;:]/iu)[0]
+  .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+|[.!?,;:]/iu)[0].trim()
   .replace(/^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu, ''));
+
+const ALLOWED_ACTION_ADVERBS = /^(?:carefully|quickly|slowly|gently|quietly|осторожно|быстро|медленно|тихо|обережно|швидко|повільно|lentamente|cuidadosamente)$/iu;
+
+function hasOnlyOptionalAdverb(prefix) {
+  const value = String(prefix ?? '').trim();
+  return !value || ALLOWED_ACTION_ADVERBS.test(value);
+}
 
 function findEntity(source, actorId, verb) {
   const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
@@ -64,7 +71,7 @@ function findEntity(source, actorId, verb) {
   if (!actorMatch) return null;
   const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
   const verbMatch = verb.re.exec(afterActor);
-  if (!verbMatch) return null;
+  if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) return null;
   const entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
   if (!entity || entity.length > 100 || /^(?:it|them|him|her|его|её|ее|их|його|її|їх)$/iu.test(entity)) return null;
   return { entity, evidence: clean(source, 1_200) };
@@ -100,7 +107,7 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
       const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
       for (const verb of LOCATION_VERBS[locale]) {
         const verbMatch = verb.re.exec(afterActor);
-        if (!verbMatch) continue;
+        if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) continue;
         const place = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
         if (!place || place.length > 100) continue;
         const value = verb.value + ':' + place;
