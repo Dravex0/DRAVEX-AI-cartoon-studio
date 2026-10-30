@@ -42,3 +42,31 @@ test('envelope stays closed for silence and clamps loud audio', () => {
   const loud = createDialogueMouthEnvelope(fakeBuffer(new Array(100).fill(1)));
   assert.ok(sampleDialogueMouthEnvelope(loud, 40) <= 1);
 });
+
+test('rolling envelope matches reference RMS when hop windows do not overlap', () => {
+  const samples = Float32Array.from({ length: 70 }, (_, index) =>
+    index < 8 ? 0.04 : index < 24 ? 0.18 : index < 40 ? 0.07 : index < 56 ? 0.25 : 0.02
+  );
+  const buffer = fakeBuffer(samples, 1000);
+  const options = { windowMs: 8, hopMs: 16, noiseFloor: 0.012, sensitivity: 5.5, attack: 0.62, release: 0.28 };
+  const envelope = createDialogueMouthEnvelope(buffer, options);
+  let previous = 0;
+  const expected = [];
+  const hopSamples = 16;
+  const halfWindow = 4;
+  for (let frame = 0; frame < Math.ceil(samples.length / hopSamples); frame++) {
+    const center = frame * hopSamples;
+    const start = Math.max(0, center - halfWindow);
+    const end = Math.min(samples.length, center + halfWindow + 1);
+    let sumSquares = 0;
+    for (let index = start; index < end; index++) sumSquares += samples[index] * samples[index];
+    const rms = end > start ? Math.sqrt(sumSquares / (end - start)) : 0;
+    const target = Math.max(0, Math.min(1, (rms - options.noiseFloor) * options.sensitivity));
+    previous += (target - previous) * (target > previous ? options.attack : options.release);
+    expected.push(previous);
+  }
+  assert.equal(envelope.values.length, expected.length);
+  expected.forEach((value, index) => {
+    assert.ok(Math.abs(envelope.values[index] - value) < 1e-6, `frame ${index}: expected ${value}, got ${envelope.values[index]}`);
+  });
+});
