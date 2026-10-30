@@ -117,3 +117,11 @@ test('readiness reports missing character references and dialogue cast mismatch'
   assert.ok(result.issues.some(issue => issue.code === 'missing-character-reference' && issue.characterId === 'Snowball'));
   assert.ok(result.issues.some(issue => issue.code === 'dialogue-speaker-not-in-scene' && issue.characterId === 'Villain'));
 });
+
+test('production scene preserves invalid raw duration as a readiness issue after normalization', () => {
+  const prepared = buildProductionScene({
+    title: 'A scene', visibleAction: 'A bird lands.', camera: 'Wide shot', durationSeconds: 99
+  });
+  assert.equal(prepared.durationSeconds, 3);
+  assert.ok(prepared.productionReadiness.issues.some(issue => issue.code === 'invalid-duration'));
+});
