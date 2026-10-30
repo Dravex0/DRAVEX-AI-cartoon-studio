@@ -3,7 +3,7 @@
  * This is a local fallback, not a generative model or visual scene-understanding system.
  */
 import { parseStoryBrief, formatProductionDirectives } from './story-brief.js';
-import { directStoryEvent } from './story-event-director.js';
+import { directStoryEvent } from './story-event-director.js';\nimport { inferSceneCausalLinks } from './scene-causality.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
