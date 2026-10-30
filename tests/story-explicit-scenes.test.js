@@ -57,3 +57,16 @@ test('explicit scene headings take precedence over a conflicting scene-count dir
   assert.equal(brief.requestedSceneCount, 3);
   assert.ok(brief.issues.some(issue => issue.code === 'scene-count-mismatch'));
 });
+test('extracts a named character bible from a Characters section', () => {
+  const brief = parseStoryBrief('Characters:\nFoxy — small orange fox with a blue scarf.\nSnowball — white rabbit with long ears.\n\nScene 1: Meeting\nFoxy meets Snowball.');
+  assert.deepEqual(brief.characters, ['Foxy', 'Snowball']);
+  assert.equal(brief.characterProfiles.length, 2);
+  assert.match(brief.characterProfiles[0].visualDescription, /orange fox/);
+  assert.match(brief.characterProfiles[1].visualDescription, /white rabbit/);
+});
+
+test('recognizes a character introduced by name in natural story text', () => {
+  const brief = parseStoryBrief('A small silver fox named Riki finds a lantern.');
+  assert.ok(brief.characters.includes('Riki'));
+  assert.match(brief.characterProfiles.find(profile => profile.characterId === 'Riki').visualDescription, /silver fox/);
+});
