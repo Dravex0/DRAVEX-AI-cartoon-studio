@@ -73,7 +73,7 @@ test('records explicit state changes and explicit reactions without guessing the
     stateChanges: [{
       entityType: 'prop', entityId: 'silver key', property: 'holder',
       previousValue: null, value: 'Foxy', actorId: 'Foxy',
-      evidence: 'Foxy picks up the silver key.'
+      evidence: 'Foxy picks up the silver key'
     }]
   }]);
   assert.deepEqual(graph.nodes[0].reaction, {
