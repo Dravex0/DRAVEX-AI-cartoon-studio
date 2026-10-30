@@ -116,7 +116,9 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
     const visibleAction = eventDirection
       ? (explicitScene ? eventDirection.visibleAction : `${eventDirection.visibleAction} ${beat.action}`)
       : beat.action;
-    const camera = eventDirection ? eventDirection.camera : beat.camera;
+    const camera = eventDirection
+      ? (explicitScene ? eventDirection.camera : `${eventDirection.camera} ${beat.camera}`)
+      : beat.camera;
     const instruction = directiveText ? ` Production directions: ${directiveText}` : '';
     const title = explicitScene?.title || beat.title;
     const description = [
