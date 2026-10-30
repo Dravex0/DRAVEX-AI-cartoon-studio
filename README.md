@@ -33,3 +33,15 @@ The Vite build is a separate development bundle; the current root `index.html` r
 - The fixture is test data, not a generated animation.
 - No paid API is required by this test foundation.
 - A successful CI run verifies syntax, unit tests, and bundling only; it does not prove mobile-browser playback, audio/video codec support, or real AI generation.
+
+
+## Optional Gemini integration (free tier only)
+
+The storyboard workspace can optionally call the Gemini Developer API using the fixed `gemini-2.5-flash-lite` model. The local storyboard generator remains available without an API key.
+
+1. Create an API key in [Google AI Studio](https://aistudio.google.com/apikey) under a project that remains on the **Free Tier**.
+2. Do **not** link Cloud Billing or enable a paid tier.
+3. Paste the key into the Gemini key field in the app when you want AI storyboard generation. The browser keeps it in page memory only; it is not saved in local storage.
+4. Clear the field when finished. Never share the key in issues, screenshots, or chat.
+
+Google's free tier has request quotas and may use submitted data to improve Google products. If the quota is exhausted, use the local generator and try Gemini again after the quota resets. No paid model fallback is configured.
