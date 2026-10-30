@@ -34,7 +34,7 @@ function appendDirective(directives, key, value) {
 }
 
 function sceneHeading(line) {
-  const match = clean(line, 3000).match(/^\s*(?:сцена|scene|escena)\s*(\d{1,2})\s*[.):-]?\s*(.*)$/iu);
+  const match = clean(line, 3000).match(/^\s*(?:сцена|scene|escena)\s*(\d{1,2})\s*[.·):-]?\s*(.*)$/iu);
   return match ? { number: Number(match[1]), title: clean(match[2], 200) } : null;
 }
 
