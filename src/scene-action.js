@@ -9,8 +9,8 @@ const ACTION_PATTERNS = [
   { action: 'sad', patterns: [/плак|груст|страх|боится|расстро|слез/, /\bcry\w*|sad\w*|afraid|fearful|scared|sorrow\w*/, /плак|сум|боїться|злякав|сльоз/, /llor\w*|triste|asustad\w*|teme/] },
   { action: 'happy', patterns: [/радост|улыб|счаст|весел|довол/, /\bhappy|smil\w*|joy\w*|cheerful|laugh\w*/, /радіс|усміх|щаслив|весел|задовол/, /feliz|sonrí\w*|alegr\w*|ríe/] },
   { action: 'talk', patterns: [/говорит|разговари|произносит|рассказыва|шепчет/, /\btalk\w*|speak\w*|say\w*|whisper\w*|dialog\w*/, /говорить|розмовля|вимовля|розповіда|шепоче/, /habl\w*|dice|susurr\w*|convers\w*/] },
-  { action: 'magic', patterns: [/свет|сия|вспыш|маг|волшеб|искрится|сверкает/, /\bglow\w*|shine\w*|flash\w*|magic\w*|spark\w*|illuminat\w*/, /світ|сяй|спалах|магі|чарів|іскриться|виблискує/, /brill\w*|magia|destell\w*|resplandec\w*/] },
   { action: 'turn', patterns: [/поворачива|оборачива|разворачива|крутится вокруг себя/, /\bturn\w*|look\s+back|rotate\w*|spin\w*/, /поверта|озира|розверта|обертається/, /gir\w*|se vuelve|mira atrás/] }
+  { action: 'magic', patterns: [/свет|сия|вспыш|маг|волшеб|искрится|сверкает/, /\bglow\w*|shine\w*|flash\w*|magic\w*|spark\w*|illuminat\w*/, /світ|сяй|спалах|магі|чарів|іскриться|виблискує/, /brill\w*|magia|destell\w*|resplandec\w*/] },
 ];
 
 function matches(text, pattern) {
