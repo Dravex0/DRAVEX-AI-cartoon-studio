@@ -2,7 +2,7 @@
  * Optional Gemini storyboard adapter.
  * Uses only the documented free-tier model; API keys are memory-only and never persisted.
  */
-export const FREE_GEMINI_MODEL = 'gemini-2.5-flash-lite';
+export const FREE_GEMINI_MODEL = 'gemini-3.5-flash-lite';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 function cleanText(value, max = 1200) {
