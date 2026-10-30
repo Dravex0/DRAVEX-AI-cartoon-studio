@@ -6,7 +6,7 @@
   "description": "DRAVEX/DX Studio prototype with a testable scene-model and storyboard QA foundation",
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/scene-model.js && node --check src/story-qa.js && node --check tests/story-qa.test.js",
+    "check": "node --check src/scene-model.js && node --check src/storyboard-generator.js && node --check src/story-qa.js && node --check tests/storyboard-generator.test.js && node --check tests/story-qa.test.js",
     "build": "vite build",
     "dev": "vite"
   },
