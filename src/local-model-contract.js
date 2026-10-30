@@ -43,7 +43,7 @@ export function validateLocalModelManifest(input = {}) {
     sizeBytes: finitePositive(file?.sizeBytes),
     sha256: clean(file?.sha256, 64).toLowerCase()
   })) : [];
-  if (!files.length || files.some(file => !file.path || file.sizeBytes === null || file.path.startsWith('/') || file.path.split(/[\\\\/]+/).includes('..'))) {
+  if (!files.length || files.some(file => !file.path || file.sizeBytes === null || file.path.startsWith('/') || file.path.split(/[\\/]+/).includes('..'))) {
     issues.push({ code: 'invalid-model-files', field: 'files' });
   }
   if (files.some(file => !/^[a-f0-9]{64}$/.test(file.sha256))) {
