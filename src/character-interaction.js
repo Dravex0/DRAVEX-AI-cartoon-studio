@@ -1,3 +1,4 @@
+const clean = value => String(value ?? '').trim().slice(0, 120);
 const escapeRegExp = value => value.replace(/[.*+?^{}()|[\]\\]/g, '\\$&').replaceAll('$', '\\$');
 
 const RELATIONS = {
