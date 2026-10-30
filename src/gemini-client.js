@@ -82,7 +82,10 @@ export async function buildGeminiStoryboard({ apiKey, idea, language = 'ru', cha
   if (!Array.isArray(parsed.scenes) || parsed.scenes.length < 3 || parsed.scenes.length > 8) {
     throw new Error('Gemini storyboard must contain between 3 and 8 scenes.');
   }
-  if (brief.requestedSceneCount && parsed.scenes.length !== requestedCount) {\n    throw new Error(`Gemini returned ${parsed.scenes.length} scenes, but the brief requested ${requestedCount}. Retry to enforce the requested scene count.`);\n  }\n  const scenes = parsed.scenes.map((item, index) => {
+  if (brief.requestedSceneCount && parsed.scenes.length !== requestedCount) {
+    throw new Error(`Gemini returned ${parsed.scenes.length} scenes, but the brief requested ${requestedCount}. Retry to enforce the requested scene count.`);
+  }
+  const scenes = parsed.scenes.map((item, index) => {
     const title = cleanText(item?.title, 100);
     const visibleAction = cleanText(item?.visibleAction, 700);
     const camera = cleanText(item?.camera, 300);
