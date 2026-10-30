@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { inferSceneCausalLinks } from '../src/scene-causality.js';
 import { buildStoryboardFromText } from '../src/storyboard-generator.js';
 
-test('extracts an explicit English consequence and binds it to adjacent source scenes', () => {
+test('extracts an explicit English consequence and binds it to prior source evidence', () => {
   const links = inferSceneCausalLinks([
     { id: 'scene_1', storyDetail: 'The bridge collapses.' },
     { id: 'scene_2', storyDetail: 'As a result, the travelers take the forest path.' }
