@@ -23,6 +23,10 @@ The current storyboard planner is deterministic and rule-based. It is not a trai
 
 A metric is `null` when the current sample does not provide enough evidence. The evaluator does not infer image quality, emotional truth, visual character identity, animation quality, or whether a generated video looks correct.
 
+## Story-aware direction engine
+
+`src/story-event-director.js` now classifies common source-story events in Russian, Ukrainian, English, and Spanish (discovery, repair/build, guidance, threat/conflict, transformation, travel, and emotional reaction). The storyboard planner uses the event type to choose a more relevant visible action and camera plan instead of always using the same generic beat direction. Unknown events use an explicit general fallback. This is a transparent multilingual rule engine, not neural semantic understanding; benchmark examples must be expanded as new story patterns are added.
+
 ## Training loop to build next
 
 1. **Collect examples:** user-approved story prompts and corrected storyboards, with private details removed.
