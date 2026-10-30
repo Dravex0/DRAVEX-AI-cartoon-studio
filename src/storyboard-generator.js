@@ -4,6 +4,7 @@
  */
 import { parseStoryBrief, formatProductionDirectives } from './story-brief.js';
 import { directStoryEvent } from './story-event-director.js';
+import { inferSceneCausalLinks } from './scene-causality.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -123,6 +124,9 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
       sourceEvents: brief.keyEvents
     };
   });
+
+  const causalLinks = inferSceneCausalLinks(scenes, locale);
+  scenes.forEach((scene, index) => { scene.causalLink = causalLinks[index]; });
 
   return {
     titles: scenes.map(scene => scene.title),

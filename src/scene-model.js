@@ -30,6 +30,16 @@ export function normalizeScene(input = {}, index = 0) {
     sourceStoryText: text(scene.sourceStoryText, 10_000),
     sourceEvents: uniqueStrings(scene.sourceEvents),
     characters: uniqueStrings(scene.characters ?? (scene.characterId ? [scene.characterId] : [])),
+    causalLink: scene.causalLink && typeof scene.causalLink === 'object' && !Array.isArray(scene.causalLink)
+      ? {
+          type: text(scene.causalLink.type, 40),
+          causeSceneId: text(scene.causalLink.causeSceneId, 120),
+          effectSceneId: text(scene.causalLink.effectSceneId, 120),
+          marker: text(scene.causalLink.marker, 100),
+          causeEvidence: text(scene.causalLink.causeEvidence, 1_200),
+          evidence: text(scene.causalLink.evidence, 1_200)
+        }
+      : null,
     interaction: scene.interaction && typeof scene.interaction === 'object' && !Array.isArray(scene.interaction)
       ? {
           type: text(scene.interaction.type, 40),

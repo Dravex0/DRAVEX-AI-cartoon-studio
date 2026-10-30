@@ -112,6 +112,29 @@ export function evaluateStoryboard({
     });
   }
 
+  const causalScenes = scenes.filter(scene => scene.causalLink);
+  let causalIntegrity = null;
+  if (causalScenes.length) {
+    const validCausalLinks = causalScenes.filter(scene => {
+      const link = scene.causalLink;
+      const effectIndex = scenes.findIndex(item => item.id === scene.id);
+      const causeIndex = scenes.findIndex(item => item.id === link.causeSceneId);
+      const cause = causeIndex >= 0 ? scenes[causeIndex] : null;
+      return Boolean(link.type === 'consequence' && cause && causeIndex < effectIndex
+        && link.effectSceneId === scene.id
+        && link.marker && link.causeEvidence && link.evidence
+        && cause.storyDetail.includes(link.causeEvidence)
+        && scene.storyDetail.includes(link.evidence)
+        && link.evidence.toLocaleLowerCase().includes(link.marker.toLocaleLowerCase()));
+    }).length;
+    causalIntegrity = percentage(validCausalLinks, causalScenes.length);
+    if (causalIntegrity < 100) issues.push({
+      skill: 'causal-reasoning',
+      code: 'invalid-causal-link',
+      message: 'A causal link is not grounded in earlier source-story evidence.'
+    });
+  }
+
   const interactionScenes = scenes.filter(scene => scene.interaction);
   let interactionIntegrity = null;
   if (interactionScenes.length) {
@@ -162,6 +185,7 @@ export function evaluateStoryboard({
     sourceOrderConsistency,
     characterConsistency,
     interactionIntegrity,
+    causalIntegrity,
     productionCompleteness,
     stateCoverage: continuityReport?.metrics.stateCoverage ?? null,
     stateTransitionConsistency: continuityReport?.metrics.stateTransitionConsistency ?? null,

@@ -130,3 +130,37 @@ test('flags an interaction that names a participant outside the scene cast', () 
   assert.equal(result.metrics.interactionIntegrity, 0);
   assert.ok(result.issues.some(issue => issue.code === 'invalid-character-interaction'));
 });
+
+
+test('accepts causal links only when they cite adjacent source-scene evidence', () => {
+  const result = evaluateStoryboard({
+    scenes: [
+      { id: 'scene_1', storyDetail: 'The bridge collapses.', visibleAction: 'The bridge breaks apart and falls into the river.', camera: 'Wide shot.' },
+      { id: 'scene_2', storyDetail: 'As a result, the travelers take the forest path.', visibleAction: 'The travelers turn away from the river and enter the forest path.', camera: 'Tracking shot.', causalLink: {
+        type: 'consequence', causeSceneId: 'scene_1', effectSceneId: 'scene_2',
+        marker: 'As a result', causeEvidence: 'The bridge collapses.',
+        evidence: 'As a result, the travelers take the forest path.'
+      } }
+    ],
+    expectedSceneCount: 2
+  });
+  assert.equal(result.metrics.causalIntegrity, 100);
+  assert.equal(result.issues.some(issue => issue.code === 'invalid-causal-link'), false);
+});
+
+test('rejects causal links that cite unsupported source evidence', () => {
+  const result = evaluateStoryboard({
+    scenes: [
+      { id: 'scene_1', storyDetail: 'The bridge collapses.', visibleAction: 'The bridge breaks apart and falls into the river.', camera: 'Wide shot.' },
+      { id: 'scene_2', storyDetail: 'The travelers look for another route.', visibleAction: 'The travelers inspect a map beside the river.', camera: 'Medium shot.' },
+      { id: 'scene_3', storyDetail: 'Therefore, they enter the forest.', visibleAction: 'The travelers enter the forest path together.', camera: 'Tracking shot.', causalLink: {
+        type: 'consequence', causeSceneId: 'scene_1', effectSceneId: 'scene_3',
+        marker: 'Therefore', causeEvidence: 'An earthquake destroyed the bridge.',
+        evidence: 'Therefore, they enter the forest.'
+      } }
+    ],
+    expectedSceneCount: 3
+  });
+  assert.equal(result.metrics.causalIntegrity, 0);
+  assert.ok(result.issues.some(issue => issue.code === 'invalid-causal-link'));
+});
