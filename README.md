@@ -10,6 +10,7 @@ A free-first prototype for turning story text into a structured storyboard. The 
 - `src/device-capabilities.js` checks HTTPS, WebGPU adapter availability, approximate browser memory, CPU threads, and browser storage before any future local model load. This is advisory only; it does not download weights or guarantee model compatibility.
 - `src/ai-horde-image-provider.js` optionally generates one still image through the free, volunteer-powered AI Horde queue. It sends text prompts only, never source photos or videos, and is gated by an explicit in-app consent checkbox.
 - `src/image-frame.js` crops generated stills to the canvas aspect ratio without stretching. The browser loads images with anonymous CORS mode; if the image host does not permit canvas access, the procedural preview remains usable.
+- `src/prompt-camera-motion.js` maps scene motion instructions such as push-in, pull-back, pan-left/right and tilt-up/down to bounded 2D camera moves on generated still images. It is prompt-guided still-image movement, not AI-generated video or character animation.
 - `src/export-timeline.js` builds a bounded, per-scene timeline so the WebM test export visits all storyboard scenes using their own durations.
 - `fixtures/aster-awakening.js` contains an eight-scene, 23-second continuity fixture.
 - `tests/story-qa.test.js` exercises normalization and storyboard QA behavior.
@@ -36,7 +37,7 @@ The Vite build is a separate development bundle. The root `index.html` is the pu
 
 - Local story planning and cinematic direction use deterministic text heuristics; they do not visually understand generated frames.
 - Gemini can optionally write storyboard scenes, but this does not generate scene artwork or animation.
-- The scene editor exposes editable image/motion prompts, continuity locks, and a preview of the assembled AI instructions. These are pre-production instructions, not an active image/video generation provider.
+- The scene editor exposes editable image/motion prompts, continuity locks, and a preview of the assembled AI instructions. The motion prompt now controls a limited 2D camera move on generated stills; full AI video generation and character animation remain unimplemented.
 - The optional local AI hardware check does not prove that a particular diffusion model will fit or run on the device.
 - AI Horde is a remote community queue, not local inference. Anonymous requests have low priority and may be slow; the service shares anonymous requests with LAION and may collect prompt and IP/usage data. The app requires explicit consent before sending a prompt. See the [AI Horde privacy policy](https://horde.aivo.chat/privacy).
 - Generated AI Horde stills are now drawn into the selected scene's canvas preview and are included in the canvas-based WebM capture when the image host permits anonymous CORS access. The preview uses a subtle Ken Burns zoom. If CORS blocks drawing, the side preview remains available and the canvas falls back to its procedural scene; no tainted canvas is exported.
