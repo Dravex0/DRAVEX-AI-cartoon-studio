@@ -32,7 +32,7 @@ test('approach gradually closes character spacing and ignores inactive events', 
   const start = getSceneCharacterLayout(scene, 0);
   const middle = getSceneCharacterLayout(scene, 1);
   assert.ok(Math.abs(middle[1].x - middle[0].x) < Math.abs(start[1].x - start[0].x));
-  const before = getSceneCharacterLayout(scene, -1);
+  const before = getSceneCharacterLayout(scene, 3.1);
   assert.equal(before[0].interaction, '');
 });
 
