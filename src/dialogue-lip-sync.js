@@ -2,7 +2,7 @@
  * Estimate mouth openness from a decoded local voice recording.
  * Uses a short RMS window around the requested offset; no network or media upload.
  */
-export function sampleDialogueMouthOpen(audioBuffer, elapsedMs, windowMs = 32) {
+function finiteClamp(value, fallback, min, max) {\n  const number = Number(value);\n  return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;\n}\n\nexport function sampleDialogueMouthOpen(audioBuffer, elapsedMs, windowMs = 32) {
   if (!audioBuffer || typeof audioBuffer.getChannelData !== 'function' ||
       !Number.isFinite(audioBuffer.sampleRate) || audioBuffer.sampleRate <= 0 ||
       !Number.isFinite(elapsedMs) || elapsedMs < 0) return 0;
@@ -10,7 +10,7 @@ export function sampleDialogueMouthOpen(audioBuffer, elapsedMs, windowMs = 32) {
   if (!Number.isInteger(length) || length <= 0) return 0;
   const channels = Math.max(1, Math.floor(Number(audioBuffer.numberOfChannels) || 1));
   const center = Math.min(length - 1, Math.floor(elapsedMs * audioBuffer.sampleRate / 1000));
-  const halfWindow = Math.max(1, Math.floor(audioBuffer.sampleRate * Math.max(8, Math.min(80, windowMs)) / 2000));
+  const safeWindowMs = finiteClamp(windowMs, 32, 8, 80);\n  const halfWindow = Math.max(1, Math.floor(audioBuffer.sampleRate * safeWindowMs / 2000));
   const start = Math.max(0, center - halfWindow);
   const end = Math.min(length, center + halfWindow + 1);
   let sumSquares = 0, samples = 0;
