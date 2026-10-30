@@ -131,7 +131,7 @@ export function evaluateStoryboard({
     if (causalIntegrity < 100) issues.push({
       skill: 'causal-reasoning',
       code: 'invalid-causal-link',
-      message: 'A causal link is not grounded in adjacent source-story evidence.'
+      message: 'A causal link is not grounded in earlier source-story evidence.'
     });
   }
 
