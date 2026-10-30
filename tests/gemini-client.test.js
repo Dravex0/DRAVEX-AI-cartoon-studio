@@ -23,7 +23,7 @@ test('rejects an empty key before making a request', async () => {
 });
 
 test('rejects invalid scene structure', async () => {
-  await assert.rejects(() => buildGeminiStoryboard({ apiKey:'test-key', idea:'A story', fetchImpl:mockFetch(reply({ scenes:[{title:'Only title'}] })) }), /missing/);
+  await assert.rejects(() => buildGeminiStoryboard({ apiKey:'test-key', idea:'A story', fetchImpl:mockFetch(reply({ scenes:[{title:'Only title'},{title:'Second',visibleAction:'Action 2',camera:'Camera 2'},{title:'Third',visibleAction:'Action 3',camera:'Camera 3'}] })) }), /missing/);
 });
 
 test('handles free-tier quota limits without suggesting paid upgrade', async () => {
