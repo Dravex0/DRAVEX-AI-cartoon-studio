@@ -37,12 +37,17 @@ export function buildStoryEventChain(scenes = []) {
         value: change.value == null ? null : clean(change.value, 160),
         actorId: clean(change.actorId, 120),
         evidence: clean(change.evidence)
-      }));
+      }))
+      .filter(change => Boolean(change.actorId && change.entityId && change.evidence
+        && storyEvidence.includes(change.evidence)
+        && characters.some(name => name.toLocaleLowerCase() === change.actorId.toLocaleLowerCase())
+        && ['prop', 'character'].includes(change.entityType));
 
     const validInteraction = interaction
       && clean(interaction.actorId, 120)
       && clean(interaction.targetId, 120)
       && clean(interaction.evidence)
+      && storyEvidence.includes(clean(interaction.evidence))
       && characters.some(name => name.toLocaleLowerCase() === clean(interaction.actorId, 120).toLocaleLowerCase())
       && characters.some(name => name.toLocaleLowerCase() === clean(interaction.targetId, 120).toLocaleLowerCase())
       ? {
@@ -53,13 +58,18 @@ export function buildStoryEventChain(scenes = []) {
         }
       : null;
 
+    const causeScene = list.find((item, itemIndex) =>
+      (clean(item?.id, 120) || `scene_${itemIndex + 1}`) === clean(causalLink?.causeSceneId, 120));
+    const causeStoryEvidence = clean(causeScene?.storyDetail);
     const validCause = causalLink
       && causalLink.type === 'consequence'
       && clean(causalLink.causeSceneId, 120)
       && clean(causalLink.effectSceneId, 120) === sceneId
       && sceneIds.has(clean(causalLink.causeSceneId, 120))
       && clean(causalLink.causeEvidence)
+      && causeStoryEvidence.includes(clean(causalLink.causeEvidence))
       && clean(causalLink.evidence)
+      && storyEvidence.includes(clean(causalLink.evidence))
       ? {
           type: 'consequence',
           causeSceneId: clean(causalLink.causeSceneId, 120),
