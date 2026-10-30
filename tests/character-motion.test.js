@@ -4,6 +4,7 @@ import {
   CHARACTER_MOTION_ACTIONS,
   CHARACTER_MOTION_CLIPS,
   getSceneCharacterMotion,
+  resolveCharacterMotionAction,
   sampleCharacterMotion
 } from '../src/character-motion.js';
 
@@ -67,4 +68,12 @@ test('sampling does not mutate shared clip definitions', () => {
   const result = sampleCharacterMotion('walk', 0.2);
   result.pose.leftArm = 999;
   assert.equal(CHARACTER_MOTION_CLIPS.walk.keyframes[0].pose.leftArm, original);
+});
+
+test('maps existing scene detector actions to supported character motion clips', () => {
+  assert.equal(resolveCharacterMotionAction('float'), 'jump');
+  assert.equal(resolveCharacterMotionAction('vanish'), 'idle');
+  assert.equal(resolveCharacterMotionAction('magic'), 'idle');
+  assert.equal(resolveCharacterMotionAction('happy'), 'happy');
+  assert.equal(resolveCharacterMotionAction('run'), 'run');
 });
