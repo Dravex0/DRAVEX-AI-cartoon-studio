@@ -125,6 +125,9 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
     };
   });
 
+  const causalLinks = inferSceneCausalLinks(scenes, locale);
+  scenes.forEach((scene, index) => { scene.causalLink = causalLinks[index]; });
+
   return {
     titles: scenes.map(scene => scene.title),
     descriptions: scenes.map(scene => scene.description),
