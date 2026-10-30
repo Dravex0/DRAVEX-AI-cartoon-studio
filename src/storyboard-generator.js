@@ -104,8 +104,9 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
   const scenes = beats.map((beat, index) => {
     const storyDetail = storyDetails[index];
     const eventDirection = storyDetail ? directStoryEvent(storyDetail, locale, subject) : null;
-    const visibleAction = eventDirection?.visibleAction ?? beat.action;
-    const camera = eventDirection?.camera ?? beat.camera;
+    // Keep event-specific direction while adding a distinct beat-level variation.
+    const visibleAction = eventDirection ? `${eventDirection.visibleAction} ${beat.action}` : beat.action;
+    const camera = eventDirection ? `${eventDirection.camera} ${beat.camera}` : beat.camera;
     const instruction = directiveText ? ` Production directions: ${directiveText}` : '';
     const description = [
       `${CHARACTER_LABEL[locale]}: ${subject}.`,
