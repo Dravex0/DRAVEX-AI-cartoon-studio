@@ -49,30 +49,27 @@ const LOCATION_VERBS = {
   ]
 };
 
-const clean = (value, max = 160) => String(value ?? '').trim().replace(/^[\\s"'«»“”‘’]+|[\\s"'«»“”‘’]+$/gu, '').slice(0, max);
-const escapeRegExp = value => String(value).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&');
+const clean = (value, max = 160) => String(value ?? '').trim()
+  .replace(/^[\s"'«»“”‘’]+|[\s"'«»“”‘’]+$/gu, '').slice(0, max);
+const escapeRegExp = value => String(value).replace(/[.*+?^$|{}()[\]\\]/g, '\\$&');
 const boundary = '(?<![\\p{L}\\p{N}])';
 const tailBoundary = '(?![\\p{L}\\p{N}])';
-const cutTail = value => clean(String(value ?? '').split(/\\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\\s+|[.!?,;:]/iu)[0]
-  .replace(/^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|цей|el|la|los|las|un|una)\\s+/iu, ''));
+const cutTail = value => clean(String(value ?? '')
+  .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+|[.!?,;:]/iu)[0]
+  .replace(/^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu, ''));
 
-function findEntity(text, actorId, verb, locale) {
+function findEntity(source, actorId, verb) {
   const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
-  const actorMatch = actor.exec(text);
+  const actorMatch = actor.exec(source);
   if (!actorMatch) return null;
-  const afterActor = text.slice(actorMatch.index + actorMatch[0].length);
+  const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
   const verbMatch = verb.re.exec(afterActor);
   if (!verbMatch) return null;
-  const afterVerb = afterActor.slice(verbMatch.index + verbMatch[0].length).trim();
-  const entity = cutTail(afterVerb);
+  const entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
   if (!entity || entity.length > 100 || /^(?:it|them|him|her|его|её|ее|их|його|її|їх)$/iu.test(entity)) return null;
-  return { entity, evidence: clean(text, 1_200) };
+  return { entity, evidence: clean(source, 1_200) };
 }
 
-/**
- * Returns one list of state changes per scene, tracking explicit state values
- * across the supplied scene order. Unknown initial values remain null.
- */
 export function inferStoryboardStateChanges(scenes = [], language = 'en', fallbackCharacter = '') {
   const locale = Object.hasOwn(VERBS, language) ? language : 'en';
   const list = Array.isArray(scenes) ? scenes : [];
@@ -86,46 +83,33 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
     const changes = [];
     for (const actorId of cast) {
       for (const verb of VERBS[locale]) {
-        const found = findEntity(source, actorId, verb, locale);
+        const found = findEntity(source, actorId, verb);
         if (!found) continue;
         const entityId = found.entity;
         const property = verb.property;
-        const key = `prop:${entityId.toLocaleLowerCase()}:${property}`;
+        const key = 'prop:' + entityId.toLocaleLowerCase() + ':' + property;
         const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
         const value = verb.value === 'actor' ? actorId : verb.value;
         if (previousValue === value) continue;
-        changes.push({
-          entityType: 'prop',
-          entityId,
-          property,
-          previousValue,
-          value,
-          actorId,
-          evidence: found.evidence
-        });
+        changes.push({ entityType: 'prop', entityId, property, previousValue, value, actorId, evidence: found.evidence });
         knownStates.set(key, value);
       }
+      const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
+      const actorMatch = actor.exec(source);
+      if (!actorMatch) continue;
+      const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
       for (const verb of LOCATION_VERBS[locale]) {
-        const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
-        const actorMatch = actor.exec(source);
-        if (!actorMatch) continue;
-        const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
         const verbMatch = verb.re.exec(afterActor);
         if (!verbMatch) continue;
         const place = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
         if (!place || place.length > 100) continue;
-        const value = `${verb.value}:${place}`;
-        const key = `character:${actorId.toLocaleLowerCase()}:location`;
+        const value = verb.value + ':' + place;
+        const key = 'character:' + actorId.toLocaleLowerCase() + ':location';
         const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
         if (previousValue === value) continue;
         changes.push({
-          entityType: 'character',
-          entityId: actorId,
-          property: 'location',
-          previousValue,
-          value,
-          actorId,
-          evidence: clean(source, 1_200)
+          entityType: 'character', entityId: actorId, property: 'location',
+          previousValue, value, actorId, evidence: clean(source, 1_200)
         });
         knownStates.set(key, value);
       }
