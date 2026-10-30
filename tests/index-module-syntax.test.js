@@ -19,3 +19,10 @@ test('published page imports the prompt-guided motion module', () => {
   assert.match(html, /from ["']\.\/src\/prompt-camera-motion\.js["']/);
   assert.match(html, /getPromptCameraTransform\(currentSceneData\.motionPrompt/);
 });
+
+test('local AI director receives and preserves the saved character bible', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /directStoryboardWithLocalAI\(\{runtime:localTextRuntime,basePlan,storyText:story,language:languageName,character,characterBible\}\)/);
+  assert.match(html, /function ensureMainCharacterReference\(character\)/);
+  assert.doesNotMatch(html, /characterBible=upsertCharacterReference\(\[\],\s*\{characterId:character\}\)/);
+});
