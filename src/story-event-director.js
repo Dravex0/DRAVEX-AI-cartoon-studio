@@ -2,44 +2,44 @@ const EVENT_PATTERNS = {
   discovery: {
     ru: /наход|обнаруж|замеча|открыва|выявля/iu,
     uk: /знаход|виявля|поміча|відкрива/iu,
-    en: /\\b(find|finds|found|discover|discovers|discovered|notice|notices|uncover|uncovers)\\b/iu,
-    es: /\\b(encuentra|descubre|descubren|halla|nota|descubre)\\b/iu
+    en: /\b(find|finds|found|discover|discovers|discovered|notice|notices|uncover|uncovers)\b/iu,
+    es: /\b(encuentra|descubre|descubren|halla|nota|descubre)\b/iu
   },
   repair_build: {
     ru: /чинит|ремонтир|строит|собирает|созда[её]т|мастерит/iu,
     uk: /лагод|ремонту|буду|збира|створю|майстру/iu,
-    en: /\\b(repair|repairs|fix|fixes|build|builds|construct|constructs|assemble|assembles|create|creates)\\b/iu,
-    es: /\\b(repara|arregla|construye|construir|ensambla|crea)\\b/iu
+    en: /\b(repair|repairs|fix|fixes|build|builds|construct|constructs|assemble|assembles|create|creates)\b/iu,
+    es: /\b(repara|arregla|construye|construir|ensambla|crea)\b/iu
   },
   guidance_help: {
     ru: /показыва|вед[её]т|помога|направля|указывает путь/iu,
     uk: /показу|веде|допомага|спрямову|вказує шлях/iu,
-    en: /\\b(guide|guides|guided|help|helps|lead|leads|show|shows|direct|directs)\\b/iu,
-    es: /\\b(guía|guia|ayuda|ayudan|dirige|muestra|conduce)\\b/iu
+    en: /\b(guide|guides|guided|help|helps|lead|leads|show|shows|direct|directs)\b/iu,
+    es: /\b(guía|guia|ayuda|ayudan|dirige|muestra|conduce)\b/iu
   },
   threat_conflict: {
     ru: /атак|преслед|преграж|угрожа|напада|напад|запирает путь/iu,
     uk: /атак|пересліду|блоку|загрож|напада|перекриває шлях/iu,
-    en: /\\b(attack|attacks|chase|chases|block|blocks|threaten|threatens|ambush|ambushes|fight|fights)\\b/iu,
-    es: /\\b(ataca|persigue|bloquea|amenaza|embosca|lucha)\\b/iu
+    en: /\b(attack|attacks|chase|chases|block|blocks|threaten|threatens|ambush|ambushes|fight|fights)\b/iu,
+    es: /\b(ataca|persigue|bloquea|amenaza|embosca|lucha)\b/iu
   },
   transformation: {
     ru: /превращ|станов|расцвет|зажига|гасн|ожива|меняет форму/iu,
     uk: /перетвор|стає|розквіта|засвіч|згаса|ожива|змінює форму/iu,
-    en: /\\b(transform|transforms|become|becomes|turns into|grow|grows|bloom|blooms|light up|lights up|fade)\\b/iu,
-    es: /\\b(transforma|convierte|crece|florece|ilumina|se apaga|cobra vida)\\b/iu
+    en: /\b(transform|transforms|become|becomes|turns into|grow|grows|bloom|blooms|light up|lights up|fade)\b/iu,
+    es: /\b(transforma|convierte|crece|florece|ilumina|se apaga|cobra vida)\b/iu
   },
   travel_movement: {
     ru: /ид[её]т|бежит|поднима|летит|входит|выходит|пересека|прибыва|убегает|плыв[её]т/iu,
     uk: /йде|біжить|підійма|летить|входить|виходить|перетина|прибува|тікає|пливе/iu,
-    en: /\\b(walk|walks|run|runs|climb|climbs|fly|flies|enter|enters|leave|leaves|cross|crosses|arrive|arrives|escape|escapes|swim|swims)\\b/iu,
-    es: /\\b(caminar|camina|corre|correr|sube|vuela|entra|sale|cruza|llega|escapa|nada)\\b/iu
+    en: /\b(walk|walks|run|runs|climb|climbs|fly|flies|enter|enters|leave|leaves|cross|crosses|arrive|arrives|escape|escapes|swim|swims)\b/iu,
+    es: /\b(caminar|camina|corre|correr|sube|vuela|entra|sale|cruza|llega|escapa|nada)\b/iu
   },
   emotional_reaction: {
     ru: /плачет|улыба|сме[её]тся|испуг|удив|радуется|сердится|волнуется/iu,
     uk: /плаче|усміха|смі[єе]ться|ляка|диву|радіє|сердиться|хвилюється/iu,
-    en: /\\b(cry|cries|smile|smiles|laugh|laughs|afraid|frightened|surprised|rejoices|angry|worries)\\b/iu,
-    es: /\\b(llora|sonríe|sonrie|ríe|rie|asusta|sorprende|alegra|enfada|preocupa)\\b/iu
+    en: /\b(cry|cries|smile|smiles|laugh|laughs|afraid|frightened|surprised|rejoices|angry|worries)\b/iu,
+    es: /\b(llora|sonríe|sonrie|ríe|rie|asusta|sorprende|alegra|enfada|preocupa)\b/iu
   }
 };
 
