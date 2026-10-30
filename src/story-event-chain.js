@@ -19,6 +19,7 @@ export function buildStoryEventChain(scenes = []) {
   const list = Array.isArray(scenes) ? scenes : [];
   const nodes = [];
   const edges = [];
+  const knownStates = new Map();
   const sceneIds = new Set(list.map((scene, index) => clean(scene?.id, 120) || `scene_${index + 1}`));
 
   list.forEach((scene, index) => {
@@ -27,21 +28,35 @@ export function buildStoryEventChain(scenes = []) {
     const characters = unique(scene?.characters);
     const interaction = isRecord(scene?.interaction) ? scene.interaction : null;
     const causalLink = isRecord(scene?.causalLink) ? scene.causalLink : null;
-    const stateChanges = (Array.isArray(scene?.stateChanges) ? scene.stateChanges : [])
-      .filter(isRecord)
-      .map(change => ({
-        entityType: clean(change.entityType, 20),
-        entityId: clean(change.entityId, 120),
-        property: clean(change.property, 40),
-        previousValue: change.previousValue == null ? null : clean(change.previousValue, 160),
-        value: change.value == null ? null : clean(change.value, 160),
-        actorId: clean(change.actorId, 120),
-        evidence: clean(change.evidence)
-      }))
-      .filter(change => Boolean(change.actorId && change.entityId && change.evidence
-        && storyEvidence.includes(change.evidence)
-        && characters.some(name => name.toLocaleLowerCase() === change.actorId.toLocaleLowerCase())
-        && ['prop', 'character'].includes(change.entityType));
+    const stateChanges = [];
+    for (const rawChange of (Array.isArray(scene?.stateChanges) ? scene.stateChanges : []).filter(isRecord)) {
+      const change = {
+        entityType: clean(rawChange.entityType, 20),
+        entityId: clean(rawChange.entityId, 120),
+        property: clean(rawChange.property, 40),
+        previousValue: rawChange.previousValue == null ? null : clean(rawChange.previousValue, 160),
+        value: rawChange.value == null ? null : clean(rawChange.value, 160),
+        actorId: clean(rawChange.actorId, 120),
+        evidence: clean(rawChange.evidence)
+      };
+      const actorKnown = characters.some(name => name.toLocaleLowerCase() === change.actorId.toLocaleLowerCase());
+      const holderKnown = change.value === null || characters.some(name => name.toLocaleLowerCase() === String(change.value).toLocaleLowerCase());
+      const validProperty = (change.entityType === 'prop' && ['holder', 'openState'].includes(change.property))
+        || (change.entityType === 'character' && change.property === 'location');
+      const validValue = (change.property === 'holder' && holderKnown)
+        || (change.property === 'openState' && ['open', 'closed'].includes(change.value))
+        || (change.property === 'location' && /^(inside|outside):/u.test(String(change.value ?? '')));
+      const key = change.entityType + ':' + change.entityId.toLocaleLowerCase() + ':' + change.property;
+      const previousMatches = knownStates.has(key)
+        ? change.previousValue === knownStates.get(key)
+        : change.previousValue === null;
+      const valid = Boolean(change.actorId && change.entityId && change.evidence
+        && storyEvidence.includes(change.evidence) && actorKnown
+        && validProperty && validValue && previousMatches);
+      if (!valid) continue;
+      stateChanges.push(change);
+      knownStates.set(key, change.value);
+    }
 
     const validInteraction = interaction
       && clean(interaction.actorId, 120)
