@@ -95,7 +95,7 @@ import { buildExportTimeline } from "./src/export-timeline.js";
 import { createAudioExportSession } from "./src/audio-export.js";
 import { buildDialogueAudioSchedule } from "./src/dialogue-audio.js";
 import { parseDialogueAudioFilename, getDialogueAudioAssignmentKey, mapDialogueAudioAssignmentsToSchedule, pruneDialogueAudioAssignments } from "./src/dialogue-audio-assets.js";
-import { sampleDialogueMouthOpen } from "./src/dialogue-lip-sync.js";
+import { createDialogueMouthEnvelope, sampleDialogueMouthEnvelope } from "./src/dialogue-lip-sync.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./src/scene-production.js";
 import { upsertCharacterReference } from "./src/character-reference.js";
 import { CHARACTER_MOTION_CLIPS, sampleCharacterMotion, resolveCharacterMotionAction } from "./src/character-motion.js";
@@ -120,6 +120,8 @@ const dialogueCharacterVolumes=new Map();
 function dialogueCharacterVolumeKey(characterId){return String(characterId||'').trim().toLowerCase()}
 function getDialogueCharacterVolumeMap(){return new Map([...dialogueCharacterVolumes.entries()].map(([key,value])=>[key,Math.max(0,Math.min(1,Number(value)||0))]))}
 let exportLipSyncState=null;
+    dialogueMouthEnvelopes=new Map();
+let dialogueMouthEnvelopes=new Map();
 function getDialogueMouthOpen(dialogue,index){
   if(!exportLipSyncState||!dialogue||typeof exportLipSyncState.audioSession?.getCurrentTime!=='function')return null;
   const cue=exportLipSyncState.schedule.find(item=>item.sceneIndex===index&&item.lineId===dialogue.id);
@@ -128,7 +130,7 @@ function getDialogueMouthOpen(dialogue,index){
   if(!buffer)return null;
   const elapsed=(exportLipSyncState.audioSession.getCurrentTime()-exportLipSyncState.startedAt)*1000-cue.startMs;
   if(elapsed<0||elapsed>cue.endMs-cue.startMs)return 0;
-  return sampleDialogueMouthOpen(buffer,elapsed);
+  return sampleDialogueMouthEnvelope(exportLipSyncState.envelopes.get(index+':'+cue.lineId),elapsed);
 }
 function renderDialogueAudioAssignments(){
   const box=$('dialogueLineAssignments');
@@ -227,7 +229,7 @@ async function decodeDialogueAudioFiles(files, schedule){
         key=parsed.sceneIndex+':'+parsed.lineId;
       }
       if(!expected.has(key)){unmatched.push(file.name);continue}
-      try{const decoded=await context.decodeAudioData((await file.arrayBuffer()).slice(0));buffers.set(key,decoded)}
+      try{const decoded=await context.decodeAudioData((await file.arrayBuffer()).slice(0));buffers.set(key,decoded);dialogueMouthEnvelopes.set(key,createDialogueMouthEnvelope(decoded))}
       catch(error){unmatched.push(file.name)}
     }
   }finally{if(context.state!=='closed')await context.close()}
@@ -756,8 +758,8 @@ $('export').onclick=async()=>{
         dialogueCharacterVolumes:getDialogueCharacterVolumeMap()
       });
       stream=audioSession.stream;
-      const audioStartTime=await audioSession.start();
-      exportLipSyncState={audioSession,startedAt:audioStartTime,schedule:dialogueSchedule,buffers:dialogueBuffers};
+      // Audio is started only after MediaRecorder begins, minimizing A/V start offset.
+      exportLipSyncState={audioSession,startedAt:0,schedule:dialogueSchedule,buffers:dialogueBuffers,envelopes:dialogueMouthEnvelopes};
     }
     const mimeTypes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
     const mimeType=mimeTypes.find(type=>MediaRecorder.isTypeSupported(type));
@@ -791,6 +793,7 @@ $('export').onclick=async()=>{
       }
     };
     recorder.start(250);
+    if(audioSession){exportLipSyncState.startedAt=await audioSession.start();}
     $('status').textContent=uiLang==='ru'
       ?'Записываем сцену 1 из '+timeline.segments.length+'…'
       :'Recording scene 1 of '+timeline.segments.length+'…';
