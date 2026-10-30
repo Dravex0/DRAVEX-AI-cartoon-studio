@@ -26,7 +26,8 @@ function safeProgress(callback, info) {
     status: String(info?.status || 'progress').slice(0, 40),
     file: String(info?.file || '').slice(-120),
     loaded: Number.isFinite(info?.loaded) ? info.loaded : null,
-    total: Number.isFinite(info?.total) ? info.total : null
+    total: Number.isFinite(info?.total) ? info.total : null,
+    progress: Number.isFinite(info?.progress) ? Math.max(0, Math.min(1, info.progress)) : null
   };
   try { callback(event); } catch { /* UI progress callbacks must not break model loading. */ }
 }
