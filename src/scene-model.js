@@ -26,6 +26,7 @@ export function normalizeScene(input = {}, index = 0) {
     purpose: text(scene.purpose ?? scene.emotion, 500),
     // Preserve source-story attribution so evaluators and later learning stages can verify fidelity.
     storyDetail: text(scene.storyDetail, 2_000),
+    storyEventType: text(scene.storyEventType, 80),
     sourceStoryText: text(scene.sourceStoryText, 10_000),
     sourceEvents: uniqueStrings(scene.sourceEvents),
     characters: uniqueStrings(scene.characters ?? (scene.characterId ? [scene.characterId] : [])),
