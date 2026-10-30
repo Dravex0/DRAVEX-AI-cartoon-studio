@@ -58,7 +58,7 @@ test('requires explicit loading before generation and rejects empty prompts', as
 test('rejects unsupported backend and unavailable WebGPU', async () => {
   const runtime = createLocalTransformersRuntime({ environment: wasmEnvironment, pipelineFactory: async () => async () => [] });
   await assert.rejects(runtime.load({ backend: 'cloud' }), /Backend must be/);
-  await assert.rejects(runtime.load({ backend: 'webgpu' }), /WebGPU is not available/);
+  await assert.rejects(runtime.load({ backend: 'webgpu' }), /WebGPU requires a secure context/);
 });
 
 test('does not load when the request is already cancelled', async () => {
