@@ -11,11 +11,36 @@ function mockFetch(payload, status = 200) {
 }
 const reply = value => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] });
 
-test('uses only the fixed free-tier model and returns normalized unique scenes', async () => {
-  const data = { scenes: [1,2,3].map(n => ({ title: 'Scene '+n, visibleAction: 'Action '+n, camera: 'Camera '+n })) };
+test('uses the free-tier model and returns normalized animation-ready scene data', async () => {
+  const data = { scenes: [1,2,3].map(n => ({
+    title: 'Scene '+n, visibleAction: 'Action '+n, camera: 'Camera '+n,
+    characters: ['Foxy'], location: 'Forest', startState: 'Standing', endState: 'Running',
+    dialogue: [{ characterId: 'Foxy', text: 'Hello' }], durationSeconds: 4, sound: 'Wind'
+  })) };
   const result = await buildGeminiStoryboard({ apiKey:'test-key', idea:'A fox finds a star.', fetchImpl:mockFetch(reply(data)) });
   assert.equal(result.scenes.length, 3);
   assert.equal(result.scenes[2].visibleAction, 'Action 3');
+  assert.deepEqual(result.scenes[0].characters, ['Foxy']);
+  assert.equal(result.scenes[0].durationSeconds, 4);
+  assert.equal(result.scenes[0].dialogue[0].text, 'Hello');
+});
+
+test('sends the complete story and explicit production directions to Gemini', async () => {
+  let sentPrompt = '';
+  const fetchImpl = async (_url, options) => {
+    sentPrompt = JSON.parse(options.body).contents[0].parts[0].text;
+    return { ok: true, status: 200, json: async () => reply({ scenes: [1,2,3].map(n => ({ title:'Scene '+n, visibleAction:'Action '+n, camera:'Camera '+n })) }) };
+  };
+  await buildGeminiStoryboard({
+    apiKey: 'test-key',
+    idea: 'Стиль: акварель\nКоличество сцен: 6\nНе добавлять: новых героев\nЛисёнок находит ключ. Он открывает ворота.',
+    language: 'ru', fetchImpl
+  });
+  assert.match(sentPrompt, /ORIGINAL USER BRIEF/);
+  assert.match(sentPrompt, /акварель/);
+  assert.match(sentPrompt, /exactly 6 scenes/);
+  assert.match(sentPrompt, /Лисёнок находит ключ/);
+  assert.match(sentPrompt, /Do not invent major characters/);
 });
 
 test('rejects an empty key before making a request', async () => {
