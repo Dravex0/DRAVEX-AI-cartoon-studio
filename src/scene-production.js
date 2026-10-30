@@ -2,11 +2,12 @@ const safe = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const list = values => Array.isArray(values) ? values.map(value => safe(value, 500)).filter(Boolean) : [];
 
 function characterDetails(scene, characterBible) {
+  const hasExplicitCast = Array.isArray(scene?.characters);
   const names = new Set(list(scene?.characters).map(name => name.toLocaleLowerCase()));
   const entries = (Array.isArray(characterBible) ? characterBible : [])
     .filter(entry => {
       const id = safe(entry?.characterId, 120).toLocaleLowerCase();
-      return id && (names.size === 0 || names.has(id));
+      return id && (!hasExplicitCast || names.has(id));
     });
   const seen = new Set();
   return entries.map(entry => [
@@ -51,7 +52,7 @@ export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
   ].filter(Boolean).join('\n\n');
 }
 
-export function validateSceneProductionReadiness(scene = {}) {
+export function validateSceneProductionReadiness(scene = {}, characterBible = []) {
   const issues = [];
   if (!safe(scene.title, 200)) issues.push({ code: 'missing-title', field: 'title' });
   if (!safe(scene.imagePrompt) && !safe(scene.prompt) && !safe(scene.description)) issues.push({ code: 'missing-image-prompt', field: 'imagePrompt' });
@@ -59,5 +60,32 @@ export function validateSceneProductionReadiness(scene = {}) {
   if (!safe(scene.camera)) issues.push({ code: 'missing-camera-plan', field: 'camera' });
   if (!safe(scene.startState)) issues.push({ code: 'missing-start-state', field: 'startState' });
   if (!safe(scene.endState)) issues.push({ code: 'missing-end-state', field: 'endState' });
+  const durationValue = scene.durationSeconds ?? scene.duration;
+  if (durationValue !== undefined && durationValue !== null) {
+    const duration = Number(durationValue);
+    if (!Number.isFinite(duration) || duration < SCENE_DURATION_MIN || duration > SCENE_DURATION_MAX) {
+      issues.push({ code: 'invalid-duration', field: 'durationSeconds', min: SCENE_DURATION_MIN, max: SCENE_DURATION_MAX });
+    }
+  }
+
+  const profileIds = new Set((Array.isArray(characterBible) ? characterBible : [])
+    .map(profile => safe(profile?.characterId, 120).toLocaleLowerCase()).filter(Boolean));
+  for (const characterId of list(scene.characters)) {
+    if (profileIds.size && !profileIds.has(characterId.toLocaleLowerCase())) {
+      issues.push({ code: 'missing-character-reference', field: 'characters', characterId });
+    }
+  }
+
+  const speakers = [
+    ...(Array.isArray(scene.dialogue) ? scene.dialogue : []),
+    ...(Array.isArray(scene.dialogueTimeline) ? scene.dialogueTimeline : [])
+  ].map(line => safe(line?.characterId, 120)).filter(Boolean);
+  const cast = new Set(list(scene.characters).map(name => name.toLocaleLowerCase()));
+  for (const characterId of new Set(speakers)) {
+    if (cast.size && !cast.has(characterId.toLocaleLowerCase())) {
+      issues.push({ code: 'dialogue-speaker-not-in-scene', field: 'dialogue', characterId });
+    }
+  }
+
   return { ready: issues.length === 0, issues };
 }
