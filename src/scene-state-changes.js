@@ -55,7 +55,7 @@ const escapeRegExp = value => [...String(value)].map(char => '.*+?^$|{}()[]'.inc
 const boundary = '(?<![\\p{L}\\p{N}])';
 const tailBoundary = '(?![\\p{L}\\p{N}])';
 const cutTail = value => clean(String(value ?? '')
-  .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+|[.!?,;:]/iu)[0]
+  .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+|[.!?,;:]/iu)[0].trim()
   .replace(/^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu, ''));
 
 const ALLOWED_ACTION_ADVERBS = /^(?:carefully|quickly|slowly|gently|quietly|осторожно|быстро|медленно|тихо|обережно|швидко|повільно|lentamente|cuidadosamente)$/iu;
