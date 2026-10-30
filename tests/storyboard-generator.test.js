@@ -106,3 +106,17 @@ test('unknown language falls back to English and long input is bounded', () => {
   assert.equal(result.scenes.length, 5);
   assert.ok(result.scenes.every(scene => scene.description.length < 2_000));
 });
+
+
+test('builds a cast automatically from natural character introductions', () => {
+  const idea = [
+    'Сцена 1. Лес',
+    'Маленький рыжий лисёнок по имени Рыжик гуляет по лесу.',
+    'Сцена 2. Встреча',
+    'Из-за дерева выбегает маленький белый кролик по имени Снежок. Рыжик встречает Снежка.'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.equal(result.mainCharacter, 'Рыжик');
+  assert.deepEqual(result.characterBible.map(item => item.characterId), ['Рыжик', 'Снежок']);
+  assert.deepEqual(result.scenes[1].characters, ['Рыжик', 'Снежок']);
+});
