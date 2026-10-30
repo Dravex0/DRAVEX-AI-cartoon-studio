@@ -87,10 +87,10 @@ test('story-specific source events drive different visible actions and camera pl
   );
   assert.equal(result.scenes[0].storyEventType, 'discovery');
   assert.equal(result.scenes[1].storyEventType, 'transformation');
-  assert.equal(result.scenes[2].storyEventType, 'guidance_help');
+  assert.equal(result.scenes[3].storyEventType, 'guidance_help');
   assert.match(result.scenes[0].visibleAction, /noticing an important object/);
   assert.match(result.scenes[1].visibleAction, /gradual change/);
-  assert.match(result.scenes[2].visibleAction, /following the guidance/);
+  assert.match(result.scenes[3].visibleAction, /following the guidance/);
   assert.notEqual(result.scenes[0].camera, result.scenes[1].camera);
-  assert.notEqual(result.scenes[1].camera, result.scenes[2].camera);
+  assert.notEqual(result.scenes[1].camera, result.scenes[3].camera);
 });
