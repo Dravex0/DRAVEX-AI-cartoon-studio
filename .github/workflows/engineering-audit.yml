@@ -1,0 +1,32 @@
+name: DRAVEX Engineering Audit
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-engineering-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run read-only engineering audit
+        env:
+          DRAVEX_AUDIT_REPORT: ${{ runner.temp }}/dravex-engineering-audit.json
+        run: node scripts/engineering-audit.js
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dravex-engineering-audit
+          path: ${{ runner.temp }}/dravex-engineering-audit.json
+          if-no-files-found: error
+          retention-days: 7
