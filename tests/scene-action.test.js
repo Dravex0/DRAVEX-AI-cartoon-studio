@@ -33,3 +33,22 @@ test('action detection is case-insensitive and safe for unusual input', () => {
   assert.equal(detectSceneAction(null), 'idle');
   assert.equal(detectSceneAction({ toString: () => 'El personaje baila' }), 'dance');
 });
+
+test('character expression takes priority over a glowing prop', () => {
+  assert.equal(detectSceneAction('The fox smiles at the glowing star'), 'happy');
+  assert.equal(detectSceneAction('Лисёнок улыбается светящейся звезде'), 'happy');
+});
+
+test('spoken action takes priority over magical scene vocabulary', () => {
+  assert.equal(detectSceneAction('The fox whispers about a magical glowing star'), 'talk');
+  assert.equal(detectSceneAction('Лисёнок шепчет о волшебной светящейся звезде'), 'talk');
+});
+
+test('magic remains detectable when no stronger character action is present', () => {
+  assert.equal(detectSceneAction('A magical star glows above the forest'), 'magic');
+  assert.equal(detectSceneAction('Волшебная звезда сияет над лесом'), 'magic');
+});
+test('explicit turning movement takes priority over glowing background details', () => {
+  assert.equal(detectSceneAction('The fox turns toward the glowing light'), 'turn');
+  assert.equal(detectSceneAction('Лисёнок поворачивается к сияющему свету'), 'turn');
+});
