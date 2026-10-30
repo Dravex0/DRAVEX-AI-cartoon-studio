@@ -40,9 +40,7 @@ test('does not invent a causal link without an explicit marker or source evidenc
     { id: 'b', storyDetail: 'The travelers enter the forest.' },
     { id: 'c', storyDetail: '' }
   ], 'en');
-  assert.equal(links[0], null);
-  assert.equal(links[1], null);
-  assert.equal(links[2].causeSceneId, 'a');
+  assert.deepEqual(links, [null, null, null]);
 });
 
 test('storyboard generation attaches explicit source causality to the consequence scene', () => {
@@ -63,5 +61,7 @@ test('links to the previous source-backed scene when storyboard beats are empty'
     { id: 'b', storyDetail: '' },
     { id: 'c', storyDetail: 'Therefore, the travelers turn back.' }
   ], 'en');
-  assert.deepEqual(links, [null, null, null]);
+  assert.equal(links[0], null);
+  assert.equal(links[1], null);
+  assert.equal(links[2].causeSceneId, 'a');
 });
