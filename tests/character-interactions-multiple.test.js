@@ -28,9 +28,9 @@ test('returns no event when participant attribution is ambiguous or incomplete',
 });
 
 test('supports multiple explicit Russian interactions', () => {
-  const events = inferCharacterInteractions('Сова помогает Мико. Мико спасает Сову.', ['Сова', 'Мико'], 'ru');
+  const events = inferCharacterInteractions('Сова помогает Мико. Мико спасает Рэй.', ['Сова', 'Мико', 'Рэй'], 'ru');
   assert.deepEqual(events.map(({ type, actorId, targetId }) => [type, actorId, targetId]), [
     ['help', 'Сова', 'Мико'],
-    ['rescue', 'Мико', 'Сова']
+    ['rescue', 'Мико', 'Рэй']
   ]);
 });
