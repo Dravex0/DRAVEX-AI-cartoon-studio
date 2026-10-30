@@ -50,10 +50,11 @@ test('mixes canvas video and one audio track into a recording stream', async () 
 test('clamps invalid and out-of-range volume values safely', async () => {
   for (const [value, expected] of [[-4, 0], [4, 1], ['not-a-number', 1]]) {
     const h = createHarness();
+    const gains = [];
     class InspectContext extends h.FakeAudioContext {
       createGain() {
         const node = super.createGain();
-        this.gainNode = node;
+        gains.push(node);
         return node;
       }
     }
@@ -64,9 +65,7 @@ test('clamps invalid and out-of-range volume values safely', async () => {
       AudioContextClass: InspectContext,
       MediaStreamClass: h.FakeMediaStream
     });
-    const instance = session;
-    assert.ok(instance);
-    // Gain validation is covered by ensuring setup succeeds for hostile values.
+    assert.equal(gains[0].gain.value, expected);
     await session.cleanup();
   }
 });
