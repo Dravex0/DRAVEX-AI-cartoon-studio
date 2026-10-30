@@ -1,3 +1,4 @@
+import { normalizeSceneInteraction } from "./scene-interactions.js";
 /** Provider-neutral, testable scene model; intentionally independent of DOM/network. */
 export const SCENE_DURATION_MIN = 0.25;
 export const SCENE_DURATION_MAX = 30;
@@ -31,6 +32,7 @@ export function normalizeScene(input = {}, index = 0) {
     camera: text(scene.camera, 1_000),
     startState: text(scene.startState, 1_000),
     endState: text(scene.endState, 1_000),
+    interactions: (Array.isArray(scene.interactions) ? scene.interactions : []).map((event, interactionIndex) => normalizeSceneInteraction(event, interactionIndex, durationSeconds)),
     dialogue: dialogueSource.map(line => typeof line === 'string'
       ? { characterId: '', text: text(line, 2_000), language: 'en' }
       : { characterId: text(line?.characterId, 120), text: text(line?.text, 2_000), language: text(line?.language, 12) || 'en' })
