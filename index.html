@@ -79,6 +79,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <p class="muted" style="font-size:12px">Runs only on your configured local/private ComfyUI server. No cloud fallback. First generate or load a still image for this scene. The API workflow JSON is kept in memory and must be selected again after reload.</p>
 <div class="field"><label for="comfyBaseUrl">ComfyUI address / Адрес сервера</label><input id="comfyBaseUrl" type="url" value="http://127.0.0.1:8188" autocomplete="off"></div>
 <div class="field"><label for="comfyWorkflowFile">ComfyUI API workflow JSON / Файл workflow</label><input id="comfyWorkflowFile" type="file" accept=".json,application/json"><small id="comfyWorkflowStatus">No workflow selected. Export API format from ComfyUI.</small></div>
+<div class="field"><label for="comfySourceImageFile">Optional local scene image / Локальное изображение сцены</label><input id="comfySourceImageFile" type="file" accept="image/png,image/jpeg,image/webp"><small id="comfySourceImageStatus">If selected, this image is sent only to your configured local ComfyUI server and takes priority over the generated preview image.</small></div>
 <div class="comfy-grid">
 <div class="field"><label for="comfyPromptNode">Prompt node ID / Узел промпта</label><input id="comfyPromptNode" value="6"></div>
 <div class="field"><label for="comfyPromptInput">Prompt input</label><input id="comfyPromptInput" value="text"></div>
@@ -501,7 +502,7 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 }finally{button.disabled=!$('hordeConsent').checked}
 });
 
-let comfyWorkflow=null,comfyConnected=false,comfyVideoUrl='';
+let comfyWorkflow=null,comfyConnected=false,comfyVideoUrl='',comfySourceImage=null;
 function comfyText(id){return $(id).value.trim()}
 function comfyBindings(){
  const binding=(nodeId,input)=>nodeId&&input?{nodeId,input}:null;
@@ -512,6 +513,11 @@ function comfyBindings(){
 }
 function setComfyStatus(message){$('comfyStatus').textContent=message}
 function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow}
+$('comfySourceImageFile').addEventListener('change',()=>{
+ const file=$('comfySourceImageFile').files?.[0]||null;
+ comfySourceImage=file;
+ $('comfySourceImageStatus').textContent=file?'Selected local image: '+file.name+' · '+Math.round(file.size/1024)+' KB. It stays in this tab until you start generation.':'No local image selected; the generated scene image will be used if available.';
+});
 $('comfyWorkflowFile').addEventListener('change',async()=>{
  const file=$('comfyWorkflowFile').files?.[0]||null;
  comfyWorkflow=null;comfyConnected=false;updateComfyAnimateAvailability();
@@ -548,11 +554,14 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  if(!prompt.trim()){setComfyStatus('This scene has no motion instruction. Add a motion prompt first.');return}
  button.disabled=true;$('checkComfyConnection').disabled=true;
  try{
-  status.textContent=uiLang==='ru'?'Получаем изображение сцены локально…':'Reading the scene image…';
-  const imageResponse=await fetch(imageUrl);
-  if(!imageResponse.ok)throw new Error('Cannot read the scene image (HTTP '+imageResponse.status+'). The image host may block browser CORS.');
-  const imageBlob=await imageResponse.blob();
-  if(!imageBlob.size)throw new Error('The scene image is empty.');
+  let imageBlob=comfySourceImage;
+  if(!imageBlob){
+   status.textContent=uiLang==='ru'?'Получаем изображение сцены локально…':'Reading the generated scene image…';
+   const imageResponse=await fetch(imageUrl);
+   if(!imageResponse.ok)throw new Error('Cannot read the scene image (HTTP '+imageResponse.status+'). Select a local image instead if the image host blocks browser CORS.');
+   imageBlob=await imageResponse.blob();
+  }
+  if(!imageBlob?.size)throw new Error('The scene image is empty.');
   const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
