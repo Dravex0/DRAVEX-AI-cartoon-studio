@@ -165,6 +165,23 @@ test('schedules decoded dialogue buffers into the same recording audio destinati
 });
 
 
+test('exposes the exact AudioContext clock used to schedule dialogue for lip sync', async () => {
+  const h = createHarness();
+  class ClockContext extends h.FakeAudioContext {
+    currentTime = 12.5;
+  }
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioElement: h.audioElement,
+    AudioContextClass: ClockContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+  const startTime = await session.start();
+  assert.equal(startTime, 12.5);
+  assert.equal(session.getCurrentTime(), 12.5);
+  await session.cleanup();
+});
+
 test('supports dialogue-only export without requiring a music element', async () => {
   const h = createHarness();
   const scheduled = [];
