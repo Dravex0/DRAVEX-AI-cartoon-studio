@@ -52,12 +52,12 @@ function languageName(language) {
   return ({ ru: 'Russian', uk: 'Ukrainian', en: 'English', es: 'Spanish' })[language] || 'English';
 }
 
-export async function buildGeminiStoryboard({ apiKey, idea, language = 'ru', character = 'Main character', style = 'Storybook', fetchImpl = fetch }) {
+export async function buildGeminiStoryboard({ apiKey, idea, language = 'ru', character = 'Main character', style = 'Storybook', duration = 3, fetchImpl = fetch }) {
   const rawBrief = cleanText(idea, 12000);
   if (!rawBrief) throw new Error('Add a story idea first.');
   const brief = parseStoryBrief(rawBrief);
   const story = brief.storyText || rawBrief;
-  const directives = { ...brief.directives, style: brief.directives.style || style };
+  const directives = { ...brief.directives, style: brief.directives.style || style, duration: brief.directives.duration || `${duration} seconds per scene` };
   const productionBrief = formatProductionDirectives(directives);
   const requestedCount = brief.requestedSceneCount || 5;
   const prompt = [
@@ -82,7 +82,7 @@ export async function buildGeminiStoryboard({ apiKey, idea, language = 'ru', cha
   if (!Array.isArray(parsed.scenes) || parsed.scenes.length < 3 || parsed.scenes.length > 8) {
     throw new Error('Gemini storyboard must contain between 3 and 8 scenes.');
   }
-  const scenes = parsed.scenes.map((item, index) => {
+  if (brief.requestedSceneCount && parsed.scenes.length !== requestedCount) {\n    throw new Error(`Gemini returned ${parsed.scenes.length} scenes, but the brief requested ${requestedCount}. Retry to enforce the requested scene count.`);\n  }\n  const scenes = parsed.scenes.map((item, index) => {
     const title = cleanText(item?.title, 100);
     const visibleAction = cleanText(item?.visibleAction, 700);
     const camera = cleanText(item?.camera, 300);
