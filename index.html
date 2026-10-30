@@ -88,7 +88,7 @@ import { validateStoryScenes } from "./src/story-qa.js";
 import { buildStoryboardFromText } from "./src/storyboard-generator.js";
 import { calculateCinematicShot } from "./src/director-engine.js";
 import { detectDeviceCapabilities } from "./src/device-capabilities.js";
-import { createLocalTransformersRuntime, DEFAULT_LOCAL_TEXT_MODEL } from "./src/transformers-local-runtime.js";
+import { createLocalTransformersRuntime } from "./src/transformers-local-runtime.js";
 import { generateImageWithHorde } from "./src/ai-horde-image-provider.js";
 import { drawImageCover } from "./src/image-frame.js";
 import { getPromptCameraTransform } from "./src/prompt-camera-motion.js";
@@ -392,8 +392,8 @@ const memory=result.deviceMemoryGB===null?(ru?'неизвестно':'unknown'):
 const cores=result.hardwareConcurrency===null?(ru?'неизвестно':'unknown'):String(result.hardwareConcurrency);
 const storage=result.storage.availableBytes===null?(ru?'неизвестно':'unknown'):(result.storage.availableBytes/1024/1024/1024).toFixed(2)+' GB';
 const lines=ru
-?['HTTPS: '+yesNo(result.secureContext),'WebGPU API: '+yesNo(result.webgpuApiAvailable),'GPU-адаптер: '+yesNo(result.adapterAvailable),'Оценка памяти браузера: '+memory,'Потоки CPU: '+cores,'Свободное хранилище браузера: '+storage,result.recommendation]
-:['Secure HTTPS: '+yesNo(result.secureContext),'WebGPU API: '+yesNo(result.webgpuApiAvailable),'GPU adapter: '+yesNo(result.adapterAvailable),'Browser memory estimate: '+memory,'CPU threads: '+cores,'Available browser storage: '+storage,result.recommendation];
+?['HTTPS: '+yesNo(result.secureContext),'WebGPU API: '+yesNo(result.webgpuApiAvailable),'GPU-адаптер: '+yesNo(result.adapterAvailable),'Оценка памяти браузера: '+memory,'Потоки CPU: '+cores,'WASM: '+yesNo(result.wasmAvailable),'Потоки WASM: '+yesNo(result.wasmThreadsAvailable),'Свободное хранилище браузера: '+storage,result.recommendation]
+:['Secure HTTPS: '+yesNo(result.secureContext),'WebGPU API: '+yesNo(result.webgpuApiAvailable),'GPU adapter: '+yesNo(result.adapterAvailable),'Browser memory estimate: '+memory,'CPU threads: '+cores,'WASM: '+yesNo(result.wasmAvailable),'Threaded WASM: '+yesNo(result.wasmThreadsAvailable),'Available browser storage: '+storage,result.recommendation];
 status.textContent=lines.join(' · ');
 }catch(error){status.textContent=(ru?'Не удалось проверить устройство: ':'Device check failed: ')+(error?.message||'Unknown error')}
 finally{button.disabled=false}
