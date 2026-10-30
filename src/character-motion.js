@@ -1,6 +1,14 @@
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const smoothstep = value => value * value * (3 - 2 * value);
 
+const ACTION_ALIASES = Object.freeze({ float: 'jump', vanish: 'idle', magic: 'idle' });
+
+export function resolveCharacterMotionAction(action) {
+  const requested = String(action ?? 'idle').trim().toLowerCase();
+  const resolved = ACTION_ALIASES[requested] ?? requested;
+  return Object.hasOwn(CHARACTER_MOTION_CLIPS, resolved) ? resolved : 'idle';
+}
+
 const pose = (values = {}) => ({
   x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1,
   headRotation: 0, leftArm: 0, rightArm: 0, leftLeg: 0, rightLeg: 0,
@@ -102,8 +110,7 @@ function interpolatePose(left, right, amount) {
 
 /** Sample a normalized 2D character pose at progress 0..1. */
 export function sampleCharacterMotion(action, progress = 0, options = {}) {
-  const requested = String(action ?? 'idle').trim().toLowerCase();
-  const actionName = Object.hasOwn(CHARACTER_MOTION_CLIPS, requested) ? requested : 'idle';
+  const actionName = resolveCharacterMotionAction(action);
   const selected = CHARACTER_MOTION_CLIPS[actionName];
   const numeric = Number(progress);
   const t = clamp(Number.isFinite(numeric) ? numeric : 0, 0, 1);
@@ -125,7 +132,5 @@ export function sampleCharacterMotion(action, progress = 0, options = {}) {
 /** Resolve a scene's explicit motion/action without claiming visual understanding. */
 export function getSceneCharacterMotion(scene = {}) {
   const action = scene.characterMotion ?? scene.motionType ?? scene.action ?? 'idle';
-  return Object.hasOwn(CHARACTER_MOTION_CLIPS, String(action).toLowerCase())
-    ? String(action).toLowerCase()
-    : 'idle';
+  return resolveCharacterMotionAction(action);
 }
