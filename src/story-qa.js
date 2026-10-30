@@ -15,7 +15,7 @@ function similarity(left, right) {
 }
 function cameraShotType(camera) {
   const value = String(camera ?? '').toLowerCase();
-  if (/extreme close|extreme close-up|ecu/.test(value)) return 'extreme-close-up';
+  if (/extreme close|extreme close-up|\\becu\\b|экстремальн\\w*\\s+крупн\\w*\\s+план|сверхкрупн\\w*\\s+план/.test(value)) return 'extreme-close-up';
   if (/\bmacro\b|\bclose[- ]?up\b|\bclose shot\b/.test(value)) return 'close-up';
   if (/\bwide\b|establishing shot/.test(value)) return 'wide';
   if (/\bmedium\b|\bmid shot\b/.test(value)) return 'medium';
