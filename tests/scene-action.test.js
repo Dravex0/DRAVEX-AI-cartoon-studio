@@ -68,3 +68,12 @@ test('uses visible action when no motion prompt is supplied', async () => {
     visibleAction: 'Лисёнок медленно шагает к двери.'
   }), 'walk');
 });
+
+
+test('does not let fallback description override an explicit motion prompt', async () => {
+  const { detectSceneActionForScene } = await import('../src/scene-action.js');
+  assert.equal(detectSceneActionForScene({
+    motionPrompt: 'The fox walks slowly toward the gate.',
+    description: 'The fox runs through the forest.'
+  }), 'walk');
+});
