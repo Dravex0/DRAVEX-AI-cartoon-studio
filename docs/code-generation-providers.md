@@ -20,4 +20,4 @@ A provider-neutral boundary for optional code-generation models. It defines how 
 - generateCodeProposal(registry, providerId, input, context)
 
 ## Not included
-This contract does not connect Gemini, Hugging Face or any other model, does not supply free inference, and does not make code changes. A real adapter must be separately implemented and tested for its model license, quota, key handling, privacy, response format and cost.
+This contract does not connect to external models, does not supply free inference, and does not make code changes. A real adapter must be separately implemented and tested for its model license, quota, key handling, privacy, response format and cost.
