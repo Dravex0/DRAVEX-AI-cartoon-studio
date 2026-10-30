@@ -11,7 +11,7 @@ test('assigns every saved character explicitly named in the source event', () =>
 
 test('matches Unicode names and multi-word character IDs', () => {
   assert.deepEqual(
-    inferSceneCast('Сова помогает Роботу Мико найти дорогу.', ['Робот Мико', 'Сова'], 'Робот Мико'),
+    inferSceneCast('Робот Мико помогает Сове найти дорогу.', ['Робот Мико', 'Сова'], 'Робот Мико'),
     ['Робот Мико', 'Сова']
   );
 });
