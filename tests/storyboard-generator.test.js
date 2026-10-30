@@ -154,7 +154,7 @@ test('infers a visible object hand-off only when the story names the object expl
   const idea = [
     'Сцена 1. Передача ключа',
     'Маленький рыжий лисёнок по имени Рыжик передаёт маленькому белому кролику по имени Снежок «серебряный ключ». Снежок принимает его.'
-  ].join('\\n');
+  ].join('\n');
   const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
   assert.equal(result.scenes[0].interactions[0].type, 'give_object');
   assert.equal(result.scenes[0].interactions[0].objectDescription, 'серебряный ключ');
