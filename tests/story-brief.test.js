@@ -29,3 +29,10 @@ test('keeps plain narrative intact when there are no recognized directions', () 
 test('formats directives for downstream AI prompts', () => {
   assert.match(formatProductionDirectives({ style: 'watercolor', avoid: 'extra characters' }), /style: watercolor/);
 });
+
+test('parses explicit scene duration in seconds and clamps it to the supported range', () => {
+  assert.equal(parseStoryBrief('Длительность: 5 секунд\nA fox finds a key.').requestedDurationSeconds, 5);
+  assert.equal(parseStoryBrief('Duration: 1.5 sec\nA fox finds a key.').requestedDurationSeconds, 1.5);
+  assert.equal(parseStoryBrief('Длительность: 90 секунд\nA fox finds a key.').requestedDurationSeconds, 30);
+  assert.equal(parseStoryBrief('Duration: cinematic\nA fox finds a key.').requestedDurationSeconds, null);
+});
