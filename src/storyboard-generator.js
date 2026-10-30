@@ -1,5 +1,5 @@
 /**
- * Deterministic five-beat storyboard planner.
+ * Deterministic storyboard planner with a five-beat default and optional 3–8 beat layouts.
  * This is a local fallback, not a generative model or visual scene-understanding system.
  */
 import { parseStoryBrief, formatProductionDirectives } from './story-brief.js';
@@ -37,6 +37,41 @@ const BEATS = {
   ]
 };
 
+const EXTENDED_BEATS = {
+  ru: [
+    { title: 'Подготовка', action: 'Герой меняет план, собирает нужные предметы и готовится преодолеть препятствие.', camera: 'Средний боковой план; плавное движение камеры вслед за подготовкой.' },
+    { title: 'Поворот истории', action: 'Неожиданная деталь меняет ситуацию, и герой принимает новое решение.', camera: 'Камера переводит фокус с важной детали на реакцию героя.' },
+    { title: 'Последствия', action: 'Покажи непосредственные последствия решающего действия и изменения в окружении.', camera: 'Широкий план с заметным изменением пространства.' }
+  ],
+  uk: [
+    { title: 'Підготовка', action: 'Герой змінює план, збирає потрібні предмети та готується подолати перешкоду.', camera: 'Середній боковий план; плавний рух камери за підготовкою.' },
+    { title: 'Поворот історії', action: 'Неочікувана деталь змінює ситуацію, і герой ухвалює нове рішення.', camera: 'Камера переводить фокус із важливої деталі на реакцію героя.' },
+    { title: 'Наслідки', action: 'Покажи безпосередні наслідки вирішальної дії та зміни в оточенні.', camera: 'Загальний план із помітною зміною простору.' }
+  ],
+  en: [
+    { title: 'Preparation', action: 'The character changes the plan, gathers what is needed, and prepares to overcome the obstacle.', camera: 'Medium side shot with a smooth camera move following the preparation.' },
+    { title: 'Turning point', action: 'An unexpected detail changes the situation, forcing the character to make a new decision.', camera: 'Rack focus from the revealing detail to the character’s reaction.' },
+    { title: 'Aftermath', action: 'Show the immediate consequences of the decisive action and how the surroundings have changed.', camera: 'Wide shot that clearly reveals the changed environment.' }
+  ],
+  es: [
+    { title: 'Preparación', action: 'El personaje cambia el plan, reúne lo necesario y se prepara para superar el obstáculo.', camera: 'Plano medio lateral con un movimiento suave que sigue la preparación.' },
+    { title: 'Giro', action: 'Un detalle inesperado cambia la situación y obliga al personaje a tomar una nueva decisión.', camera: 'Cambio de enfoque desde el detalle revelador hasta la reacción del personaje.' },
+    { title: 'Consecuencias', action: 'Muestra las consecuencias inmediatas de la acción decisiva y los cambios en el entorno.', camera: 'Plano general que revela claramente el entorno transformado.' }
+  ]
+};
+
+function selectBeats(locale, requestedCount) {
+  const base = BEATS[locale];
+  const extras = EXTENDED_BEATS[locale];
+  const count = requestedCount ?? STORYBOARD_BEAT_COUNT;
+  if (count === 3) return [base[0], base[2], base[4]];
+  if (count === 4) return [base[0], base[1], base[3], base[4]];
+  if (count === 5) return base;
+  if (count === 6) return [base[0], base[1], base[2], extras[0], base[3], base[4]];
+  if (count === 7) return [base[0], base[1], base[2], extras[0], extras[1], base[3], base[4]];
+  return [base[0], base[1], base[2], extras[0], extras[1], base[3], extras[2], base[4]];
+}
+
 const CHARACTER_LABEL = { ru: 'Главный персонаж', uk: 'Головний персонаж', en: 'Main character', es: 'Personaje principal' };
 const STORY_LABEL = { ru: 'Деталь исходной истории', uk: 'Деталь початкової історії', en: 'Story detail to preserve', es: 'Detalle que conservar de la historia' };
 const FALLBACK = { ru: 'Начинается новое приключение.', uk: 'Починається нова пригода.', en: 'A new adventure begins.', es: 'Comienza una nueva aventura.' };
@@ -51,7 +86,7 @@ function distributeStoryDetails(sentences, beatCount) {
 }
 
 /**
- * Build five editable beats. Explicit labeled instructions are retained as production metadata.
+ * Build the requested number of editable beats. Explicit labeled instructions are retained as production metadata.
  * A one-sentence premise still uses clearly scaffolded local suggestions rather than invented plot facts.
  */
 export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
@@ -60,8 +95,9 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
   const brief = parseStoryBrief(idea);
   const source = brief.storyText;
   const sentences = source ? (source.match(/[^.!?。！？]+[.!?。！？]?/gu) || []).map(part => part.trim()).filter(Boolean) : [FALLBACK[locale]];
-  const storyDetails = distributeStoryDetails(sentences.length ? sentences : [FALLBACK[locale]], STORYBOARD_BEAT_COUNT);
-  const beats = BEATS[locale];
+  const beatCount = brief.requestedSceneCount ?? STORYBOARD_BEAT_COUNT;
+  const storyDetails = distributeStoryDetails(sentences.length ? sentences : [FALLBACK[locale]], beatCount);
+  const beats = selectBeats(locale, beatCount);
   const directiveText = formatProductionDirectives(brief.directives);
 
   const scenes = beats.map((beat, index) => {
@@ -87,6 +123,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
     titles: scenes.map(scene => scene.title),
     descriptions: scenes.map(scene => scene.description),
     scenes,
-    brief
+    brief,
+    requestedSceneCount: beatCount
   };
 }
