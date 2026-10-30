@@ -57,12 +57,25 @@ function occurrences(source, name) {
 export function inferCharacterInteraction(detail, characterIds = [], language = 'en') {
   const source = String(detail ?? '').trim();
   const locale = Object.hasOwn(RELATIONS, language) ? language : 'en';
-  const names = [...new Set((Array.isArray(characterIds) ? characterIds : []).map(clean).filter(Boolean))].slice(0, 12);
+  const names = [];
+  const seenNames = new Set();
+  for (const value of Array.isArray(characterIds) ? characterIds : []) {
+    const name = clean(value);
+    const key = name.toLocaleLowerCase();
+    if (!name || seenNames.has(key)) continue;
+    seenNames.add(key);
+    names.push(name);
+    if (names.length >= 12) break;
+  }
   if (!source || names.length < 2) return null;
 
-  for (const [type, verbPattern] of RELATIONS[locale]) {
-    const verb = verbPattern.exec(source);
-    if (!verb) continue;
+  // Relation-table order must not override the actual order of actions in the source.
+  const actions = RELATIONS[locale]
+    .map(([type, verbPattern]) => ({ type, verb: verbPattern.exec(source) }))
+    .filter(item => item.verb)
+    .sort((left, right) => left.verb.index - right.verb.index);
+
+  for (const { type, verb } of actions) {
     const before = names.flatMap(name => occurrences(source.slice(0, verb.index), name)).sort((a, b) => b.end - a.end);
     const after = names.flatMap(name => occurrences(source.slice(verb.index + verb[0].length), name))
       .map(item => ({ ...item, start: item.start + verb.index + verb[0].length, end: item.end + verb.index + verb[0].length }))

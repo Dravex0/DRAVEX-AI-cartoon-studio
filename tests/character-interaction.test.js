@@ -36,3 +36,21 @@ test('ignores regex metacharacters in saved character IDs', () => {
   const result = inferCharacterInteraction('A+B helps Foxy.', ['A+B', 'Foxy'], 'en');
   assert.equal(result?.actorId, 'A+B');
 });
+
+test('uses the earliest directed action in source order instead of relation-table priority', () => {
+  const result = inferCharacterInteraction(
+    'Foxy attacks Bird. Snowball rescues Foxy.',
+    ['Foxy', 'Bird', 'Snowball'],
+    'en'
+  );
+  assert.equal(result?.type, 'attack');
+  assert.equal(result?.actorId, 'Foxy');
+  assert.equal(result?.targetId, 'Bird');
+});
+
+test('deduplicates character IDs case-insensitively before resolving participants', () => {
+  const result = inferCharacterInteraction('Foxy helps Bird.', ['Foxy', 'foxy', 'Bird'], 'en');
+  assert.equal(result?.type, 'help');
+  assert.equal(result?.actorId, 'Foxy');
+  assert.equal(result?.targetId, 'Bird');
+});
