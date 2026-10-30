@@ -2,7 +2,12 @@
  * Estimate mouth openness from a decoded local voice recording.
  * Uses a short RMS window around the requested offset; no network or media upload.
  */
-function finiteClamp(value, fallback, min, max) {\n  const number = Number(value);\n  return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;\n}\n\nexport function sampleDialogueMouthOpen(audioBuffer, elapsedMs, windowMs = 32) {
+function finiteClamp(value, fallback, min, max) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;
+}
+
+export function sampleDialogueMouthOpen(audioBuffer, elapsedMs, windowMs = 32) {
   if (!audioBuffer || typeof audioBuffer.getChannelData !== 'function' ||
       !Number.isFinite(audioBuffer.sampleRate) || audioBuffer.sampleRate <= 0 ||
       !Number.isFinite(elapsedMs) || elapsedMs < 0) return 0;
@@ -10,7 +15,8 @@ function finiteClamp(value, fallback, min, max) {\n  const number = Number(value
   if (!Number.isInteger(length) || length <= 0) return 0;
   const channels = Math.max(1, Math.floor(Number(audioBuffer.numberOfChannels) || 1));
   const center = Math.min(length - 1, Math.floor(elapsedMs * audioBuffer.sampleRate / 1000));
-  const safeWindowMs = finiteClamp(windowMs, 32, 8, 80);\n  const halfWindow = Math.max(1, Math.floor(audioBuffer.sampleRate * safeWindowMs / 2000));
+  const safeWindowMs = finiteClamp(windowMs, 32, 8, 80);
+  const halfWindow = Math.max(1, Math.floor(audioBuffer.sampleRate * safeWindowMs / 2000));
   const start = Math.max(0, center - halfWindow);
   const end = Math.min(length, center + halfWindow + 1);
   let sumSquares = 0, samples = 0;
@@ -38,8 +44,14 @@ export function createDialogueMouthEnvelope(audioBuffer, { windowMs = 32, hopMs 
   const channels = Math.max(1, Math.floor(Number(audioBuffer.numberOfChannels) || 1));
   if (!Number.isInteger(length) || length <= 0) return null;
   const rate = audioBuffer.sampleRate;
-  const hopSamples = Math.max(1, Math.floor(rate * Math.max(8, Math.min(80, hopMs)) / 1000));
-  const halfWindow = Math.max(1, Math.floor(rate * Math.max(8, Math.min(100, windowMs)) / 2000));
+  const safeHopMs = finiteClamp(hopMs, 16, 8, 80);
+  const safeWindowMs = finiteClamp(windowMs, 32, 8, 100);
+  const safeNoiseFloor = finiteClamp(noiseFloor, 0.012, 0, 1);
+  const safeSensitivity = finiteClamp(sensitivity, 5.5, 0, 100);
+  const safeAttack = finiteClamp(attack, 0.62, 0, 1);
+  const safeRelease = finiteClamp(release, 0.28, 0, 1);
+  const hopSamples = Math.max(1, Math.floor(rate * safeHopMs / 1000));
+  const halfWindow = Math.max(1, Math.floor(rate * safeWindowMs / 2000));
   const channelData = Array.from({ length: channels }, (_, channel) => audioBuffer.getChannelData(channel));
   const values = new Float32Array(Math.ceil(length / hopSamples));
   let previous = 0, windowStart = 0, windowEnd = 0, sumSquares = 0, count = 0;
@@ -73,8 +85,8 @@ export function createDialogueMouthEnvelope(audioBuffer, { windowMs = 32, hopMs 
     windowStart = nextStart;
     windowEnd = nextEnd;
     const rms = count > 0 ? Math.sqrt(Math.max(0, sumSquares) / count) : 0;
-    const target = Math.max(0, Math.min(1, (rms - noiseFloor) * sensitivity));
-    previous += (target - previous) * Math.max(0, Math.min(1, target > previous ? attack : release));
+    const target = Math.max(0, Math.min(1, (rms - safeNoiseFloor) * safeSensitivity));
+    previous += (target - previous) * (target > previous ? safeAttack : safeRelease);
     values[frame] = previous;
   }
   return { values, hopMs: hopSamples * 1000 / rate, durationMs: length * 1000 / rate };
