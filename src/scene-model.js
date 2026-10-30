@@ -7,6 +7,18 @@ export const DEFAULT_SCENE_DURATION = 3;
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
 
+/** Return the single active speaker line at scene-local playback time. */
+export function getActiveSceneDialogue(scene, timeSeconds = 0) {
+  const time = Number.isFinite(Number(timeSeconds)) ? Math.max(0, Number(timeSeconds)) : 0;
+  const lines = Array.isArray(scene?.dialogueTimeline) ? scene.dialogueTimeline : [];
+  return lines.find(line => Number.isFinite(Number(line?.startSeconds))
+    && Number.isFinite(Number(line?.endSeconds))
+    && time >= Number(line.startSeconds)
+    && time < Number(line.endSeconds)
+    && typeof line?.text === 'string' && line.text.trim()
+    && typeof line?.characterId === 'string' && line.characterId.trim()) || null;
+}
+
 /** Normalize both current and legacy prototype scene shapes without dropping production prompts. */
 export function normalizeScene(input = {}, index = 0) {
   const scene = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
