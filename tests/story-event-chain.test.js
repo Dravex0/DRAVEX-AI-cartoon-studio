@@ -68,7 +68,7 @@ test('rejects a causal edge whose cause scene is absent or effect ID is mismatch
 
 test('records explicit state changes and explicit reactions without guessing their cause', () => {
   const graph = buildStoryEventChain([{
-    id: 's1', storyEventType: 'emotional_reaction', storyDetail: 'Foxy smiles with relief.',
+    id: 's1', storyEventType: 'emotional_reaction', storyDetail: 'Foxy picks up the silver key, then smiles with relief.',
     characters: ['Foxy'],
     stateChanges: [{
       entityType: 'prop', entityId: 'silver key', property: 'holder',
@@ -94,4 +94,35 @@ test('links an explicit reaction to its stated cause, not merely the previous sc
       } }
   ]);
   assert.ok(graph.edges.some(edge => edge.type === 'reacts_to' && edge.fromSceneId === 's2' && edge.toSceneId === 's1'));
+});
+
+
+test('does not create graph edges from interaction or state evidence absent from the scene source', () => {
+  const graph = buildStoryEventChain([{
+    id: 's1', storyEventType: 'guidance_help', storyDetail: 'Bird looks toward Foxy.',
+    characters: ['Bird', 'Foxy'],
+    interaction: { type: 'guide', actorId: 'Bird', targetId: 'Foxy', evidence: 'Bird secretly guides Foxy' },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'silver key', property: 'holder',
+      previousValue: null, value: 'Bird', actorId: 'Bird',
+      evidence: 'Bird picks up the silver key.'
+    }]
+  }]);
+  assert.equal(graph.nodes[0].action, null);
+  assert.deepEqual(graph.nodes[0].stateChanges, []);
+  assert.deepEqual(graph.edges, []);
+});
+
+test('does not create a causal edge when cause or effect evidence is not present in its source scene', () => {
+  const graph = buildStoryEventChain([
+    { id: 's1', storyEventType: 'general', storyDetail: 'The bridge remains open.' },
+    { id: 's2', storyEventType: 'general', storyDetail: 'Therefore, the travelers take the forest path.',
+      causalLink: {
+        type: 'consequence', causeSceneId: 's1', effectSceneId: 's2',
+        marker: 'Therefore', causeEvidence: 'The bridge collapses.',
+        evidence: 'Therefore, the travelers take the forest path.'
+      } }
+  ]);
+  assert.equal(graph.nodes[1].consequence, null);
+  assert.equal(graph.edges.some(edge => edge.type === 'causes'), false);
 });
