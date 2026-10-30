@@ -27,3 +27,35 @@ test('rejects an empty identity and enforces the profile limit', () => {
   const full = Array.from({ length: CHARACTER_REFERENCE_LIMIT }, (_, index) => ({ characterId: 'character-' + index }));
   assert.throws(() => upsertCharacterReference(full, { characterId: 'extra' }), /limit reached/);
 });
+
+
+test('merges story-extracted profiles without overwriting manually edited references', async () => {
+  const { mergeCharacterReferences } = await import('../src/character-reference.js');
+  const existing = [
+    { characterId: 'Foxy', visualDescription: 'User-approved orange fox', clothing: 'Custom blue scarf' }
+  ];
+  const discovered = [
+    { characterId: 'foxy', visualDescription: 'Automatically inferred fox' },
+    { characterId: 'Snowball', visualDescription: 'White rabbit with long ears' }
+  ];
+  const merged = mergeCharacterReferences(existing, discovered);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0].visualDescription, 'User-approved orange fox');
+  assert.equal(merged[0].clothing, 'Custom blue scarf');
+  assert.equal(merged[1].characterId, 'Snowball');
+});
+
+test('merges only valid unique profiles and respects the character library limit', async () => {
+  const { mergeCharacterReferences } = await import('../src/character-reference.js');
+  const existing = Array.from({ length: CHARACTER_REFERENCE_LIMIT - 1 }, (_, index) => ({
+    characterId: 'existing-' + index
+  }));
+  const merged = mergeCharacterReferences(existing, [
+    { characterId: 'existing-0', visualDescription: 'Duplicate' },
+    { characterId: 'new-one', visualDescription: 'First new character' },
+    { characterId: 'new-two', visualDescription: 'Must be capped' },
+    { visualDescription: 'Missing ID' }
+  ]);
+  assert.equal(merged.length, CHARACTER_REFERENCE_LIMIT);
+  assert.equal(merged.at(-1).characterId, 'new-one');
+});
