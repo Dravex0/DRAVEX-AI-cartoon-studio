@@ -11,7 +11,7 @@ function characterDetails(scene, characterBible) {
 }
 
 /** Creates a provider-neutral still-image prompt without calling a paid or remote service. */
-export function buildImageGenerationPrompt(scene = {}, characterBible = []) {
+export function buildImageGenerationPrompt(scene = {}, characterBible = [], options = {}) {
   const characterLock = characterDetails(scene, characterBible);
   return [
     safe(scene.imagePrompt) || safe(scene.prompt) || safe(scene.description),
@@ -20,7 +20,7 @@ export function buildImageGenerationPrompt(scene = {}, characterBible = []) {
     safe(scene.camera) && `Composition and camera: ${safe(scene.camera, 1000)}`,
     characterLock.length && `Character appearance reference: ${characterLock.join(' | ')}`,
     safe(scene.continuityLock) && `Continuity lock: ${safe(scene.continuityLock, 2000)}`,
-    safe(scene.negativePrompt) && `Avoid: ${safe(scene.negativePrompt, 2000)}`,
+    options.includeNegative !== false && safe(scene.negativePrompt) && `Avoid: ${safe(scene.negativePrompt, 2000)}`,
     'Create one coherent still frame. Preserve the specified character identities and visual continuity. Do not add captions, logos, or watermarks.'
   ].filter(Boolean).join('\n\n');
 }
