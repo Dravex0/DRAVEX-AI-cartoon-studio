@@ -9,6 +9,18 @@ test('normalizes legacy scene fields without losing prompt, motion, camera, or 2
   assert.equal(scene.id, 'legacy-1'); assert.equal(scene.visibleAction, 'His iris darkens.');
   assert.equal(scene.durationSeconds, 2); assert.equal(scene.camera, 'Close-up');
 });
+test('preserves separate image, motion, negative, and continuity prompts through normalization', () => {
+  const scene = normalizeScene({
+    imagePrompt: 'A fox holding a silver key in a moonlit forest.',
+    motionPrompt: 'The fox raises the key and the gate opens.',
+    negativePrompt: 'No extra characters.',
+    continuityLock: 'Same orange fur and blue scarf.'
+  });
+  assert.match(scene.imagePrompt, /silver key/);
+  assert.match(scene.motionPrompt, /gate opens/);
+  assert.match(scene.negativePrompt, /No extra characters/);
+  assert.match(scene.continuityLock, /blue scarf/);
+});
 test('normalizes malformed durations and bounds heuristic scores', () => {
   const scene = normalizeScene({ duration: 999, directorHeuristicScore: 150 }, 2);
   assert.equal(scene.durationSeconds, 3); assert.equal(scene.id, 'scene_3'); assert.equal(scene.directorHeuristicScore, 100);

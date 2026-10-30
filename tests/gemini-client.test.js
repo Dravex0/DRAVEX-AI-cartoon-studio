@@ -13,7 +13,7 @@ const reply = value => ({ candidates: [{ content: { parts: [{ text: JSON.stringi
 
 test('uses the free-tier model and returns normalized animation-ready scene data', async () => {
   const data = { scenes: [1,2,3].map(n => ({
-    title: 'Scene '+n, visibleAction: 'Action '+n, camera: 'Camera '+n,
+    title: 'Scene '+n, visibleAction: 'Action '+n, camera: 'Camera '+n, imagePrompt: 'Still frame '+n, motionPrompt: 'Motion '+n, negativePrompt: 'No extra character', continuityLock: 'Foxy remains orange',
     characters: ['Foxy'], location: 'Forest', startState: 'Standing', endState: 'Running',
     dialogue: [{ characterId: 'Foxy', text: 'Hello' }], durationSeconds: 4, sound: 'Wind'
   })) };
@@ -21,7 +21,10 @@ test('uses the free-tier model and returns normalized animation-ready scene data
   assert.equal(result.scenes.length, 3);
   assert.equal(result.scenes[2].visibleAction, 'Action 3');
   assert.deepEqual(result.scenes[0].characters, ['Foxy']);
-  assert.equal(result.scenes[0].durationSeconds, 4);
+  assert.equal(result.scenes[0].durationSeconds, 3);
+  assert.equal(result.scenes[0].imagePrompt, 'Still frame 1');
+  assert.equal(result.scenes[0].motionPrompt, 'Motion 1');
+  assert.equal(result.scenes[0].continuityLock, 'Foxy remains orange');
   assert.equal(result.scenes[0].dialogue[0].text, 'Hello');
 });
 
@@ -49,6 +52,24 @@ test('rejects a response that ignores an explicitly requested scene count', asyn
     idea: 'Количество сцен: 6\nA fox finds a star.',
     fetchImpl: mockFetch(reply({ scenes: [1,2,3,4,5].map(n => ({ title:'Scene '+n, visibleAction:'Action '+n, camera:'Camera '+n })) }))
   }), /requested 6/);
+});
+
+test('enforces the requested duration for every scene and returns a stable character bible', async () => {
+  const payload = { characterBible: [{ characterId: 'Foxy', visualDescription: 'Small orange fox', clothing: 'Blue scarf', colors: 'Orange and blue', distinctiveFeatures: 'White tail tip' }], scenes: [1,2,3].map(n => ({
+    title: 'Scene '+n, visibleAction: 'Action '+n, camera: 'Camera '+n,
+    characters: ['Foxy'], durationSeconds: 12, startState: 'Start', endState: 'End'
+  })) };
+  const result = await buildGeminiStoryboard({
+    apiKey: 'test-key',
+    idea: 'Длительность: 5 секунд\nЛисёнок находит звезду.',
+    duration: 3,
+    fetchImpl: mockFetch(reply(payload))
+  });
+  assert.equal(result.brief.requestedDurationSeconds, 5);
+  assert.ok(result.scenes.every(scene => scene.durationSeconds === 5));
+  assert.equal(result.characterBible[0].visualDescription, 'Small orange fox');
+  assert.match(result.scenes[0].imagePrompt, /Action 1/);
+  assert.match(result.scenes[0].motionPrompt, /Start/);
 });
 
 test('rejects an empty key before making a request', async () => {

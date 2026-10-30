@@ -4,10 +4,9 @@ export const SCENE_DURATION_MAX = 30;
 export const DEFAULT_SCENE_DURATION = 3;
 
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
-const uniqueStrings = (values) => [...new Set((Array.isArray(values) ? values : [])
-  .map((value) => text(value, 160)).filter(Boolean))];
+const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
 
-/** Normalize both current and legacy prototype scene shapes. */
+/** Normalize both current and legacy prototype scene shapes without dropping production prompts. */
 export function normalizeScene(input = {}, index = 0) {
   const scene = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
   let rawDuration = NaN;
@@ -32,14 +31,18 @@ export function normalizeScene(input = {}, index = 0) {
     camera: text(scene.camera, 1_000),
     startState: text(scene.startState, 1_000),
     endState: text(scene.endState, 1_000),
-    dialogue: dialogueSource.map((line) => typeof line === 'string'
+    dialogue: dialogueSource.map(line => typeof line === 'string'
       ? { characterId: '', text: text(line, 2_000), language: 'en' }
       : { characterId: text(line?.characterId, 120), text: text(line?.text, 2_000), language: text(line?.language, 12) || 'en' })
-      .filter((line) => line.text),
+      .filter(line => line.text),
     sound: text(scene.sound ?? scene.soundCue, 1_000),
     durationSeconds,
     transition: text(scene.transition, 500),
     prompt,
+    imagePrompt: text(scene.imagePrompt, 4_000),
+    motionPrompt: text(scene.motionPrompt, 3_000),
+    negativePrompt: text(scene.negativePrompt, 2_000),
+    continuityLock: text(scene.continuityLock, 2_000),
     // Temporary compatibility fields retained during gradual migration.
     emotion: text(scene.emotion, 500),
     effects: text(scene.effects, 1_000),
