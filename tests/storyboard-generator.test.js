@@ -148,3 +148,22 @@ test('does not invent multi-character interactions in a single-character scene',
   const result = buildStoryboardFromText('Сцена 1. Лес\nРыжик гуляет по лесу.', 'ru', 'Foxy');
   assert.deepEqual(result.scenes[0].interactions, []);
 });
+
+
+test('infers a visible object hand-off only when the story names the object explicitly', () => {
+  const idea = [
+    'Сцена 1. Передача ключа',
+    'Маленький рыжий лисёнок по имени Рыжик передаёт маленькому белому кролику по имени Снежок «серебряный ключ». Снежок принимает его.'
+  ].join('\\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.equal(result.scenes[0].interactions[0].type, 'give_object');
+  assert.equal(result.scenes[0].interactions[0].objectDescription, 'серебряный ключ');
+  assert.deepEqual(result.scenes[0].interactions[0].participants, ['Рыжик', 'Снежок']);
+});
+
+test('does not invent a prop description for an unlabelled hand-off', () => {
+  const idea = 'Сцена 1. Передача. Маленький рыжий лисёнок по имени Рыжик передаёт что-то Снежку.';
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.equal(result.scenes[0].interactions[0].type, 'give_object');
+  assert.equal(result.scenes[0].interactions[0].objectDescription, undefined);
+});
