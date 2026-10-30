@@ -1,3 +1,5 @@
+import { normalizeScene, SCENE_DURATION_MIN, SCENE_DURATION_MAX } from './scene-model.js';
+
 const safe = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const list = values => Array.isArray(values) ? values.map(value => safe(value, 500)).filter(Boolean) : [];
 
@@ -52,6 +54,37 @@ export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
   ].filter(Boolean).join('\n\n');
 }
 
+/**
+ * Converts a storyboard scene into a canonical, provider-neutral production record.
+ * Missing start/end states remain missing: this function does not invent story facts.
+ */
+export function buildProductionScene(scene = {}, characterBible = [], options = {}) {
+  const normalized = normalizeScene(scene, Number.isInteger(options.index) ? options.index : 0);
+  const imagePrompt = normalized.imagePrompt || [
+    normalized.title,
+    normalized.storyDetail,
+    normalized.visibleAction
+  ].filter(Boolean).join('. ');
+  const motionPrompt = normalized.motionPrompt || normalized.visibleAction;
+  const prepared = {
+    ...scene,
+    ...normalized,
+    imagePrompt,
+    motionPrompt,
+    negativePrompt: normalized.negativePrompt || safe(options.negativePrompt, 2000)
+  };
+  const readinessInput = { ...prepared };
+  if (scene.durationSeconds !== undefined) readinessInput.durationSeconds = scene.durationSeconds;
+  else if (scene.duration !== undefined) readinessInput.duration = scene.duration;
+  return {
+    ...prepared,
+    imageGenerationPrompt: buildImageGenerationPrompt(prepared, characterBible, options),
+    motionGenerationPrompt: buildMotionGenerationPrompt(prepared, characterBible),
+    productionReadiness: validateSceneProductionReadiness(readinessInput, characterBible)
+  };
+}
+
+/** Validate required fields and references before sending a scene to a provider. */
 export function validateSceneProductionReadiness(scene = {}, characterBible = []) {
   const issues = [];
   if (!safe(scene.title, 200)) issues.push({ code: 'missing-title', field: 'title' });
@@ -60,6 +93,7 @@ export function validateSceneProductionReadiness(scene = {}, characterBible = []
   if (!safe(scene.camera)) issues.push({ code: 'missing-camera-plan', field: 'camera' });
   if (!safe(scene.startState)) issues.push({ code: 'missing-start-state', field: 'startState' });
   if (!safe(scene.endState)) issues.push({ code: 'missing-end-state', field: 'endState' });
+
   const durationValue = scene.durationSeconds ?? scene.duration;
   if (durationValue !== undefined && durationValue !== null) {
     const duration = Number(durationValue);
