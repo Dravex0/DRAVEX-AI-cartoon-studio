@@ -140,6 +140,7 @@ export function evaluateStoryboard({
     actionDiversity,
     cameraVariety: cameraDiversity,
     sourceFidelity,
+    sourceOrderConsistency,
     characterConsistency,
     productionCompleteness,
     stateCoverage: continuityReport?.metrics.stateCoverage ?? null,
