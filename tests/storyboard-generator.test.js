@@ -127,7 +127,7 @@ test('builds a cast automatically from natural character introductions', () => {
 test('infers a face-to-face interaction from dialogue in a two-character scene', () => {
   const idea = [
     'Сцена 1. Встреча',
-    'Рыжик встречает Снежка. Снежок говорит: «Не трогай кристалл!»'
+    'Маленький рыжий лисёнок по имени Рыжик встречает маленького белого кролика по имени Снежок. Снежок говорит: «Не трогай кристалл!»'
   ].join('\n');
   const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
   assert.deepEqual(result.scenes[0].characters, ['Рыжик', 'Снежок']);
@@ -138,7 +138,7 @@ test('infers a face-to-face interaction from dialogue in a two-character scene',
 test('infers approach movement only when the story describes approaching', () => {
   const idea = [
     'Сцена 1. Встреча',
-    'Рыжик подходит к Снежку и осторожно останавливается рядом.'
+    'Маленький рыжий лисёнок по имени Рыжик подходит к маленькому белому кролику по имени Снежок и осторожно останавливается рядом.'
   ].join('\n');
   const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
   assert.equal(result.scenes[0].interactions[0].type, 'approach');
