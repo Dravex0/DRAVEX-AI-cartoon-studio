@@ -97,3 +97,17 @@ test('story-specific source events drive different visible actions and camera pl
   assert.notEqual(result.scenes[0].camera, result.scenes[1].camera);
   assert.notEqual(result.scenes[1].camera, result.scenes[3].camera);
 });
+
+test('storyboard scenes include isolated production prompts, matching cast and requested duration', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — small orange fox with a blue scarf.\nSnowball — white rabbit with long ears.\nDuration: 4 seconds\n\nScene 1: Meeting\nFoxy meets Snowball.\n\nScene 2: Departure\nSnowball leaves the forest.',
+    'en',
+    'Foxy'
+  );
+  assert.deepEqual(result.scenes[0].characters, ['Foxy', 'Snowball']);
+  assert.deepEqual(result.scenes[1].characters, ['Snowball']);
+  assert.equal(result.scenes[0].durationSeconds, 4);
+  assert.match(result.scenes[0].imageGenerationPrompt, /small orange fox/);
+  assert.match(result.scenes[0].motionGenerationPrompt, /Foxy/i);
+  assert.ok(result.scenes.every(scene => scene.productionReadiness && Array.isArray(scene.productionReadiness.issues)));
+});
