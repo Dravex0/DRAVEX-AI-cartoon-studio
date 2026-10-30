@@ -111,3 +111,40 @@ test('rejects missing Web Audio dependencies', () => {
   const h = harness();
   assert.throws(() => scheduleDialogueAudioBuffers({ context: h.context, schedule: [], audioBuffers: new Map() }), /destination/);
 });
+
+test('isolates Web Audio scheduling failures to the affected cue and cleans partial nodes', () => {
+  const h = harness();
+  let sourceCount = 0;
+  h.context.createBufferSource = () => {
+    sourceCount += 1;
+    const shouldFail = sourceCount === 2;
+    return {
+      connect(target) { h.calls.push(['connect', target]); },
+      start(...args) {
+        h.calls.push(['start', ...args]);
+        if (shouldFail) throw new Error('cannot schedule');
+      },
+      stop() { h.calls.push(['stop']); },
+      disconnect() { h.calls.push(['disconnect']); }
+    };
+  };
+  const result = scheduleDialogueAudioBuffers({
+    context: h.context,
+    destination: h.destination,
+    schedule: [
+      { sceneIndex: 0, lineId: 'good', startMs: 0, endMs: 1000 },
+      { sceneIndex: 0, lineId: 'broken', startMs: 1000, endMs: 2000 },
+      { sceneIndex: 0, lineId: 'later', startMs: 2000, endMs: 3000 }
+    ],
+    audioBuffers: new Map([
+      ['0:good', { duration: 1 }],
+      ['0:broken', { duration: 1 }],
+      ['0:later', { duration: 1 }]
+    ])
+  });
+  assert.equal(result.scheduledCount, 2);
+  assert.deepEqual(result.skipped, ['0:broken']);
+  assert.equal(h.calls.filter(call => call[0] === 'stop').length, 1);
+  assert.equal(h.calls.filter(call => call[0] === 'disconnect').length, 1);
+  result.stop();
+});
