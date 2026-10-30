@@ -22,7 +22,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     eventType: clean(scene.storyEventType, 80),
     assignedCharacters: Array.isArray(scene.characters) ? scene.characters : [],
     lockedInteraction: scene.interaction || null,
-    lockedCausalLink: scene.causalLink || null
+    lockedCausalLink: scene.causalLink || null,\n    lockedStateChanges: scene.stateChanges || []
   }));
   return [
     'You are DRAVEX, a careful animation film director.',
@@ -34,7 +34,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'Do not add characters, events, locations, or props that are not supported by the story.',
     'Keep every character identity unchanged. Use only the character IDs assigned to each locked scene.',
     'Preserve every supplied lockedInteraction exactly: actorId is the acting character, targetId is the recipient, and type is the directed action. Never reverse participants or invent a relationship when lockedInteraction is null.',
-    'Preserve every supplied lockedCausalLink exactly. A causal link is valid only when its causeSceneId, effectSceneId, marker, causeEvidence, and evidence remain unchanged. Do not invent causes, consequences, or links when lockedCausalLink is null.',
+    'Preserve every supplied lockedCausalLink exactly. A causal link is valid only when its causeSceneId, effectSceneId, marker, causeEvidence, and evidence remain unchanged. Do not invent causes, consequences, or links when lockedCausalLink is null.',\n    'Preserve every supplied lockedStateChanges record exactly, including entity, property, previousValue, value, actorId, and source evidence. Never invent a prop transfer, door state, or character location change.',
     'CHARACTER BIBLE (locked visual references): ' + JSON.stringify(characterBible),
     'Preserve each character\'s visual description, clothing, colors, and distinctive features in every image and motion prompt where that character appears.',
     'Main character reference: ' + clean(character, 120) + '.',
@@ -104,7 +104,7 @@ export async function directStoryboardWithLocalAI({
       characters: Array.isArray(base.characters) && base.characters.length ? base.characters : [clean(character, 120)],
       // Causal attribution is locked to source-grounded deterministic inference.
       causalLink: base.causalLink || null,
-      interaction: base.interaction || null,
+      interaction: base.interaction || null,\n      stateChanges: base.stateChanges || [],
       visibleAction: clean(scene.visibleAction, 1_000),
       camera: clean(scene.camera, 1_000),
       imagePrompt: clean(scene.imagePrompt, 4_000) || base.imagePrompt || base.prompt,
