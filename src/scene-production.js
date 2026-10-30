@@ -72,11 +72,14 @@ export function buildProductionScene(scene = {}, characterBible = [], options = 
     motionPrompt,
     negativePrompt: normalized.negativePrompt || safe(options.negativePrompt, 2000)
   };
+  const readinessInput = { ...prepared };
+  if (scene.durationSeconds !== undefined) readinessInput.durationSeconds = scene.durationSeconds;
+  else if (scene.duration !== undefined) readinessInput.duration = scene.duration;
   return {
     ...prepared,
     imageGenerationPrompt: buildImageGenerationPrompt(prepared, characterBible, options),
     motionGenerationPrompt: buildMotionGenerationPrompt(prepared, characterBible),
-    productionReadiness: validateSceneProductionReadiness(prepared, characterBible)
+    productionReadiness: validateSceneProductionReadiness(readinessInput, characterBible)
   };
 }
 
