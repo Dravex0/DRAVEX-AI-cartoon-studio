@@ -17,6 +17,20 @@ export function normalizeScene(input = {}, index = 0) {
   const prompt = text(scene.prompt ?? scene.visualPrompt);
   const visibleAction = text(scene.visibleAction ?? scene.motion);
   const dialogueSource = Array.isArray(scene.dialogue) ? scene.dialogue : [];
+  const rawDialogueTimeline = Array.isArray(scene.dialogueTimeline) ? scene.dialogueTimeline : [];
+  const dialogueTimeline = rawDialogueTimeline.slice(0, 20).map((line, lineIndex) => {
+    let start = NaN, end = NaN;
+    try { start = Number(line?.startSeconds); end = Number(line?.endSeconds); } catch {}
+    const characterId = text(line?.characterId, 120);
+    const lineText = text(line?.text, 2_000);
+    return {
+      id: text(line?.id, 120) || `dialogue_${lineIndex + 1}`,
+      characterId,
+      text: lineText,
+      startSeconds: Number.isFinite(start) ? Math.max(0, Math.min(durationSeconds, start)) : 0,
+      endSeconds: Number.isFinite(end) ? Math.max(0, Math.min(durationSeconds, end)) : 0
+    };
+  }).filter(line => line.text && line.endSeconds > line.startSeconds);
   let orderRaw = NaN, scoreRaw = NaN;
   try { orderRaw = Number(scene.order ?? scene.num); } catch {}
   try { scoreRaw = Number(scene.directorHeuristicScore); } catch {}
@@ -33,6 +47,7 @@ export function normalizeScene(input = {}, index = 0) {
     startState: text(scene.startState, 1_000),
     endState: text(scene.endState, 1_000),
     interactions: (Array.isArray(scene.interactions) ? scene.interactions : []).map((event, interactionIndex) => normalizeSceneInteraction(event, interactionIndex, durationSeconds)),
+    dialogueTimeline,
     dialogue: dialogueSource.map(line => typeof line === 'string'
       ? { characterId: '', text: text(line, 2_000), language: 'en' }
       : { characterId: text(line?.characterId, 120), text: text(line?.text, 2_000), language: text(line?.language, 12) || 'en' })
