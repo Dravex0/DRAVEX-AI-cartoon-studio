@@ -316,16 +316,22 @@ const button=$('generateSceneImage'),status=$('imageGenerationStatus');
 if(!$('hordeConsent').checked){status.textContent=uiLang==='ru'?'Сначала подтверди согласие на отправку текстового промпта.':'First confirm consent to send the text prompt.';return}
 if(button.disabled)return;
 const targetIndex=sceneIndex,meta=sceneMetadata[targetIndex]||{};
-const scene={...meta,title:titles[targetIndex],imagePrompt:$('sceneImagePrompt').value.trim(),prompt:$('sceneImagePrompt').value.trim(),camera:$('sceneCamera').value.trim(),location:meta.location,timeOfDay:meta.timeOfDay,characters:meta.characters,continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
+const targetId=String(meta.id||('scene_'+(targetIndex+1)+'_'+Date.now()));
+const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),prompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),location:meta.location,timeOfDay:meta.timeOfDay,characters:meta.characters,startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
+titles[targetIndex]=scene.title;descriptions[targetIndex]=scene.description;
+sceneMetadata[targetIndex]=scene;
 const prompt=buildImageGenerationPrompt(scene,characterBible,{includeNegative:false});
+renderScenes();
 button.disabled=true;status.textContent=uiLang==='ru'?'Отправляем текстовый промпт в бесплатную очередь AI Horde…':'Submitting the text prompt to the free AI Horde queue…';
 try{
 const result=await generateImageWithHorde({prompt,negativePrompt:scene.negativePrompt,onProgress:progress=>{
 const position=progress.queuePosition===null?'?':progress.queuePosition;
 status.textContent=uiLang==='ru'?'Очередь AI Horde · позиция: '+position+' · ожидают: '+progress.waiting+' · обрабатываются: '+progress.processing:'AI Horde queue · position: '+position+' · waiting: '+progress.waiting+' · processing: '+progress.processing;
 }});
-sceneMetadata[targetIndex]={...(sceneMetadata[targetIndex]||{}),generatedImageUrl:result.imageUrl,generatedImageSeed:result.seed,generatedImageModel:result.model,generatedImageWorker:result.workerName};
-if(sceneIndex===targetIndex)renderGeneratedSceneImage();
+const resolvedIndex=sceneMetadata.findIndex(item=>item&&item.id===targetId);
+if(resolvedIndex>=0)sceneMetadata[resolvedIndex]={...sceneMetadata[resolvedIndex],generatedImageUrl:result.imageUrl,generatedImageSeed:result.seed,generatedImageModel:result.model,generatedImageWorker:result.workerName};
+if(sceneIndex===resolvedIndex)renderGeneratedSceneImage();
+updateStoryQA();
 status.textContent=uiLang==='ru'?'Изображение сцены '+(targetIndex+1)+' создано. Сохрани черновик, чтобы запомнить ссылку.':'Image for scene '+(targetIndex+1)+' generated. Save the draft to keep its result link.';
 }catch(error){
 status.textContent=(uiLang==='ru'?'Не удалось создать изображение: ':'Image generation failed: ')+(error?.message||'Unknown error');
