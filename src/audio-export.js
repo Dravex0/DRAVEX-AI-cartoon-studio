@@ -70,17 +70,20 @@ export async function createAudioExportSession({
       async start() {
         if (closed) throw new Error('Audio export session is already closed.');
         await context.resume();
+        const audioStartTime = context.currentTime;
         if (Array.isArray(dialogueAudioSchedule) && dialogueAudioSchedule.length) {
           dialoguePlayback = scheduleDialogueAudioBuffers({
             context,
             destination,
             schedule: dialogueAudioSchedule,
             audioBuffers: dialogueAudioBuffers,
-            startAt: context.currentTime
+            startAt: audioStartTime
           });
         }
         await Promise.all(audioElements.map(element => element.play()));
+        return audioStartTime;
       },
+      getCurrentTime() { return context.currentTime; },
       async cleanup() {
         if (closed) return;
         closed = true;
