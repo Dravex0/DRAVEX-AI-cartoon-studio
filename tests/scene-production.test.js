@@ -26,6 +26,11 @@ test('image prompt builder includes scene, setting, camera, character bible and 
   assert.match(prompt, /No extra characters/);
 });
 
+test('image prompt builder can omit negative text when a provider accepts it separately', () => {
+  const prompt = buildImageGenerationPrompt(scene, bible, { includeNegative: false });
+  assert.match(prompt, /silver key/);
+  assert.doesNotMatch(prompt, /Avoid: No extra characters/);
+});
 test('motion prompt builder separates temporal action and preserves continuity', () => {
   const prompt = buildMotionGenerationPrompt(scene, bible);
   assert.match(prompt, /slowly turns the key/);
