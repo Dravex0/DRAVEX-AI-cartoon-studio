@@ -32,7 +32,9 @@ function buildDirectorPrompt({ basePlan, storyText, language, character }) {
     'Keep the main character identity unchanged: ' + clean(character, 120) + '.',
     'Write all scene text in ' + clean(language, 30) + '.',
     'Keep imagePrompt focused on one still frame; keep motionPrompt focused on movement.',
-    'startState and endState must describe visual continuity between adjacent scenes.',
+    'Build a strict scene-to-scene hand-off: scene N+1 startState must continue scene N endState. Preserve the exact positions and states of characters, props, clothing, lighting, weather, and location unless the supplied story explicitly changes them.',
+    'Do not teleport characters or objects. If a character holds an object at the end of one scene, begin the next scene with that same character still holding it. Carry unresolved actions forward before starting a new action.',
+    'Keep startState and endState concrete, visible, and mutually compatible across every adjacent scene.',
     'The source details below are locked facts. Do not rewrite, reorder, omit, or duplicate them.',
     'LOCKED SOURCE DETAILS: ' + JSON.stringify(requiredDetails),
     'ORIGINAL STORY: ' + clean(storyText, 12_000)
@@ -106,7 +108,8 @@ export async function directStoryboardWithLocalAI({
     expectedSceneCount: fallback.length,
     expectedStoryDetails,
     characterRequirements: candidate.map(scene => ({ sceneId: scene.id, characterId: clean(character, 120) })),
-    requireProductionFields: true
+    requireProductionFields: true,
+    requireContinuity: true
   });
   if (!evaluation.passed) return fallbackResult('candidate-failed-story-quality-gate', evaluation);
 
