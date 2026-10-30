@@ -29,7 +29,7 @@ test('sends the complete story and explicit production directions to Gemini', as
   let sentPrompt = '';
   const fetchImpl = async (_url, options) => {
     sentPrompt = JSON.parse(options.body).contents[0].parts[0].text;
-    return { ok: true, status: 200, json: async () => reply({ scenes: [1,2,3].map(n => ({ title:'Scene '+n, visibleAction:'Action '+n, camera:'Camera '+n })) }) };
+    return { ok: true, status: 200, json: async () => reply({ scenes: [1,2,3,4,5,6].map(n => ({ title:'Scene '+n, visibleAction:'Action '+n, camera:'Camera '+n })) }) };
   };
   await buildGeminiStoryboard({
     apiKey: 'test-key',
