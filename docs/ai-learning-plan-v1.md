@@ -47,7 +47,7 @@ The app must keep the download opt-in and explain that model weights are downloa
 
 ## Quality-gated AI director
 
-`src/local-story-director.js` asks the local model to propose concrete actions, camera plans, image/motion prompts, and scene start/end states. It locks source-story attribution, event order, and character membership to the deterministic baseline. The candidate is accepted only when the text-level storyboard evaluator passes; malformed, incomplete, repetitive, or low-specificity output falls back to the baseline. This is a guardrail, not proof of semantic correctness or visual quality. The browser UI's local-AI test action now runs this director against the current story and updates the editable storyboard only after the quality gate passes.
+`src/local-story-director.js` asks the local model to propose concrete actions, camera plans, image/motion prompts, and scene start/end states. It locks source-story attribution, event order, and character membership to the deterministic baseline. The candidate is accepted only when the text-level storyboard evaluator passes scene count, source fidelity and order, concrete action, action/camera diversity, main-character membership, and production completeness (image prompt, motion prompt, start state, and end state). Malformed, incomplete, repetitive, or low-specificity output falls back to the baseline. This is a guardrail, not proof of semantic correctness or visual quality. The browser UI's local-AI test action now runs this director against the current story and updates the editable storyboard only after the quality gate passes.
 
 ## Training loop to build next
 

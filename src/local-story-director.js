@@ -104,7 +104,9 @@ export async function directStoryboardWithLocalAI({
   const evaluation = evaluateStoryboard({
     scenes: candidate,
     expectedSceneCount: fallback.length,
-    expectedStoryDetails
+    expectedStoryDetails,
+    characterRequirements: candidate.map(scene => ({ sceneId: scene.id, characterId: clean(character, 120) })),
+    requireProductionFields: true
   });
   if (!evaluation.passed) return fallbackResult('candidate-failed-story-quality-gate', evaluation);
 
