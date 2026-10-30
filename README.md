@@ -25,14 +25,16 @@ npm run build
 npm run dev
 ```
 
-The Vite build is a separate development bundle; the current root `index.html` remains the existing standalone prototype until the new engine is deliberately connected to the UI.
+The Vite build is a separate development bundle. The root `index.html` is the published standalone workspace and now uses the deterministic director engine to vary preview framing from scene text and camera metadata. The optional Gemini adapter can generate structured scene plans when a user supplies their own Free Tier API key.
 
 ## Current limitations
 
-- Story analysis is rule-based QA, not an AI model.
-- The fixture is test data, not a generated animation.
-- No paid API is required by this test foundation.
-- A successful CI run verifies syntax, unit tests, and bundling only; it does not prove mobile-browser playback, audio/video codec support, or real AI generation.
+- Local story planning and cinematic direction use deterministic text heuristics; they do not visually understand generated frames.
+- Gemini can optionally write storyboard scenes, but this does not generate scene artwork or animation.
+- The canvas preview uses procedural shapes and camera framing; it is not full AI-generated animation.
+- Voice synthesis, lip-sync, music generation, and production-grade audiovisual export are not implemented yet.
+- No paid API is required. Gemini is optional and limited to Google's Free Tier quota when configured.
+- A successful CI run verifies syntax, unit tests, and bundling only; it does not prove mobile-device playback, audio/video codec support, or a live Gemini request.
 
 
 ## Optional Gemini integration (free tier only)
