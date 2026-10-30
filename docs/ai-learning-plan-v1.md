@@ -39,6 +39,12 @@ The evaluator now checks not only whether required source-story details survive,
 
 `src/local-model-contract.js` defines the manifest and adapter boundary for a future WebGPU/WASM model: supported tasks, model files, license, declared local-only behavior, device-fit estimates, cancellation, and structured JSON output. The adapter accepts an injected inference runner; it does not bundle model weights or an inference runtime. The runner is trusted code, so this contract alone cannot prove that a third-party runner never uses the network. No neural model is installed or running yet.
 
+## First local inference runtime
+
+`src/transformers-local-runtime.js` is an opt-in browser runtime built on Transformers.js and ONNX Runtime Web. It loads `onnx-community/SmolLM2-135M-Instruct-ONNX` only after the user requests a model load, selects WebGPU when an adapter is available and otherwise uses WASM, and runs text generation in the browser. The first load downloads model assets from Hugging Face (the q4f16 ONNX weight is approximately 117 MB); prompts are not sent to an inference provider. Browser cache persistence depends on browser storage policy. AbortSignal can prevent stale results from updating the UI, but the current Transformers.js pipeline call cannot be interrupted once generation has begun. The model is a small experimental assistant, not a DRAVEX-trained model and not a visual/video model.
+
+The app must keep the download opt-in and explain that model weights are downloaded from Hugging Face while inference remains on-device. No model should load automatically on page open.
+
 ## Training loop to build next
 
 1. **Collect examples:** user-approved story prompts and corrected storyboards, with private details removed.
