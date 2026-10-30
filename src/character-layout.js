@@ -57,3 +57,32 @@ export function getSceneCharacterLayout(scene = {}, timeSeconds = 0) {
   }
   return layout.map(item => ({ ...item, x: clamp(item.x, 0.12, 0.88) }));
 }
+
+
+/**
+ * Returns only explicitly described props in active hand-off events.
+ * The first participant is the giver and the second is the receiver.
+ */
+export function getSceneObjectHandoffs(scene = {}, timeSeconds = 0) {
+  scene = scene && typeof scene === 'object' && !Array.isArray(scene) ? scene : {};
+  const time = Number.isFinite(Number(timeSeconds)) ? Math.max(0, Number(timeSeconds)) : 0;
+  const layout = getSceneCharacterLayout(scene, time);
+  const results = [];
+  for (const event of Array.isArray(scene.interactions) ? scene.interactions : []) {
+    if (!event || !['give_object', 'receive_object'].includes(event.type)) continue;
+    const label = String(event.objectDescription ?? event.objectLabel ?? '').trim().slice(0, 120);
+    if (!label) continue;
+    const start = Number(event.startSeconds ?? event.start);
+    const end = Number(event.endSeconds ?? event.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || time < start || time > end) continue;
+    const ids = Array.isArray(event.participants) ? event.participants.map(clean) : [];
+    const giver = layout.find(item => item.characterId === ids[0]);
+    const receiver = layout.find(item => item.characterId === ids[1]);
+    if (!giver || !receiver) continue;
+    const progress = clamp((time - start) / (end - start), 0, 1);
+    const x = giver.x + (receiver.x - giver.x) * progress;
+    const y = Math.min(giver.y, receiver.y) - 0.105 - Math.sin(progress * Math.PI) * 0.035;
+    results.push({ interactionId: clean(event.id), objectId: clean(event.objectId), label, x, y, progress, giverId: giver.characterId, receiverId: receiver.characterId });
+  }
+  return results;
+}
