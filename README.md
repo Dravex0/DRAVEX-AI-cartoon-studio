@@ -37,7 +37,7 @@ The Vite build is a separate development bundle; the current root `index.html` r
 
 ## Optional Gemini integration (free tier only)
 
-The storyboard workspace can optionally call the Gemini Developer API using the fixed `gemini-2.5-flash-lite` model. The local storyboard generator remains available without an API key.
+The storyboard workspace can optionally call the Gemini Developer API using the fixed `gemini-3.5-flash-lite` model. The local storyboard generator remains available without an API key.
 
 1. Create an API key in [Google AI Studio](https://aistudio.google.com/apikey) under a project that remains on the **Free Tier**.
 2. Do **not** link Cloud Billing or enable a paid tier.
