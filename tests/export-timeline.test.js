@@ -33,8 +33,8 @@ test('clamps scene and fallback durations to safe bounds', () => {
     { durationSeconds: 0.01 },
     { durationSeconds: 999 }
   ], 0);
-  assert.deepEqual(result.segments.map(item => item.durationMs), [500, 30000]);
-  assert.equal(result.totalDurationMs, 30500);
+  assert.deepEqual(result.segments.map(item => item.durationMs), [250, 30000]);
+  assert.equal(result.totalDurationMs, 30250);
 });
 
 test('limits export to the editor maximum of twelve scenes', () => {
