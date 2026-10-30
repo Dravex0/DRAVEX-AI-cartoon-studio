@@ -70,3 +70,19 @@ test('rolling envelope matches reference RMS when hop windows do not overlap', (
     assert.ok(Math.abs(envelope.values[index] - value) < 1e-6, `frame ${index}: expected ${value}, got ${envelope.values[index]}`);
   });
 });
+
+test('envelope averages independent stereo channels consistently', () => {
+  const left = Float32Array.from([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]);
+  const right = Float32Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  const stereo = {
+    length: left.length,
+    sampleRate: 1000,
+    numberOfChannels: 2,
+    getChannelData(channel) { return channel === 0 ? left : right; }
+  };
+  const envelope = createDialogueMouthEnvelope(stereo, {
+    windowMs: 8, hopMs: 8, noiseFloor: 0, sensitivity: 1, attack: 1, release: 1
+  });
+  const expectedRms = Math.sqrt((left.reduce((sum, value) => sum + value * value, 0)) / (left.length * 2));
+  assert.ok(Math.abs(envelope.values[0] - expectedRms) < 1e-6);
+});
