@@ -40,7 +40,15 @@ export function normalizeScene(input = {}, index = 0) {
           evidence: text(scene.causalLink.evidence, 1_200)
         }
       : null,
-    stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => ({\n      entityType: text(change.entityType, 20),\n      entityId: text(change.entityId, 120),\n      property: text(change.property, 40),\n      previousValue: change.previousValue == null ? null : text(change.previousValue, 160),\n      value: change.value == null ? null : text(change.value, 160),\n      actorId: text(change.actorId, 120),\n      evidence: text(change.evidence, 1_200)\n    })) : [],\n    interaction: scene.interaction && typeof scene.interaction === 'object' && !Array.isArray(scene.interaction)
+    stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => ({
+      entityType: text(change.entityType, 20),
+      entityId: text(change.entityId, 120),
+      property: text(change.property, 40),
+      previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
+      value: change.value == null ? null : text(change.value, 160),
+      actorId: text(change.actorId, 120),
+      evidence: text(change.evidence, 1_200)
+    })) : [],    interaction: scene.interaction && typeof scene.interaction === 'object' && !Array.isArray(scene.interaction)
       ? {
           type: text(scene.interaction.type, 40),
           actorId: text(scene.interaction.actorId, 120),
