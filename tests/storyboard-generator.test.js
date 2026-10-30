@@ -122,3 +122,29 @@ test('builds a cast automatically from natural character introductions', () => {
   assert.deepEqual(result.characterBible.map(item => item.characterId), ['Рыжик', 'Снежок']);
   assert.deepEqual(result.scenes[1].characters, ['Рыжик', 'Снежок']);
 });
+
+
+test('infers a face-to-face interaction from dialogue in a two-character scene', () => {
+  const idea = [
+    'Сцена 1. Встреча',
+    'Рыжик встречает Снежка. Снежок говорит: «Не трогай кристалл!»'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.deepEqual(result.scenes[0].characters, ['Рыжик', 'Снежок']);
+  assert.equal(result.scenes[0].interactions[0].type, 'talk_to');
+  assert.deepEqual(result.scenes[0].interactions[0].participants, ['Рыжик', 'Снежок']);
+});
+
+test('infers approach movement only when the story describes approaching', () => {
+  const idea = [
+    'Сцена 1. Встреча',
+    'Рыжик подходит к Снежку и осторожно останавливается рядом.'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.equal(result.scenes[0].interactions[0].type, 'approach');
+});
+
+test('does not invent multi-character interactions in a single-character scene', () => {
+  const result = buildStoryboardFromText('Сцена 1. Лес\nРыжик гуляет по лесу.', 'ru', 'Foxy');
+  assert.deepEqual(result.scenes[0].interactions, []);
+});
