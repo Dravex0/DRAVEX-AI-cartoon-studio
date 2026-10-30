@@ -61,7 +61,14 @@ export function createDialogueMouthEnvelope(audioBuffer, { windowMs = 32, hopMs 
     const center = frame * hopSamples;
     const nextStart = Math.max(0, center - halfWindow);
     const nextEnd = Math.min(length, center + halfWindow + 1);
-    if (nextStart > windowStart) removeRange(windowStart, nextStart);
+    if (frame > 0 && nextStart >= windowEnd) {
+      sumSquares = 0;
+      count = 0;
+      windowStart = nextStart;
+      windowEnd = nextStart;
+    } else if (nextStart > windowStart) {
+      removeRange(windowStart, Math.min(nextStart, windowEnd));
+    }
     if (nextEnd > windowEnd) addRange(windowEnd, nextEnd);
     windowStart = nextStart;
     windowEnd = nextEnd;
