@@ -15,7 +15,6 @@ function similarity(left, right) {
 }
 function cameraShotType(camera) {
   const value = String(camera ?? '').toLowerCase();
-  const cyrillic = '[а-яёіїєґ]*';
   if (/extreme close|extreme close-up|\becu\b|экстремальн[а-яёіїєґ]*\s+крупн[а-яёіїєґ]*\s+план|сверхкрупн[а-яёіїєґ]*\s+план/.test(value)) return 'extreme-close-up';
   if (/\bmacro\b|\bclose[- ]?up\b|\bclose shot\b|крупн[а-яёіїєґ]*\s+план|перв[а-яёіїєґ]*\s+план|primer plano/.test(value)) return 'close-up';
   if (/\bwide\b|establishing shot|общ[а-яёіїєґ]*\s+план|загальн[а-яёіїєґ]*\s+план|plano general/.test(value)) return 'wide';
