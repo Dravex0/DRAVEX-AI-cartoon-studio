@@ -60,6 +60,15 @@ test('rejects completed jobs without a usable image', async () => {
   await assert.rejects(() => generateImageWithHorde({ prompt: 'A fox.', fetchImpl, pollIntervalMs: 0 }), /no usable image/);
 });
 
+test('rejects non-HTTPS result URLs', async () => {
+  const fetchImpl = async url => {
+    if (url.endsWith('/generate/async')) return response({ id: 'bad-url' }, 202);
+    if (url.endsWith('/generate/check/bad-url')) return response({ done: true, finished: 1 });
+    return response({ generations: [{ img: 'http://untrusted.example.test/image.webp' }] });
+  };
+  await assert.rejects(() => generateImageWithHorde({ prompt: 'A fox.', fetchImpl, pollIntervalMs: 0 }), /unsupported image result/);
+});
+
 test('cancels an unfinished request when the volunteer queue times out', async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {
