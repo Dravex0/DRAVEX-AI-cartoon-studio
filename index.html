@@ -105,9 +105,45 @@ es:{titles:['El comienzo','Un giro','El siguiente paso'],middle:'Un nuevo detall
 };
 const storyLabels={en:'Scene',ru:'Сцена',uk:'Сцена',es:'Escena'};
 function storyLanguage(){return $('language').value||'en'}
-const sceneEditorLabels={en:{title:'Selected scene title',description:'Selected scene description',apply:'Apply scene edits',add:'Add scene',del:'Delete scene',titlePlaceholder:'Scene title',descriptionPlaceholder:'Describe what happens in this scene',limit:'You can add up to 12 scenes in this prototype.',minimum:'Keep at least one scene.',updated:'Scene updated.',added:'New scene added.',deleted:'Scene deleted.'},ru:{title:'Название выбранной сцены',description:'Описание выбранной сцены',apply:'Применить изменения',add:'Добавить сцену',del:'Удалить сцену',titlePlaceholder:'Название сцены',descriptionPlaceholder:'Опиши, что происходит в этой сцене',limit:'В этой версии можно добавить не более 12 сцен.',minimum:'Нужно оставить хотя бы одну сцену.',updated:'Сцена обновлена.',added:'Новая сцена добавлена.',deleted:'Сцена удалена.'}};
-function applySceneEditorLanguage(){const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;$('sceneTitleLabel').textContent=t.title;$('sceneDescriptionLabel').textContent=t.description;$('applyScene').textContent=t.apply;$('addScene').textContent=t.add;$('deleteScene').textContent=t.del;$('sceneTitle').placeholder=t.titlePlaceholder;$('sceneDescription').placeholder=t.descriptionPlaceholder}
-function syncSceneEditor(){ $('sceneTitle').value=titles[sceneIndex]||''; $('sceneDescription').value=descriptions[sceneIndex]||''; $('sceneTitleLabel').textContent=(sceneEditorLabels[uiLang]||sceneEditorLabels.en).title; }
+const sceneEditorLabels={
+en:{title:'Selected scene title',description:'Selected scene description',apply:'Apply scene edits',add:'Add scene',del:'Delete scene',titlePlaceholder:'Scene title',descriptionPlaceholder:'Describe what happens in this scene',limit:'You can add up to 12 scenes in this prototype.',minimum:'Keep at least one scene.',updated:'Scene updated.',added:'New scene added.',deleted:'Scene deleted.',production:'Scene production instructions',camera:'Camera / composition',image:'Image prompt · what the still frame must show',motion:'Motion prompt · what changes over time',start:'Start state',end:'End state',negative:'Avoid / negative prompt',continuity:'Continuity lock · details that must not change',compiled:'Preview of the final AI instructions',imagePreview:'Image generation instruction',motionPreview:'Animation instruction',characters:'Character consistency reference',noCharacters:'No character bible was returned. Add character details in the story brief or edit the scene prompts manually.',ready:'Scene is ready for image and motion generation.',incomplete:'Production brief incomplete: ',missing:{'missing-image-prompt':'image prompt','missing-motion-prompt':'motion prompt','missing-camera-plan':'camera plan','missing-start-state':'start state','missing-end-state':'end state'}},
+ru:{title:'Название выбранной сцены',description:'Описание выбранной сцены',apply:'Применить изменения',add:'Добавить сцену',del:'Удалить сцену',titlePlaceholder:'Название сцены',descriptionPlaceholder:'Опиши, что происходит в этой сцене',limit:'В этой версии можно добавить не более 12 сцен.',minimum:'Нужно оставить хотя бы одну сцену.',updated:'Сцена обновлена.',added:'Новая сцена добавлена.',deleted:'Сцена удалена.',production:'Инструкции для создания сцены',camera:'Камера и композиция',image:'Промпт изображения · что должно быть на кадре',motion:'Промпт движения · что меняется во времени',start:'Начальное состояние',end:'Конечное состояние',negative:'Чего избегать · negative prompt',continuity:'Фиксация постоянства · что нельзя менять',compiled:'Предпросмотр итоговых инструкций для AI',imagePreview:'Инструкция для генерации изображения',motionPreview:'Инструкция для анимации',characters:'Постоянство внешности персонажей',noCharacters:'Character Bible не получен. Добавь описание персонажей в сюжет или заполни промпты сцены вручную.',ready:'Сцена подготовлена для генерации изображения и движения.',incomplete:'Не хватает данных для подготовки сцены: ',missing:{'missing-image-prompt':'промпт изображения','missing-motion-prompt':'промпт движения','missing-camera-plan':'план камеры','missing-start-state':'начальное состояние','missing-end-state':'конечное состояние'}}}
+};
+function applySceneEditorLanguage(){
+const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;
+$('sceneTitleLabel').textContent=t.title;$('sceneDescriptionLabel').textContent=t.description;$('applyScene').textContent=t.apply;$('addScene').textContent=t.add;$('deleteScene').textContent=t.del;
+$('sceneTitle').placeholder=t.titlePlaceholder;$('sceneDescription').placeholder=t.descriptionPlaceholder;
+const labels={production:'productionSummary',camera:'sceneCameraLabel',image:'sceneImagePromptLabel',motion:'sceneMotionPromptLabel',start:'sceneStartStateLabel',end:'sceneEndStateLabel',negative:'sceneNegativePromptLabel',continuity:'sceneContinuityLockLabel',compiled:'compiledPromptSummary',imagePreview:'imagePromptPreviewLabel',motionPreview:'motionPromptPreviewLabel',characters:'characterBibleSummary'};
+for(const [key,id] of Object.entries(labels))$(id).textContent=t[key];
+}
+function renderCharacterBible(){
+const box=$('characterBibleList');box.replaceChildren();
+if(!characterBible.length){const empty=document.createElement('p');empty.className='muted';empty.textContent=(sceneEditorLabels[uiLang]||sceneEditorLabels.en).noCharacters;box.appendChild(empty);return}
+characterBible.forEach(entry=>{
+const card=document.createElement('div');card.className='character-card';
+const title=document.createElement('strong');title.textContent=String(entry.characterId||'Character');
+const details=document.createElement('small');details.textContent=[entry.visualDescription,entry.clothing,entry.colors,entry.distinctiveFeatures].filter(Boolean).join(' · ');
+card.append(title,details);box.appendChild(card);
+});
+}
+function syncSceneEditor(){
+const meta=sceneMetadata[sceneIndex]||{};
+$('sceneTitle').value=titles[sceneIndex]||'';
+$('sceneDescription').value=descriptions[sceneIndex]||'';
+$('sceneCamera').value=meta.camera||'';
+$('sceneImagePrompt').value=meta.imagePrompt||meta.prompt||descriptions[sceneIndex]||'';
+$('sceneMotionPrompt').value=meta.motionPrompt||meta.visibleAction||descriptions[sceneIndex]||'';
+$('sceneStartState').value=meta.startState||'';
+$('sceneEndState').value=meta.endState||'';
+$('sceneNegativePrompt').value=meta.negativePrompt||'No extra characters, no character redesign, no duplicate body parts, no text or watermark.';
+$('sceneContinuityLock').value=meta.continuityLock||'';
+const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;
+const readiness=validateSceneProductionReadiness({...meta,title:titles[sceneIndex],imagePrompt:$('sceneImagePrompt').value,motionPrompt:$('sceneMotionPrompt').value,camera:$('sceneCamera').value,startState:$('sceneStartState').value,endState:$('sceneEndState').value});
+$('sceneReadiness').textContent=readiness.ready?t.ready:t.incomplete+readiness.issues.map(issue=>t.missing[issue.code]||issue.field).join(', ');
+$('imagePromptPreview').textContent=buildImageGenerationPrompt({...meta,title:titles[sceneIndex],imagePrompt:$('sceneImagePrompt').value,camera:$('sceneCamera').value,negativePrompt:$('sceneNegativePrompt').value,continuityLock:$('sceneContinuityLock').value},characterBible);
+$('motionPromptPreview').textContent=buildMotionGenerationPrompt({...meta,title:titles[sceneIndex],motionPrompt:$('sceneMotionPrompt').value,camera:$('sceneCamera').value,startState:$('sceneStartState').value,endState:$('sceneEndState').value,negativePrompt:$('sceneNegativePrompt').value,continuityLock:$('sceneContinuityLock').value},characterBible);
+renderCharacterBible();
+}
 function updateStoryQA(){
   const safeText=value=>{
     if(value===null||value===undefined)return '';
@@ -175,7 +211,16 @@ function updateStoryQA(){
   }
   return {...qa,issues,scenes,canContinue:errors===0};
 }
-$('applyScene').onclick=()=>{const title=$('sceneTitle').value.trim(),description=$('sceneDescription').value.trim();if(!title||!description){$('status').textContent=uiLang==='ru'?'Заполни название и описание сцены.':'Please enter both a scene title and description.';return}titles[sceneIndex]=title;descriptions[sceneIndex]=description;sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),title,description,prompt:description,visibleAction:description,camera:''};$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+title;renderScenes();updateStoryQA();if(!playing)draw();$('status').textContent=(sceneEditorLabels[uiLang]||sceneEditorLabels.en).updated};
+$('applyScene').onclick=()=>{
+const title=$('sceneTitle').value.trim(),description=$('sceneDescription').value.trim();
+if(!title||!description){$('status').textContent=uiLang==='ru'?'Заполни название и описание сцены.':'Please enter both a scene title and description.';return}
+const imagePrompt=$('sceneImagePrompt').value.trim()||description;
+const motionPrompt=$('sceneMotionPrompt').value.trim()||description;
+titles[sceneIndex]=title;descriptions[sceneIndex]=description;
+sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),title,description,prompt:imagePrompt,imagePrompt,visibleAction:motionPrompt,motionPrompt,camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim()};
+$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+title;
+renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=(sceneEditorLabels[uiLang]||sceneEditorLabels.en).updated
+};
 $('addScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length>=12){$('status').textContent=t.limit;return}titles.push(uiLang==='ru'?'Новая сцена':'New scene');descriptions.push(uiLang==='ru'?'Добавь описание этой сцены.':'Add a description for this scene.');sceneMetadata.push({title:titles[titles.length-1],description:descriptions[descriptions.length-1],prompt:descriptions[descriptions.length-1],visibleAction:descriptions[descriptions.length-1],camera:''});sceneIndex=titles.length-1;$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();$('status').textContent=t.added};
 $('deleteScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length<=1){$('status').textContent=t.minimum;return}titles.splice(sceneIndex,1);descriptions.splice(sceneIndex,1);sceneMetadata.splice(sceneIndex,1);sceneIndex=Math.min(sceneIndex,titles.length-1);$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=t.deleted};
 
