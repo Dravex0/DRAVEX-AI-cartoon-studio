@@ -56,3 +56,10 @@ test("audit recognizes configured shared test files", () => {
   ]});
   assert.equal(report.findingCount, 0);
 });
+
+test("engineering status distinguishes provider contract from a connected model", () => {
+  const status = getEngineeringSystemStatus();
+  assert.ok(status.capabilities.includes("code-provider-contract"));
+  assert.equal(status.executionMode, "no-external-model");
+  assert.ok(status.limitations.some((item) => item.includes("model adapter is connected")));
+});
