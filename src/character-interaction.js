@@ -1,5 +1,4 @@
-const clean = value => String(value ?? '').trim().slice(0, 120);
-const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\]/g, '\$&').replaceAll('$', '\$');
+const escapeRegExp = value => value.replace(/[.*+?^{}()|[\]\\]/g, '\\$&').replaceAll('$', '\\$');
 
 const RELATIONS = {
   en: [
@@ -45,11 +44,13 @@ const RELATIONS = {
 };
 
 function occurrences(source, name) {
-  const pattern = new RegExp('(^|[^\\\\p{L}\\\\p{N}_])(' + escapeRegExp(name) + ')(?=$|[^\\\\p{L}\\\\p{N}_])', 'giu');
-  return [...source.matchAll(pattern)].map(match => {
-    const start = match.index + match[1].length;
-    return { start, end: start + match[2].length, name };
-  });
+  const pattern = new RegExp('(^|[^\\p{L}\\p{N}_])(' + escapeRegExp(name) + ')(?=$|[^\\p{L}\\p{N}_])', 'giu');
+  const result = [];
+  for (const match of source.matchAll(pattern)) {
+    const offset = match.index + match[1].length;
+    result.push({ start: offset, end: offset + match[2].length, name });
+  }
+  return result;
 }
 
 function verbOccurrences(source, type, pattern) {
