@@ -8,6 +8,7 @@ A free-first prototype for turning story text into a structured storyboard. The 
 - `src/story-qa.js` performs deterministic text-level checks for missing actions, duplicate IDs, repetitive prompts, duration normalization, and dialogue/character mismatches. It does not inspect rendered video or claim model-level understanding.
 - `src/scene-production.js` assembles separate still-image and motion prompts using camera direction, start/end states, negative constraints, and matching Character Bible entries.
 - `src/device-capabilities.js` checks HTTPS, WebGPU adapter availability, approximate browser memory, CPU threads, and browser storage before any future local model load. This is advisory only; it does not download weights or guarantee model compatibility.
+- `src/ai-horde-image-provider.js` optionally generates one still image through the free, volunteer-powered AI Horde queue. It sends text prompts only, never source photos or videos, and is gated by an explicit in-app consent checkbox.
 - `fixtures/aster-awakening.js` contains an eight-scene, 23-second continuity fixture.
 - `tests/story-qa.test.js` exercises normalization and storyboard QA behavior.
 - `.github/workflows/quality.yml` runs syntax checks, tests, and a production build on pushes and pull requests.
@@ -35,6 +36,8 @@ The Vite build is a separate development bundle. The root `index.html` is the pu
 - Gemini can optionally write storyboard scenes, but this does not generate scene artwork or animation.
 - The scene editor exposes editable image/motion prompts, continuity locks, and a preview of the assembled AI instructions. These are pre-production instructions, not an active image/video generation provider.
 - The optional local AI hardware check does not prove that a particular diffusion model will fit or run on the device.
+- AI Horde is a remote community queue, not local inference. Anonymous requests have low priority and may be slow; the service shares anonymous requests with LAION and may collect prompt and IP/usage data. The app requires explicit consent before sending a prompt. See the [AI Horde privacy policy](https://horde.aivo.chat/privacy).
+- Images returned by AI Horde are displayed beside the selected scene. The current WebM prototype export still records the procedural canvas only, not these generated images.
 - The canvas preview uses procedural shapes and camera framing; it is not full AI-generated animation.
 - Voice synthesis, lip-sync, music generation, and production-grade audiovisual export are not implemented yet.
 - No paid API is required. Gemini is optional and limited to Google's Free Tier quota when configured.
