@@ -282,3 +282,35 @@ test('rolls back all audio when one track fails to play', async () => {
   await session.cleanup();
   assert.ok(h.events.includes('close'));
 });
+
+
+test('rolls back audio when a media element throws synchronously from play', async () => {
+  const h = createHarness();
+  const workingTrack = {
+    currentTime: 2,
+    async play() { h.events.push('working-play'); },
+    pause() { h.events.push('working-pause'); }
+  };
+  const throwingTrack = {
+    currentTime: 6,
+    play() { h.events.push('throwing-play'); throw new Error('Synchronous play failure'); },
+    pause() { h.events.push('throwing-pause'); }
+  };
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioTracks: [
+      { audioElement: workingTrack, volume: 1 },
+      { audioElement: throwingTrack, volume: 1 }
+    ],
+    AudioContextClass: h.FakeAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  await assert.rejects(() => session.start(), /Synchronous play failure/);
+  assert.equal(workingTrack.currentTime, 0);
+  assert.equal(throwingTrack.currentTime, 0);
+  assert.ok(h.events.includes('working-pause'));
+  assert.ok(h.events.includes('throwing-pause'));
+  await session.cleanup();
+  assert.ok(h.events.includes('close'));
+});
