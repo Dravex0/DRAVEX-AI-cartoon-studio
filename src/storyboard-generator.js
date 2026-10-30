@@ -95,11 +95,11 @@ export function inferSceneEmotion(sceneText = '') {
   const source = String(sceneText ?? '').toLocaleLowerCase().slice(0, 4000);
   if (!source.trim()) return 'neutral';
   const cues = [
-    ['fear', /(?:боится|испугал|испугал[асьи]?|страшно|ужас|в ужасе|панику|тревож|fearful|afraid|scared|terrified|frightened|miedo|asustad[oa]|teme|temor)/iu],
-    ['anger', /(?:злится|разозлил|разгневан|сердит|ярост|гнев|кричит от злости|angry|furious|annoyed|怒|enojad[oa]|furios[oa])/iu],
-    ['sad', /(?:груст|печал|плачет|сл[её]зы|расстроен|одинок|sad|sorrow|crying|tears|unhappy|triste|llora|lágrimas)/iu],
-    ['happy', /(?:радост|счастлив|улыбается|сме[её]тся|весел|доволен|happy|joyful|delighted|laughs?|smiles?|excited|feliz|alegr[еí]a|sonr[ií]e|ríe)/iu],
-    ['surprised', /(?:удивил|удивл[её]н|изумл[её]н|ошеломл[её]н|неожиданно|воскликнул|surprised|astonished|amazed|shocked|sorprendid[oa]|asombrad[oa])/iu]
+    ['fear', /(?:боится|испугал|испугал(?:ся|ась|ись)?|страшно|ужас|в ужасе|панику|тревож|боїться|злякався|злякалася|налякан|fearful|afraid|scared|terrified|frightened|miedo|asustad[oa]|teme|temor)/iu],
+    ['anger', /(?:злится|разозлил|разгневан|сердит|ярост|гнев|злий|сердиться|розлютився|кричит от злости|angry|furious|annoyed|怒|enojad[oa]|furios[oa])/iu],
+    ['sad', /(?:груст|печал|плачет|сл[её]зы|расстроен|одинок|сумує|сумний|сумна|плаче|sad|sorrow|crying|tears|unhappy|triste|llora|lágrimas)/iu],
+    ['happy', /(?:радост|счастлив|улыбается|сме[её]тся|весел|доволен|щаслив|радіє|усміхається|happy|joyful|delighted|laughs?|smiles?|excited|feliz|alegr[еí]a|sonr[ií]e|ríe)/iu],
+    ['surprised', /(?:удивил|удивл[её]н|изумл[её]н|ошеломл[её]н|здивован|здивувал|неожиданно|воскликнул|surprised|astonished|amazed|shocked|sorprendid[oa]|asombrad[oa])/iu]
   ];
   for (const [emotion, pattern] of cues) if (pattern.test(source)) return emotion;
   return 'neutral';
