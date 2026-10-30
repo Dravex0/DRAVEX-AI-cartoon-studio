@@ -176,3 +176,29 @@ test('locks directed character interaction and keeps actor-target direction in l
   assert.ok(prompt.includes('"actorId":"Bird"'));
   assert.ok(prompt.includes('"targetId":"Foxy"'));
 });
+
+
+test('locks source-grounded causal links against local model rewriting', async () => {
+  const causalPlan = {
+    ...basePlan,
+    scenes: basePlan.scenes.map((scene, index) => index === 1 ? {
+      ...scene,
+      causalLink: {
+        type: 'consequence', causeSceneId: basePlan.scenes[0].id,
+        effectSceneId: scene.id, marker: 'As a result',
+        causeEvidence: basePlan.scenes[0].storyDetail,
+        evidence: 'As a result, the forest becomes dark.'
+      }
+    } : scene)
+  };
+  let prompt = '';
+  const runtime = runtimeReturning(goodScenes, {
+    generate: async value => {
+      prompt = value;
+      return { text: JSON.stringify({ scenes: goodScenes }), modelId: 'mock-local-model', backend: 'wasm' };
+    }
+  });
+  const result = await directStoryboardWithLocalAI({ runtime, basePlan: causalPlan });
+  assert.ok(prompt.includes('"lockedCausalLink"'));
+  assert.deepEqual(result.scenes[1].causalLink, causalPlan.scenes[1].causalLink);
+});
