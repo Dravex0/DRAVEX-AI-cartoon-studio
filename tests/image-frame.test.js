@@ -54,9 +54,9 @@ test('drawImageCover supports video dimensions when drawing generated scene clip
   assert.equal(drawImageCover(context, video, 640, 420), true);
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0], video);
-  assert.equal(calls[0][1], 137.1428571428571);
+  assert.ok(Math.abs(calls[0][1] - 137.1428571428571) < 1e-9);
   assert.equal(calls[0][2], 0);
-  assert.equal(calls[0][3], 1645.7142857142858);
+  assert.ok(Math.abs(calls[0][3] - 1645.7142857142858) < 1e-9);
   assert.equal(calls[0][4], 1080);
   assert.equal(calls[0][7], 640);
   assert.equal(calls[0][8], 420);
