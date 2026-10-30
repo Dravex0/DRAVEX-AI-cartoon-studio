@@ -146,7 +146,7 @@ export function parseStoryBrief(input) {
 
   // Also recognize natural-language introductions such as "лисёнок по имени Рыжик"
   // and "a rabbit named Snowball", so users do not need a separate cast section.
-  const namedCharacterPattern = /([^.!?。！？\n]{0,140}?)\b(?:по имени|на имя|на ім'я|named)\s+([\p{L}][\p{L}'’-]{1,39})/giu;
+  const namedCharacterPattern = /([^.!?。！？\n]{0,140}?)(?:по имени|на имя|на ім'я|named)\s+([\p{L}][\p{L}'’-]{1,39})/giu;
   for (const match of rawText.matchAll(namedCharacterPattern)) {
     const characterId = clean(match[2], 80);
     if (!characterId || characterProfiles.some(item => item.characterId.toLowerCase() === characterId.toLowerCase())) continue;
