@@ -109,8 +109,7 @@ export function getSceneCharacterGesturePose(scene = {}, timeSeconds = 0, charac
     const reach = participantIndex === 0 ? 1 : Math.max(0, Math.min(1, (progress - 0.35) / 0.55));
     const angle = 82 * (participantIndex === 0 ? eased : reach);
     if (['gesture_to', 'give_object', 'receive_object', 'touch'].includes(event.type)) {
-      if (participantIndex === 0) pose.rightArm = angle;
-      else pose.leftArm = -angle;
+      pose.rightArm = angle;
       pose.active = true;
       pose.interaction = event.type;
     } else if (event.type === 'react_to') {
