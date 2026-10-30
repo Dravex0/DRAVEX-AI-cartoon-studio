@@ -94,7 +94,7 @@ import { createAudioExportSession } from "./src/audio-export.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./src/scene-production.js";
 import { upsertCharacterReference } from "./src/character-reference.js";
 import { CHARACTER_MOTION_CLIPS, sampleCharacterMotion, resolveCharacterMotionAction } from "./src/character-motion.js";
-import { inferSceneEmotion } from "./src/storyboard-generator.js";
+import { inferSceneEmotion, sampleSceneEmotion } from "./src/storyboard-generator.js";
 import { getSceneTransitionProgress } from "./src/scene-transition.js";
 import { getSceneCharacterLayout, getSceneObjectHandoffs, getSceneCharacterGesturePose } from "./src/character-layout.js";
 const translations={
@@ -128,7 +128,7 @@ $('audioVolume').addEventListener('input',()=>{$('audioVolumeValue').textContent
 
 const canvas=$('canvas'),ctx=canvas.getContext('2d');let frame=0,playing=true,raf=0,sceneIndex=0;const transitionCanvas=document.createElement('canvas');transitionCanvas.width=canvas.width;transitionCanvas.height=canvas.height;const transitionCtx=transitionCanvas.getContext('2d');let sceneTransitionStartFrame=0,sceneTransitionActive=false;let sceneMotionSceneIndex=-1,sceneMotionStartFrame=0;let titles=[...translations[uiLang].sceneTitles];let descriptions=[...translations[uiLang].sceneDescriptions];let sceneMetadata=titles.map((title,index)=>({title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''}));let characterBible=[];
 function getSceneAction(index){return detectSceneAction((titles[index]||'')+' '+(descriptions[index]||''));}
-function getSceneEmotion(index){const scene=sceneMetadata[index]||{};return ['neutral','happy','sad','fear','anger','surprised'].includes(scene.emotion)?scene.emotion:inferSceneEmotion((titles[index]||'')+' '+(descriptions[index]||''));}
+function getSceneEmotion(index,timeSeconds=0){const scene=sceneMetadata[index]||{};const fallback=['neutral','happy','sad','fear','anger','surprised'].includes(scene.emotion)?scene.emotion:inferSceneEmotion((titles[index]||'')+' '+(descriptions[index]||''));return sampleSceneEmotion(scene.emotionTimeline,timeSeconds,fallback);}
 class ParticleEmitter {
 constructor(){this.particles=[];this.maxParticles=160}
 emit(x,y,count=5,color='#ffe58a'){
@@ -207,7 +207,7 @@ else if(action==='talk'){fy+=Math.sin(t*5)*2}
 else if(action==='surprised'){fy-=Math.abs(Math.sin(t*2))*5}
 else if(action==='sad'){fy+=Math.abs(Math.sin(t*1.5))*3}
 const toRadians=value=>value*Math.PI/180;
-const emotion=getSceneEmotion(sceneIndex);const emotionExpression={happy:'happy',sad:'sad',fear:'surprised',anger:'neutral',surprised:'surprised',neutral:'neutral'}[emotion];const expression=['happy','sad','surprised','talk'].includes(action)?action:emotionExpression||characterPose.expression;
+const emotion=getSceneEmotion(sceneIndex,sceneMotionProgress*sceneDuration);const emotionExpression={happy:'happy',sad:'sad',fear:'surprised',anger:'neutral',surprised:'surprised',neutral:'neutral'}[emotion];const expression=['happy','sad','surprised','talk'].includes(action)?action:emotionExpression||characterPose.expression;
 ctx.save();
 ctx.translate(fx,fy);
 ctx.rotate(scenePose[2]+characterPose.rotation*Math.PI/180+(sceneIndex===2?Math.sin(t*1.8)*.04:0)+(action==='dance'?Math.sin(t*3.4)*.2:action==='turn'?Math.sin(t*2)*.5:0));
