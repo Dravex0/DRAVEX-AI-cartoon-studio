@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { inferCharacterInteraction } from '../src/character-interaction.js';
+
+test('extracts actor and target from explicit English help and guidance', () => {
+  assert.deepEqual(
+    inferCharacterInteraction('Bird guides Foxy home.', ['Foxy', 'Bird'], 'en'),
+    { type: 'guide', actorId: 'Bird', targetId: 'Foxy', evidence: 'Bird guides Foxy' }
+  );
+});
+
+test('extracts Russian directed help without reversing participants', () => {
+  const result = inferCharacterInteraction('Сова помогает Роботу Мико найти дорогу.', ['Робот Мико', 'Сова'], 'ru');
+  assert.equal(result.type, 'help');
+  assert.equal(result.actorId, 'Сова');
+  assert.equal(result.targetId, 'Робот Мико');
+});
+
+test('extracts Ukrainian and Spanish interactions', () => {
+  const uk = inferCharacterInteraction('Сова допомагає Мико знайти шлях.', ['Сова', 'Мико'], 'uk');
+  const es = inferCharacterInteraction('El ave guía al zorro a casa.', ['ave', 'zorro'], 'es');
+  assert.equal(uk?.type, 'help');
+  assert.equal(uk?.actorId, 'Сова');
+  assert.equal(es?.type, 'guide');
+  assert.equal(es?.actorId, 'ave');
+  assert.equal(es?.targetId, 'zorro');
+});
+
+test('does not invent a relationship when a participant is missing or ambiguous', () => {
+  assert.equal(inferCharacterInteraction('Bird helps the lost fox.', ['Bird', 'Foxy'], 'en'), null);
+  assert.equal(inferCharacterInteraction('Bird sees Foxy.', ['Bird', 'Foxy'], 'en'), null);
+  assert.equal(inferCharacterInteraction('Bird helps Bird.', ['Bird', 'Foxy'], 'en'), null);
+});
+
+test('ignores regex metacharacters in saved character IDs', () => {
+  const result = inferCharacterInteraction('A+B helps Foxy.', ['A+B', 'Foxy'], 'en');
+  assert.equal(result?.actorId, 'A+B');
+});
