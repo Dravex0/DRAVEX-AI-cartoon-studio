@@ -60,3 +60,11 @@ test('extracts named character profiles from the character section', () => {
   assert.equal(brief.characterProfiles.length, 2);
   assert.match(brief.characterProfiles[1].visualDescription, /белый кролик/);
 });
+
+
+test('detects character names introduced naturally without a cast heading', () => {
+  const brief = parseStoryBrief('Маленький рыжий лисёнок по имени Рыжик гуляет по лесу. Из-за дерева выбегает маленький белый кролик по имени Снежок.');
+  assert.deepEqual(brief.characters, ['Рыжик', 'Снежок']);
+  assert.match(brief.characterProfiles[0].visualDescription, /рыжий лисёнок/);
+  assert.match(brief.characterProfiles[1].visualDescription, /белый кролик/);
+});
