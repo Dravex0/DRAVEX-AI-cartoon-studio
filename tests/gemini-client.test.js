@@ -21,7 +21,10 @@ test('uses the free-tier model and returns normalized animation-ready scene data
   assert.equal(result.scenes.length, 3);
   assert.equal(result.scenes[2].visibleAction, 'Action 3');
   assert.deepEqual(result.scenes[0].characters, ['Foxy']);
-  assert.equal(result.scenes[0].durationSeconds, 3);\n  assert.equal(result.scenes[0].imagePrompt, 'Still frame 1');\n  assert.equal(result.scenes[0].motionPrompt, 'Motion 1');\n  assert.equal(result.scenes[0].continuityLock, 'Foxy remains orange');
+  assert.equal(result.scenes[0].durationSeconds, 3);
+  assert.equal(result.scenes[0].imagePrompt, 'Still frame 1');
+  assert.equal(result.scenes[0].motionPrompt, 'Motion 1');
+  assert.equal(result.scenes[0].continuityLock, 'Foxy remains orange');
   assert.equal(result.scenes[0].dialogue[0].text, 'Hello');
 });
 
