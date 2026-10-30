@@ -183,6 +183,7 @@ test('locks source-grounded causal links against local model rewriting', async (
     ...basePlan,
     scenes: basePlan.scenes.map((scene, index) => index === 1 ? {
       ...scene,
+      storyDetail: 'As a result, the forest becomes dark.',
       causalLink: {
         type: 'consequence', causeSceneId: basePlan.scenes[0].id,
         effectSceneId: scene.id, marker: 'As a result',
@@ -199,6 +200,7 @@ test('locks source-grounded causal links against local model rewriting', async (
     }
   });
   const result = await directStoryboardWithLocalAI({ runtime, basePlan: causalPlan });
+  assert.equal(result.usedLocalModel, true);
   assert.ok(prompt.includes('"lockedCausalLink"'));
   assert.deepEqual(result.scenes[1].causalLink, causalPlan.scenes[1].causalLink);
 });
