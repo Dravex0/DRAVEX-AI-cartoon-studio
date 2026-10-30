@@ -90,7 +90,7 @@ export async function directStoryboardWithLocalAI({
       storyEventType: base.storyEventType,
       sourceStoryText: base.sourceStoryText,
       sourceEvents: base.sourceEvents,
-      characters: base.characters,
+      characters: Array.isArray(base.characters) && base.characters.length ? base.characters : [clean(character, 120)],
       visibleAction: clean(scene.visibleAction, 1_000),
       camera: clean(scene.camera, 1_000),
       imagePrompt: clean(scene.imagePrompt, 4_000) || base.imagePrompt || base.prompt,
