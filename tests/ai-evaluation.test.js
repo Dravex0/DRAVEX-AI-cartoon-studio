@@ -104,3 +104,29 @@ test('does not score event chronology when source details are missing or duplica
   });
   assert.equal(report.metrics.sourceOrderConsistency, null);
 });
+
+test('accepts a directed interaction when both participants belong to the scene cast', () => {
+  const result = evaluateStoryboard({
+    scenes: [{
+      id: 'scene_1', title: 'Help', visibleAction: 'Bird helps Foxy cross the river safely.',
+      camera: 'Wide tracking shot.', characters: ['Bird', 'Foxy'],
+      interaction: { type: 'help', actorId: 'Bird', targetId: 'Foxy', evidence: 'Bird helps Foxy' }
+    }],
+    expectedSceneCount: 1
+  });
+  assert.equal(result.metrics.interactionIntegrity, 100);
+  assert.equal(result.issues.some(issue => issue.code === 'invalid-character-interaction'), false);
+});
+
+test('flags an interaction that names a participant outside the scene cast', () => {
+  const result = evaluateStoryboard({
+    scenes: [{
+      id: 'scene_1', title: 'Help', visibleAction: 'Bird helps Foxy cross the river safely.',
+      camera: 'Wide tracking shot.', characters: ['Bird', 'Foxy'],
+      interaction: { type: 'help', actorId: 'Wolf', targetId: 'Foxy', evidence: 'Wolf helps Foxy' }
+    }],
+    expectedSceneCount: 1
+  });
+  assert.equal(result.metrics.interactionIntegrity, 0);
+  assert.ok(result.issues.some(issue => issue.code === 'invalid-character-interaction'));
+});

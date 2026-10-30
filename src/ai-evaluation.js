@@ -112,6 +112,25 @@ export function evaluateStoryboard({
     });
   }
 
+  const interactionScenes = scenes.filter(scene => scene.interaction);
+  let interactionIntegrity = null;
+  if (interactionScenes.length) {
+    const validInteractions = interactionScenes.filter(scene => {
+      const interaction = scene.interaction;
+      const actor = String(interaction.actorId ?? '').toLocaleLowerCase();
+      const target = String(interaction.targetId ?? '').toLocaleLowerCase();
+      const cast = scene.characters.map(name => name.toLocaleLowerCase());
+      return Boolean(interaction.type && interaction.evidence && actor && target && actor !== target
+        && cast.includes(actor) && cast.includes(target));
+    }).length;
+    interactionIntegrity = percentage(validInteractions, interactionScenes.length);
+    if (interactionIntegrity < 100) issues.push({
+      skill: 'character-interaction',
+      code: 'invalid-character-interaction',
+      message: 'A directed character interaction has missing participants, evidence, or scene-cast membership.'
+    });
+  }
+
   let productionCompleteness = null;
   if (requireProductionFields) {
     const complete = scenes.filter(scene =>
@@ -142,6 +161,7 @@ export function evaluateStoryboard({
     sourceFidelity,
     sourceOrderConsistency,
     characterConsistency,
+    interactionIntegrity,
     productionCompleteness,
     stateCoverage: continuityReport?.metrics.stateCoverage ?? null,
     stateTransitionConsistency: continuityReport?.metrics.stateTransitionConsistency ?? null,

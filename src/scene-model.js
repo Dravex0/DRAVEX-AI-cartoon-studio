@@ -30,6 +30,14 @@ export function normalizeScene(input = {}, index = 0) {
     sourceStoryText: text(scene.sourceStoryText, 10_000),
     sourceEvents: uniqueStrings(scene.sourceEvents),
     characters: uniqueStrings(scene.characters ?? (scene.characterId ? [scene.characterId] : [])),
+    interaction: scene.interaction && typeof scene.interaction === 'object' && !Array.isArray(scene.interaction)
+      ? {
+          type: text(scene.interaction.type, 40),
+          actorId: text(scene.interaction.actorId, 120),
+          targetId: text(scene.interaction.targetId, 120),
+          evidence: text(scene.interaction.evidence, 500)
+        }
+      : null,
     location: text(scene.location, 500),
     timeOfDay: text(scene.timeOfDay, 120),
     visibleAction,
