@@ -95,6 +95,7 @@ import { buildExportTimeline } from "./src/export-timeline.js";
 import { createAudioExportSession } from "./src/audio-export.js";
 import { buildDialogueAudioSchedule } from "./src/dialogue-audio.js";
 import { parseDialogueAudioFilename, getDialogueAudioAssignmentKey, mapDialogueAudioAssignmentsToSchedule, pruneDialogueAudioAssignments } from "./src/dialogue-audio-assets.js";
+import { sampleDialogueMouthOpen } from "./src/dialogue-lip-sync.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./src/scene-production.js";
 import { upsertCharacterReference } from "./src/character-reference.js";
 import { CHARACTER_MOTION_CLIPS, sampleCharacterMotion, resolveCharacterMotionAction } from "./src/character-motion.js";
@@ -115,6 +116,17 @@ $('uiLanguage').addEventListener('change',()=>{uiLang=$('uiLanguage').value;writ
 $('style').addEventListener('change',()=>{if(!playing)draw()});
 let selectedMusicUrl='';
 const dialogueAudioAssignments=new Map();
+let exportLipSyncState=null;
+function getDialogueMouthOpen(dialogue,index){
+  if(!exportLipSyncState||!dialogue||!Number.isFinite(exportLipSyncState.startedAt))return null;
+  const cue=exportLipSyncState.schedule.find(item=>item.sceneIndex===index&&item.lineId===dialogue.id);
+  if(!cue)return null;
+  const buffer=exportLipSyncState.buffers.get(index+':'+cue.lineId);
+  if(!buffer)return null;
+  const elapsed=performance.now()-exportLipSyncState.startedAt-cue.startMs;
+  if(elapsed<0||elapsed>cue.endMs-cue.startMs)return 0;
+  return sampleDialogueMouthOpen(buffer,elapsed);
+}
 function renderDialogueAudioAssignments(){
   const box=$('dialogueLineAssignments');
   if(!box)return;
@@ -338,7 +350,7 @@ ctx.strokeStyle='#242033';ctx.fillStyle='#242033';ctx.lineWidth=2.5;
 if(expression==='happy'||expression==='laughing'){ctx.beginPath();ctx.arc(17,19,8,0,Math.PI);ctx.stroke()}
 else if(expression==='sad'){ctx.beginPath();ctx.arc(17,28,7,Math.PI,Math.PI*2);ctx.stroke()}
 else if(expression==='surprised'){ctx.beginPath();ctx.ellipse(17,21,5,8,0,0,Math.PI*2);ctx.fill()}
-else if(expression==='talk'||expression==='talking'){ctx.beginPath();ctx.ellipse(17,21,4,Math.max(2,3+Math.abs(Math.sin(t*8))*4),0,0,Math.PI*2);ctx.fill()}
+else if(expression==='talk'||expression==='talking'){const audioMouthOpen=getDialogueMouthOpen(activeDialogue,sceneIndex);ctx.beginPath();ctx.ellipse(17,21,4,audioMouthOpen===null?Math.max(2,3+Math.abs(Math.sin(t*8))*4):2+audioMouthOpen*7,0,0,Math.PI*2);ctx.fill()}
 else{ctx.beginPath();ctx.moveTo(11,22);ctx.quadraticCurveTo(17,25,23,22);ctx.stroke()}
 if(expression==='sad'){ctx.fillStyle='rgba(130,220,255,.85)';ctx.beginPath();ctx.ellipse(34,8,3,6,-.25,0,Math.PI*2);ctx.fill()}
 ctx.restore();ctx.restore();for(let characterIndex=1;characterIndex<Math.min(sceneCharacterIds.length,characterLayout.length);characterIndex++){const layout=characterLayout[characterIndex];const profile=characterBible.find(entry=>entry.characterId.toLowerCase()===layout.characterId.toLowerCase())||{};drawAdditionalCharacter(profile,layout.x*w,layout.y*h,.82,t,layout.facing,layout.interaction,getSceneCharacterGesturePose({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration,layout.characterId),emotion,Boolean(activeDialogue&&activeDialogue.characterId.toLowerCase()===layout.characterId.toLowerCase()))}for(const handoff of getSceneObjectHandoffs({...currentSceneData,characters:sceneCharacterIds},sceneMotionProgress*sceneDuration)){drawSceneObjectHandoff(handoff,t)}ctx.restore();const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
@@ -670,6 +682,7 @@ $('export').onclick=async()=>{
     sceneTimers.forEach(timer=>clearTimeout(timer));
     if(stream)stream.getTracks().forEach(track=>track.stop());
     if(audioSession)void audioSession.cleanup();
+    exportLipSyncState=null;
     sceneIndex=originalSceneIndex;
     playing=wasPlaying;
     speechPlaybackArmed=false;stopDialogueSpeech();
@@ -711,6 +724,7 @@ $('export').onclick=async()=>{
       });
       stream=audioSession.stream;
       await audioSession.start();
+      exportLipSyncState={startedAt:performance.now(),schedule:dialogueSchedule,buffers:dialogueBuffers};
     }
     const mimeTypes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
     const mimeType=mimeTypes.find(type=>MediaRecorder.isTypeSupported(type));
