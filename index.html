@@ -143,6 +143,14 @@ $('sceneReadiness').textContent=readiness.ready?t.ready:t.incomplete+readiness.i
 $('imagePromptPreview').textContent=buildImageGenerationPrompt(scene,characterBible);
 $('motionPromptPreview').textContent=buildMotionGenerationPrompt(scene,characterBible);
 }
+function renderGeneratedSceneImage(){
+const meta=sceneMetadata[sceneIndex]||{},wrap=$('generatedImageWrap'),image=$('generatedSceneImage');
+const url=String(meta.generatedImageUrl||'').trim();
+if(!url){wrap.hidden=true;image.removeAttribute('src');$('generatedImageMeta').textContent='';return}
+image.src=url;image.alt=(uiLang==='ru'?'Изображение сцены: ':'Generated scene image: ')+String(titles[sceneIndex]||'');
+const info=[meta.generatedImageModel,meta.generatedImageWorker,meta.generatedImageSeed?'seed '+meta.generatedImageSeed:''].filter(Boolean);
+$('generatedImageMeta').textContent=info.join(' · ');wrap.hidden=false;
+}
 function syncSceneEditor(){
 const meta=sceneMetadata[sceneIndex]||{};
 $('sceneTitle').value=titles[sceneIndex]||'';
@@ -156,6 +164,7 @@ $('sceneNegativePrompt').value=meta.negativePrompt||'No extra characters, no cha
 $('sceneContinuityLock').value=meta.continuityLock||'';
 updateProductionPreview();
 renderCharacterBible();
+renderGeneratedSceneImage();
 }
 ['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock'].forEach(id=>$(id).addEventListener('input',updateProductionPreview));
 function updateStoryQA(){
@@ -300,6 +309,27 @@ const lines=ru
 status.textContent=lines.join(' · ');
 }catch(error){status.textContent=(ru?'Не удалось проверить устройство: ':'Device check failed: ')+(error?.message||'Unknown error')}
 finally{button.disabled=false}
+});
+$('hordeConsent').addEventListener('change',()=>{$('generateSceneImage').disabled=!$('hordeConsent').checked});
+$('generateSceneImage').addEventListener('click',async()=>{
+const button=$('generateSceneImage'),status=$('imageGenerationStatus');
+if(!$('hordeConsent').checked){status.textContent=uiLang==='ru'?'Сначала подтверди согласие на отправку текстового промпта.':'First confirm consent to send the text prompt.';return}
+if(button.disabled)return;
+const targetIndex=sceneIndex,meta=sceneMetadata[targetIndex]||{};
+const scene={...meta,title:titles[targetIndex],imagePrompt:$('sceneImagePrompt').value.trim(),prompt:$('sceneImagePrompt').value.trim(),camera:$('sceneCamera').value.trim(),location:meta.location,timeOfDay:meta.timeOfDay,characters:meta.characters,continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
+const prompt=buildImageGenerationPrompt(scene,characterBible,{includeNegative:false});
+button.disabled=true;status.textContent=uiLang==='ru'?'Отправляем текстовый промпт в бесплатную очередь AI Horde…':'Submitting the text prompt to the free AI Horde queue…';
+try{
+const result=await generateImageWithHorde({prompt,negativePrompt:scene.negativePrompt,onProgress:progress=>{
+const position=progress.queuePosition===null?'?':progress.queuePosition;
+status.textContent=uiLang==='ru'?'Очередь AI Horde · позиция: '+position+' · ожидают: '+progress.waiting+' · обрабатываются: '+progress.processing:'AI Horde queue · position: '+position+' · waiting: '+progress.waiting+' · processing: '+progress.processing;
+}});
+sceneMetadata[targetIndex]={...(sceneMetadata[targetIndex]||{}),generatedImageUrl:result.imageUrl,generatedImageSeed:result.seed,generatedImageModel:result.model,generatedImageWorker:result.workerName};
+if(sceneIndex===targetIndex)renderGeneratedSceneImage();
+status.textContent=uiLang==='ru'?'Изображение сцены '+(targetIndex+1)+' создано. Сохрани черновик, чтобы запомнить ссылку.':'Image for scene '+(targetIndex+1)+' generated. Save the draft to keep its result link.';
+}catch(error){
+status.textContent=(uiLang==='ru'?'Не удалось создать изображение: ':'Image generation failed: ')+(error?.message||'Unknown error');
+}finally{button.disabled=!$('hordeConsent').checked}
 });
 $('testGemini').addEventListener('click',async()=>{const status=$('status');status.textContent=uiLang==='ru'?'Проверяем соединение Gemini…':'Testing Gemini connection…';try{await testGeminiConnection({apiKey:$('geminiKey').value});status.textContent=uiLang==='ru'?'Gemini подключён и отвечает.':'Gemini is connected and responding.';}catch(error){status.textContent=(uiLang==='ru'?'Проверка Gemini не пройдена: ':'Gemini connection test failed: ')+(error?.message||'Unknown error');}});
 $('play').onclick=()=>{playing=!playing;$('play').textContent=playing?tr('pauseButton'):tr('playButton');if(playing&&!raf)draw()};
