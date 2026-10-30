@@ -46,6 +46,22 @@ test('drawImageCover uses the calculated source and destination rectangles', () 
   assert.deepEqual(calls[0].slice(1), [0, 0, 800, 600, 0, 0, 400, 300]);
 });
 
+
+test('drawImageCover supports video dimensions when drawing generated scene clips', () => {
+  const calls = [];
+  const context = { drawImage: (...args) => calls.push(args) };
+  const video = { videoWidth: 1920, videoHeight: 1080, readyState: 2 };
+  assert.equal(drawImageCover(context, video, 640, 420), true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], video);
+  assert.ok(Math.abs(calls[0][1] - 137.1428571428571) < 1e-9);
+  assert.equal(calls[0][2], 0);
+  assert.ok(Math.abs(calls[0][3] - 1645.7142857142858) < 1e-9);
+  assert.equal(calls[0][4], 1080);
+  assert.equal(calls[0][7], 640);
+  assert.equal(calls[0][8], 420);
+});
+
 test('drawImageCover safely rejects incomplete image objects', () => {
   const context = { drawImage() { throw new Error('must not be called'); } };
   assert.equal(drawImageCover(context, { naturalWidth: 0, naturalHeight: 0 }, 400, 300), false);
