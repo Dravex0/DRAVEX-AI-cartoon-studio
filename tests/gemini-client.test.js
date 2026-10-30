@@ -43,6 +43,14 @@ test('sends the complete story and explicit production directions to Gemini', as
   assert.match(sentPrompt, /Do not invent major characters/);
 });
 
+test('rejects a response that ignores an explicitly requested scene count', async () => {
+  await assert.rejects(() => buildGeminiStoryboard({
+    apiKey: 'test-key',
+    idea: 'Количество сцен: 6\nA fox finds a star.',
+    fetchImpl: mockFetch(reply({ scenes: [1,2,3,4,5].map(n => ({ title:'Scene '+n, visibleAction:'Action '+n, camera:'Camera '+n })) }))
+  }), /requested 6/);
+});
+
 test('rejects an empty key before making a request', async () => {
   await assert.rejects(() => buildGeminiStoryboard({ apiKey:'', idea:'A story' }), /API key/);
 });
