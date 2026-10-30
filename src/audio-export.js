@@ -22,6 +22,13 @@ function normalizeAudioTracks({ audioElement, audioTracks, volume }) {
   });
 }
 
+function resetAudioElements(elements) {
+  for (const element of elements) {
+    try { element.pause(); } catch {}
+    try { element.currentTime = 0; } catch {}
+  }
+}
+
 /**
  * Mixes one or more local audio elements into a canvas MediaStream for recording.
  * Audio is routed only to the recording destination, not back to the speakers.
@@ -52,7 +59,11 @@ export async function createAudioExportSession({
   const audioElements = [];
   const outputTracks = [];
   let closed = false;
+  let started = false;
+  let startTime = null;
+  let startPromise = null;
   let dialoguePlayback = null;
+
   try {
     const destination = context.createMediaStreamDestination();
     for (const track of tracksToMix) {
@@ -66,34 +77,57 @@ export async function createAudioExportSession({
     outputTracks.push(...destination.stream.getAudioTracks());
     if (!outputTracks.length) throw new Error('Audio recording track could not be created.');
     const stream = new MediaStreamClass([...videoStream.getTracks(), ...outputTracks]);
+
     return {
       stream,
-      async start() {
-        if (closed) throw new Error('Audio export session is already closed.');
-        await context.resume();
-        const audioStartTime = context.currentTime;
-        if (Array.isArray(dialogueAudioSchedule) && dialogueAudioSchedule.length) {
-          dialoguePlayback = scheduleDialogueAudioBuffers({
-            context,
-            destination,
-            schedule: dialogueAudioSchedule,
-            audioBuffers: dialogueAudioBuffers,
-            characterVolumes: dialogueCharacterVolumes,
-            startAt: audioStartTime
-          });
-        }
-        await Promise.all(audioElements.map(element => element.play()));
-        return audioStartTime;
+      start() {
+        if (closed) return Promise.reject(new Error('Audio export session is already closed.'));
+        if (started) return Promise.resolve(startTime);
+        if (startPromise) return startPromise;
+
+        startPromise = (async () => {
+          await context.resume();
+          if (closed) throw new Error('Audio export session is already closed.');
+          startTime = context.currentTime;
+
+          if (Array.isArray(dialogueAudioSchedule) && dialogueAudioSchedule.length) {
+            dialoguePlayback = scheduleDialogueAudioBuffers({
+              context,
+              destination,
+              schedule: dialogueAudioSchedule,
+              audioBuffers: dialogueAudioBuffers,
+              characterVolumes: dialogueCharacterVolumes,
+              startAt: startTime
+            });
+          }
+
+          const results = await Promise.allSettled(audioElements.map(element => element.play()));
+          const failed = results.find(result => result.status === 'rejected');
+          if (closed || failed) {
+            if (dialoguePlayback) {
+              try { dialoguePlayback.stop(); } catch {}
+              dialoguePlayback = null;
+            }
+            resetAudioElements(audioElements);
+            if (closed) throw new Error('Audio export session is already closed.');
+            throw failed.reason;
+          }
+
+          started = true;
+          return startTime;
+        })();
+
+        return startPromise;
       },
       getCurrentTime() { return context.currentTime; },
       async cleanup() {
         if (closed) return;
         closed = true;
-        if (dialoguePlayback) dialoguePlayback.stop();
-        for (const element of audioElements) {
-          try { element.pause(); } catch {}
-          try { element.currentTime = 0; } catch {}
+        if (dialoguePlayback) {
+          try { dialoguePlayback.stop(); } catch {}
+          dialoguePlayback = null;
         }
+        resetAudioElements(audioElements);
         for (const track of outputTracks) { try { track.stop(); } catch {} }
         if (context.state !== 'closed') await context.close();
       }
