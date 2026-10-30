@@ -16,3 +16,21 @@ export function getEmotionFacePose(emotion='neutral', timeSeconds=0) {
   const pose=poses[mood]||poses.neutral;
   return {...pose,eyeScale:clamp(pose.eyeScale,.65,1.35),mouthOpen:clamp(pose.mouthOpen,0,.8),cheek:clamp(pose.cheek,0,.4),tear:clamp(pose.tear,0,1)};
 }
+
+/** Blend the previous and current sentence emotion near a timeline boundary. */
+export function sampleEmotionFaceTimeline(timeline,timeSeconds=0,transitionSeconds=.22,fallback='neutral') {
+  const time=Number.isFinite(Number(timeSeconds))?Math.max(0,Number(timeSeconds)):0;
+  const transition=Number.isFinite(Number(transitionSeconds))?clamp(Number(transitionSeconds),0,.75):.22;
+  const valid=(Array.isArray(timeline)?timeline:[]).filter(item=>item&&Number.isFinite(Number(item.startSeconds))&&Number.isFinite(Number(item.endSeconds))&&Number(item.endSeconds)>Number(item.startSeconds)&&typeof item.emotion==='string').sort((a,b)=>Number(a.startSeconds)-Number(b.startSeconds));
+  if(!valid.length)return getEmotionFacePose(fallback,time);
+  let index=valid.findIndex(item=>time>=Number(item.startSeconds)&&time<Number(item.endSeconds));
+  if(index<0)index=time>=Number(valid[valid.length-1].endSeconds)?valid.length-1:0;
+  const current=valid[index],currentPose=getEmotionFacePose(current.emotion,time);
+  if(index===0||transition<=0)return currentPose;
+  const boundary=Number(current.startSeconds),progress=clamp((time-(boundary-transition))/transition,0,1);
+  if(progress>=1)return currentPose;
+  const p=progress*progress*(3-2*progress),previousPose=getEmotionFacePose(valid[index-1].emotion,time);
+  const blended={};
+  for(const key of Object.keys(currentPose))blended[key]=previousPose[key]+(currentPose[key]-previousPose[key])*p;
+  return blended;
+}
