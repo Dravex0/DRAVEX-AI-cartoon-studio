@@ -18,6 +18,7 @@ export function scheduleDialogueAudioBuffers({
   destination,
   schedule,
   audioBuffers,
+  characterVolumes = new Map(),
   startAt
 } = {}) {
   if (!context || typeof context.createBufferSource !== 'function') {
@@ -28,6 +29,7 @@ export function scheduleDialogueAudioBuffers({
   if (!(audioBuffers instanceof Map)) throw new TypeError('Dialogue audio assets must be supplied as a Map.');
   const baseTime = Number.isFinite(Number(startAt)) ? Math.max(0, Number(startAt)) : Math.max(0, Number(context.currentTime) || 0);
   const sources = [];
+  const gains = [];
   const skipped = [];
 
   for (const cue of schedule) {
@@ -47,7 +49,14 @@ export function scheduleDialogueAudioBuffers({
     }
     const source = context.createBufferSource();
     source.buffer = buffer;
-    source.connect(destination);
+    const characterKey = String(cue?.characterId || '').trim().toLowerCase();
+    const requestedVolume = characterVolumes instanceof Map ? Number(characterVolumes.get(characterKey)) : NaN;
+    const volume = Number.isFinite(requestedVolume) ? Math.max(0, Math.min(1, requestedVolume)) : 1;
+    const gain = context.createGain();
+    gain.gain.value = volume;
+    source.connect(gain);
+    gain.connect(destination);
+    gains.push(gain);
     const when = baseTime + Math.max(0, startMs) / 1000;
     source.start(when, 0, durationSeconds);
     sources.push(source);
@@ -64,6 +73,7 @@ export function scheduleDialogueAudioBuffers({
         try { source.stop(); } catch {}
         try { source.disconnect?.(); } catch {}
       }
+      for (const gain of gains) { try { gain.disconnect?.(); } catch {} }
     }
   };
 }
