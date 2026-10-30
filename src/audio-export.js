@@ -1,3 +1,5 @@
+import { scheduleDialogueAudioBuffers } from './dialogue-audio-playback.js';
+
 const clampVolume = value => {
   const number = Number(value);
   return Number.isFinite(number) ? Math.min(1, Math.max(0, number)) : 1;
@@ -32,7 +34,9 @@ export async function createAudioExportSession({
   audioTracks = [],
   volume = 1,
   AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext,
-  MediaStreamClass = globalThis.MediaStream
+  MediaStreamClass = globalThis.MediaStream,
+  dialogueAudioSchedule = [],
+  dialogueAudioBuffers = new Map()
 } = {}) {
   if (!videoStream || typeof videoStream.getTracks !== 'function') {
     throw new TypeError('A video MediaStream is required.');
@@ -46,6 +50,7 @@ export async function createAudioExportSession({
   const audioElements = [];
   const outputTracks = [];
   let closed = false;
+  let dialoguePlayback = null;
   try {
     const destination = context.createMediaStreamDestination();
     for (const track of tracksToMix) {
@@ -64,11 +69,21 @@ export async function createAudioExportSession({
       async start() {
         if (closed) throw new Error('Audio export session is already closed.');
         await context.resume();
+        if (Array.isArray(dialogueAudioSchedule) && dialogueAudioSchedule.length) {
+          dialoguePlayback = scheduleDialogueAudioBuffers({
+            context,
+            destination,
+            schedule: dialogueAudioSchedule,
+            audioBuffers: dialogueAudioBuffers,
+            startAt: context.currentTime
+          });
+        }
         await Promise.all(audioElements.map(element => element.play()));
       },
       async cleanup() {
         if (closed) return;
         closed = true;
+        if (dialoguePlayback) dialoguePlayback.stop();
         for (const element of audioElements) {
           try { element.pause(); } catch {}
           try { element.currentTime = 0; } catch {}
