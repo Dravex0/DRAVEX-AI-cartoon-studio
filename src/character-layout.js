@@ -1,3 +1,5 @@
+import { sampleInteractionProgress } from './scene-interactions.js';
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const clean = value => String(value ?? '').trim().slice(0, 120);
 
@@ -28,7 +30,7 @@ export function getSceneCharacterLayout(scene = {}, timeSeconds = 0) {
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || time < start || time > end) continue;
     const participants = event.participants.map(clean).filter(id => ids.includes(id));
     if (!participants.length) continue;
-    const progress = clamp((time - start) / (end - start), 0, 1);
+    const progress = sampleInteractionProgress(event, time);
     const first = layout.find(item => item.characterId === participants[0]);
     const second = layout.find(item => item.characterId === participants[1]);
     if (first && second) {
