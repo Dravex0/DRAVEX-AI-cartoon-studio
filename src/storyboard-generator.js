@@ -141,15 +141,9 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
   const causalLinks = inferSceneCausalLinks(scenes, locale);
   const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
   const knownCharacters = brief.characters.length ? brief.characters : [subject];
-  const characterMention = (name, text) => {
-    const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\  const causalLinks = inferSceneCausalLinks(scenes, locale);
-  const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
-  scenes.forEach((scene, index) => {
-    scene.causalLink = causalLinks[index];
-    scene.stateChanges = stateChanges[index];
-  });
-  const eventChain = buildStoryEventChain(scenes);');
-    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(text);
+  const characterMention = (name, sourceText) => {
+    const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
+    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
   };
   scenes.forEach((scene, index) => {
     scene.causalLink = causalLinks[index];
