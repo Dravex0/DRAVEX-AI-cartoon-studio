@@ -101,3 +101,31 @@ test('sanitizes non-finite analysis options without producing NaN mouth values',
   }
   assert.ok(Number.isFinite(sampleDialogueMouthOpen(buffer, 24, NaN)));
 });
+
+test('rolling envelope matches reference RMS when windows overlap', () => {
+  const samples = Float32Array.from({ length: 113 }, (_, index) =>
+    index % 19 < 6 ? 0.03 : index % 19 < 13 ? 0.22 : 0.08
+  );
+  const buffer = fakeBuffer(samples, 2000);
+  const options = { windowMs: 24, hopMs: 8, noiseFloor: 0.01, sensitivity: 4.2, attack: 0.7, release: 0.35 };
+  const envelope = createDialogueMouthEnvelope(buffer, options);
+  let previous = 0;
+  const hopSamples = 16;
+  const halfWindow = 24;
+  const expected = [];
+  for (let frame = 0; frame < Math.ceil(samples.length / hopSamples); frame++) {
+    const center = frame * hopSamples;
+    const start = Math.max(0, center - halfWindow);
+    const end = Math.min(samples.length, center + halfWindow + 1);
+    let sumSquares = 0;
+    for (let index = start; index < end; index++) sumSquares += samples[index] * samples[index];
+    const rms = end > start ? Math.sqrt(sumSquares / (end - start)) : 0;
+    const target = Math.max(0, Math.min(1, (rms - options.noiseFloor) * options.sensitivity));
+    previous += (target - previous) * (target > previous ? options.attack : options.release);
+    expected.push(previous);
+  }
+  assert.equal(envelope.values.length, expected.length);
+  expected.forEach((value, index) => {
+    assert.ok(Math.abs(envelope.values[index] - value) < 1e-6, `frame ${index}: expected ${value}, got ${envelope.values[index]}`);
+  });
+});
