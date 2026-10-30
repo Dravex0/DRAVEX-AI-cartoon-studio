@@ -90,6 +90,21 @@ function sceneCharacters(sceneText, characterIds, fallback) {
   return matched.length ? matched : [fallback];
 }
 
+/** Infer only explicit, high-confidence emotion words from scene text. */
+export function inferSceneEmotion(sceneText = '') {
+  const source = String(sceneText ?? '').toLocaleLowerCase().slice(0, 4000);
+  if (!source.trim()) return 'neutral';
+  const cues = [
+    ['fear', /(?:боится|испугал|испугал[асьи]?|страшно|ужас|в ужасе|панику|тревож|fearful|afraid|scared|terrified|frightened|miedo|asustad[oa]|teme|temor)/iu],
+    ['anger', /(?:злится|разозлил|разгневан|сердит|ярост|гнев|кричит от злости|angry|furious|annoyed|怒|enojad[oa]|furios[oa])/iu],
+    ['sad', /(?:груст|печал|плачет|сл[её]зы|расстроен|одинок|sad|sorrow|crying|tears|unhappy|triste|llora|lágrimas)/iu],
+    ['happy', /(?:радост|счастлив|улыбается|сме[её]тся|весел|доволен|happy|joyful|delighted|laughs?|smiles?|excited|feliz|alegr[еí]a|sonr[ií]e|ríe)/iu],
+    ['surprised', /(?:удивил|удивл[её]н|изумл[её]н|ошеломл[её]н|неожиданно|воскликнул|surprised|astonished|amazed|shocked|sorprendid[oa]|asombrad[oa])/iu]
+  ];
+  for (const [emotion, pattern] of cues) if (pattern.test(source)) return emotion;
+  return 'neutral';
+}
+
 function inferSceneInteractions(sceneText, characters) {
   if (!Array.isArray(characters) || characters.length < 2) return [];
   const source = String(sceneText ?? '').toLocaleLowerCase();
@@ -211,6 +226,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
       purpose: title,
       characters,
       interactions: inferSceneInteractions(storyDetail, characters),
+      emotion: inferSceneEmotion(storyDetail),
       visibleAction,
       camera,
       imagePrompt,
