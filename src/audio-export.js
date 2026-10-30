@@ -42,7 +42,8 @@ export async function createAudioExportSession({
     throw new TypeError('A video MediaStream is required.');
   }
   const tracksToMix = normalizeAudioTracks({ audioElement, audioTracks, volume });
-  if (!tracksToMix.length) throw new TypeError('At least one audio element is required.');
+  const hasDialogueAudio = Array.isArray(dialogueAudioSchedule) && dialogueAudioSchedule.length > 0 && dialogueAudioBuffers instanceof Map && dialogueAudioBuffers.size > 0;
+  if (!tracksToMix.length && !hasDialogueAudio) throw new TypeError('At least one music or dialogue audio track is required.');
   if (typeof AudioContextClass !== 'function') throw new Error('Web Audio is not supported by this browser.');
   if (typeof MediaStreamClass !== 'function') throw new Error('MediaStream composition is not supported by this browser.');
 
