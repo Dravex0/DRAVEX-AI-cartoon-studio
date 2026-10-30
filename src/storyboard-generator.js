@@ -7,6 +7,7 @@ import { directStoryEvent } from './story-event-director.js';
 import { inferSceneCausalLinks } from './scene-causality.js';
 import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
+import { buildProductionScene } from './scene-production.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -139,16 +140,27 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
 
   const causalLinks = inferSceneCausalLinks(scenes, locale);
   const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
+  const knownCharacters = brief.characters.length ? brief.characters : [subject];
+  const characterMention = (name, sourceText) => {
+    const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
+    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
+  };
   scenes.forEach((scene, index) => {
     scene.causalLink = causalLinks[index];
     scene.stateChanges = stateChanges[index];
+    scene.characters = knownCharacters.filter(name => scene.storyDetail
+      ? characterMention(name, scene.storyDetail)
+      : name.toLocaleLowerCase() === subject.toLocaleLowerCase());
+    scene.durationSeconds = brief.requestedDurationSeconds ?? 3;
+    scene.negativePrompt = brief.directives.avoid || '';
   });
-  const eventChain = buildStoryEventChain(scenes);
+  const productionScenes = scenes.map((scene, index) => buildProductionScene(scene, brief.characterProfiles, { index }));
+  const eventChain = buildStoryEventChain(productionScenes);
 
   return {
     titles: scenes.map(scene => scene.title),
     descriptions: scenes.map(scene => scene.description),
-    scenes,
+    scenes: productionScenes,
     eventChain,
     brief,
     requestedSceneCount: beatCount
