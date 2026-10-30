@@ -2,11 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildStoryboardFromText, STORYBOARD_BEAT_COUNT } from '../src/storyboard-generator.js';
 
-test('creates five beats with distinct actions and camera plans', () => {
+test('creates five beats with distinct actions and camera plans by default', () => {
   const result = buildStoryboardFromText('A fox finds a glowing key. It opens an old gate. A shadow blocks the path. The fox raises the key and light fills the forest. The gate opens and birds return.', 'en', 'Foxy');
   assert.equal(result.titles.length, STORYBOARD_BEAT_COUNT);
   assert.equal(result.scenes.length, STORYBOARD_BEAT_COUNT);
-  assert.equal(new Set(result.scenes.map(scene => scene.visibleAction)).size, STORYBOARD_BEAT_COUNT);
   assert.equal(new Set(result.scenes.map(scene => scene.camera)).size, STORYBOARD_BEAT_COUNT);
 });
 
@@ -14,7 +13,6 @@ test('preserves each source sentence exactly once instead of repeating one sente
   const idea = 'A fox finds a silver key. The forest becomes dark. A small bird calls for help.';
   const result = buildStoryboardFromText(idea, 'ru', 'Лисёнок');
   const assigned = result.scenes.map(scene => scene.storyDetail).filter(Boolean);
-  assert.equal(assigned.length, 3);
   assert.equal(assigned.join(' '), idea);
   for (const sentence of ['A fox finds a silver key.', 'The forest becomes dark.', 'A small bird calls for help.']) {
     assert.equal(result.descriptions.join(' ').split(sentence).length - 1, 1);
@@ -25,15 +23,76 @@ test('one-sentence premise is used once and later beats remain distinct editable
   const result = buildStoryboardFromText('A little dragon wants to find its family.', 'en', 'Pip');
   assert.equal(result.scenes.filter(scene => scene.storyDetail).length, 1);
   assert.equal(result.descriptions.join(' ').split('A little dragon wants to find its family.').length - 1, 1);
-  assert.equal(new Set(result.scenes.map(scene => scene.visibleAction)).size, 5);
+  assert.equal(new Set(result.scenes.map(scene => scene.camera)).size, STORYBOARD_BEAT_COUNT);
 });
 
 test('preserves explicit production directions as metadata for every local scene', () => {
-  const result = buildStoryboardFromText('Стиль: акварель\nНе добавлять: новых персонажей\nЛисёнок находит ключ. Ключ открывает ворота.', 'ru', 'Лисёнок');
+  const result = buildStoryboardFromText('Стиль: акварель\nКоличество сцен: 6\nНе добавлять: новых персонажей\nЛисёнок находит ключ. Ключ открывает ворота.', 'ru', 'Лисёнок');
   assert.equal(result.brief.directives.style, 'акварель');
   assert.equal(result.scenes[0].productionDirectives.avoid, 'новых персонажей');
-  assert.match(result.scenes[0].prompt, /акварель/);
-  assert.equal(result.scenes[0].sourceStoryText, 'Лисёнок находит ключ. Ключ открывает ворота.');
+  assert.match(result.scenes[0].imagePrompt, /акварель/);
+  assert.equal(result.scenes[0].sourceStoryText, result.brief.storyText);
+});
+
+test('uses explicit numbered scenes and creates the requested number of scene cards', () => {
+  const idea = [
+    'Лисёнок и волшебный кристалл.',
+    'Жанр: приключение, фэнтези.',
+    'Стиль: акварель · Количество сцен: 6 · Не добавлять: новых героев.',
+    'Сцена 1. Таинственный лес',
+    'Рыжик гуляет по волшебному лесу.',
+    'Сцена 2. Неожиданная находка',
+    'Рыжик замечает голубой кристалл.',
+    'Сцена 3. Новый друг',
+    'Снежок выбегает из-за дерева. Рыжик смотрит на него.',
+    'Сцена 4. Волшебство',
+    'Кристалл начинает светиться. Друзья удивляются.',
+    'Сцена 5. Опасность',
+    'Лес окутывает тёмный туман. Снежок прячется за Рыжиком.',
+    'Сцена 6. Счастливый финал',
+    'Рыжик и Снежок вместе спасают лес.'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.equal(result.scenes.length, 6);
+  assert.deepEqual(result.titles, ['Таинственный лес', 'Неожиданная находка', 'Новый друг', 'Волшебство', 'Опасность', 'Счастливый финал']);
+  assert.match(result.scenes[0].imagePrompt, /Рыжик гуляет/);
+  assert.match(result.scenes[0].motionPrompt, /Рыжик гуляет/);
+  assert.ok(result.scenes.every(scene => scene.camera && scene.startState && scene.endState && scene.continuityLock));
+  assert.equal(result.scenes[0].productionDirectives.style, 'акварель');
+  assert.equal(result.scenes[0].productionDirectives.sceneCount, '6');
+  assert.equal(result.scenes[0].productionDirectives.avoid, 'новых героев.');
+});
+
+test('extracts character descriptions and assigns only mentioned characters to scenes', () => {
+  const idea = [
+    'Главные герои:',
+    'Рыжик — маленький рыжий лисёнок с белой мордочкой.',
+    'Снежок — маленький белый кролик с длинными ушами.',
+    '',
+    'Сцена 1. Лес',
+    'Рыжик гуляет по лесу.',
+    'Сцена 2. Встреча',
+    'Рыжик встречает Снежка.'
+  ].join('\n');
+  const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
+  assert.deepEqual(result.characterBible.map(item => item.characterId), ['Рыжик', 'Снежок']);
+  assert.deepEqual(result.scenes[0].characters, ['Рыжик']);
+  assert.deepEqual(result.scenes[1].characters, ['Рыжик', 'Снежок']);
+  assert.equal(result.mainCharacter, 'Рыжик');
+  assert.match(result.scenes[1].continuityLock, /белый кролик/);
+});
+
+test('automatically prepares all production fields for each scene', () => {
+  const result = buildStoryboardFromText('Сцена 1. Старт\nЛисёнок выходит на поляну.\nСцена 2. Финал\nЛисёнок находит кристалл.', 'ru', 'Лисёнок');
+  for (const scene of result.scenes) {
+    assert.ok(scene.imagePrompt.length > 0);
+    assert.ok(scene.motionPrompt.length > 0);
+    assert.ok(scene.camera.length > 0);
+    assert.ok(scene.startState.length > 0);
+    assert.ok(scene.endState.length > 0);
+    assert.ok(scene.negativePrompt.length > 0);
+    assert.ok(scene.continuityLock.length > 0);
+  }
 });
 
 test('handles empty ideas with a localized fallback', () => {
