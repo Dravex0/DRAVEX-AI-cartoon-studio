@@ -101,7 +101,7 @@ export async function createAudioExportSession({
             });
           }
 
-          const results = await Promise.allSettled(audioElements.map(element => element.play()));
+          const results = await Promise.allSettled(audioElements.map(element => Promise.resolve().then(() => element.play())));
           const failed = results.find(result => result.status === 'rejected');
           if (closed || failed) {
             if (dialoguePlayback) {
