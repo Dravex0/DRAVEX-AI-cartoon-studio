@@ -20,7 +20,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     scene: index + 1,
     sourceDetail: clean(scene.storyDetail, 1_200),
     eventType: clean(scene.storyEventType, 80),
-    assignedCharacters: Array.isArray(scene.characters) ? scene.characters : []
+    assignedCharacters: Array.isArray(scene.characters) ? scene.characters : [],\n    lockedInteraction: scene.interaction || null
   }));
   return [
     'You are DRAVEX, a careful animation film director.',
@@ -30,7 +30,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'Each visibleAction must describe one concrete, filmable physical action, not a vague feeling or a static pose.',
     'Make every scene action and camera plan distinct. Use specific shot size, angle, and camera movement.',
     'Do not add characters, events, locations, or props that are not supported by the story.',
-    'Keep every character identity unchanged. Use only the character IDs assigned to each locked scene.',
+    'Keep every character identity unchanged. Use only the character IDs assigned to each locked scene.',\n    'Preserve every supplied lockedInteraction exactly: actorId is the acting character, targetId is the recipient, and type is the directed action. Never reverse participants or invent a relationship when lockedInteraction is null.',
     'CHARACTER BIBLE (locked visual references): ' + JSON.stringify(characterBible),
     'Preserve each character\'s visual description, clothing, colors, and distinctive features in every image and motion prompt where that character appears.',
     'Main character reference: ' + clean(character, 120) + '.',
