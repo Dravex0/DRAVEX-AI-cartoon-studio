@@ -51,7 +51,7 @@ const LOCATION_VERBS = {
 
 const clean = (value, max = 160) => String(value ?? '').trim()
   .replace(/^[\s"'«»“”‘’]+|[\s"'«»“”‘’]+$/gu, '').slice(0, max);
-const escapeRegExp = value => String(value).replace(/[.*+?^$|{}()[\]\\]/g, '\\$&');
+const escapeRegExp = value => [...String(value)].map(char => '.*+?^$|{}()[]'.includes(char) || char === String.fromCharCode(92) ? String.fromCharCode(92) + char : char).join('');
 const boundary = '(?<![\\p{L}\\p{N}])';
 const tailBoundary = '(?![\\p{L}\\p{N}])';
 const cutTail = value => clean(String(value ?? '')
