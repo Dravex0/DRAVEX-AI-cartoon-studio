@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildStoryboardFromText, STORYBOARD_BEAT_COUNT } from '../src/storyboard-generator.js';
+import { buildStoryboardFromText, inferSceneEmotion, STORYBOARD_BEAT_COUNT } from '../src/storyboard-generator.js';
 
 test('creates five beats with distinct actions and camera plans by default', () => {
   const result = buildStoryboardFromText('A fox finds a glowing key. It opens an old gate. A shadow blocks the path. The fox raises the key and light fills the forest. The gate opens and birds return.', 'en', 'Foxy');
@@ -166,4 +166,20 @@ test('does not invent a prop description for an unlabelled hand-off', () => {
   const result = buildStoryboardFromText(idea, 'ru', 'Foxy');
   assert.equal(result.scenes[0].interactions[0].type, 'give_object');
   assert.equal(result.scenes[0].interactions[0].objectDescription, undefined);
+});
+
+
+test('infers explicit scene emotions across Russian, Ukrainian, English and Spanish', () => {
+  assert.equal(inferSceneEmotion('Рыжик счастлив и улыбается.'), 'happy');
+  assert.equal(inferSceneEmotion('Снежок боится громкого звука.'), 'fear');
+  assert.equal(inferSceneEmotion('Герой плачет от грусти.'), 'sad');
+  assert.equal(inferSceneEmotion('The fox is furious and angry.'), 'anger');
+  assert.equal(inferSceneEmotion('El conejo está sorprendido.'), 'surprised');
+  assert.equal(inferSceneEmotion('Герой спокойно идёт по лесу.'), 'neutral');
+});
+
+test('stores inferred emotion on each scene without changing neutral scenes', () => {
+  const result = buildStoryboardFromText('Сцена 1. Радость\nРыжик счастлив и смеётся.\nСцена 2. Лес\nРыжик гуляет по лесу.', 'ru', 'Рыжик');
+  assert.equal(result.scenes[0].emotion, 'happy');
+  assert.equal(result.scenes[1].emotion, 'neutral');
 });
