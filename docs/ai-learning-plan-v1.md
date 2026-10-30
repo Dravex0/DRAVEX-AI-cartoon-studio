@@ -45,6 +45,10 @@ The evaluator now checks not only whether required source-story details survive,
 
 The app must keep the download opt-in and explain that model weights are downloaded from Hugging Face while inference remains on-device. No model should load automatically on page open.
 
+## Quality-gated AI director
+
+`src/local-story-director.js` asks the local model to propose concrete actions, camera plans, image/motion prompts, and scene start/end states. It locks source-story attribution, event order, and character membership to the deterministic baseline. The candidate is accepted only when the text-level storyboard evaluator passes; malformed, incomplete, repetitive, or low-specificity output falls back to the baseline. This is a guardrail, not proof of semantic correctness or visual quality. The browser UI's local-AI test action now runs this director against the current story and updates the editable storyboard only after the quality gate passes.
+
 ## Training loop to build next
 
 1. **Collect examples:** user-approved story prompts and corrected storyboards, with private details removed.
