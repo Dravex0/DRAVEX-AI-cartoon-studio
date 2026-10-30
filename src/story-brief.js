@@ -118,6 +118,32 @@ export function parseStoryBrief(input) {
     }
   }
 
+  // A second pass makes multi-line character sections reliable.
+  const extractedProfiles = [];
+  let inCharacterSection = false;
+  for (const rawLine of rawText.split('\n')) {
+    const line = rawLine.trim();
+    if (!line) { inCharacterSection = false; continue; }
+    if (/^(?:главные герои|главные персонажи|персонажи|головні герої|персонажі|characters)\s*[:：]\s*$/iu.test(line)) {
+      inCharacterSection = true;
+      continue;
+    }
+    if (sceneHeading(line) || /^\s*[^:：]{2,60}\s*[:：]/u.test(line)) {
+      inCharacterSection = false;
+      continue;
+    }
+    if (inCharacterSection) {
+      const profile = parseCharacterLine(line);
+      if (profile) extractedProfiles.push(profile);
+    }
+  }
+  for (const profile of extractedProfiles) {
+    if (!characterProfiles.some(item => item.characterId.toLowerCase() === profile.characterId.toLowerCase())) {
+      characterProfiles.push(profile);
+      appendDirective(directives, 'characters', profile.characterId);
+    }
+  }
+
   const sceneData = sceneBlocks.map((scene, index) => ({
     number: scene.number || index + 1,
     title: scene.title,
