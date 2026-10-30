@@ -1,0 +1,52 @@
+const safe = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
+const list = values => Array.isArray(values) ? values.map(value => safe(value, 500)).filter(Boolean) : [];
+
+function characterDetails(scene, characterBible) {
+  const names = list(scene?.characters);
+  const entries = (Array.isArray(characterBible) ? characterBible : [])
+    .filter(entry => names.length === 0 || names.includes(entry?.characterId));
+  return entries.map(entry => [
+    entry.characterId, entry.visualDescription, entry.clothing, entry.colors, entry.distinctiveFeatures
+  ].map(value => safe(value, 700)).filter(Boolean).join(' — ')).filter(Boolean);
+}
+
+/** Creates a provider-neutral still-image prompt without calling a paid or remote service. */
+export function buildImageGenerationPrompt(scene = {}, characterBible = []) {
+  const characterLock = characterDetails(scene, characterBible);
+  return [
+    safe(scene.imagePrompt) || safe(scene.prompt) || safe(scene.description),
+    safe(scene.location) && `Location: ${safe(scene.location, 500)}`,
+    safe(scene.timeOfDay) && `Time: ${safe(scene.timeOfDay, 120)}`,
+    safe(scene.camera) && `Composition and camera: ${safe(scene.camera, 1000)}`,
+    characterLock.length && `Character appearance reference: ${characterLock.join(' | ')}`,
+    safe(scene.continuityLock) && `Continuity lock: ${safe(scene.continuityLock, 2000)}`,
+    safe(scene.negativePrompt) && `Avoid: ${safe(scene.negativePrompt, 2000)}`,
+    'Create one coherent still frame. Preserve the specified character identities and visual continuity. Do not add captions, logos, or watermarks.'
+  ].filter(Boolean).join('\n\n');
+}
+
+/** Creates a motion-only instruction and keeps the still image description separate. */
+export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
+  const characterLock = characterDetails(scene, characterBible);
+  return [
+    safe(scene.motionPrompt) || safe(scene.visibleAction),
+    safe(scene.startState) && `Start state: ${safe(scene.startState, 1000)}`,
+    safe(scene.endState) && `End state: ${safe(scene.endState, 1000)}`,
+    safe(scene.camera) && `Camera movement: ${safe(scene.camera, 1000)}`,
+    characterLock.length && `Keep these character designs unchanged: ${characterLock.join(' | ')}`,
+    safe(scene.continuityLock) && `Continuity lock: ${safe(scene.continuityLock, 2000)}`,
+    safe(scene.negativePrompt) && `Avoid: ${safe(scene.negativePrompt, 2000)}`,
+    'Animate only the described action. Preserve the scene composition and character identity; do not introduce new objects or characters.'
+  ].filter(Boolean).join('\n\n');
+}
+
+export function validateSceneProductionReadiness(scene = {}) {
+  const issues = [];
+  if (!safe(scene.title, 200)) issues.push({ code: 'missing-title', field: 'title' });
+  if (!safe(scene.imagePrompt) && !safe(scene.prompt) && !safe(scene.description)) issues.push({ code: 'missing-image-prompt', field: 'imagePrompt' });
+  if (!safe(scene.motionPrompt) && !safe(scene.visibleAction)) issues.push({ code: 'missing-motion-prompt', field: 'motionPrompt' });
+  if (!safe(scene.camera)) issues.push({ code: 'missing-camera-plan', field: 'camera' });
+  if (!safe(scene.startState)) issues.push({ code: 'missing-start-state', field: 'startState' });
+  if (!safe(scene.endState)) issues.push({ code: 'missing-end-state', field: 'endState' });
+  return { ready: issues.length === 0, issues };
+}
