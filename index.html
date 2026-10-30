@@ -519,7 +519,8 @@ function refreshSpeechVoices(){
 }
 function stopDialogueSpeech(){if('speechSynthesis' in window)window.speechSynthesis.cancel();lastSpokenDialogueKey=''}
 function speakActiveDialogue(dialogue){
-  if(!speechPlaybackArmed||!playing||!$('voiceEnabled').checked||!dialogue||!('speechSynthesis' in window))return;
+  if(!dialogue){if(lastSpokenDialogueKey)stopDialogueSpeech();return}
+  if(!speechPlaybackArmed||!playing||!$('voiceEnabled').checked||!('speechSynthesis' in window))return;
   const key=[sceneIndex,dialogue.characterId,dialogue.startSeconds,dialogue.text].join('|');
   if(key===lastSpokenDialogueKey)return;
   window.speechSynthesis.cancel();lastSpokenDialogueKey=key;
