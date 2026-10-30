@@ -162,6 +162,42 @@ function inferSceneInteractions(sceneText, characters) {
   }];
 }
 
+/** Extract only explicitly attributed quoted dialogue; narration is never converted into speech. */
+export function inferSceneDialogueTimeline(sceneText = '', characters = [], durationSeconds = 3) {
+  const source = String(sceneText ?? '').slice(0, 4000);
+  const cast = (Array.isArray(characters) ? characters : []).map(value => String(value ?? '').trim()).filter(Boolean);
+  const duration = Number.isFinite(Number(durationSeconds)) && Number(durationSeconds) >= 0.25 && Number(durationSeconds) <= 30
+    ? Number(durationSeconds) : 3;
+  if (!source || !cast.length) return [];
+  const quotePattern = /(?:^|[.!?。！？\n]\s*|\s)([\p{L}][\p{L}\p{M}'’-]{0,39})\s*(?:(?:говорит|сказал(?:а)?|спросил(?:а)?|ответил(?:а)?|шепчет|кричит|прошептал(?:а)?|says?|said|asks?|asked|replies?|whispers?|shouts?)\s*:\s*|:\s*)[«“"]([^»”"]{1,500})[»”"]/giu;
+  const found = [];
+  let match;
+  while ((match = quotePattern.exec(source)) !== null) {
+    const rawSpeaker = match[1].toLocaleLowerCase();
+    const speaker = cast.find(id => id.toLocaleLowerCase() === rawSpeaker);
+    if (!speaker) continue;
+    const line = match[2].trim();
+    if (!line) continue;
+    found.push({ characterId: speaker, text: line });
+    if (found.length >= 20) break;
+  }
+  if (!found.length) return [];
+  const weights = found.map(item => Math.max(1, item.text.length));
+  const totalWeight = weights.reduce((sum, value) => sum + value, 0);
+  let cursor = 0;
+  return found.map((item, index) => {
+    const startSeconds = Number(cursor.toFixed(3));
+    cursor += duration * weights[index] / totalWeight;
+    return {
+      id: `dialogue_${index + 1}`,
+      characterId: item.characterId,
+      text: item.text,
+      startSeconds,
+      endSeconds: Number((index === found.length - 1 ? duration : cursor).toFixed(3))
+    };
+  });
+}
+
 function buildCharacterBible(brief, fallbackCharacter) {
   const profiles = Array.isArray(brief.characterProfiles) ? brief.characterProfiles : [];
   if (profiles.length) return profiles.slice(0, 20);
@@ -275,6 +311,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
       sourceEvents: storyDetail ? splitSentences(storyDetail) : brief.keyEvents,
       durationSeconds: brief.requestedDurationSeconds || null,
       dialogue: [],
+      dialogueTimeline: inferSceneDialogueTimeline(storyDetail, characters, brief.requestedDurationSeconds || 3),
       sound: '',
       transition: index === 0 ? 'fade-in' : 'crossfade'
     };
