@@ -108,3 +108,23 @@ test('reaction gesture raises both arms and inactive or unknown actors stay neut
 test('malformed gesture input safely returns a neutral pose', () => {
   assert.deepEqual(getSceneCharacterGesturePose(null, NaN, 'A'), { leftArm: 0, rightArm: 0, active: false, interaction: '' });
 });
+
+
+test('handoff arm poses release smoothly at the end of the interaction', () => {
+  const scene = { characters: ['A', 'B'], interactions: [{ type: 'give_object', participants: ['A', 'B'], startSeconds: 0, endSeconds: 2 }] };
+  const giverNearEnd = getSceneCharacterGesturePose(scene, 1.9, 'A');
+  const receiverAtEnd = getSceneCharacterGesturePose(scene, 2, 'B');
+  assert.ok(giverNearEnd.rightArm < 15);
+  assert.equal(receiverAtEnd.rightArm, 0);
+  assert.equal(receiverAtEnd.active, false);
+});
+
+test('overlapping interaction cues preserve the strongest arm pose', () => {
+  const scene = { characters: ['A', 'B', 'C'], interactions: [
+    { type: 'gesture_to', participants: ['A', 'B'], startSeconds: 0, endSeconds: 2 },
+    { type: 'give_object', participants: ['A', 'C'], startSeconds: 0, endSeconds: 2 }
+  ] };
+  const pose = getSceneCharacterGesturePose(scene, 1, 'A');
+  assert.equal(pose.rightArm, 82);
+  assert.equal(pose.active, true);
+});
