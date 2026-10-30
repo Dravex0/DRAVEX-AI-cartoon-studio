@@ -61,3 +61,17 @@ test('checks explicit character membership and production readiness when request
   assert.equal(report.metrics.characterConsistency, 100);
   assert.equal(report.metrics.productionCompleteness, 100);
 });
+
+test('integrates optional scene continuity and character reference checks', () => {
+  const report = evaluateStoryboard({
+    scenes: [
+      { id: 'scene_1', characters: ['Foxy'], visibleAction: 'Foxy opens the red wooden door and steps inside.', camera: 'Wide shot', startState: 'The red wooden door is closed.', endState: 'The red wooden door is open.' },
+      { id: 'scene_2', characters: ['Foxy'], visibleAction: 'Foxy walks through the open red wooden door into the forest.', camera: 'Close-up', startState: 'The open red wooden door stands behind Foxy.', endState: 'Foxy reaches the forest path.' }
+    ],
+    characterBible: [{ characterId: 'Foxy', visualDescription: 'Small orange fox', clothing: 'Blue scarf' }],
+    requireContinuity: true
+  });
+  assert.equal(report.metrics.stateCoverage, 100);
+  assert.equal(report.metrics.characterReferenceCoverage, 100);
+  assert.ok(report.continuityReport);
+});
