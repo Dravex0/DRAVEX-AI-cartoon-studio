@@ -42,3 +42,23 @@ test('malformed scene input fails safely and caps layout size', () => {
   assert.equal(layout.length, 8);
   assert.ok(layout.every(item => Number.isFinite(item.x)));
 });
+
+
+test('approach eases back to the original staging after the event ends', () => {
+  const scene = { characters: ['A', 'B'], interactions: [{ type: 'approach', participants: ['A', 'B'], startSeconds: 1, endSeconds: 3 }] };
+  const before = getSceneCharacterLayout(scene, 0.5);
+  const during = getSceneCharacterLayout(scene, 2);
+  const after = getSceneCharacterLayout(scene, 3.5);
+  const distance = layout => Math.abs(layout[1].x - layout[0].x);
+  assert.ok(distance(during) < distance(before));
+  assert.equal(distance(after), distance(before));
+});
+
+test('give-object staging eases in and returns characters to baseline', () => {
+  const scene = { characters: ['A', 'B'], interactions: [{ type: 'give_object', participants: ['A', 'B'], objectId: 'letter', startSeconds: 1, endSeconds: 3 }] };
+  const before = getSceneCharacterLayout(scene, 0.5);
+  const during = getSceneCharacterLayout(scene, 2);
+  const after = getSceneCharacterLayout(scene, 3.5);
+  assert.ok(during[0].x > before[0].x);
+  assert.equal(after[0].x, before[0].x);
+});
