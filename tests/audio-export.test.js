@@ -93,3 +93,55 @@ test('cleanup is safe to call more than once', async () => {
   await session.cleanup();
   assert.equal(h.events.filter(event => event === 'close').length, 1);
 });
+
+
+test('concurrent start calls share one playback operation', async () => {
+  const h = createHarness();
+  let resolveResume;
+  class DelayedResumeContext extends h.FakeAudioContext {
+    resume() {
+      h.events.push('resume');
+      return new Promise(resolve => {
+        resolveResume = () => {
+          this.state = 'running';
+          resolve();
+        };
+      });
+    }
+  }
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioElement: h.audioElement,
+    AudioContextClass: DelayedResumeContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  const firstStart = session.start();
+  const secondStart = session.start();
+  assert.equal(firstStart, secondStart);
+  assert.equal(h.events.filter(event => event === 'resume').length, 1);
+
+  resolveResume();
+  await Promise.all([firstStart, secondStart]);
+  assert.equal(h.events.filter(event => event === 'play').length, 1);
+  await session.cleanup();
+});
+
+test('rolls audio back when play throws synchronously', async () => {
+  const h = createHarness();
+  h.audioElement.play = () => {
+    h.events.push('play-throws');
+    throw new Error('synchronous playback failure');
+  };
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioElement: h.audioElement,
+    AudioContextClass: h.FakeAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  await assert.rejects(session.start(), /synchronous playback failure/);
+  assert.ok(h.events.includes('pause'));
+  assert.equal(h.audioElement.currentTime, 0);
+  await session.cleanup();
+});
