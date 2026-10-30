@@ -52,3 +52,28 @@ test('explicit turning movement takes priority over glowing background details',
   assert.equal(detectSceneAction('The fox turns toward the glowing light'), 'turn');
   assert.equal(detectSceneAction('Лисёнок поворачивается к сияющему свету'), 'turn');
 });
+
+
+test('uses the selected scene motion prompt before fallback description text', async () => {
+  const { detectSceneActionForScene } = await import('../src/scene-action.js');
+  assert.equal(detectSceneActionForScene({
+    motionPrompt: 'The fox jumps over the river.',
+    description: 'The fox waits beside a tree.'
+  }), 'jump');
+});
+
+test('uses visible action when no motion prompt is supplied', async () => {
+  const { detectSceneActionForScene } = await import('../src/scene-action.js');
+  assert.equal(detectSceneActionForScene({
+    visibleAction: 'Лисёнок медленно шагает к двери.'
+  }), 'walk');
+});
+
+
+test('does not let fallback description override an explicit motion prompt', async () => {
+  const { detectSceneActionForScene } = await import('../src/scene-action.js');
+  assert.equal(detectSceneActionForScene({
+    motionPrompt: 'The fox walks slowly toward the gate.',
+    description: 'The fox runs through the forest.'
+  }), 'walk');
+});
