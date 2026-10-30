@@ -165,20 +165,19 @@ function inferSceneInteractions(sceneText, characters) {
 /** Extract only explicitly attributed quoted dialogue; narration is never converted into speech. */
 export function inferSceneDialogueTimeline(sceneText = '', characters = [], durationSeconds = 3) {
   const source = String(sceneText ?? '').slice(0, 4000);
-  const cast = (Array.isArray(characters) ? characters : []).map(value => String(value ?? '').trim()).filter(Boolean);
+  const cast = [...new Set((Array.isArray(characters) ? characters : []).map(value => String(value ?? '').trim()).filter(Boolean))];
   const duration = Number.isFinite(Number(durationSeconds)) && Number(durationSeconds) >= 0.25 && Number(durationSeconds) <= 30
     ? Number(durationSeconds) : 3;
   if (!source || !cast.length) return [];
-  const quotePattern = /(?:^|[.!?。！？\n]\s*|\s)([\p{L}][\p{L}\p{M}'’-]{0,39})\s*(?:(?:говорит|сказал(?:а)?|спросил(?:а)?|ответил(?:а)?|шепчет|кричит|прошептал(?:а)?|says?|said|asks?|asked|replies?|whispers?|shouts?)\s*:\s*|:\s*)[«“"]([^»”"]{1,500})[»”"]/giu;
+  const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const speakerPattern = cast.slice().sort((left, right) => right.length - left.length).map(escapeRegExp).join('|');
+  const quotePattern = new RegExp('(?:^|[.!?。！？\\n]\\s*|\\s)(' + speakerPattern + ')\\s*(?:(?:говорит|сказал(?:а)?|спросил(?:а)?|спрашивает|ответил(?:а)?|отвечает|шепчет|кричит|прошептал(?:а)?|says?|said|asks?|asked|replies?|answers?|whispers?|shouts?)\\s*:\\s*|:\\s*)[«“"]([^»”"]{1,500})[»”"]', 'giu');
   const found = [];
   let match;
   while ((match = quotePattern.exec(source)) !== null) {
-    const rawSpeaker = match[1].toLocaleLowerCase();
-    const speaker = cast.find(id => id.toLocaleLowerCase() === rawSpeaker);
-    if (!speaker) continue;
+    const speaker = cast.find(id => id.toLocaleLowerCase() === match[1].toLocaleLowerCase());
     const line = match[2].trim();
-    if (!line) continue;
-    found.push({ characterId: speaker, text: line });
+    if (speaker && line) found.push({ characterId: speaker, text: line });
     if (found.length >= 20) break;
   }
   if (!found.length) return [];
