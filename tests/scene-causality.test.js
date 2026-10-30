@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { inferSceneCausalLinks } from '../src/scene-causality.js';
+import { buildStoryboardFromText } from '../src/storyboard-generator.js';
 
 test('extracts an explicit English consequence and binds it to adjacent source scenes', () => {
   const links = inferSceneCausalLinks([
@@ -39,10 +40,24 @@ test('does not invent a causal link without an explicit marker or source evidenc
     { id: 'b', storyDetail: 'The travelers enter the forest.' },
     { id: 'c', storyDetail: '' }
   ], 'en');
-  assert.deepEqual(links, [null, null, null]);
+  assert.equal(links[0], null);
+  assert.equal(links[1], null);
+  assert.equal(links[2].causeSceneId, 'a');
 });
 
-test('does not create a link from the first scene or skip over a missing prior cause', () => {
+test('storyboard generation attaches explicit source causality to the consequence scene', () => {
+  const plan = buildStoryboardFromText(
+    'The bridge collapses. As a result, the travelers take the forest path.',
+    'en', 'Foxy'
+  );
+  const effect = plan.scenes.find(scene => scene.causalLink);
+  assert.ok(effect);
+  assert.equal(effect.causalLink.type, 'consequence');
+  assert.equal(effect.causalLink.effectSceneId, effect.id);
+  assert.ok(effect.causalLink.causeEvidence.includes('The bridge collapses'));
+});
+
+test('links to the previous source-backed scene when storyboard beats are empty', () => {
   const links = inferSceneCausalLinks([
     { id: 'a', storyDetail: 'The bridge collapses.' },
     { id: 'b', storyDetail: '' },
