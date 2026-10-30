@@ -1,4 +1,5 @@
 import { normalizeScenes } from './scene-model.js';
+import { evaluateSceneContinuity } from './scene-continuity.js';
 
 const normalizeText = value => String(value ?? '').toLocaleLowerCase().normalize('NFKC')
   .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -23,7 +24,9 @@ export function evaluateStoryboard({
   expectedSceneCount = null,
   expectedStoryDetails = [],
   characterRequirements = [],
-  requireProductionFields = false
+  requireProductionFields = false,
+  characterBible = [],
+  requireContinuity = false
 } = {}) {
   const scenes = normalizeScenes(rawScenes);
   const issues = [];
@@ -104,6 +107,15 @@ export function evaluateStoryboard({
     });
   }
 
+  const continuityReport = requireContinuity
+    ? evaluateSceneContinuity({ scenes, characterBible })
+    : null;
+  if (continuityReport) {
+    for (const entry of continuityReport.issues) {
+      issues.push({ skill: 'continuity', ...entry });
+    }
+  }
+
   const metrics = {
     storyStructure: validCount ? 100 : 0,
     actionSpecificity: percentage(actionable.length, scenes.length),
@@ -111,7 +123,10 @@ export function evaluateStoryboard({
     cameraVariety: cameraDiversity,
     sourceFidelity,
     characterConsistency,
-    productionCompleteness
+    productionCompleteness,
+    stateCoverage: continuityReport?.metrics.stateCoverage ?? null,
+    stateTransitionConsistency: continuityReport?.metrics.stateTransitionConsistency ?? null,
+    characterReferenceCoverage: continuityReport?.metrics.characterReferenceCoverage ?? null
   };
   const measured = Object.values(metrics).filter(value => value !== null);
   const overallScore = measured.length
@@ -123,6 +138,7 @@ export function evaluateStoryboard({
     evaluatedSceneCount: scenes.length,
     overallScore,
     metrics,
+    continuityReport,
     passed: overallScore >= 85 && issues.length === 0,
     issues,
     limitations: [
