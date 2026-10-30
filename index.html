@@ -73,6 +73,7 @@ import { calculateCinematicShot } from "./src/director-engine.js";
 import { detectDeviceCapabilities } from "./src/device-capabilities.js";
 import { generateImageWithHorde } from "./src/ai-horde-image-provider.js";
 import { drawImageCover } from "./src/image-frame.js";
+import { buildExportTimeline } from "./src/export-timeline.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./src/scene-production.js";
 const translations={
 en:{freeTag:'FREE · LOCAL-FIRST',previewTag:'CARTOON WORKSPACE · EARLY PREVIEW',headline:'Turn your idea<br>into a story.',intro:'Create a storyboard locally or use the optional Gemini Free Tier for AI-written scenes. Preview and export a simple silent WebM test; full AI animation, voice, music and lip-sync are not implemented yet.',createTitle:'01 · Create a story',ideaLabel:'Story idea',ideaPlaceholder:'A curious fox discovers a glowing star in the forest...',characterLabel:'Main character',styleLabel:'Visual style',durationLabel:'Scene duration',seconds3:'3 seconds',seconds5:'5 seconds',seconds8:'8 seconds',storyLanguageLabel:'Story language',createButton:'Create storyboard',saveButton:'Save draft',readyStatus:'Ready. Your idea stays in this browser unless you export it.',previewTitle:'02 · Preview',playButton:'Play preview',pauseButton:'Pause preview',exportButton:'Export WebM test',previewDisclaimer:'Preview/export uses a simple canvas animation. It is not full AI-generated animation and has no voice, music, or lip-sync yet.',footer:'DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to',sceneTitles:['A discovery','A closer look','A new adventure'],sceneDescriptions:['The fox spots a glowing star.','The little star floats nearby.','The fox follows the light.'],sceneLabel:'Scene',ready:'Ready. Your idea stays in this browser unless you export it.',emptyIdea:'Add a story idea first.',created:'Local storyboard created. Optional Gemini AI scene generation is available when configured.',saved:'Draft saved in this browser.',storageError:'Browser storage is unavailable; you can still keep this page open.',restored:'Restored draft from this browser.',recording:'Recording a short preview…',exported:'WebM preview exported. Silent prototype only.',unsupported:'WebM recording is not supported by this browser.',exportFailed:'Export failed in this browser. Try Play preview first.'},
@@ -369,22 +370,36 @@ $('export').onclick=async()=>{
   }
   const button=$('export');
   if(button.disabled)return;
+  const timeline=buildExportTimeline(titles.map((title,index)=>sceneMetadata[index]||{title}),$('duration').value);
+  if(!timeline.segments.length){
+    $('status').textContent=uiLang==='ru'?'Сначала создай раскадровку.':'Create a storyboard before exporting.';
+    return;
+  }
   button.disabled=true;
   const wasPlaying=playing;
-  playing=true;
-  $('play').textContent=tr('pauseButton');
-  if(!raf)draw();
-  let stream=null,recorder=null,timer=null;
+  const originalSceneIndex=sceneIndex;
+  const sceneTimers=[];
+  let stream=null,recorder=null,stopTimer=null,cleaned=false;
   const chunks=[];
   const cleanup=()=>{
-    if(timer!==null)clearTimeout(timer);
+    if(cleaned)return;
+    cleaned=true;
+    if(stopTimer!==null)clearTimeout(stopTimer);
+    sceneTimers.forEach(timer=>clearTimeout(timer));
     if(stream)stream.getTracks().forEach(track=>track.stop());
+    sceneIndex=originalSceneIndex;
     playing=wasPlaying;
     $('play').textContent=playing?tr('pauseButton'):tr('playButton');
+    renderScenes();
+    syncSceneEditor();
     if(playing&&!raf)draw();
     button.disabled=false;
   };
   try{
+    sceneIndex=timeline.segments[0].sceneIndex;
+    playing=true;
+    $('play').textContent=tr('pauseButton');
+    if(!raf)draw();
     stream=canvas.captureStream(24);
     const mimeTypes=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
     const mimeType=mimeTypes.find(type=>MediaRecorder.isTypeSupported(type));
@@ -402,12 +417,14 @@ $('export').onclick=async()=>{
         const url=URL.createObjectURL(blob);
         const anchor=document.createElement('a');
         anchor.href=url;
-        anchor.download='dravex-cartoon-preview.webm';
+        anchor.download='dravex-cartoon-storyboard.webm';
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
         setTimeout(()=>URL.revokeObjectURL(url),5000);
-        $('status').textContent=tr('exported');
+        $('status').textContent=uiLang==='ru'
+          ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'
+          :'Exported '+timeline.segments.length+' scenes · '+timeline.totalDurationSeconds.toFixed(2)+' sec.';
       }catch(error){
         console.error('DRAVEX export failed:',error);
         $('status').textContent=tr('exportFailed');
@@ -416,14 +433,21 @@ $('export').onclick=async()=>{
       }
     };
     recorder.start(250);
-    $('status').textContent=tr('recording');
-    const requestedDuration=Number($('duration').value);
-    const durationMs=Number.isFinite(requestedDuration)
-      ?Math.min(30000,Math.max(1500,requestedDuration*1000))
-      :3000;
-    timer=setTimeout(()=>{
+    $('status').textContent=uiLang==='ru'
+      ?'Записываем сцену 1 из '+timeline.segments.length+'…'
+      :'Recording scene 1 of '+timeline.segments.length+'…';
+    timeline.segments.slice(1).forEach(segment=>{
+      const timer=setTimeout(()=>{
+        sceneIndex=segment.sceneIndex;
+        $('status').textContent=uiLang==='ru'
+          ?'Записываем сцену '+(segment.sceneIndex+1)+' из '+timeline.segments.length+'…'
+          :'Recording scene '+(segment.sceneIndex+1)+' of '+timeline.segments.length+'…';
+      },segment.startMs);
+      sceneTimers.push(timer);
+    });
+    stopTimer=setTimeout(()=>{
       if(recorder&&recorder.state!=='inactive')recorder.stop();
-    },durationMs);
+    },timeline.totalDurationMs);
   }catch(error){
     console.error('DRAVEX export failed:',error);
     cleanup();
