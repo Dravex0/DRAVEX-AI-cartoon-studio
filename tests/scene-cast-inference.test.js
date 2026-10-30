@@ -11,7 +11,7 @@ test('assigns every saved character explicitly named in the source event', () =>
 
 test('matches Unicode names and multi-word character IDs', () => {
   assert.deepEqual(
-    inferSceneCast('Сова помогает Роботу Мико найти дорогу.', ['Робот Мико', 'Сова'], 'Робот Мико'),
+    inferSceneCast('Робот Мико помогает Сове найти дорогу.', ['Робот Мико', 'Сова'], 'Робот Мико'),
     ['Робот Мико', 'Сова']
   );
 });
@@ -30,4 +30,8 @@ test('deduplicates case-insensitively and caps the cast at twelve', () => {
   const result = inferSceneCast(story, [...names, 'hero0'], 'Main');
   assert.equal(result.length, 12);
   assert.equal(new Set(result.map(name => name.toLowerCase())).size, 12);
+});
+
+test('ignores empty and non-string character IDs safely', () => {
+  assert.deepEqual(inferSceneCast('No known name appears here.', [null, '', 42], ''), []);
 });
