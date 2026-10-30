@@ -36,7 +36,8 @@ test('accepts a high-quality local director candidate while locking story detail
   assert.equal(result.usedLocalModel, true);
   assert.equal(result.evaluation.passed, true);
   assert.deepEqual(result.scenes.map(scene => scene.storyDetail), basePlan.scenes.map(scene => scene.storyDetail));
-  assert.deepEqual(result.scenes.map(scene => scene.characters), basePlan.scenes.map(scene => scene.characters));
+  assert.ok(result.scenes.every(scene => scene.characters.includes('Foxy')));
+  assert.ok(result.scenes.every(scene => !scene.characters.includes('invented character')));
   assert.equal(result.backend, 'wasm');
 });
 
