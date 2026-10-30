@@ -1,5 +1,6 @@
 import { evaluateStoryboard } from './ai-evaluation.js';
 import { normalizeScenes } from './scene-model.js';
+import { buildStoryEventChain } from './story-event-chain.js';
 
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
 const isRecord = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -68,13 +69,14 @@ export async function directStoryboardWithLocalAI({
   maxNewTokens = 700
 } = {}) {
   const fallback = Array.isArray(basePlan?.scenes) ? basePlan.scenes : [];
+  const eventChain = buildStoryEventChain(fallback);
   const fallbackResult = (reason, evaluation = null) => ({
     usedLocalModel: false,
     scenes: fallback,
     evaluation,
     fallbackReason: reason,
     modelId: runtime?.status?.modelId || null,
-    eventChain: basePlan?.eventChain || null
+    eventChain
   });
 
   if (!runtime || typeof runtime.generate !== 'function') return fallbackResult('local-runtime-unavailable');
@@ -82,7 +84,7 @@ export async function directStoryboardWithLocalAI({
 
   let generated;
   try {
-    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: basePlan?.eventChain || null }), {
+    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain }), {
       maxNewTokens,
       temperature: 0.15
     });
