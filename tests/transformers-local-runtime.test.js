@@ -80,3 +80,21 @@ test('rejects invalid pipeline factory output and empty model responses', async 
   await empty.load();
   await assert.rejects(empty.generate('hello'), /empty response/);
 });
+
+test('uses WASM rather than WebGPU in an insecure context', async () => {
+  let options;
+  const runtime = createLocalTransformersRuntime({
+    environment: {
+      isSecureContext: false,
+      WebAssembly: fakeWasm,
+      navigator: { gpu: { requestAdapter: async () => ({ limits: {}, features: new Set() }) } }
+    },
+    pipelineFactory: async (_task, _model, settings) => {
+      options = settings;
+      return async () => [{ generated_text: 'Fallback works.' }];
+    }
+  });
+  const status = await runtime.load({ backend: 'auto' });
+  assert.equal(status.backend, 'wasm');
+  assert.equal(options.device, undefined);
+});
