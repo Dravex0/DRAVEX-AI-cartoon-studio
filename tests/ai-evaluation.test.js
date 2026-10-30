@@ -148,7 +148,7 @@ test('accepts causal links only when they cite adjacent source-scene evidence', 
   assert.equal(result.issues.some(issue => issue.code === 'invalid-causal-link'), false);
 });
 
-test('rejects causal links that skip a scene or cite unsupported evidence', () => {
+test('rejects causal links that cite unsupported source evidence', () => {
   const result = evaluateStoryboard({
     scenes: [
       { id: 'scene_1', storyDetail: 'The bridge collapses.', visibleAction: 'The bridge breaks apart and falls into the river.', camera: 'Wide shot.' },
