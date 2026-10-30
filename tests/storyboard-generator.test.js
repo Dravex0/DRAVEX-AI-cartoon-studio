@@ -47,3 +47,34 @@ test('unknown language falls back to English and long input is bounded', () => {
   assert.equal(result.scenes.length, 5);
   assert.ok(result.scenes.every(scene => scene.description.length < 2_000));
 });
+
+
+test('honors requested scene counts from 3 through 8 with distinct action and camera plans', () => {
+  for (const count of [3, 4, 5, 6, 7, 8]) {
+    const result = buildStoryboardFromText(
+      `Количество сцен: ${count}\nЛисёнок находит ключ. Ворота закрыты. Появляется сова. Лисёнок меняет план. Ключ начинает светиться.`,
+      'ru',
+      'Лисёнок'
+    );
+    assert.equal(result.scenes.length, count, `expected ${count} scenes`);
+    assert.equal(result.requestedSceneCount, count);
+    assert.equal(new Set(result.scenes.map(scene => scene.visibleAction)).size, count);
+    assert.equal(new Set(result.scenes.map(scene => scene.camera)).size, count);
+  }
+});
+
+test('keeps the five-scene default when no scene count is requested', () => {
+  const result = buildStoryboardFromText('A fox finds a lantern.', 'en', 'Foxy');
+  assert.equal(result.scenes.length, 5);
+  assert.equal(result.requestedSceneCount, 5);
+});
+
+test('preserves source story details exactly once when the requested scene count changes', () => {
+  const idea = 'Количество сцен: 7\nЛисёнок находит ключ. В лесу гаснет свет. Сова показывает путь.';
+  const result = buildStoryboardFromText(idea, 'ru', 'Лисёнок');
+  const details = result.scenes.map(scene => scene.storyDetail).filter(Boolean);
+  assert.equal(details.join(' '), 'Лисёнок находит ключ. В лесу гаснет свет. Сова показывает путь.');
+  for (const sentence of ['Лисёнок находит ключ.', 'В лесу гаснет свет.', 'Сова показывает путь.']) {
+    assert.equal(result.descriptions.join(' ').split(sentence).length - 1, 1);
+  }
+});
