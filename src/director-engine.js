@@ -36,7 +36,7 @@ function containsAny(text, terms) {
 export function calculateCinematicShot(sceneData = {}, previousScale = null) {
   const scene = normalizeScene(sceneData);
   const text = [
-    scene.title, scene.purpose, scene.visibleAction, scene.prompt,
+    scene.title, scene.purpose, scene.visibleAction, scene.prompt, sceneData.action, sceneData.motion,
     scene.location, scene.camera, scene.effects,
   ].join(' ').toLocaleLowerCase();
   const beatIndex = Number.isInteger(sceneData.beatIndex) ? sceneData.beatIndex : 0;
