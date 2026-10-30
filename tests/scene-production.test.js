@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from '../src/scene-production.js';
+import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildProductionScene, validateSceneProductionReadiness } from '../src/scene-production.js';
 
 const scene = {
   title: 'The key turns',
@@ -82,4 +82,38 @@ test('empty scene character list keeps the existing all-profile fallback', () =>
   ]);
   assert.match(prompt, /Orange fox/);
   assert.match(prompt, /Yellow bird/);
+});
+
+test('builds a canonical production record and separates image from motion prompts', () => {
+  const prepared = buildProductionScene({
+    id: 'scene_1', title: 'The key', storyDetail: 'Foxy finds a silver key.',
+    visibleAction: 'Foxy lifts the key.', camera: 'Medium close-up',
+    characters: ['Foxy'], durationSeconds: 4
+  }, [{ characterId: 'Foxy', visualDescription: 'Small orange fox', clothing: 'Blue scarf' }]);
+  assert.match(prepared.imagePrompt, /silver key/);
+  assert.match(prepared.motionPrompt, /lifts the key/);
+  assert.match(prepared.imageGenerationPrompt, /Small orange fox/);
+  assert.match(prepared.motionGenerationPrompt, /Blue scarf/);
+  assert.equal(prepared.durationSeconds, 4);
+  assert.equal(prepared.productionReadiness.ready, false);
+  assert.ok(prepared.productionReadiness.issues.some(issue => issue.code === 'missing-start-state'));
+});
+
+test('does not invent missing continuity states or accept invalid duration', () => {
+  const prepared = buildProductionScene({
+    title: 'A scene', visibleAction: 'A bird lands.', camera: 'Wide shot', durationSeconds: 99
+  });
+  assert.equal(prepared.startState, '');
+  assert.equal(prepared.endState, '');
+  assert.ok(prepared.productionReadiness.issues.some(issue => issue.code === 'invalid-duration'));
+});
+
+test('readiness reports missing character references and dialogue cast mismatch', () => {
+  const result = validateSceneProductionReadiness({
+    title: 'Dialogue', imagePrompt: 'Two friends talk.', motionPrompt: 'They talk.',
+    camera: 'Two-shot', startState: 'They face each other.', endState: 'They smile.',
+    characters: ['Foxy', 'Snowball'], dialogue: [{ characterId: 'Villain', text: 'Wait!' }]
+  }, [{ characterId: 'Foxy' }]);
+  assert.ok(result.issues.some(issue => issue.code === 'missing-character-reference' && issue.characterId === 'Snowball'));
+  assert.ok(result.issues.some(issue => issue.code === 'dialogue-speaker-not-in-scene' && issue.characterId === 'Villain'));
 });
