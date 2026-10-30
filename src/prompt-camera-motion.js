@@ -23,7 +23,7 @@ export function getPromptCameraTransform(motionPrompt, progress = 0) {
   if (zoomOut) zoom = 1.11 - eased * 0.075;
   else if (zoomIn) zoom = 1.025 + eased * 0.085;
   const direction = 0.58;
-  const panX = (left ? 1 : right ? -1 : 0) * direction * eased;
-  const panY = (up ? 1 : down ? -1 : 0) * direction * eased;
+  const panX = eased === 0 ? 0 : (left ? 1 : right ? -1 : 0) * direction * eased;
+  const panY = eased === 0 ? 0 : (up ? 1 : down ? -1 : 0) * direction * eased;
   return { zoom: clamp(zoom, 1.02, 1.12), panX: clamp(panX, -0.6, 0.6), panY: clamp(panY, -0.6, 0.6) };
 }
