@@ -30,7 +30,9 @@ test('preserves explicit production directions as metadata for every local scene
   const result = buildStoryboardFromText('Стиль: акварель\nЖанр: приключение\nНастроение: волшебное\nКоличество сцен: 6\nНе добавлять: новых персонажей\nЛисёнок находит ключ. Ключ открывает ворота.', 'ru', 'Лисёнок');
   assert.equal(result.brief.directives.style, 'акварель');
   assert.equal(result.scenes[0].productionDirectives.avoid, 'новых персонажей');
-  assert.match(result.scenes[0].imagePrompt, /акварель/);\n  assert.match(result.scenes[0].imagePrompt, /Genre: приключение/);\n  assert.match(result.scenes[0].motionPrompt, /Mood: волшебное/);
+  assert.match(result.scenes[0].imagePrompt, /акварель/);
+  assert.match(result.scenes[0].imagePrompt, /Genre: приключение/);
+  assert.match(result.scenes[0].motionPrompt, /Mood: волшебное/);
   assert.equal(result.scenes[0].sourceStoryText, result.brief.storyText);
 });
 
