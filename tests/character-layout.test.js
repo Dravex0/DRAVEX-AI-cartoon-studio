@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getSceneCharacterLayout } from '../src/character-layout.js';
+import { getSceneCharacterLayout, getSceneObjectHandoffs } from '../src/character-layout.js';
 
 test('stages two or more stable character IDs at distinct positions', () => {
   const layout = getSceneCharacterLayout({ characters: ['Ryzhik', 'Snowball', 'Owl'] }, 0);
@@ -61,4 +61,24 @@ test('give-object staging eases in and returns characters to baseline', () => {
   const after = getSceneCharacterLayout(scene, 3.5);
   assert.ok(during[0].x > before[0].x);
   assert.equal(after[0].x, before[0].x);
+});
+
+
+test('object hand-off moves an explicitly described prop from giver to receiver', () => {
+  const scene = { characters: ['A', 'B'], interactions: [{ id: 'pass-key', type: 'give_object', participants: ['A', 'B'], objectId: 'key-1', objectDescription: 'silver key', startSeconds: 1, endSeconds: 3 }] };
+  const start = getSceneObjectHandoffs(scene, 1)[0];
+  const middle = getSceneObjectHandoffs(scene, 2)[0];
+  const end = getSceneObjectHandoffs(scene, 3)[0];
+  assert.equal(start.label, 'silver key');
+  assert.equal(start.progress, 0);
+  assert.equal(middle.progress, 0.5);
+  assert.equal(end.progress, 1);
+  assert.ok(start.x < middle.x && middle.x < end.x);
+  assert.equal(middle.giverId, 'A');
+  assert.equal(middle.receiverId, 'B');
+});
+
+test('does not invent a visible prop when an exchange has no explicit object description', () => {
+  const scene = { characters: ['A', 'B'], interactions: [{ type: 'give_object', participants: ['A', 'B'], objectId: 'unknown', startSeconds: 0, endSeconds: 2 }] };
+  assert.deepEqual(getSceneObjectHandoffs(scene, 1), []);
 });
