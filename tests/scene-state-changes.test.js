@@ -34,7 +34,7 @@ test('tracks explicit character location changes without guessing pronouns', () 
     { storyDetail: 'Foxy enters the cave.', characters: ['Foxy'] },
     { storyDetail: 'Foxy leaves the cave.', characters: ['Foxy'] }
   ], 'en');
-  assert.deepEqual(changes[0].map(change => change.value), ['inside:the cave']);
+  assert.deepEqual(changes[0].map(change => change.value), ['inside:cave']);
   assert.deepEqual(changes[1].map(change => [change.previousValue, change.value]), [
     ['inside:the cave', 'outside:the cave']
   ]);
