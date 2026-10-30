@@ -54,7 +54,19 @@ function occurrences(source, name) {
   return result;
 }
 
-export function inferCharacterInteraction(detail, characterIds = [], language = 'en') {
+function verbOccurrences(source, type, pattern) {
+  const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
+  const globalPattern = new RegExp(pattern.source, flags);
+  return [...source.matchAll(globalPattern)].map(match => ({
+    type, start: match.index, end: match.index + match[0].length
+  }));
+}
+
+/**
+ * Extract every unambiguous, explicitly written directed interaction in source order.
+ * Source offsets are evidence positions, not timestamps; callers must not treat them as seconds.
+ */
+export function inferCharacterInteractions(detail, characterIds = [], language = 'en') {
   const source = String(detail ?? '').trim();
   const locale = Object.hasOwn(RELATIONS, language) ? language : 'en';
   const names = [];
@@ -67,18 +79,16 @@ export function inferCharacterInteraction(detail, characterIds = [], language = 
     names.push(name);
     if (names.length >= 12) break;
   }
-  if (!source || names.length < 2) return null;
+  if (!source || names.length < 2) return [];
 
-  // Relation-table order must not override the actual order of actions in the source.
-  const actions = RELATIONS[locale]
-    .map(([type, verbPattern]) => ({ type, verb: verbPattern.exec(source) }))
-    .filter(item => item.verb)
-    .sort((left, right) => left.verb.index - right.verb.index);
-
-  for (const { type, verb } of actions) {
-    const before = names.flatMap(name => occurrences(source.slice(0, verb.index), name)).sort((a, b) => b.end - a.end);
-    const after = names.flatMap(name => occurrences(source.slice(verb.index + verb[0].length), name))
-      .map(item => ({ ...item, start: item.start + verb.index + verb[0].length, end: item.end + verb.index + verb[0].length }))
+  const actions = RELATIONS[locale].flatMap(([type, pattern]) => verbOccurrences(source, type, pattern))
+    .sort((left, right) => left.start - right.start || left.end - right.end);
+  const results = [];
+  for (const action of actions) {
+    const before = names.flatMap(name => occurrences(source.slice(0, action.start), name))
+      .sort((a, b) => b.end - a.end);
+    const after = names.flatMap(name => occurrences(source.slice(action.end), name))
+      .map(item => ({ ...item, start: item.start + action.end, end: item.end + action.end }))
       .sort((a, b) => a.start - b.start);
     if (!before.length || !after.length) continue;
     const actor = before[0].name;
@@ -86,12 +96,22 @@ export function inferCharacterInteraction(detail, characterIds = [], language = 
     if (actor.toLocaleLowerCase() === target.toLocaleLowerCase()) continue;
     if (before.length > 1 && before[0].end === before[1].end && before[0].name !== before[1].name) continue;
     if (after.length > 1 && after[0].start === after[1].start && after[0].name !== after[1].name) continue;
-    return {
-      type,
+    results.push({
+      type: action.type,
       actorId: actor,
       targetId: target,
-      evidence: source.slice(Math.max(0, before[0].start), Math.min(source.length, after[0].end)).slice(0, 500)
-    };
+      evidence: source.slice(Math.max(0, before[0].start), Math.min(source.length, after[0].end)).slice(0, 500),
+      sourceStart: before[0].start,
+      sourceEnd: after[0].end
+    });
   }
-  return null;
+  return results;
+}
+
+/** Backward-compatible first-interaction API. */
+export function inferCharacterInteraction(detail, characterIds = [], language = 'en') {
+  const first = inferCharacterInteractions(detail, characterIds, language)[0];
+  if (!first) return null;
+  const { type, actorId, targetId, evidence } = first;
+  return { type, actorId, targetId, evidence };
 }

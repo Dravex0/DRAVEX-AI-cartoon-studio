@@ -48,7 +48,14 @@ export function normalizeScene(input = {}, index = 0) {
       value: change.value == null ? null : text(change.value, 160),
       actorId: text(change.actorId, 120),
       evidence: text(change.evidence, 1_200)
-    })) : [],    interaction: scene.interaction && typeof scene.interaction === 'object' && !Array.isArray(scene.interaction)
+    })) : [],
+    interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
+      type: text(item.type, 40), actorId: text(item.actorId, 120), targetId: text(item.targetId, 120),
+      evidence: text(item.evidence, 500),
+      sourceStart: Number.isInteger(item.sourceStart) && item.sourceStart >= 0 ? item.sourceStart : null,
+      sourceEnd: Number.isInteger(item.sourceEnd) && item.sourceEnd >= 0 ? item.sourceEnd : null
+    })) : [],
+    interaction: scene.interaction && typeof scene.interaction === 'object' && !Array.isArray(scene.interaction)
       ? {
           type: text(scene.interaction.type, 40),
           actorId: text(scene.interaction.actorId, 120),
