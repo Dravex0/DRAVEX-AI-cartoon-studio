@@ -58,7 +58,7 @@ const cutTail = value => clean(String(value ?? '')
   .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+|[.!?,;:]/iu)[0]
   .replace(/^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu, ''));
 
-function findEntity(source, actorId, verb) {
+const ALLOWED_ACTION_ADVERBS = /^(?:carefully|quickly|slowly|gently|quietly|осторожно|быстро|медленно|тихо|обережно|швидко|повільно|lentamente|cuidadosamente)$/iu;\n\nfunction hasOnlyOptionalAdverb(prefix) {\n  const value = String(prefix ?? '').trim();\n  return !value || ALLOWED_ACTION_ADVERBS.test(value);\n}\n\nfunction findEntity(source, actorId, verb) {
   const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
   const actorMatch = actor.exec(source);
   if (!actorMatch) return null;
