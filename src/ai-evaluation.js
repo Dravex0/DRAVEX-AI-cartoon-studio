@@ -112,7 +112,7 @@ export function evaluateStoryboard({
     });
   }
 
-  const interactionScenes = scenes.filter(scene => scene.interaction);
+  const causalScenes = scenes.filter(scene => scene.causalLink);\n  let causalIntegrity = null;\n  if (causalScenes.length) {\n    const validCausalLinks = causalScenes.filter(scene => {\n      const link = scene.causalLink;\n      const effectIndex = scenes.findIndex(item => item.id === scene.id);\n      const cause = scenes[effectIndex - 1];\n      return Boolean(link.type === 'consequence' && cause\n        && link.causeSceneId === cause.id && link.effectSceneId === scene.id\n        && link.marker && link.causeEvidence && link.evidence\n        && cause.storyDetail.includes(link.causeEvidence)\n        && scene.storyDetail.includes(link.evidence)\n        && link.evidence.toLocaleLowerCase().includes(link.marker.toLocaleLowerCase()));\n    }).length;\n    causalIntegrity = percentage(validCausalLinks, causalScenes.length);\n    if (causalIntegrity < 100) issues.push({\n      skill: 'causal-reasoning',\n      code: 'invalid-causal-link',\n      message: 'A causal link is not grounded in adjacent source-story evidence.'\n    });\n  }\n\n  const interactionScenes = scenes.filter(scene => scene.interaction);
   let interactionIntegrity = null;
   if (interactionScenes.length) {
     const validInteractions = interactionScenes.filter(scene => {
