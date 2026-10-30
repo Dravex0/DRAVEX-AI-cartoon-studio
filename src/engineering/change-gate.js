@@ -12,10 +12,15 @@ const SECRET_PATTERNS = [
 ];
 function validatePath(value) {
   if (typeof value !== "string" || !value || value.length > 240) return false;
-  if (value.startsWith("/") || value.includes("\\") || value.includes("\0")) return false;
+  if (value !== value.trim() || value.startsWith("/") || value.includes("\\") ||
+      /[\0-\x1f\x7f:#?]/.test(value) || /%(?:2e|2f|5c)/i.test(value)) return false;
+  if (/^[a-z]:/i.test(value)) return false;
   const parts = value.split("/");
   return parts.every((part) => part && part !== "." && part !== "..") &&
     !parts.some((part) => part.startsWith(".") && part !== ".github");
+}
+function validBlobSha(value) {
+  return typeof value === "string" && /^[a-f0-9]{40}$/i.test(value);
 }
 /**
  * Validates a proposed patch manifest. It never writes files, invokes shell commands,
@@ -50,14 +55,15 @@ export function prepareChangeSet(input, options = {}) {
       severity: "high", code: "possible-secret", path: filePath,
       message: "A credential-like pattern was detected; proposed content must be reviewed and the value must not be committed."
     });
-    if (operation === "update" && (typeof change.expectedSha !== "string" || !change.expectedSha)) findings.push({
-      severity: "medium", code: "missing-expected-sha", path: filePath,
-      message: "An update should include the current file SHA to prevent overwriting concurrent changes."
+    if (operation !== "create" && !validBlobSha(change.expectedSha)) findings.push({
+      severity: "medium", code: "missing-or-invalid-expected-sha", path: filePath,
+      message: "An update or deletion must include the current 40-character Git blob SHA to prevent stale-file changes."
     });
+    if (operation === "create" && change.expectedSha !== undefined) throw new TypeError("Create operations must not include an expected SHA.");
     return {
       path: filePath, operation,
       ...(operation !== "delete" ? { content: change.content } : {}),
-      ...(change.expectedSha ? { expectedSha: String(change.expectedSha) } : {}),
+      ...(validBlobSha(change.expectedSha) ? { expectedSha: change.expectedSha } : {}),
       protectedPath
     };
   });
