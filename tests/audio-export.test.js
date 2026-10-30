@@ -145,3 +145,34 @@ test('rolls audio back when play throws synchronously', async () => {
   assert.equal(h.audioElement.currentTime, 0);
   await session.cleanup();
 });
+
+
+test('does not start playback when cleanup happens during context resume', async () => {
+  const h = createHarness();
+  let resolveResume;
+  class DelayedResumeContext extends h.FakeAudioContext {
+    resume() {
+      h.events.push('resume');
+      return new Promise(resolve => {
+        resolveResume = () => {
+          this.state = 'running';
+          resolve();
+        };
+      });
+    }
+  }
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioElement: h.audioElement,
+    AudioContextClass: DelayedResumeContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  const startPromise = session.start();
+  await session.cleanup();
+  resolveResume();
+
+  await assert.rejects(startPromise, /already closed/);
+  assert.equal(h.events.includes('play'), false);
+  assert.equal(h.audioTrack.stopped, true);
+});
