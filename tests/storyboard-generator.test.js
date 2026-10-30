@@ -231,3 +231,16 @@ test('dialogue timeline is bounded and ignores malformed entries during scene no
   assert.equal(scene.dialogueTimeline[0].startSeconds, 0);
   assert.equal(scene.dialogueTimeline[1].endSeconds, 4);
 });
+
+
+test('samples only the active attributed dialogue line at scene-local time', async () => {
+  const { getActiveSceneDialogue } = await import('../src/scene-model.js');
+  const scene = { dialogueTimeline: [
+    { characterId: 'Рыжик', text: 'Привет!', startSeconds: 0, endSeconds: 2 },
+    { characterId: 'Снежок', text: 'Здравствуй!', startSeconds: 2, endSeconds: 4 }
+  ] };
+  assert.equal(getActiveSceneDialogue(scene, 0.5).characterId, 'Рыжик');
+  assert.equal(getActiveSceneDialogue(scene, 2).characterId, 'Снежок');
+  assert.equal(getActiveSceneDialogue(scene, 4), null);
+  assert.equal(getActiveSceneDialogue({ dialogueTimeline: [] }, 1), null);
+});
