@@ -1,7 +1,9 @@
 /**
  * Deterministic five-beat storyboard planner.
- * This creates an editable outline; it does not claim to understand images or generate AI art.
+ * This is a local fallback, not a generative model or visual scene-understanding system.
  */
+import { parseStoryBrief, formatProductionDirectives } from './story-brief.js';
+
 export const STORYBOARD_BEAT_COUNT = 5;
 
 const BEATS = {
@@ -35,32 +37,9 @@ const BEATS = {
   ]
 };
 
-const CHARACTER_LABEL = {
-  ru: 'Главный персонаж',
-  uk: 'Головний персонаж',
-  en: 'Main character',
-  es: 'Personaje principal'
-};
-const STORY_LABEL = {
-  ru: 'Деталь исходной истории',
-  uk: 'Деталь початкової історії',
-  en: 'Story detail to preserve',
-  es: 'Detalle que conservar de la historia'
-};
-const FALLBACK = {
-  ru: 'Начинается новое приключение.',
-  uk: 'Починається нова пригода.',
-  en: 'A new adventure begins.',
-  es: 'Comienza una nueva aventura.'
-};
-
-function splitStorySentences(value) {
-  const text = String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 12_000);
-  if (!text) return [];
-  return (text.match(/[^.!?。！？]+[.!?。！？]?/gu) || [])
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
+const CHARACTER_LABEL = { ru: 'Главный персонаж', uk: 'Головний персонаж', en: 'Main character', es: 'Personaje principal' };
+const STORY_LABEL = { ru: 'Деталь исходной истории', uk: 'Деталь початкової історії', en: 'Story detail to preserve', es: 'Detalle que conservar de la historia' };
+const FALLBACK = { ru: 'Начинается новое приключение.', uk: 'Починається нова пригода.', en: 'A new adventure begins.', es: 'Comienza una nueva aventura.' };
 
 function distributeStoryDetails(sentences, beatCount) {
   const buckets = Array.from({ length: beatCount }, () => []);
@@ -68,45 +47,46 @@ function distributeStoryDetails(sentences, beatCount) {
     const bucketIndex = Math.min(beatCount - 1, Math.floor(index * beatCount / sentences.length));
     buckets[bucketIndex].push(sentence);
   });
-  return buckets.map((bucket) => bucket.join(' ').slice(0, 1_200));
+  return buckets.map(bucket => bucket.join(' ').slice(0, 1200));
 }
 
 /**
- * Build five distinct editable story beats while preserving every source sentence once.
- * With a one-sentence premise, later beats are clearly scaffolded suggestions, not inferred plot facts.
+ * Build five editable beats. Explicit labeled instructions are retained as production metadata.
+ * A one-sentence premise still uses clearly scaffolded local suggestions rather than invented plot facts.
  */
 export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
   const locale = Object.hasOwn(BEATS, lang) ? lang : 'en';
-  const subject = String(character ?? '').trim().slice(0, 120)
-    || (locale === 'ru' || locale === 'uk' ? 'Персонаж' : locale === 'es' ? 'Personaje' : 'Character');
-  const source = splitStorySentences(idea);
-  const sentences = source.length ? source : [FALLBACK[locale]];
+  const subject = String(character ?? '').trim().slice(0, 120) || (locale === 'ru' || locale === 'uk' ? 'Персонаж' : locale === 'es' ? 'Personaje' : 'Character');
+  const brief = parseStoryBrief(idea);
+  const source = brief.storyText;
+  const sentences = source ? (source.match(/[^.!?。！？]+[.!?。！？]?/gu) || []).map(part => part.trim()).filter(Boolean) : [FALLBACK[locale]];
+  const storyDetails = distributeStoryDetails(sentences.length ? sentences : [FALLBACK[locale]], STORYBOARD_BEAT_COUNT);
   const beats = BEATS[locale];
-  const storyDetails = distributeStoryDetails(sentences, STORYBOARD_BEAT_COUNT);
+  const directiveText = formatProductionDirectives(brief.directives);
 
   const scenes = beats.map((beat, index) => {
     const storyDetail = storyDetails[index];
+    const instruction = directiveText ? ` Production directions: ${directiveText}` : '';
     const description = [
       `${CHARACTER_LABEL[locale]}: ${subject}.`,
       beat.action,
       beat.camera,
-      storyDetail ? `${STORY_LABEL[locale]}: ${storyDetail}` : ''
+      storyDetail ? `${STORY_LABEL[locale]}: ${storyDetail}` : '',
+      instruction
     ].filter(Boolean).join(' ');
     return {
-      id: `scene_${index + 1}`,
-      order: index + 1,
-      title: beat.title,
-      visibleAction: beat.action,
-      camera: beat.camera,
-      storyDetail,
-      prompt: description,
-      description
+      id: `scene_${index + 1}`, order: index + 1, title: beat.title,
+      visibleAction: beat.action, camera: beat.camera, storyDetail,
+      prompt: description, description,
+      productionDirectives: brief.directives, sourceStoryText: source,
+      sourceEvents: brief.keyEvents
     };
   });
 
   return {
-    titles: scenes.map((scene) => scene.title),
-    descriptions: scenes.map((scene) => scene.description),
-    scenes
+    titles: scenes.map(scene => scene.title),
+    descriptions: scenes.map(scene => scene.description),
+    scenes,
+    brief
   };
 }
