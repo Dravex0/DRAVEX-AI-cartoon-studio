@@ -24,7 +24,7 @@ export function getImageCoverCrop(imageWidth, imageHeight, viewportWidth, viewpo
 /** Draws an image with cover behavior; returns false when dimensions are invalid. */
 export function drawImageCover(context, image, width, height, options = {}) {
   if (!context || typeof context.drawImage !== 'function' || !image) return false;
-  const crop = getImageCoverCrop(image.naturalWidth || image.width, image.naturalHeight || image.height, width, height, options.zoom, options.panX, options.panY);
+  const crop = getImageCoverCrop(image.naturalWidth || image.videoWidth || image.width, image.naturalHeight || image.videoHeight || image.height, width, height, options.zoom, options.panX, options.panY);
   if (!crop) return false;
   context.drawImage(image, crop.sx, crop.sy, crop.sw, crop.sh, crop.dx, crop.dy, crop.dw, crop.dh);
   return true;
