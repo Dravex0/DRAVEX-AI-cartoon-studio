@@ -64,6 +64,23 @@ test('does not treat extreme close-up and macro close-up as the same shot size',
   ]);
   assert.equal(result.issues.some((entry) => entry.code === 'camera-shot-repeat'), false);
 });
+
+test('recognizes repeated Russian and Ukrainian wide camera framing', () => {
+  const result = validateStoryScenes([
+    { id: 'wide-ru', duration: 3, prompt: 'A fox discovers a lantern.', motion: 'The fox approaches the lantern.', camera: 'Общий план лесной поляны' },
+    { id: 'wide-uk', duration: 3, prompt: 'A rabbit opens a gate.', motion: 'The rabbit pushes the gate open.', camera: 'Загальний план біля воріт' }
+  ]);
+  assert.ok(result.issues.some((entry) => entry.code === 'camera-shot-repeat' && entry.sceneId === 'wide-uk'));
+});
+
+test('distinguishes Russian close-up from extreme close-up', () => {
+  const result = validateStoryScenes([
+    { id: 'close-ru', duration: 3, prompt: 'Aster reacts to a sound.', motion: 'His expression changes.', camera: 'Крупный план лица' },
+    { id: 'extreme-ru', duration: 3, prompt: 'A silver rune activates.', motion: 'A tiny crack emits light.', camera: 'Экстремально крупный план руны' }
+  ]);
+  assert.equal(result.issues.some((entry) => entry.code === 'camera-shot-repeat'), false);
+});
+
 test('normalizes invalid duration and reports correction', () => {
   const result = validateStoryScenes([{ id: 'too-long', duration: 60, prompt: 'A bird flies over a lake.' }]);
   assert.equal(result.totalDurationSeconds, 3); assert.ok(result.issues.some((entry) => entry.code === 'duration-normalized'));
