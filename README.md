@@ -6,6 +6,8 @@ A free-first prototype for turning story text into a structured storyboard. The 
 
 - `src/scene-model.js` normalizes current and legacy scene shapes into a predictable scene structure.
 - `src/story-qa.js` performs deterministic text-level checks for missing actions, duplicate IDs, repetitive prompts, duration normalization, and dialogue/character mismatches. It does not inspect rendered video or claim model-level understanding.
+- `src/scene-production.js` assembles separate still-image and motion prompts using camera direction, start/end states, negative constraints, and matching Character Bible entries.
+- `src/device-capabilities.js` checks HTTPS, WebGPU adapter availability, approximate browser memory, CPU threads, and browser storage before any future local model load. This is advisory only; it does not download weights or guarantee model compatibility.
 - `fixtures/aster-awakening.js` contains an eight-scene, 23-second continuity fixture.
 - `tests/story-qa.test.js` exercises normalization and storyboard QA behavior.
 - `.github/workflows/quality.yml` runs syntax checks, tests, and a production build on pushes and pull requests.
@@ -31,6 +33,8 @@ The Vite build is a separate development bundle. The root `index.html` is the pu
 
 - Local story planning and cinematic direction use deterministic text heuristics; they do not visually understand generated frames.
 - Gemini can optionally write storyboard scenes, but this does not generate scene artwork or animation.
+- The scene editor exposes editable image/motion prompts, continuity locks, and a preview of the assembled AI instructions. These are pre-production instructions, not an active image/video generation provider.
+- The optional local AI hardware check does not prove that a particular diffusion model will fit or run on the device.
 - The canvas preview uses procedural shapes and camera framing; it is not full AI-generated animation.
 - Voice synthesis, lip-sync, music generation, and production-grade audiovisual export are not implemented yet.
 - No paid API is required. Gemini is optional and limited to Google's Free Tier quota when configured.
