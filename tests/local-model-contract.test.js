@@ -92,3 +92,12 @@ test('rejects path traversal and missing model file checksums', () => {
   assert.ok(unsafe.issues.some(issue => issue.code === 'invalid-model-files'));
   assert.ok(unsafe.issues.some(issue => issue.code === 'invalid-file-checksum'));
 });
+
+test('does not assume WASM support when browser capability is unknown', () => {
+  const fit = assessLocalModelFit(manifest, {
+    deviceMemoryGB: 4,
+    storage: { availableBytes: 2_000_000_000 }
+  });
+  assert.equal(fit.status, 'unknown');
+  assert.equal(fit.canAttempt, true);
+});
