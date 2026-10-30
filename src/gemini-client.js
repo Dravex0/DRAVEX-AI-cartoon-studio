@@ -57,7 +57,9 @@ export async function buildGeminiStoryboard({ apiKey, idea, language = 'ru', cha
   if (!rawBrief) throw new Error('Add a story idea first.');
   const brief = parseStoryBrief(rawBrief);
   const story = brief.storyText || rawBrief;
-  const directives = { ...brief.directives, style: brief.directives.style || style, duration: brief.directives.duration || `${duration} seconds per scene` };
+  const selectedDuration = Number(duration);
+  const sceneDurationSeconds = brief.requestedDurationSeconds ?? (Number.isFinite(selectedDuration) ? Math.max(0.25, Math.min(30, selectedDuration)) : 3);
+  const directives = { ...brief.directives, style: brief.directives.style || style, duration: brief.directives.duration || `${sceneDurationSeconds} seconds per scene` };
   const productionBrief = formatProductionDirectives(directives);
   const requestedCount = brief.requestedSceneCount || 5;
   const prompt = [
@@ -69,8 +71,11 @@ export async function buildGeminiStoryboard({ apiKey, idea, language = 'ru', cha
     'SCENE DESIGN: Each scene must have a distinct visible action, a clear beginning state and ending state, and advance the story. No duplicate actions, repeated establishing shots, or vague actions such as "the character feels something".',
     'CONTINUITY: Keep character names, appearance cues, clothing, props, location and time continuity consistent across all scenes. Carry consequences from one scene into the next.',
     'ANIMATION READINESS: Describe what visibly moves, what causes the movement, the reaction, and the final pose/state. Give a specific camera framing/movement. Include dialogue only when the story supports it.',
-    'OUTPUT: Return ONLY valid JSON: {"scenes":[{"title":"...","purpose":"...","characters":["..."],"location":"...","timeOfDay":"...","visibleAction":"...","startState":"...","endState":"...","camera":"...","dialogue":[{"characterId":"...","text":"..."}],"sound":"...","durationSeconds":3,"transition":"...","description":"...","prompt":"..."}]}.',
-    'SCENE COUNT: Create exactly ' + requestedCount + ' scenes unless that would split a single indivisible event; in that case use the closest sensible count and explain in scene purpose.',
+    'IMAGE AND MOTION PROMPTS: For every scene write a standalone imagePrompt for a single coherent still frame, and a motionPrompt describing temporal movement from startState to endState. Add a negativePrompt to prevent unwanted visual drift, extra limbs, duplicate characters, text/watermarks, and contradictions. Add continuityLock that repeats only the relevant character appearance, clothing, key props, and environment facts that must remain unchanged.',
+    'CHARACTER BIBLE: Return a top-level characterBible array. Give each recurring character a stable characterId and concise visualDescription, clothing, colors, proportions, and distinctiveFeatures. Do not silently redesign a character between scenes.',
+    'OUTPUT: Return ONLY valid JSON: {"characterBible":[{"characterId":"...","visualDescription":"...","clothing":"...","colors":"...","distinctiveFeatures":"..."}],"scenes":[{"title":"...","purpose":"...","characters":["..."],"location":"...","timeOfDay":"...","visibleAction":"...","startState":"...","endState":"...","camera":"...","imagePrompt":"...","motionPrompt":"...","negativePrompt":"...","continuityLock":"...","dialogue":[{"characterId":"...","text":"..."}],"sound":"...","durationSeconds":3,"transition":"...","description":"...","prompt":"..."}]}.',
+    'SCENE COUNT: Create exactly ' + requestedCount + ' scenes. Do not silently change the requested count.',
+    'DURATION: Every scene must be exactly ' + sceneDurationSeconds + ' seconds. Return this exact durationSeconds value for every scene.',
     'LANGUAGE: All scene text and dialogue must be in ' + languageName(language) + '.',
     'MAIN CHARACTER FIELD: ' + cleanText(character, 120),
     'PRODUCTION DIRECTIONS (highest priority after plot fidelity):\n' + (productionBrief || '- Use the selected visual style: ' + cleanText(style, 80)),
@@ -85,6 +90,13 @@ export async function buildGeminiStoryboard({ apiKey, idea, language = 'ru', cha
   if (brief.requestedSceneCount && parsed.scenes.length !== requestedCount) {
     throw new Error(`Gemini returned ${parsed.scenes.length} scenes, but the brief requested ${requestedCount}. Retry to enforce the requested scene count.`);
   }
+  const characterBible = Array.isArray(parsed.characterBible) ? parsed.characterBible.slice(0, 20).map(entry => ({
+    characterId: cleanText(entry?.characterId, 120),
+    visualDescription: cleanText(entry?.visualDescription, 700),
+    clothing: cleanText(entry?.clothing, 400),
+    colors: cleanText(entry?.colors, 200),
+    distinctiveFeatures: cleanText(entry?.distinctiveFeatures, 400)
+  })).filter(entry => entry.characterId) : [];
   const scenes = parsed.scenes.map((item, index) => {
     const title = cleanText(item?.title, 100);
     const visibleAction = cleanText(item?.visibleAction, 700);
@@ -102,14 +114,18 @@ export async function buildGeminiStoryboard({ apiKey, idea, language = 'ru', cha
       endState: cleanText(item?.endState, 500),
       dialogue: Array.isArray(item?.dialogue) ? item.dialogue.slice(0, 8).map(line => ({ characterId: cleanText(line?.characterId, 120), text: cleanText(line?.text, 500), language })).filter(line => line.text) : [],
       sound: cleanText(item?.sound, 300),
-      durationSeconds: Number.isFinite(Number(item?.durationSeconds)) ? Math.max(0.25, Math.min(30, Number(item.durationSeconds))) : 3,
+      durationSeconds: sceneDurationSeconds,
       transition: cleanText(item?.transition, 200),
       description, prompt: cleanText(item?.prompt, 1200) || description,
+      imagePrompt: cleanText(item?.imagePrompt, 4000) || [description, cleanText(item?.location, 300), cleanText(item?.camera, 300)].filter(Boolean).join('. '),
+      motionPrompt: cleanText(item?.motionPrompt, 3000) || [visibleAction, cleanText(item?.startState, 500), cleanText(item?.endState, 500)].filter(Boolean).join('. '),
+      negativePrompt: cleanText(item?.negativePrompt, 2000) || 'No character redesign, no extra characters, no duplicate body parts, no text, no watermark, no scene contradictions.',
+      continuityLock: cleanText(item?.continuityLock, 2000) || characterBible.filter(entry => (item?.characters || []).includes(entry.characterId)).map(entry => [entry.visualDescription, entry.clothing, entry.colors, entry.distinctiveFeatures].filter(Boolean).join('; ')).join(' | '),
       productionDirectives: directives,
       sourceStoryText: story
     };
   });
-  return { titles: scenes.map(scene => scene.title), descriptions: scenes.map(scene => scene.description), scenes, brief: { ...brief, directives, requestedSceneCount: requestedCount } };
+  return { titles: scenes.map(scene => scene.title), descriptions: scenes.map(scene => scene.description), scenes, characterBible, brief: { ...brief, directives, requestedSceneCount: requestedCount, requestedDurationSeconds: sceneDurationSeconds } };
 }
 
 export async function testGeminiConnection({ apiKey, fetchImpl = fetch }) {
