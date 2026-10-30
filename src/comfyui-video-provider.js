@@ -158,7 +158,7 @@ export function createComfyUIVideoProvider({
   for (const [key, binding] of Object.entries(nodeBindings)) applyBinding(cloneWorkflow(template), binding, '__validation__', key);
   const interval = Math.max(250, Math.min(10000, Number(pollIntervalMs) || 1500));
   const timeout = Math.max(1000, Math.min(1800000, Number(maxWaitMs) || 600000));
-  const frameStep = Math.max(1, Math.min(120, Math.round(Number(frameCountStep) || 1));
+  const frameStep = Math.max(1, Math.min(120, Math.round(Number(frameCountStep) || 1)));
   const frameOffset = Math.max(0, Math.min(frameStep - 1, Math.round(Number(frameCountOffset) || 0)));
 
   return Object.freeze({
