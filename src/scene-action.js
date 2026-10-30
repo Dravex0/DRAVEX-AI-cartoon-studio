@@ -33,13 +33,19 @@ export function detectSceneAction(input) {
  * This is a lexical preview cue, not generative character animation.
  */
 export function detectSceneActionForScene(scene = {}, fallbackTitle = '', fallbackDescription = '') {
-  const source = [
+  const candidates = [
     scene?.motionPrompt,
     scene?.visibleAction,
     scene?.storyDetail,
     scene?.description,
     fallbackDescription,
     fallbackTitle
-  ].map(value => String(value ?? '').trim()).filter(Boolean).join(' ');
-  return detectSceneAction(source);
+  ];
+  for (const candidate of candidates) {
+    const value = String(candidate ?? '').trim();
+    if (!value) continue;
+    const action = detectSceneAction(value);
+    if (action !== 'idle') return action;
+  }
+  return 'idle';
 }
