@@ -138,7 +138,7 @@ export async function directStoryboardWithLocalAI({
   return {
     usedLocalModel: true,
     scenes: candidate,
-    eventChain: basePlan?.eventChain || null,
+    eventChain,
     evaluation,
     fallbackReason: null,
     modelId: generated.modelId || runtime.status?.modelId || null,
