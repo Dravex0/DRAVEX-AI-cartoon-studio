@@ -71,7 +71,7 @@ function findEntity(source, actorId, verb) {
   if (!actorMatch) return null;
   const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
   const verbMatch = verb.re.exec(afterActor);
-  if (!verbMatch) return null;
+  if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) return null;
   const entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
   if (!entity || entity.length > 100 || /^(?:it|them|him|her|его|её|ее|их|його|її|їх)$/iu.test(entity)) return null;
   return { entity, evidence: clean(source, 1_200) };
@@ -107,7 +107,7 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
       const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
       for (const verb of LOCATION_VERBS[locale]) {
         const verbMatch = verb.re.exec(afterActor);
-        if (!verbMatch) continue;
+        if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) continue;
         const place = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
         if (!place || place.length > 100) continue;
         const value = verb.value + ':' + place;
