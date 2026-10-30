@@ -65,3 +65,25 @@ test('links to the previous source-backed scene when storyboard beats are empty'
   assert.equal(links[1], null);
   assert.equal(links[2].causeSceneId, 'a');
 });
+
+
+test('recognizes additional explicit consequence markers in all supported languages', () => {
+  const cases = [
+    ['en', 'The alarm rings.', 'As a consequence, the guard wakes up.'],
+    ['en', 'The bridge is blocked.', 'Due to this, the travelers turn back.'],
+    ['ru', 'Дверь заперта.', 'По этой причине герой ищет другой вход.'],
+    ['ru', 'Мост разрушен.', 'В результате этого путники идут через лес.'],
+    ['uk', 'Дорога затоплена.', 'З цієї причини мандрівники повертаються.'],
+    ['uk', 'Міст зруйнований.', 'У результаті цього герої шукають обхід.'],
+    ['es', 'La puerta está cerrada.', 'Como consecuencia, buscan otra entrada.'],
+    ['es', 'El puente está bloqueado.', 'Debido a esto, los viajeros regresan.']
+  ];
+  for (const [language, cause, effect] of cases) {
+    const links = inferSceneCausalLinks([
+      { id: 'cause', storyDetail: cause },
+      { id: 'effect', storyDetail: effect }
+    ], language);
+    assert.equal(links[1]?.causeSceneId, 'cause', effect);
+    assert.equal(links[1]?.effectSceneId, 'effect', effect);
+  }
+});
