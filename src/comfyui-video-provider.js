@@ -143,6 +143,8 @@ export function createComfyUIVideoProvider({
   fetchImpl = fetch,
   pollIntervalMs = 1500,
   maxWaitMs = 600000,
+  frameCountStep = 1,
+  frameCountOffset = 0,
   clientId = 'dravex-cartoon-studio'
 } = {}) {
   const base = normalizeComfyUIBaseUrl(baseUrl);
@@ -156,6 +158,8 @@ export function createComfyUIVideoProvider({
   for (const [key, binding] of Object.entries(nodeBindings)) applyBinding(cloneWorkflow(template), binding, '__validation__', key);
   const interval = Math.max(250, Math.min(10000, Number(pollIntervalMs) || 1500));
   const timeout = Math.max(1000, Math.min(1800000, Number(maxWaitMs) || 600000));
+  const frameStep = Math.max(1, Math.min(120, Math.round(Number(frameCountStep) || 1));
+  const frameOffset = Math.max(0, Math.min(frameStep - 1, Math.round(Number(frameCountOffset) || 0)));
 
   return Object.freeze({
     id: 'comfyui-local',
@@ -191,7 +195,7 @@ export function createComfyUIVideoProvider({
         image: imagePath,
         durationSeconds: request.durationSeconds,
         fps: request.fps,
-        frameCount: Math.max(1, Math.round(request.durationSeconds * request.fps)),
+        frameCount: frameOffset + Math.max(1, Math.ceil((request.durationSeconds * request.fps - frameOffset) / frameStep)) * frameStep,
         seed: request.seed ?? 0
       };
       for (const [key, binding] of Object.entries(nodeBindings)) {
