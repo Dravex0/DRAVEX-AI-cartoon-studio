@@ -23,14 +23,16 @@ export function sampleEmotionFaceTimeline(timeline,timeSeconds=0,transitionSecon
   const transition=Number.isFinite(Number(transitionSeconds))?clamp(Number(transitionSeconds),0,.75):.22;
   const valid=(Array.isArray(timeline)?timeline:[]).filter(item=>item&&Number.isFinite(Number(item.startSeconds))&&Number.isFinite(Number(item.endSeconds))&&Number(item.endSeconds)>Number(item.startSeconds)&&typeof item.emotion==='string').sort((a,b)=>Number(a.startSeconds)-Number(b.startSeconds));
   if(!valid.length)return getEmotionFacePose(fallback,time);
+  for(let index=1;index<valid.length;index++){
+    const current=valid[index],boundary=Number(current.startSeconds);
+    if(transition>0&&time>=boundary-transition&&time<boundary){
+      const p0=clamp((time-(boundary-transition))/transition,0,1),p=p0*p0*(3-2*p0);
+      const previousPose=getEmotionFacePose(valid[index-1].emotion,time),currentPose=getEmotionFacePose(current.emotion,time),blended={};
+      for(const key of Object.keys(currentPose))blended[key]=previousPose[key]+(currentPose[key]-previousPose[key])*p;
+      return blended;
+    }
+  }
   let index=valid.findIndex(item=>time>=Number(item.startSeconds)&&time<Number(item.endSeconds));
   if(index<0)index=time>=Number(valid[valid.length-1].endSeconds)?valid.length-1:0;
-  const current=valid[index],currentPose=getEmotionFacePose(current.emotion,time);
-  if(index===0||transition<=0)return currentPose;
-  const boundary=Number(current.startSeconds),progress=clamp((time-(boundary-transition))/transition,0,1);
-  if(progress>=1)return currentPose;
-  const p=progress*progress*(3-2*progress),previousPose=getEmotionFacePose(valid[index-1].emotion,time);
-  const blended={};
-  for(const key of Object.keys(currentPose))blended[key]=previousPose[key]+(currentPose[key]-previousPose[key])*p;
-  return blended;
+  return getEmotionFacePose(valid[index].emotion,time);
 }
