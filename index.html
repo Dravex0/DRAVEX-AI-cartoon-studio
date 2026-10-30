@@ -116,6 +116,9 @@ $('uiLanguage').addEventListener('change',()=>{uiLang=$('uiLanguage').value;writ
 $('style').addEventListener('change',()=>{if(!playing)draw()});
 let selectedMusicUrl='';
 const dialogueAudioAssignments=new Map();
+const dialogueCharacterVolumes=new Map();
+function dialogueCharacterVolumeKey(characterId){return String(characterId||'').trim().toLowerCase()}
+function getDialogueCharacterVolumeMap(){return new Map([...dialogueCharacterVolumes.entries()].map(([key,value])=>[key,Math.max(0,Math.min(1,Number(value)||0))]))}
 let exportLipSyncState=null;
 function getDialogueMouthOpen(dialogue,index){
   if(!exportLipSyncState||!dialogue||typeof exportLipSyncState.audioSession?.getCurrentTime!=='function')return null;
@@ -135,6 +138,35 @@ function renderDialogueAudioAssignments(){
   const heading=document.createElement('strong');
   heading.textContent=uiLang==='ru'?'Озвучка реплик этой сцены':'Voice recordings for this scene';
   box.appendChild(heading);
+  const speakers=[...new Set(lines.map(line=>String(line.characterId||'').trim()).filter(Boolean))];
+  if(speakers.length){
+    const volumeGroup=document.createElement('div');
+    volumeGroup.className='field';
+    const volumeHeading=document.createElement('strong');
+    volumeHeading.textContent=uiLang==='ru'?'Громкость голоса персонажей':'Character voice levels';
+    volumeGroup.appendChild(volumeHeading);
+    speakers.forEach(speaker=>{
+      const key=dialogueCharacterVolumeKey(speaker);
+      const control=document.createElement('label');
+      control.className='field';
+      const caption=document.createElement('span');
+      caption.textContent=speaker;
+      const slider=document.createElement('input');
+      slider.type='range';slider.min='0';slider.max='100';slider.step='5';
+      slider.value=String(Math.round((dialogueCharacterVolumes.get(key)??1)*100));
+      const value=document.createElement('small');
+      value.className='muted';value.textContent=slider.value+'%';
+      slider.setAttribute('aria-label',(uiLang==='ru'?'Громкость голоса: ':'Voice volume: ')+speaker);
+      slider.addEventListener('input',()=>{
+        const level=Number(slider.value)/100;
+        dialogueCharacterVolumes.set(key,level);
+        value.textContent=slider.value+'%';
+      });
+      control.append(caption,slider,value);
+      volumeGroup.appendChild(control);
+    });
+    box.appendChild(volumeGroup);
+  }
   if(!lines.length){
     const empty=document.createElement('small');
     empty.className='muted';
@@ -720,7 +752,8 @@ $('export').onclick=async()=>{
         videoStream:stream,
         audioTracks,
         dialogueAudioSchedule:dialogueSchedule,
-        dialogueAudioBuffers:dialogueBuffers
+        dialogueAudioBuffers:dialogueBuffers,
+        dialogueCharacterVolumes:getDialogueCharacterVolumeMap()
       });
       stream=audioSession.stream;
       const audioStartTime=await audioSession.start();
