@@ -376,7 +376,7 @@ ctx.save();ctx.translate(0,-23);ctx.rotate(toRadians(characterPose.headRotation)
 ctx.beginPath();ctx.moveTo(-38,0);ctx.lineTo(-48,-45);ctx.lineTo(-10,-22);ctx.fill();
 ctx.beginPath();ctx.moveTo(5,-22);ctx.lineTo(32,-55);ctx.lineTo(42,-3);ctx.fill();
 ctx.fillStyle='#ffd0a1';ctx.beginPath();ctx.ellipse(8,17,31,23,0,0,Math.PI*2);ctx.fill();
-const facePose=sampleEmotionFaceTimeline(sceneMetadata[sceneIndex]?.emotionTimeline,sceneMotionProgress*sceneDuration,.24,expression);const blink=Math.sin(t*1.73+0.4)>.996?0.12:1;
+const facePose=sampleEmotionFaceTimeline(sceneMetadata[sceneIndex]?.emotionTimeline,sceneMotionProgress*sceneDuration,.25,expression);const blink=Math.sin(t*1.73+0.4)>.996?0.12:1;
 ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(4,-5,9,12*blink*facePose.eyeScale,0,0,Math.PI*2);ctx.ellipse(28,-5,9,12*blink*facePose.eyeScale,0,0,Math.PI*2);ctx.fill();
 ctx.fillStyle='#242033';ctx.beginPath();if(blink>.5){ctx.arc(7,-4,4,0,Math.PI*2);ctx.arc(29,-4,4,0,Math.PI*2)}ctx.fill();
 ctx.strokeStyle='#242033';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-2,-17-facePose.browLift*5+facePose.browTilt*4);ctx.lineTo(11,-17-facePose.browLift*5-facePose.browTilt*4);ctx.moveTo(23,-17-facePose.browLift*5+facePose.browTilt*4);ctx.lineTo(36,-17-facePose.browLift*5-facePose.browTilt*4);ctx.stroke();
