@@ -359,7 +359,7 @@ else if(action==='talk'){fy+=Math.sin(t*5)*2}
 else if(action==='surprised'){fy-=Math.abs(Math.sin(t*2))*5}
 else if(action==='sad'){fy+=Math.abs(Math.sin(t*1.5))*3}
 const toRadians=value=>value*Math.PI/180;
-const activeDialogue=getActiveDialogue(sceneIndex,sceneMotionProgress*sceneDuration);speakActiveDialogue(activeDialogue);const leadIsSpeaking=Boolean(activeDialogue&&activeDialogue.characterId.toLowerCase()===String(sceneCharacterIds[0]).toLowerCase());const emotion=getSceneEmotion(sceneIndex,sceneMotionProgress*sceneDuration);const emotionExpression={happy:'happy',sad:'sad',fear:'surprised',anger:'neutral',surprised:'surprised',neutral:'neutral'}[emotion];const expression=leadIsSpeaking?'talk':['happy','sad','surprised','talk'].includes(action)?action:emotionExpression||characterPose.expression;
+const activeDialogue=getActiveDialogue(sceneIndex,sceneMotionProgress*sceneDuration);speakActiveDialogue(activeDialogue);const leadIsSpeaking=Boolean(activeDialogue&&activeDialogue.characterId.toLowerCase()===String(sceneCharacterIds[0]).toLowerCase());const emotion=getSceneEmotion(sceneIndex,sceneMotionProgress*sceneDuration);const emotionExpression={happy:'happy',sad:'sad',fear:'fear',anger:'anger',surprised:'surprised',neutral:'neutral'}[emotion];const expression=leadIsSpeaking?'talk':['happy','sad','surprised','talk'].includes(action)?action:emotionExpression||characterPose.expression;
 ctx.save();
 ctx.translate(fx,fy);
 ctx.rotate(scenePose[2]+characterPose.rotation*Math.PI/180+(sceneIndex===2?Math.sin(t*1.8)*.04:0)+(action==='dance'?Math.sin(t*3.4)*.2:action==='turn'?Math.sin(t*2)*.5:0));
