@@ -163,3 +163,29 @@ test('schedules decoded dialogue buffers into the same recording audio destinati
   await session.cleanup();
   assert.equal(scheduled.filter(event => event[0] === 'stop').length, 1);
 });
+
+
+test('supports dialogue-only export without requiring a music element', async () => {
+  const h = createHarness();
+  const scheduled = [];
+  class DialogueOnlyContext extends h.FakeAudioContext {
+    createBufferSource() {
+      return {
+        connect() {},
+        start(...args) { scheduled.push(args); },
+        stop() {},
+        disconnect() {}
+      };
+    }
+  }
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    dialogueAudioSchedule: [{ sceneIndex: 1, lineId: 'dialogue_1', startMs: 0, endMs: 900 }],
+    dialogueAudioBuffers: new Map([['1:dialogue_1', { duration: 1 }]]),
+    AudioContextClass: DialogueOnlyContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+  await session.start();
+  assert.deepEqual(scheduled, [[0, 0, 0.9]]);
+  await session.cleanup();
+});
