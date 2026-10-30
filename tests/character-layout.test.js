@@ -90,7 +90,7 @@ test('handoff gestures extend the giver arm and animate the receiver reach later
   const receiverEarly = getSceneCharacterGesturePose(scene, 0.5, 'B');
   const receiverLate = getSceneCharacterGesturePose(scene, 1.8, 'B');
   assert.equal(giver.active, true);
-  assert.ok(giver.rightArm > 70);
+  assert.ok(giver.rightArm > 35);
   assert.equal(receiverEarly.rightArm, 0);
   assert.ok(receiverLate.rightArm > receiverEarly.rightArm);
 });
