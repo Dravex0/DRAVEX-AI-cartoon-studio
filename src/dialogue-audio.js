@@ -49,3 +49,21 @@ export function getActiveDialogueAudioCue(schedule, elapsedMs) {
   if (!Array.isArray(schedule)) return null;
   return schedule.find(cue => time >= cue.startMs && time < cue.endMs) || null;
 }
+
+/** Collect all distinct attributed speakers across the storyboard in first-seen order. */
+export function getDialogueSpeakers(scenes) {
+  const source = Array.isArray(scenes) ? scenes : [];
+  const seen = new Set();
+  const speakers = [];
+  for (const scene of source) {
+    const lines = Array.isArray(scene?.dialogueTimeline) ? scene.dialogueTimeline.slice(0, MAX_DIALOGUE_LINES_PER_SCENE) : [];
+    for (const line of lines) {
+      const name = typeof line?.characterId === 'string' ? line.characterId.trim().slice(0, 120) : '';
+      const key = name.toLocaleLowerCase();
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      speakers.push(name);
+    }
+  }
+  return speakers;
+}
