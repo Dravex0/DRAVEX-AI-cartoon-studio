@@ -46,6 +46,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 </main>
 <script type="module">
 import { validateStoryScenes } from "./src/story-qa.js";
+import { buildStoryboardFromText } from "./src/storyboard-generator.js";
 const translations={
 en:{freeTag:'FREE · LOCAL-FIRST',previewTag:'CARTOON WORKSPACE · EARLY PREVIEW',headline:'Turn your idea<br>into a story.',intro:'Plan characters and scenes, preview a simple animated storyboard, and export a short silent WebM test. This prototype does not call an AI service yet.',createTitle:'01 · Create a story',ideaLabel:'Story idea',ideaPlaceholder:'A curious fox discovers a glowing star in the forest...',characterLabel:'Main character',styleLabel:'Visual style',durationLabel:'Scene duration',seconds3:'3 seconds',seconds5:'5 seconds',seconds8:'8 seconds',storyLanguageLabel:'Story language',createButton:'Create storyboard',saveButton:'Save draft',readyStatus:'Ready. Your idea stays in this browser unless you export it.',previewTitle:'02 · Preview',playButton:'Play preview',pauseButton:'Pause preview',exportButton:'Export WebM test',previewDisclaimer:'Preview/export uses a simple canvas animation. It is not full AI-generated animation and has no voice, music, or lip-sync yet.',footer:'DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to',sceneTitles:['A discovery','A closer look','A new adventure'],sceneDescriptions:['The fox spots a glowing star.','The little star floats nearby.','The fox follows the light.'],sceneLabel:'Scene',ready:'Ready. Your idea stays in this browser unless you export it.',emptyIdea:'Add a story idea first.',created:'Storyboard outline created locally. AI script generation is not connected yet.',saved:'Draft saved in this browser.',storageError:'Browser storage is unavailable; you can still keep this page open.',restored:'Restored draft from this browser.',recording:'Recording a short preview…',exported:'WebM preview exported. Silent prototype only.',unsupported:'WebM recording is not supported by this browser.',exportFailed:'Export failed in this browser. Try Play preview first.'},
 ru:{freeTag:'БЕСПЛАТНО · ЛОКАЛЬНАЯ РАБОТА',previewTag:'РАБОЧЕЕ ПРОСТРАНСТВО МУЛЬТФИЛЬМОВ · РАННИЙ ПРЕДПРОСМОТР',headline:'Преврати идею<br>в историю.',intro:'Планируй персонажей и сцены, смотри простую анимированную раскадровку и экспортируй короткое немое видео WebM. В этой версии ИИ пока не подключён.',createTitle:'01 · Создание истории',ideaLabel:'Идея истории',ideaPlaceholder:'Любопытный лисёнок находит светящуюся звезду в лесу…',characterLabel:'Главный персонаж',styleLabel:'Визуальный стиль',durationLabel:'Длительность сцены',seconds3:'3 секунды',seconds5:'5 секунд',seconds8:'8 секунд',storyLanguageLabel:'Язык истории',createButton:'Создать раскадровку',saveButton:'Сохранить черновик',readyStatus:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',previewTitle:'02 · Предпросмотр',playButton:'Воспроизвести',pauseButton:'Пауза',exportButton:'Экспорт тестового WebM',previewDisclaimer:'Предпросмотр и экспорт используют простую анимацию Canvas. Это ещё не полноценная ИИ-анимация: озвучки, музыки и синхронизации губ пока нет.',footer:'DRAVEX AI Cartoon Studio · Прототип · Платный API не требуется · Используй только материалы, на которые у тебя есть права',sceneTitles:['Открытие','Поближе','Новое приключение'],sceneDescriptions:['Лисёнок замечает светящуюся звезду.','Маленькая звезда парит рядом.','Лисёнок следует за светом.'],sceneLabel:'Сцена',ready:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',emptyIdea:'Сначала добавь идею истории.',created:'Черновая раскадровка создана локально. Генерация сценария с помощью ИИ пока не подключена.',saved:'Черновик сохранён в этом браузере.',storageError:'Хранилище браузера недоступно; можно оставить страницу открытой.',restored:'Черновик восстановлен из этого браузера.',recording:'Записываем короткий предпросмотр…',exported:'Предпросмотр WebM экспортирован. Это только немой прототип.',unsupported:'Этот браузер не поддерживает запись WebM.',exportFailed:'Не удалось экспортировать видео. Сначала попробуй запустить предпросмотр.'}
@@ -198,71 +199,6 @@ function renderScenes(){
     };
     box.appendChild(button);
   });
-}
-function buildStoryboardFromText(idea,lang='ru',character='Foxy'){
-const locale=['ru','uk','es','en'].includes(lang)?lang:'en';
-const subject=String(character||'').trim()||(locale==='ru'?'Персонаж':locale==='uk'?'Персонаж':locale==='es'?'Personaje':'Character');
-const cleanIdea=String(idea||'').replace(/\s+/g,' ').trim();
-const sentences=cleanIdea.split(/(?<=[.!?。！？])\s+/).map(s=>s.trim()).filter(Boolean);
-const fallback={ru:'Новое приключение начинается.',uk:'Починається нова пригода.',es:'Comienza una nueva aventura.',en:'A new adventure begins.'}[locale];
-const source=sentences.length?sentences:[fallback];
-const beats={
-ru:[
-['Завязка','Покажи место действия и исходное положение героя. Герой осматривается и делает первое заметное движение.'],
-['Событие','Покажи, что меняется: герой замечает или слышит важную деталь и явно реагирует на неё.'],
-['Препятствие','Герой приближается к цели, пробует действовать и сталкивается с конкретным препятствием.'],
-['Кульминация','Покажи самое важное физическое действие, реакцию окружения и заметное последствие.'],
-['Развязка','Покажи результат действия, эмоциональную реакцию героя и новый финальный образ.']],
-uk:[
-['Зав’язка','Покажи місце події та початкове положення героя. Герой озирається й робить перший помітний рух.'],
-['Подія','Покажи зміну: герой помічає або чує важливу деталь і виразно реагує.'],
-['Перешкода','Герой наближається до мети, пробує діяти й стикається з конкретною перешкодою.'],
-['Кульмінація','Покажи головну фізичну дію, реакцію оточення та помітний наслідок.'],
-['Розв’язка','Покажи результат дії, емоційну реакцію героя та новий фінальний образ.']],
-es:[
-['Inicio','Establece el lugar y la posición inicial. El personaje observa el entorno y realiza un primer movimiento visible.'],
-['Incidente','Muestra el cambio: el personaje percibe un detalle importante y reacciona claramente.'],
-['Obstáculo','El personaje se acerca a su objetivo, intenta actuar y encuentra un obstáculo concreto.'],
-['Clímax','Muestra la acción física principal, la reacción del entorno y una consecuencia visible.'],
-['Desenlace','Muestra el resultado, la reacción emocional y una imagen final nueva.']],
-en:[
-['Introduction','Establish the location and starting position. The character scans the surroundings and makes a clear first movement.'],
-['Inciting event','Show what changes: the character notices or hears an important detail and visibly reacts.'],
-['Obstacle','The character moves toward the goal, tries an action, and meets a concrete obstacle.'],
-['Climax','Show the main physical action, the environment reacting, and a visible consequence.'],
-['Resolution','Show the result, the character’s emotional reaction, and a distinct final image.']]
-};
-const beatsForLocale=beats[locale]||beats.en;
-const titlesOut=[],descriptionsOut=[];
-for(let idx=0;idx<5;idx++){
- const beat=beatsForLocale[idx];
- const sentenceIndex=source.length===1?0:Math.round(idx*(source.length-1)/4);
- const sourceLine=source[sentenceIndex];
- const continuity=idx===0
-  ?({ru:'Начни с общего плана.',uk:'Почни із загального плану.',es:'Empieza con un plano general.',en:'Begin with a wide establishing shot.'}[locale])
-  :idx===1
-  ?({ru:'Перейди к среднему плану и покажи реакцию.',uk:'Перейди до середнього плану й покажи реакцію.',es:'Pasa a un plano medio y muestra la reacción.',en:'Cut to a medium shot and show the reaction.'}[locale])
-  :idx===2
-  ?({ru:'Используй движение камеры вслед за героем.',uk:'Використай рух камери за героєм.',es:'Mueve la cámara siguiendo al personaje.',en:'Track the character with the camera.'}[locale])
-  :idx===3
-  ?({ru:'Используй крупный план действия и покажи его последствия.',uk:'Використай крупний план дії та покажи її наслідки.',es:'Usa un primer plano de la acción y muestra sus consecuencias.',en:'Use a close-up of the action and show its consequence.'}[locale])
-  :({ru:'Заверши отдельным спокойным кадром, не копируя кульминацию.',uk:'Заверши окремим спокійним кадром, не копіюючи кульмінацію.',es:'Termina con un plano tranquilo distinto, sin repetir el clímax.',en:'Finish on a distinct, quieter shot rather than repeating the climax.'}[locale]);
- titlesOut.push(beat[0]);
- const characterContext={
-  ru:`Главный персонаж: ${subject}.`,
-  uk:`Головний персонаж: ${subject}.`,
-  es:`Personaje principal: ${subject}.`,
-  en:`Main character: ${subject}.`
- }[locale];
- const storyContext={
-  ru:`Связь с исходной историей: ${sourceLine}`,
-  uk:`Зв’язок з початковою історією: ${sourceLine}`,
-  es:`Conexión con la historia original: ${sourceLine}`,
-  en:`Story detail to preserve: ${sourceLine}`
- }[locale];
- descriptionsOut.push(characterContext+' '+beat[1]+' '+continuity+' '+storyContext);
-}
-return {titles:titlesOut,descriptions:descriptionsOut};
 }
 $('make').addEventListener('click',()=>{const status=$('status');try{const idea=$('idea').value.trim();if(!idea){status.textContent=tr('emptyIdea');$('idea').focus();return}const lang=storyLanguage();const plan=buildStoryboardFromText(idea,lang,$('character').value.trim()||(lang==='ru'?'Главный герой':'Foxy'));titles=plan.titles;descriptions=plan.descriptions;sceneIndex=0;$('sceneLabel').textContent=(storyLabels[lang]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();updateStoryQA();status.textContent=uiLang==='ru'?'Создана 5-сценная сюжетная раскадровка. Это локальный планировщик, не ИИ-генерация; проверь и отредактируй каждую сцену.':'Created a five-beat story outline locally. This is not AI generation yet; review and edit each scene.';status.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(error){console.error('DRAVEX storyboard error:',error);status.textContent=(uiLang==='ru'?'Не удалось создать сцены. Обнови страницу и попробуй ещё раз.':'Could not create scenes. Refresh the page and try again.')+' ('+(error&&error.message?error.message:'unknown error')+')';}});
 $('play').onclick=()=>{playing=!playing;$('play').textContent=playing?tr('pauseButton'):tr('playButton');if(playing&&!raf)draw()};
