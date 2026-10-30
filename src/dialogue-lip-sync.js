@@ -28,7 +28,10 @@ export function sampleDialogueMouthOpen(audioBuffer, elapsedMs, windowMs = 32) {
   return Math.max(0, Math.min(1, (rms - 0.012) * 5.5));
 }
 
-/** Precompute a compact, smoothed RMS envelope once after local audio decoding. */
+/** Precompute a compact, smoothed RMS envelope once after local audio decoding.
+ * Uses a rolling sum of squared samples so overlapping RMS windows are O(samples),
+ * rather than rescanning the full window for every output frame.
+ */
 export function createDialogueMouthEnvelope(audioBuffer, { windowMs = 32, hopMs = 16, noiseFloor = 0.012, sensitivity = 5.5, attack = 0.62, release = 0.28 } = {}) {
   if (!audioBuffer || typeof audioBuffer.getChannelData !== 'function' || !Number.isFinite(audioBuffer.sampleRate) || audioBuffer.sampleRate <= 0) return null;
   const length = Number(audioBuffer.length);
@@ -39,12 +42,30 @@ export function createDialogueMouthEnvelope(audioBuffer, { windowMs = 32, hopMs 
   const halfWindow = Math.max(1, Math.floor(rate * Math.max(8, Math.min(100, windowMs)) / 2000));
   const channelData = Array.from({ length: channels }, (_, channel) => audioBuffer.getChannelData(channel));
   const values = new Float32Array(Math.ceil(length / hopSamples));
-  let previous = 0;
+  let previous = 0, windowStart = 0, windowEnd = 0, sumSquares = 0, count = 0;
+  const addRange = (from, to) => {
+    for (const data of channelData) if (data) for (let i = from; i < to; i++) {
+      const sample = Number(data[i]) || 0;
+      sumSquares += sample * sample;
+      count++;
+    }
+  };
+  const removeRange = (from, to) => {
+    for (const data of channelData) if (data) for (let i = from; i < to; i++) {
+      const sample = Number(data[i]) || 0;
+      sumSquares -= sample * sample;
+      count--;
+    }
+  };
   for (let frame = 0; frame < values.length; frame++) {
-    const center = frame * hopSamples, start = Math.max(0, center - halfWindow), end = Math.min(length, center + halfWindow + 1);
-    let sumSquares = 0, count = 0;
-    for (const data of channelData) if (data) for (let i = start; i < end; i++) { const sample = Number(data[i]) || 0; sumSquares += sample * sample; count++; }
-    const rms = count ? Math.sqrt(sumSquares / count) : 0;
+    const center = frame * hopSamples;
+    const nextStart = Math.max(0, center - halfWindow);
+    const nextEnd = Math.min(length, center + halfWindow + 1);
+    if (nextStart > windowStart) removeRange(windowStart, nextStart);
+    if (nextEnd > windowEnd) addRange(windowEnd, nextEnd);
+    windowStart = nextStart;
+    windowEnd = nextEnd;
+    const rms = count > 0 ? Math.sqrt(Math.max(0, sumSquares) / count) : 0;
     const target = Math.max(0, Math.min(1, (rms - noiseFloor) * sensitivity));
     previous += (target - previous) * Math.max(0, Math.min(1, target > previous ? attack : release));
     values[frame] = previous;
