@@ -134,3 +134,32 @@ test('mixes multiple local audio tracks with independent volume and lifecycle', 
   assert.ok(h.events.includes('dialogue-pause'));
   assert.ok(h.events.includes('music-pause'));
 });
+
+
+test('schedules decoded dialogue buffers into the same recording audio destination', async () => {
+  const h = createHarness();
+  const scheduled = [];
+  class DialogueContext extends h.FakeAudioContext {
+    createBufferSource() {
+      return {
+        connect(destination) { scheduled.push(['connect', destination]); },
+        start(...args) { scheduled.push(['start', ...args]); },
+        stop() { scheduled.push(['stop']); },
+        disconnect() { scheduled.push(['disconnect']); }
+      };
+    }
+  }
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioElement: h.audioElement,
+    dialogueAudioSchedule: [{ sceneIndex: 0, lineId: 'line-1', startMs: 400, endMs: 1400 }],
+    dialogueAudioBuffers: new Map([['0:line-1', { duration: 2 }]]),
+    AudioContextClass: DialogueContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+  await session.start();
+  assert.equal(scheduled.filter(event => event[0] === 'start').length, 1);
+  assert.deepEqual(scheduled.find(event => event[0] === 'start'), ['start', 0.4, 0, 1]);
+  await session.cleanup();
+  assert.equal(scheduled.filter(event => event[0] === 'stop').length, 1);
+});
