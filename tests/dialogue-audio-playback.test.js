@@ -58,7 +58,7 @@ test('skips missing or invalid assets without preventing valid cues', () => {
     audioBuffers: new Map([['0:valid', { duration: 2 }]])
   });
   assert.equal(result.scheduledCount, 1);
-  assert.deepEqual(result.skipped, ['0:missing', 'invalid-cue']);
+  assert.deepEqual(result.skipped, ['0:missing', '0:bad']);
 });
 
 test('uses supplied startAt and stops scheduled sources safely once', () => {
