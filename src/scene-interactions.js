@@ -28,6 +28,7 @@ export function normalizeSceneInteraction(input = {}, index = 0, sceneDuration =
     participants,
     targetCharacterId: clean(source.targetCharacterId, 120),
     objectId: clean(source.objectId, 120),
+    objectDescription: clean(source.objectDescription ?? source.objectLabel, 120),
     startSeconds: Math.min(startSeconds, endSeconds),
     endSeconds: Math.max(startSeconds, endSeconds),
     description: clean(source.description, 1000)
