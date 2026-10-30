@@ -13,3 +13,28 @@ export function parseDialogueAudioFilename(filename) {
     lineId: match[2].toLowerCase()
   };
 }
+
+
+/** Stable UI assignment key; unlike sceneIndex, sceneId survives scene reordering. */
+export function getDialogueAudioAssignmentKey(sceneId, lineId) {
+  if (typeof sceneId !== 'string' || !sceneId.trim() ||
+      typeof lineId !== 'string' || !lineId.trim()) return '';
+  return sceneId.trim() + ':' + lineId.trim();
+}
+
+/**
+ * Translate stable scene-ID assignments to the current export schedule's
+ * positional asset keys. Deleted scenes and removed lines are naturally ignored.
+ */
+export function mapDialogueAudioAssignmentsToSchedule(assignments, scenes, schedule) {
+  const result = new Map();
+  if (!(assignments instanceof Map) || !Array.isArray(scenes) || !Array.isArray(schedule)) return result;
+  for (const cue of schedule) {
+    const scene = scenes[cue?.sceneIndex];
+    const stableKey = getDialogueAudioAssignmentKey(scene?.id, cue?.lineId);
+    const exportKey = Number.isInteger(cue?.sceneIndex) && typeof cue?.lineId === 'string'
+      ? cue.sceneIndex + ':' + cue.lineId : '';
+    if (stableKey && exportKey && assignments.has(stableKey)) result.set(exportKey, assignments.get(stableKey));
+  }
+  return result;
+}
