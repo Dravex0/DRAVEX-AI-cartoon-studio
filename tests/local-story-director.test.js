@@ -39,6 +39,7 @@ test('accepts a high-quality local director candidate while locking story detail
   assert.ok(result.scenes.every(scene => scene.characters.includes('Foxy')));
   assert.ok(result.scenes.every(scene => !scene.characters.includes('invented character')));
   assert.equal(result.backend, 'wasm');
+  assert.deepEqual(result.eventChain, basePlan.eventChain);
 });
 
 test('rejects repetitive or vague model directions and returns the deterministic baseline', async () => {
@@ -47,6 +48,7 @@ test('rejects repetitive or vague model directions and returns the deterministic
   assert.equal(result.usedLocalModel, false);
   assert.equal(result.fallbackReason, 'candidate-failed-story-quality-gate');
   assert.deepEqual(result.scenes, basePlan.scenes);
+  assert.deepEqual(result.eventChain, basePlan.eventChain);
   assert.ok(result.evaluation.issues.length > 0);
 });
 
@@ -118,6 +120,8 @@ test('locks multiple assigned characters and evaluates their visual reference pr
   assert.ok(capturedPrompt.includes('Tiny blue songbird'));
   assert.ok(capturedPrompt.includes('White tail tip'));
   assert.ok(capturedPrompt.includes('"assignedCharacters":["Foxy","Bird"]'));
+  assert.ok(capturedPrompt.includes('LOCKED EVENT CHAIN:'));
+  assert.ok(capturedPrompt.includes('"schemaVersion":1'));
 });
 
 test('rejects multi-character direction when an assigned character has no reference profile', async () => {
