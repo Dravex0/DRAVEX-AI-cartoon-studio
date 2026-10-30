@@ -26,3 +26,20 @@ export function detectSceneAction(input) {
   }
   return 'idle';
 }
+
+
+/**
+ * Resolve the preview action from explicit scene motion fields first.
+ * This is a lexical preview cue, not generative character animation.
+ */
+export function detectSceneActionForScene(scene = {}, fallbackTitle = '', fallbackDescription = '') {
+  const source = [
+    scene?.motionPrompt,
+    scene?.visibleAction,
+    scene?.storyDetail,
+    scene?.description,
+    fallbackDescription,
+    fallbackTitle
+  ].map(value => String(value ?? '').trim()).filter(Boolean).join(' ');
+  return detectSceneAction(source);
+}
