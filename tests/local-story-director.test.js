@@ -117,6 +117,7 @@ test('locks multiple assigned characters and evaluates their visual reference pr
   assert.equal(result.evaluation.metrics.characterReferenceCoverage, 100);
   assert.ok(capturedPrompt.includes('Tiny blue songbird'));
   assert.ok(capturedPrompt.includes('White tail tip'));
+  assert.ok(capturedPrompt.includes('"assignedCharacters":["Foxy","Bird"]'));
 });
 
 test('rejects multi-character direction when an assigned character has no reference profile', async () => {
