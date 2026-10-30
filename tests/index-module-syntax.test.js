@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 
 test('published index contains exactly one parseable module script', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  const scripts = [...html.matchAll(/<script\\s+type=["']module["']\\s*>([\\s\\S]*?)<\\/script>/gi)];
+  const scripts = [...html.matchAll(/<script\s+type=["']module["']\s*>([\s\S]*?)<\/script>/gi)];
   assert.equal(scripts.length, 1, 'expected one inline ES module in the published page');
   const result = spawnSync(process.execPath, ['--check', '--input-type=module'], {
     input: scripts[0][1],
@@ -16,6 +16,6 @@ test('published index contains exactly one parseable module script', () => {
 
 test('published page imports the prompt-guided motion module', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /from ["']\\.\\/src\\/prompt-camera-motion\\.js["']/);
-  assert.match(html, /getPromptCameraTransform\\(currentSceneData\\.motionPrompt/);
+  assert.match(html, /from ["']\.\/src\/prompt-camera-motion\.js["']/);
+  assert.match(html, /getPromptCameraTransform\(currentSceneData\.motionPrompt/);
 });
