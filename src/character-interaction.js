@@ -1,46 +1,46 @@
 const clean = value => String(value ?? '').trim().slice(0, 120);
-const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replaceAll('$', '\\$');
+const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\]/g, '\$&').replaceAll('$', '\$');
 
 const RELATIONS = {
   en: [
-    ['rescue', /\\b(rescues?|saves?)\\b/iu],
-    ['attack', /\\b(attacks?|hits?|strikes?|pushes?)\\b/iu],
-    ['chase', /\\b(chases?|pursues?|follows?)\\b/iu],
-    ['help', /\\b(helps?|assists?|supports?)\\b/iu],
-    ['guide', /\\b(guides?|leads?|shows)\\b/iu],
-    ['give', /\\b(gives?|hands?|offers?)\\b/iu],
-    ['warn', /\\b(warns?|alerts?)\\b/iu],
-    ['talk', /\\b(tells?|asks?|answers?|speaks?\\s+to|talks?\\s+to)\\b/iu]
+    ['rescue', /\b(rescues?|saves?)\b/iu],
+    ['attack', /\b(attacks?|hits?|strikes?|pushes?)\b/iu],
+    ['chase', /\b(chases?|pursues?|follows?)\b/iu],
+    ['help', /\b(helps?|assists?|supports?)\b/iu],
+    ['guide', /\b(guides?|leads?|shows)\b/iu],
+    ['give', /\b(gives?|hands?|offers?)\b/iu],
+    ['warn', /\b(warns?|alerts?)\b/iu],
+    ['talk', /\b(tells?|asks?|answers?|speaks?\s+to|talks?\s+to)\b/iu]
   ],
   ru: [
     ['rescue', /спаса(?:ет|ют)|выруча(?:ет|ют)/iu],
     ['attack', /атаку(?:ет|ют)|бь[её]т|ударя(?:ет|ют)|толка(?:ет|ют)/iu],
-    ['chase', /преследу(?:ет|ют)|гонится\\s+за|следу(?:ет|ют)\\s+за/iu],
+    ['chase', /преследу(?:ет|ют)|гонится\s+за|следу(?:ет|ют)\s+за/iu],
     ['help', /помога(?:ет|ют)|помог(?:ает|ают)|поддержива(?:ет|ют)/iu],
-    ['guide', /вед[её]т|направля(?:ет|ют)|показыва(?:ет|ют)\\s+(?:путь|дорогу)/iu],
+    ['guide', /вед[её]т|направля(?:ет|ют)|показыва(?:ет|ют)\s+(?:путь|дорогу)/iu],
     ['give', /да[её]т|переда[её]т|вруча(?:ет|ют)/iu],
     ['warn', /предупрежда(?:ет|ют)|предостерега(?:ет|ют)/iu],
-    ['talk', /говорит\\s+с|рассказыва(?:ет|ют)|спрашива(?:ет|ют)|отвеча(?:ет|ют)/iu]
+    ['talk', /говорит\s+с|рассказыва(?:ет|ют)|спрашива(?:ет|ют)|отвеча(?:ет|ют)/iu]
   ],
   uk: [
     ['rescue', /ряту[єе]|визволя[єе]/iu],
     ['attack', /атаку[єе]|б[’']?є|штовха[єе]/iu],
-    ['chase', /пересліду[єе]|женеться\\s+за|йде\\s+за/iu],
+    ['chase', /пересліду[єе]|женеться\s+за|йде\s+за/iu],
     ['help', /допомага[єе]|підтриму[єе]/iu],
-    ['guide', /веде|спрямову[єе]|показу[єе]\\s+(?:шлях|дорогу)/iu],
+    ['guide', /веде|спрямову[єе]|показу[єе]\s+(?:шлях|дорогу)/iu],
     ['give', /да[єе]|переда[єе]|вруча[єе]/iu],
     ['warn', /попереджа[єе]|застеріга[єе]/iu],
-    ['talk', /говорить\\s+з|розповіда[єе]|запиту[єе]|відповіда[єе]/iu]
+    ['talk', /говорить\s+з|розповіда[єе]|запиту[єе]|відповіда[єе]/iu]
   ],
   es: [
-    ['rescue', /\\b(rescata|salva)\\b/iu],
-    ['attack', /\\b(ataca|golpea|empuja)\\b/iu],
-    ['chase', /\\b(persigue|sigue)\\b/iu],
-    ['help', /\\b(ayuda|apoya)\\b/iu],
-    ['guide', /\\b(guía|guia|dirige|conduce)\\b/iu],
-    ['give', /\\b(da|entrega|ofrece)\\b/iu],
-    ['warn', /\\b(avisa|advierte)\\b/iu],
-    ['talk', /\\b(dice|pregunta|responde|habla\\s+a)\\b/iu]
+    ['rescue', /\b(rescata|salva)\b/iu],
+    ['attack', /\b(ataca|golpea|empuja)\b/iu],
+    ['chase', /\b(persigue|sigue)\b/iu],
+    ['help', /\b(ayuda|apoya)\b/iu],
+    ['guide', /\b(guía|guia|dirige|conduce)\b/iu],
+    ['give', /\b(da|entrega|ofrece)\b/iu],
+    ['warn', /\b(avisa|advierte)\b/iu],
+    ['talk', /\b(dice|pregunta|responde|habla\s+a)\b/iu]
   ]
 };
 
