@@ -48,3 +48,7 @@ test('magic remains detectable when no stronger character action is present', ()
   assert.equal(detectSceneAction('A magical star glows above the forest'), 'magic');
   assert.equal(detectSceneAction('Волшебная звезда сияет над лесом'), 'magic');
 });
+test('explicit turning movement takes priority over glowing background details', () => {
+  assert.equal(detectSceneAction('The fox turns toward the glowing light'), 'turn');
+  assert.equal(detectSceneAction('Лисёнок поворачивается к сияющему свету'), 'turn');
+});
