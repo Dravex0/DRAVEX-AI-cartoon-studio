@@ -90,6 +90,24 @@ function sceneCharacters(sceneText, characterIds, fallback) {
   return matched.length ? matched : [fallback];
 }
 
+function inferSceneInteractions(sceneText, characters) {
+  if (!Array.isArray(characters) || characters.length < 2) return [];
+  const source = String(sceneText ?? '').toLocaleLowerCase();
+  const participants = characters.slice(0, 2);
+  let type = 'look_at';
+  if (/(?:подход|приближа|ид[её]т к|approach|walks? toward)/iu.test(source)) type = 'approach';
+  else if (/(?:отступ|уход|убега|move away|walks? away)/iu.test(source)) type = 'move_away';
+  else if (/(?:говорит|сказал|сказала|ответил|ответила|спросил|спросила|диалог|говорят|says?|said|replies?|asks?|dialogue)/iu.test(source) || /[«“"][^»”"]{2,}[»”"]/u.test(source)) type = 'talk_to';
+  return [{
+    id: 'interaction_1',
+    type,
+    participants,
+    startSeconds: 0.2,
+    endSeconds: 2.8,
+    description: type === 'talk_to' ? 'The characters face each other during dialogue.' : type === 'approach' ? 'The first character gradually approaches the second.' : type === 'move_away' ? 'The first character gradually moves away from the second.' : 'The characters notice and look toward each other.'
+  }];
+}
+
 function buildCharacterBible(brief, fallbackCharacter) {
   const profiles = Array.isArray(brief.characterProfiles) ? brief.characterProfiles : [];
   if (profiles.length) return profiles.slice(0, 20);
@@ -185,6 +203,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
       description,
       purpose: title,
       characters,
+      interactions: inferSceneInteractions(storyDetail, characters),
       visibleAction,
       camera,
       imagePrompt,
