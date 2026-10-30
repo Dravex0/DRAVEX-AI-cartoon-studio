@@ -204,3 +204,30 @@ test('locks source-grounded causal links against local model rewriting', async (
   assert.ok(prompt.includes('"lockedCausalLink"'));
   assert.deepEqual(result.scenes[1].causalLink, causalPlan.scenes[1].causalLink);
 });
+
+test('locks scene state changes against local model rewriting', async () => {
+  const statePlan = {
+    ...basePlan,
+    scenes: basePlan.scenes.map((scene, index) => index === 0 ? {
+      ...scene,
+      storyDetail: 'Foxy picks up the silver key.',
+      characters: ['Foxy'],
+      stateChanges: [{
+        entityType: 'prop', entityId: 'silver key', property: 'holder',
+        previousValue: null, value: 'Foxy', actorId: 'Foxy',
+        evidence: 'Foxy picks up the silver key.'
+      }]
+    } : scene)
+  };
+  let prompt = '';
+  const runtime = runtimeReturning(goodScenes, {
+    generate: async value => {
+      prompt = value;
+      return { text: JSON.stringify({ scenes: goodScenes }), modelId: 'mock-local-model', backend: 'wasm' };
+    }
+  });
+  const result = await directStoryboardWithLocalAI({ runtime, basePlan: statePlan });
+  assert.equal(result.usedLocalModel, true);
+  assert.ok(prompt.includes('"lockedStateChanges"'));
+  assert.deepEqual(result.scenes[0].stateChanges, statePlan.scenes[0].stateChanges);
+});
