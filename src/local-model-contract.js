@@ -43,10 +43,10 @@ export function validateLocalModelManifest(input = {}) {
     sizeBytes: finitePositive(file?.sizeBytes),
     sha256: clean(file?.sha256, 64).toLowerCase()
   })) : [];
-  if (!files.length || files.some(file => !file.path || file.sizeBytes === null)) {
+  if (!files.length || files.some(file => !file.path || file.sizeBytes === null || file.path.startsWith('/') || file.path.split(/[\\\\/]+/).includes('..'))) {
     issues.push({ code: 'invalid-model-files', field: 'files' });
   }
-  if (files.some(file => file.sha256 && !/^[a-f0-9]{64}$/.test(file.sha256))) {
+  if (files.some(file => !/^[a-f0-9]{64}$/.test(file.sha256))) {
     issues.push({ code: 'invalid-file-checksum', field: 'files.sha256' });
   }
 
