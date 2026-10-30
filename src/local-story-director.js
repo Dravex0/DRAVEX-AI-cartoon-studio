@@ -19,7 +19,8 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
   const requiredDetails = basePlan.scenes.map((scene, index) => ({
     scene: index + 1,
     sourceDetail: clean(scene.storyDetail, 1_200),
-    eventType: clean(scene.storyEventType, 80)
+    eventType: clean(scene.storyEventType, 80),
+    assignedCharacters: Array.isArray(scene.characters) ? scene.characters : []
   }));
   return [
     'You are DRAVEX, a careful animation film director.',
