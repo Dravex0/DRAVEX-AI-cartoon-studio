@@ -1,4 +1,11 @@
 const DEFAULT_REQUIRED_FILES = ["package.json","README.md","index.html",".github/workflows/quality.yml"];
+const SHARED_TESTS = {
+  "src/scene-model.js": ["tests/story-qa.test.js"],
+  "src/engineering/agent-registry.js": ["tests/engineering-system.test.js"],
+  "src/engineering/audit-engine.js": ["tests/engineering-system.test.js"],
+  "src/engineering/index.js": ["tests/engineering-system.test.js"],
+  "src/engineering/task-planner.js": ["tests/engineering-system.test.js"]
+};
 function normalizeFiles(input) {
   if (!Array.isArray(input)) throw new TypeError("files must be an array.");
   return input.map((entry) => typeof entry === "string"
@@ -44,10 +51,12 @@ export function auditRepository(snapshot, options = {}) {
   for (const source of sourceFiles) {
     const name = source.path.split("/").pop().replace(/\.js$/, "");
     const expectedTest = "tests/" + name + ".test.js";
-    if (!byPath.has(expectedTest)) findings.push({
+    const sharedTests = SHARED_TESTS[source.path] ?? [];
+    const hasRecognizedTest = byPath.has(expectedTest) || sharedTests.some((testPath) => byPath.has(testPath));
+    if (!hasRecognizedTest) findings.push({
       id: "test-gap-" + name, severity: "low", category: "test-coverage", path: source.path,
-      message: "No same-name test file was found for " + source.path + ".",
-      evidence: "The supplied snapshot does not contain " + expectedTest + "; indirect coverage may still exist.",
+      message: "No recognized direct or shared test file was found for " + source.path + ".",
+      evidence: "Neither " + expectedTest + " nor a configured shared test was present; other indirect coverage may still exist.",
       recommendation: "Review coverage and add a focused test if this module contains behavior that can regress."
     });
   }
@@ -60,7 +69,7 @@ export function auditRepository(snapshot, options = {}) {
     limitations: [
       "Only supplied file paths and contents were inspected.",
       "This audit does not execute code, run tests, inspect runtime behavior, or prove security.",
-      "A missing same-name test is a coverage prompt, not proof of missing test coverage."
+      "A shared test-file mapping is a heuristic and does not prove that every exported function is covered."
     ],
     findings
   };
