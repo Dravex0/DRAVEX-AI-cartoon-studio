@@ -33,3 +33,11 @@ test('published page wires source-grounded state changes into storyboard scenes 
   assert.match(html, /inferStoryboardStateChanges\(preparedScenes,lang,character\)/);
   assert.match(html, /inferStoryboardStateChanges\(castScenes,language,character\)/);
 });
+
+
+test('published storyboard workflow rebuilds the event chain after cast and state inference', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /from ["']\.\/src\/story-event-chain\.js["']/);
+  assert.match(html, /eventChain:buildStoryEventChain\(sceneMetadata\)/);
+  assert.match(html, /eventChain:buildStoryEventChain\(preparedScenes\)/);
+});
