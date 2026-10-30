@@ -8,6 +8,9 @@ test('creates five beats with distinct actions and camera plans', () => {
   assert.equal(result.scenes.length, STORYBOARD_BEAT_COUNT);
   assert.equal(new Set(result.scenes.map(scene => scene.visibleAction)).size, STORYBOARD_BEAT_COUNT);
   assert.equal(new Set(result.scenes.map(scene => scene.camera)).size, STORYBOARD_BEAT_COUNT);
+  assert.equal(result.eventChain.sceneCount, STORYBOARD_BEAT_COUNT);
+  assert.equal(result.eventChain.nodes.length, STORYBOARD_BEAT_COUNT);
+  assert.ok(result.eventChain.nodes.every(node => node.sceneId && node.sourceEvidence !== undefined));
 });
 
 test('preserves each source sentence exactly once instead of repeating one sentence in every scene', () => {
