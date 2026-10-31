@@ -70,8 +70,8 @@ test('WebM export derives built-in character mouth movement from scheduled local
   assert.match(html, /voiceTracks\.filter\(track=>track\.characterName\.trim\(\)\.toLowerCase\(\)===mainCharacterKey\)/);
   assert.match(html, /lipSyncSkippedTracks\+\+/);
   assert.match(html, /lipSyncSkippedTracks=lipSyncRenderableTracks\.length/);
-  assert.match(html, /lip-sync analysis was skipped for /);
-  assert.match(html, /синхронизация губ не рассчитана для /);
+  assert.match(html, /Lip-sync analysis was skipped for /);
+  assert.match(html, /Анализ синхронизации губ пропущен для /);
   assert.match(html, /lipSyncGeneratedMediaTracks\+\+/);
   assert.match(html, /Mouth animation is not composited into AI-generated scene media for /);
   assert.match(html, /Анимация рта не накладывается на AI-изображения и видео для /);
