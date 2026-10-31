@@ -27,7 +27,7 @@ test('interpolates the acting character transform inside its phase', () => {
   assert.equal(result[0].x, 0.5);
   assert.equal(result[0].y, 0.525);
   assert.equal(result[0].scale, 1.25);
-  assert.equal(result[0].rotation, 0.1);
+  assert.ok(Math.abs(result[0].rotation - 0.1) < 1e-9);
 });
 
 test('uses the exact target pose at phase end and persists it afterward', () => {
@@ -40,8 +40,8 @@ test('uses the exact target pose at phase end and persists it afterward', () => 
 
 test('applies motion only to matching actors and supports multiple characters', () => {
   const result = applyCharacterActionTimelineToLayers(layers, timeline, 0.75);
-  assert.equal(result[1].y, 0.45);
-  assert.equal(result[1].opacity, 0.75);
+  assert.ok(Math.abs(result[1].y - 0.45) < 1e-9);
+  assert.ok(Math.abs(result[1].opacity - 0.75) < 1e-9);
   assert.equal(result[0].opacity, 1);
 });
 
