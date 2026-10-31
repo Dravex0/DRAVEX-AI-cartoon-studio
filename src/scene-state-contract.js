@@ -21,8 +21,8 @@ const MAX_CLONE_NODES = 10000;
 const MAX_CLONE_DEPTH = 40;
 
 const isRecord = value => {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   try {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
     const prototype = Object.getPrototypeOf(value);
     return prototype === Object.prototype || prototype === null;
   } catch {
@@ -155,10 +155,14 @@ export function normalizeStateChange(raw, options = {}) {
   const value = asStringOrNull(valueRead.value, 500);
   if (!entity || !property || value === null) return { ok: false };
 
+  const resolverRead = safeRead(options, "kindResolver");
+  if (!resolverRead.ok) return { ok: false };
+  const kindResolver = resolverRead.value;
   let kind;
-  if (typeof options.kindResolver === "function") {
+  if (kindResolver !== undefined && kindResolver !== null) {
+    if (typeof kindResolver !== "function") return { ok: false };
     try {
-      kind = options.kindResolver(entity);
+      kind = kindResolver(entity);
     } catch {
       return { ok: false };
     }
@@ -182,26 +186,25 @@ export function normalizeStateChange(raw, options = {}) {
 }
 
 export function normalizeStateChanges(raw, options = {}) {
-  if (raw === null || raw === undefined) return { ok: true, value: [] };
-  if (!Array.isArray(raw)) return { ok: false };
-
-  let length;
   try {
-    length = raw.length;
+    if (raw === null || raw === undefined) return { ok: true, value: [] };
+    if (!Array.isArray(raw)) return { ok: false };
+
+    const length = raw.length;
+    if (length > MAX_STATE_CHANGES) return { ok: false };
+
+    const result = [];
+    for (let index = 0; index < length; index += 1) {
+      const read = safeRead(raw, index);
+      if (!read.ok) return { ok: false };
+      const normalized = normalizeStateChange(read.value, options);
+      if (!normalized.ok) return { ok: false };
+      result.push(normalized.value);
+    }
+    return { ok: true, value: result };
   } catch {
     return { ok: false };
   }
-  if (length > MAX_STATE_CHANGES) return { ok: false };
-
-  const result = [];
-  for (let index = 0; index < length; index += 1) {
-    const read = safeRead(raw, index);
-    if (!read.ok) return { ok: false };
-    const normalized = normalizeStateChange(read.value, options);
-    if (!normalized.ok) return { ok: false };
-    result.push(normalized.value);
-  }
-  return { ok: true, value: result };
 }
 
 function collectIdsFromMap(state, key, target) {
