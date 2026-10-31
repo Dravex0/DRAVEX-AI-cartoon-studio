@@ -9,6 +9,7 @@ import { inferSceneCausalLinks } from './scene-causality.js';
 import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
+import { detectSceneAction } from './scene-action.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -156,6 +157,25 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
     scene.interactions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
       : [];
+    // Add a minimal action-only timeline only when source text supports a character action
+    // or a directed interaction. Do not invent preparation, reaction, or aftermath phases.
+    const sourceAction = detectSceneAction(scene.storyDetail);
+    const primaryInteraction = scene.interactions[0] || null;
+    const actionActor = primaryInteraction?.actorId || scene.characters[0] || '';
+    const actionEvidence = (Array.isArray(scene.sourceEvents) ? scene.sourceEvents : [])
+      .find(evidence => typeof evidence === 'string' && evidence.trim()) || scene.storyDetail;
+    if (actionActor && actionEvidence && (sourceAction !== 'idle' || primaryInteraction)) {
+      scene.actionTimeline = {
+        schemaVersion: 1,
+        phases: [{
+          phase: 'action', start: 0, end: 1,
+          actorId: actionActor,
+          targetId: primaryInteraction?.targetId || null,
+          description: scene.visibleAction || scene.storyDetail,
+          evidence: actionEvidence
+        }]
+      };
+    }
     // Preserve the original single-interaction field for older UI and consumers.
     scene.interaction = scene.interactions[0]
       ? (({ type, actorId, targetId, evidence }) => ({ type, actorId, targetId, evidence }))(scene.interactions[0])

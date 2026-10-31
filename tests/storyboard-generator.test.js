@@ -144,3 +144,52 @@ test('does not invent a storyboard interaction when the source only describes lo
   assert.equal(result.eventChain.nodes[0].action, null);
   assert.equal(result.eventChain.edges.some(edge => edge.type === 'directed_interaction'), false);
 });
+
+
+test('creates a minimal source-grounded action timeline for an explicit directed interaction', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nBird — a small yellow bird.\nFoxy — a small orange fox.\n\nScene 1: Guidance\nBird guides Foxy home.',
+    'en',
+    'Foxy'
+  );
+  const scene = result.scenes[0];
+  assert.deepEqual(scene.actionTimeline, {
+    schemaVersion: 1,
+    phases: [{
+      phase: 'action',
+      start: 0,
+      end: 1,
+      actorId: 'Bird',
+      targetId: 'Foxy',
+      description: scene.visibleAction,
+      evidence: 'Bird guides Foxy home.'
+    }]
+  });
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+  assert.match(scene.motionGenerationPrompt, /Character action timeline/);
+  assert.match(scene.motionGenerationPrompt, /actor: Bird/);
+});
+
+test('does not fabricate an action timeline for a passive look with no directed action', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nBird — a small yellow bird.\nFoxy — a small orange fox.\n\nScene 1: Meeting\nBird looks toward Foxy.',
+    'en',
+    'Foxy'
+  );
+  assert.equal(result.scenes[0].actionTimeline, null);
+  assert.equal(result.scenes[0].productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+  assert.doesNotMatch(result.scenes[0].motionGenerationPrompt, /Character action timeline/);
+});
+
+test('creates a single action phase for explicit movement without inventing other phases', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — a small orange fox.\n\nScene 1: Escape\nFoxy runs through the forest.',
+    'en',
+    'Foxy'
+  );
+  const timeline = result.scenes[0].actionTimeline;
+  assert.equal(timeline.phases.length, 1);
+  assert.equal(timeline.phases[0].phase, 'action');
+  assert.equal(timeline.phases[0].actorId, 'Foxy');
+  assert.equal(timeline.phases[0].evidence, 'Foxy runs through the forest.');
+});
