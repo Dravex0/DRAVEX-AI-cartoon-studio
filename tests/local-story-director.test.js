@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { directStoryboardWithLocalAI } from '../src/local-story-director.js';
 import { buildStoryboardFromText } from '../src/storyboard-generator.js';
+import { inferStoryboardStateChanges } from '../src/scene-state-changes.js';
 
 const basePlan = buildStoryboardFromText(
   'A fox finds a silver key. The forest becomes dark. A small bird guides the fox home.',
@@ -263,31 +264,29 @@ test('accepts a local director candidate with consistent structured scene-state 
 });
 
 test('accepts a structured character location change when its evidence is grounded in the scene story', async () => {
+  const sourceScenes = basePlan.scenes.map((scene, index) => ({
+    ...scene,
+    storyDetail: index === 0 ? 'Foxy enters the moonlit forest.'
+      : index === 1 ? 'Foxy enters the stone castle.' : scene.storyDetail
+  }));
+  const inferredChanges = inferStoryboardStateChanges(sourceScenes, 'en');
   const statePlan = {
     ...basePlan,
-    scenes: basePlan.scenes.map((scene, index) => index === 1 ? {
+    scenes: sourceScenes.map((scene, index) => ({
       ...scene,
-      storyDetail: 'Foxy enters the stone castle.',
-      stateChanges: [{
-        entityType: 'character',
-        entityId: 'Foxy',
-        property: 'location',
-        previousValue: 'moonlit forest',
-        value: 'stone castle',
-        actorId: 'Foxy',
-        evidence: 'Foxy enters the stone castle.'
-      }]
-    } : scene)
+      stateChanges: inferredChanges[index]
+    }))
   };
   const structured = goodScenes.map(scene => ({
     ...scene,
     startStateData: structuredState(),
     endStateData: structuredState()
   }));
-  const atCastle = structuredState();
-  atCastle.characters.Foxy.location = 'stone castle';
-  structured[1].startStateData = atCastle;
-  structured[1].endStateData = atCastle;
+  structured[0].endStateData.characters.Foxy.location = 'inside:moonlit forest';
+  for (let index = 1; index < structured.length; index += 1) {
+    structured[index].startStateData.characters.Foxy.location = 'inside:stone castle';
+    structured[index].endStateData.characters.Foxy.location = 'inside:stone castle';
+  }
   const result = await directStoryboardWithLocalAI({
     runtime: runtimeReturning(structured),
     basePlan: statePlan
@@ -299,7 +298,6 @@ test('accepts a structured character location change when its evidence is ground
   }));
   assert.equal(result.evaluation.structuredStateMemoryReport.passed, true);
 });
-
 test('rejects a local director candidate with unexplained structured character teleportation', async () => {
   const structured = goodScenes.map(scene => ({
     ...scene,
