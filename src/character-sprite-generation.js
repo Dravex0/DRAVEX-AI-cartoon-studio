@@ -58,6 +58,7 @@ export async function generateCharacterSpriteAsset({
     generationStatus: 'generated',
     verificationStatus: 'not_verified',
     transparencyStatus: 'unverified',
+    visualIdentityStatus: 'not_verified',
     generatedAt: new Date().toISOString()
   };
 }
