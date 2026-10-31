@@ -266,3 +266,39 @@ test('production scene blocks sprite plans when a cast member lacks a canonical 
   assert.equal(prepared.characterSpriteAssetPlan[0].prompt, '');
   assert.ok(prepared.characterSpriteAssetPlan[0].issues.some(issue => issue.code === 'missing-character-reference'));
 });
+
+
+test('production scene includes a separate environment-only background plan without character data', async () => {
+  const prepared = buildProductionScene({
+    id: 'background-scene',
+    title: 'Foxy enters the garden',
+    environmentDescription: 'A stone garden with a fountain and flowering vines.',
+    location: 'Palace garden',
+    timeOfDay: 'Morning',
+    weather: 'Light mist',
+    environmentLighting: 'Soft golden light',
+    environmentStyle: 'Hand-painted anime background',
+    imagePrompt: 'Foxy stands beside the fountain.',
+    visibleAction: 'Foxy walks toward the fountain.',
+    characters: ['Foxy']
+  }, [{ characterId: 'Foxy', visualDescription: 'Small orange fox', clothing: 'Blue scarf' }]);
+  assert.equal(prepared.sceneBackgroundPlan.ready, true);
+  assert.equal(prepared.sceneBackgroundPlan.assetRole, 'scene-background');
+  assert.equal(prepared.sceneBackgroundPlan.compositionStatus, 'unverified');
+  assert.match(prepared.sceneBackgroundPlan.prompt, /stone garden/);
+  assert.doesNotMatch(prepared.sceneBackgroundPlan.prompt, /Foxy|orange fox|Blue scarf|walks toward/);
+  assert.match(prepared.imageGenerationPrompt, /Small orange fox/);
+});
+
+test('production scene does not fabricate a background plan from character-aware image prompts', () => {
+  const prepared = buildProductionScene({
+    id: 'no-background-context',
+    title: 'A fox',
+    imagePrompt: 'Foxy in a forest.',
+    visibleAction: 'Foxy waves.',
+    characters: ['Foxy']
+  });
+  assert.equal(prepared.sceneBackgroundPlan.ready, false);
+  assert.equal(prepared.sceneBackgroundPlan.prompt, '');
+  assert.equal(prepared.sceneBackgroundPlan.compositionStatus, 'unverified');
+});
