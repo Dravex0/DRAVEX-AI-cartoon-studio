@@ -48,12 +48,8 @@ function stateValue(state, kind, entity, property) {
   return group?.[entity]?.[property] ?? null;
 }
 
-function exactTransition(change, previous, next) {
-  return change.entity === previous.entity
-    && change.property === previous.property
-    && change.previousValue === previous.value
-    && change.value === next.value
-    && known(change.evidence);
+function transitionKey(entity, property, previousValue, value) {
+  return JSON.stringify([entity, property, previousValue, value]);
 }
 
 function makeIssue(code, severity, previousSceneId, sceneId, details = {}) {
@@ -88,7 +84,7 @@ export function buildSceneStateMemory(rawScenes) {
  * accepted only when the next scene contains an exact, evidence-backed stateChange.
  * This is structured-state validation, not visual inspection of rendered frames.
  */
-export function validateSceneStateContinuity(candidateMemory) {
+function validateSceneStateContinuityUnsafe(candidateMemory) {
   if (!isRecord(candidateMemory)
       || candidateMemory.schemaVersion !== 1
       || !Array.isArray(candidateMemory.scenes)
@@ -121,6 +117,10 @@ export function validateSceneStateContinuity(candidateMemory) {
 
     const before = stateEntries(previous.endState);
     const changes = current.stateChanges;
+    const authorizedTransitions = new Set(
+      changes.filter(change => known(change.evidence)).map(change =>
+        transitionKey(change.entity, change.property, change.previousValue, change.value))
+    );
 
     for (const entry of before) {
       const nextValue = stateValue(current.startState, entry.kind, entry.entity, entry.property);
@@ -128,8 +128,9 @@ export function validateSceneStateContinuity(candidateMemory) {
       // Omitted and null values carry no assertion about disappearance or deletion.
       if (!known(nextValue) || nextValue === entry.value) continue;
 
-      const next = { ...entry, value: nextValue };
-      if (changes.some(change => exactTransition(change, entry, next))) continue;
+      if (authorizedTransitions.has(
+        transitionKey(entry.entity, entry.property, entry.value, nextValue)
+      )) continue;
 
       if (entry.kind === "character" && entry.property === "location") {
         issues.push(makeIssue(
@@ -166,12 +167,9 @@ export function validateSceneStateContinuity(candidateMemory) {
       const wasTracked = previous.endState.objects[objectId];
       if (!wasTracked || !known(wasTracked.state)
           || KNOWN_OBJECT_LOSS_STATES.has(wasTracked.state.toLocaleLowerCase())) continue;
-      const lossIsExplained = changes.some(change =>
-        change.entity === objectId
-        && change.property === "state"
-        && change.previousValue === wasTracked.state
-        && change.value === objectState.state
-        && known(change.evidence));
+      const lossIsExplained = authorizedTransitions.has(
+        transitionKey(objectId, "state", wasTracked.state, objectState.state)
+      );
       if (!lossIsExplained) {
         issues.push(makeIssue(
           "object-disappearance-unexplained",
@@ -189,4 +187,18 @@ export function validateSceneStateContinuity(candidateMemory) {
     checkedTransitions,
     issues
   };
+}
+
+
+/** Public fail-closed boundary for malformed records, proxies, and hostile getters. */
+export function validateSceneStateContinuity(candidateMemory) {
+  try {
+    return validateSceneStateContinuityUnsafe(candidateMemory);
+  } catch {
+    return {
+      passed: false,
+      checkedTransitions: 0,
+      issues: [{ code: "malformed-memory", severity: "error" }]
+    };
+  }
 }
