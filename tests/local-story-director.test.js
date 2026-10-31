@@ -315,7 +315,7 @@ test('passes a source-backed action timeline from the local director into storyb
       return { text: JSON.stringify({ scenes: directed }), modelId: 'mock-local-model', backend: 'wasm' };
     }
   });
-  const result = await directStoryboardWithLocalAI({ runtime, basePlan });
+  const result = await directStoryboardWithLocalAI({ runtime, basePlan, character: 'Foxy' });
   assert.equal(result.usedLocalModel, true);
   assert.equal(result.scenes[0].actionTimeline.phases[0].phase, 'action');
   assert.equal(result.evaluation.actionTimelineReport.coverage, 20);
