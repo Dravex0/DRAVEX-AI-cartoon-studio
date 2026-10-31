@@ -191,3 +191,37 @@ test('keeps valid causal links from an earlier scene', () => {
   assert.ok(graph.edges.some(edge => edge.type === 'causes' && edge.fromSceneId === 'cause' && edge.toSceneId === 'effect'));
 });
 
+test('rejects causal links when the cause scene ID is duplicated', () => {
+  const graph = buildStoryEventChain([
+    { id: 'cause', storyEventType: 'general', storyDetail: 'The bridge collapses.' },
+    { id: 'cause', storyEventType: 'general', storyDetail: 'A second scene reuses the cause ID.' },
+    {
+      id: 'effect', storyEventType: 'general', storyDetail: 'As a result, Foxy takes another path.',
+      causalLink: {
+        type: 'consequence', causeSceneId: 'cause', effectSceneId: 'effect',
+        marker: 'As a result', causeEvidence: 'The bridge collapses.',
+        evidence: 'As a result, Foxy takes another path.'
+      }
+    }
+  ]);
+  assert.equal(graph.nodes[2].consequence, null);
+  assert.equal(graph.edges.some(edge => edge.type === 'causes'), false);
+});
+
+test('rejects causal links when the effect scene ID is duplicated', () => {
+  const graph = buildStoryEventChain([
+    { id: 'cause', storyEventType: 'general', storyDetail: 'The bridge collapses.' },
+    {
+      id: 'effect', storyEventType: 'general', storyDetail: 'As a result, Foxy takes another path.',
+      causalLink: {
+        type: 'consequence', causeSceneId: 'cause', effectSceneId: 'effect',
+        marker: 'As a result', causeEvidence: 'The bridge collapses.',
+        evidence: 'As a result, Foxy takes another path.'
+      }
+    },
+    { id: 'effect', storyEventType: 'general', storyDetail: 'A second scene reuses the effect ID.' }
+  ]);
+  assert.equal(graph.nodes[1].consequence, null);
+  assert.equal(graph.edges.some(edge => edge.type === 'causes'), false);
+});
+
