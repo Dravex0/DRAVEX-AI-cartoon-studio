@@ -21,7 +21,7 @@ function similarity(left, right) {
 function actionSimilarity(left, right) {
   const leftAction = detectSceneAction(left);
   const rightAction = detectSceneAction(right);
-  if (leftAction !== 'idle' && rightAction !== 'idle' && leftAction !== rightAction) return 0;
+  if (leftAction !== rightAction) return 0;
   return similarity(left, right);
 }
 function cameraShotType(camera) {
