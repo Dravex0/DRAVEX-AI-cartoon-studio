@@ -31,5 +31,5 @@ test("returns safe catalog metadata without exposing mutable registry arrays",()
  const first=listLocalTtsModels();
  assert.equal(first.length,4);
  first[0].languages?.push?.("xx");
- assert.deepEqual(listLocalTtsModels()[0].languages,undefined);
+ assert.deepEqual(listLocalTtsModels()[0].languages,["en"]);
 });
