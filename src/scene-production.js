@@ -54,7 +54,14 @@ function actionTimelineInstructions(scene = {}) {
     const target = phase.targetId ? `; target: ${safe(phase.targetId, 120)}` : '';
     return `- ${safe(phase.phase, 24)} (${Math.round(phase.start * 100)}%-${Math.round(phase.end * 100)}%; ${startSeconds}-${endSeconds}s): ${safe(phase.description, 700)}; actor: ${safe(phase.actorId, 120)}${target}`;
   });
-  return `Character action timeline (follow these phases in order):\n${phases.join('\n')}`;
+  return [
+    'Character action timeline (follow these phases in order):\n' + phases.join('\n'),
+    'Temporal motion constraints: keep the action continuous across phase boundaries; do not teleport, reset the pose, or jump to a new screen position between phases.',
+    "Preserve each character's identity, body proportions, clothing, facing direction, and screen-space position unless the phase description explicitly changes them.",
+    'When a phase names a target, make the actor interact with that exact target; preserve believable contact, hand/paw occupancy, and object ownership through the interaction and the stated end state.',
+    'Only the listed actor performs the phase action. Other characters remain stable unless they have their own explicit phase; do not invent extra gestures, reactions, props, or story events.',
+    'Respect the phase time ranges as relative timing within this scene; use smooth anticipation, movement, and settling rather than compressing every phase into one instant.'
+  ].join('\n');
 }
 
 /** Creates a motion-only instruction and keeps the still image description separate. */
