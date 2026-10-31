@@ -3,6 +3,8 @@ export const SCENE_DURATION_MIN = 0.25;
 export const SCENE_DURATION_MAX = 30;
 export const DEFAULT_SCENE_DURATION = 3;
 
+import { normalizeCharacterActionTimeline } from './character-action-timeline.js';
+
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
 
@@ -66,6 +68,7 @@ export function normalizeScene(input = {}, index = 0) {
     location: text(scene.location, 500),
     timeOfDay: text(scene.timeOfDay, 120),
     visibleAction,
+    actionTimeline: normalizeCharacterActionTimeline(scene.actionTimeline),
     camera: text(scene.camera, 1_000),
     startState: text(scene.startState, 1_000),
     endState: text(scene.endState, 1_000),
