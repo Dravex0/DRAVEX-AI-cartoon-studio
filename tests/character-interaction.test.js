@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { inferCharacterInteraction } from '../src/character-interaction.js';
+import { inferCharacterInteraction, inferCharacterInteractions } from '../src/character-interaction.js';
 
 test('extracts actor and target from explicit English help and guidance', () => {
   assert.deepEqual(
@@ -53,4 +53,26 @@ test('deduplicates character IDs case-insensitively before resolving participant
   assert.equal(result?.type, 'help');
   assert.equal(result?.actorId, 'Foxy');
   assert.equal(result?.targetId, 'Bird');
+});
+
+
+test('does not borrow an interaction target from a later sentence', () => {
+  const result = inferCharacterInteraction(
+    'Foxy notices a shadow. Mira helps. Snowball arrives.',
+    ['Foxy', 'Mira', 'Snowball'],
+    'en'
+  );
+  assert.equal(result, null);
+});
+
+test('keeps multiple directed interactions within their own sentences', () => {
+  const results = inferCharacterInteractions(
+    'Foxy helps Bird. Snowball rescues Mira.',
+    ['Foxy', 'Bird', 'Snowball', 'Mira'],
+    'en'
+  );
+  assert.deepEqual(results.map(({ actorId, targetId, type }) => ({ actorId, targetId, type })), [
+    { actorId: 'Foxy', targetId: 'Bird', type: 'help' },
+    { actorId: 'Snowball', targetId: 'Mira', type: 'rescue' }
+  ]);
 });
