@@ -127,7 +127,7 @@ import { createVoiceAudioStorage } from "./src/voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./src/scene-voice-workflow.js";
 import { createSceneVideoStorage } from "./src/scene-video-storage.js";
 import { syncSceneVideoPlayback } from "./src/scene-video-transport.js";
-import { waitForSceneVideoReady } from "./src/scene-video-readiness.js";
+import { waitForSceneVideoReady, waitForSceneImageReady } from "./src/scene-video-readiness.js";
 import { getPromptCameraTransform } from "./src/prompt-camera-motion.js";
 import { detectSceneActionForScene } from "./src/scene-action.js";
 import { buildExportTimeline } from "./src/export-timeline.js";
@@ -908,16 +908,26 @@ $('export').onclick=async()=>{
   };
   try{
     await sceneVideoRestorePromise;
-    $('status').textContent=uiLang==='ru'?'Ожидание готовности видео сцен…':'Waiting for scene videos to become ready…';
+    $('status').textContent=uiLang==='ru'?'Ожидание готовности медиа сцен…':'Waiting for scene media to become ready…';
+    const readinessTasks=[];
     for(const segment of timeline.segments){
       const meta=sceneMetadata[segment.sceneIndex]||{};
       const key=String(meta.id||('scene-index-'+segment.sceneIndex));
       const entry=sceneVideoCache.get(key);
       if(entry?.video){
-        await waitForSceneVideoReady(entry.video,{timeoutMs:12000});
-        try{entry.video.currentTime=0;}catch{}
+        readinessTasks.push(waitForSceneVideoReady(entry.video,{timeoutMs:12000}).then(()=>{
+          try{entry.video.currentTime=0;}catch{}
+        }));
+      }
+      const imageUrl=String(meta.generatedImageUrl||'').trim();
+      if(imageUrl){
+        getLoadedSceneImage(imageUrl);
+        const imageEntry=sceneImageCache.get(imageUrl);
+        if(!imageEntry)throw new Error('Could not initialize generated image for scene '+(segment.sceneIndex+1)+'.');
+        readinessTasks.push(waitForSceneImageReady(imageEntry.image,{timeoutMs:12000}));
       }
     }
+    await Promise.all(readinessTasks);
     sceneIndex=timeline.segments[0].sceneIndex;
     playing=true;
     syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:true,restart:true});
