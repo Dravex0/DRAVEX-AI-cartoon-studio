@@ -141,14 +141,14 @@ test("preserves validated timestamped viseme events on dialogue cues", () => {
   const result = buildSceneVoiceTimeline({
     sceneId: "timestamped-viseme-scene",
     dialogue: [{ characterId: "Foxy", text: "Hi", language: "en" }],
-    artifacts: [{ audioHash: hash("g"), durationMs: 500, visemeEvents: events }]
+    artifacts: [{ audioHash: hash("7"), durationMs: 500, visemeEvents: events }]
   });
   assert.deepEqual(result.cues[0].visemeEvents, events);
 });
 
 test("rejects malformed and unordered timestamped viseme events", () => {
   const dialogue = [{ characterId: "Foxy", text: "Hi" }];
-  const base = { audioHash: hash("h"), durationMs: 500 };
+  const base = { audioHash: hash("8"), durationMs: 500 };
   assert.throws(() => buildSceneVoiceTimeline({
     sceneId: "bad-viseme-order", dialogue,
     artifacts: [{ ...base, visemeEvents: [
