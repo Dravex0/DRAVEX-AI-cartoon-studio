@@ -4,6 +4,8 @@ import {
   evaluateCharacterActionTimelines,
   validateCharacterActionTimeline
 } from '../src/character-action-timeline.js';
+import { evaluateStoryboard } from '../src/ai-evaluation.js';
+import { normalizeScene } from '../src/scene-model.js';
 
 const scene = {
   id: 'scene_1',
@@ -21,6 +23,10 @@ const scene = {
     ]
   }
 };
+
+test('scene normalization preserves action timeline metadata for evaluation', () => {
+  assert.deepEqual(normalizeScene(scene).actionTimeline, scene.actionTimeline);
+});
 
 test('accepts ordered, source-grounded action phases in normalized scene time', () => {
   const report = validateCharacterActionTimeline(scene);
@@ -74,4 +80,38 @@ test('marks an entirely legacy storyboard as not yet measurable', () => {
   assert.equal(report.coverage, null);
   assert.equal(report.integrity, null);
   assert.equal(report.passed, null);
+});
+
+
+test('storyboard quality gate includes supplied action timeline integrity', () => {
+  const valid = structuredClone(scene);
+  const invalid = structuredClone(scene);
+  invalid.id = 'scene_2';
+  invalid.actionTimeline.phases[2].start = 0.6;
+  const report = evaluateStoryboard({
+    scenes: [
+      { ...valid, id: 'scene_1' },
+      invalid,
+      { id: 'scene_3', visibleAction: 'Foxy walks along the moonlit forest path.', characters: ['Foxy'] }
+    ],
+    expectedSceneCount: 3
+  });
+  assert.equal(report.actionTimelineReport.suppliedSceneCount, 2);
+  assert.equal(report.actionTimelineReport.integrity, 50);
+  assert.equal(report.metrics.actionTimelineIntegrity, 50);
+  assert.ok(report.issues.some(item => item.code === 'invalid-character-action-timeline'));
+  assert.equal(report.passed, false);
+});
+
+test('legacy storyboard without action timelines remains evaluable', () => {
+  const report = evaluateStoryboard({
+    scenes: [
+      { id: 'a', visibleAction: 'Foxy walks across the moonlit forest path.' },
+      { id: 'b', visibleAction: 'Foxy discovers a silver key beneath a tree.' },
+      { id: 'c', visibleAction: 'Foxy raises the silver key toward the moon.' }
+    ],
+    expectedSceneCount: 3
+  });
+  assert.equal(report.actionTimelineReport.passed, null);
+  assert.equal(report.metrics.actionTimelineCoverage, null);
 });
