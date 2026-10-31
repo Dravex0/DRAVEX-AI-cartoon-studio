@@ -88,5 +88,5 @@ test('published page exposes the experimental English timestamped Kokoro voice e
   assert.ok(html.includes('createTimestampedKokoroEngine'));
   assert.ok(html.includes('value="timestamped"'));
   assert.ok(html.includes('Experimental timestamped Kokoro · English only'));
-  assert.ok(html.includes('timestamped?locale!==\'en\''));
+  assert.ok(html.includes('timestamped&&locale!==\'en\''));
 });
