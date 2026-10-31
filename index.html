@@ -833,7 +833,8 @@ $('export').onclick=async()=>{
   }
   const button=$('export');
   if(button.disabled)return;
-  const timeline=buildExportTimeline(titles.map((title,index)=>sceneMetadata[index]||{title}),$('duration').value);
+  const exportScenes=titles.map((title,index)=>{const meta=sceneMetadata[index]||{title};const voiceDuration=Number(meta.voiceTimeline?.totalDurationMs)||0;if(voiceDuration>30000)throw new RangeError('Dialogue in scene '+(index+1)+' exceeds the 30-second scene export limit.');const requested=Number(meta.durationSeconds??meta.duration??$('duration').value)||3;return {...meta,durationSeconds:Math.max(requested,voiceDuration/1000)};});
+  const timeline=buildExportTimeline(exportScenes,$('duration').value);
   if(!timeline.segments.length){
     $('status').textContent=uiLang==='ru'?'Сначала создай раскадровку.':'Create a storyboard before exporting.';
     return;
@@ -870,11 +871,27 @@ $('export').onclick=async()=>{
     if(!raf)draw();
     stream=canvas.captureStream(24);
     const musicFile=$('audioFile').files?.[0]||null;
-    if(musicFile){
-      const audioElement=new Audio(selectedMusicUrl);
-      audioElement.loop=true;
-      audioElement.preload='auto';
-      audioSession=await createAudioExportSession({videoStream:stream,audioElement,volume:Number($('audioVolume').value)/100});
+    const voiceTracks=[];
+    let voiceStorage=null;
+    for(const segment of timeline.segments){
+      const meta=sceneMetadata[segment.sceneIndex]||{};
+      const cues=Array.isArray(meta.voiceCues)?meta.voiceCues:[];
+      if(!cues.length)continue;
+      if(!meta.voiceTimeline||!Array.isArray(meta.voiceTimeline.tracks))throw new Error('Scene '+(segment.sceneIndex+1)+' has voice files but no valid voice timeline. Regenerate its dialogue.');
+      if(!voiceStorage)voiceStorage=createVoiceAudioStorage();
+      for(const cue of cues){
+        if(!/^[a-f0-9]{64}$/i.test(String(cue.audioHash||'')))throw new Error('Scene '+(segment.sceneIndex+1)+' contains an invalid dialogue audio reference.');
+        const record=await voiceStorage.get(cue.audioHash);
+        if(!record?.blob)throw new Error('A generated voice file is missing from this device. Regenerate the dialogue before exporting.');
+        const startMs=segment.startMs+(Number(cue.startFrame)||0)*(1000/24);
+        if(startMs+Number(cue.durationMs||0)>segment.endMs+35)throw new Error('Dialogue exceeds its scene export interval. Regenerate the scene voice timeline.');
+        voiceTracks.push({cueId:cue.cueId,blob:record.blob,startMs});
+      }
+    }
+    if(musicFile||voiceTracks.length){
+      const audioElement=musicFile?new Audio(selectedMusicUrl):null;
+      if(audioElement){audioElement.loop=true;audioElement.preload='auto';}
+      audioSession=await createAudioExportSession({videoStream:stream,audioElement,volume:Number($('audioVolume').value)/100,voiceTracks,voiceVolume:0.9});
       stream=audioSession.stream;
       await audioSession.start();
     }
@@ -900,8 +917,8 @@ $('export').onclick=async()=>{
         anchor.remove();
         setTimeout(()=>URL.revokeObjectURL(url),5000);
         $('status').textContent=uiLang==='ru'
-          ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'
-          :'Exported '+timeline.segments.length+' scenes · '+timeline.totalDurationSeconds.toFixed(2)+' sec.';
+          ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')
+          :'Exported '+timeline.segments.length+' scenes · '+timeline.totalDurationSeconds.toFixed(2)+' sec.'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'');
       }catch(error){
         console.error('DRAVEX export failed:',error);
         $('status').textContent=tr('exportFailed');
@@ -911,8 +928,8 @@ $('export').onclick=async()=>{
     };
     recorder.start(250);
     $('status').textContent=uiLang==='ru'
-      ?'Записываем сцену 1 из '+timeline.segments.length+'…'
-      :'Recording scene 1 of '+timeline.segments.length+'…';
+      ?'Записываем '+timeline.segments.length+' сцен'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+'…'
+      :'Recording '+timeline.segments.length+' scenes'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'')+'…';
     timeline.segments.slice(1).forEach(segment=>{
       const timer=setTimeout(()=>{
         sceneIndex=segment.sceneIndex;
