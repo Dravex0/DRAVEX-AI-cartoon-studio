@@ -13,8 +13,8 @@ function issue(code, phase, message) {
 export function normalizeCharacterActionTimeline(rawTimeline) {
   if (!isRecord(rawTimeline) || !Array.isArray(rawTimeline.phases)) return null;
   return {
-    schemaVersion: 1,
-    phases: rawTimeline.phases.slice(0, 8).map(phase => {
+    schemaVersion: rawTimeline.schemaVersion,
+    phases: rawTimeline.phases.slice(0, 9).map(phase => {
       if (!isRecord(phase)) return null;
       const start = Number(phase.start);
       const end = Number(phase.end);
@@ -93,7 +93,7 @@ export function validateCharacterActionTimeline(scene = {}) {
       issues.push(issue('phase-target-not-in-cast', name, 'The phase target must belong to this scene cast.'));
     }
     if (!normalized.evidence || !evidenceSources.some(source => source.includes(normalized.evidence))) {
-      issues.push(issue('phase-evidence-un grounded'.replace(' ', ''), name, 'Phase evidence must exactly match scene story, visible-action, or motion text.'));
+      issues.push(issue('phase-evidence-ungrounded', name, 'Phase evidence must exactly match scene story, visible-action, or motion text.'));
     }
   });
 
