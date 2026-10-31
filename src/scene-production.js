@@ -141,7 +141,7 @@ export function validateSceneProductionReadiness(scene = {}, characterBible = []
   const profileIds = new Set((Array.isArray(characterBible) ? characterBible : [])
     .map(profile => safe(profile?.characterId, 120).toLocaleLowerCase()).filter(Boolean));
   for (const characterId of list(scene.characters)) {
-    if (profileIds.size && !profileIds.has(characterId.toLocaleLowerCase())) {
+    if (!profileIds.has(characterId.toLocaleLowerCase())) {
       issues.push({ code: 'missing-character-reference', field: 'characters', characterId });
     }
   }
