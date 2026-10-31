@@ -120,6 +120,7 @@ import { directStoryboardWithLocalAI } from "./src/local-story-director.js";
 import { generateImageWithHorde } from "./src/ai-horde-image-provider.js";
 import { drawImageCover } from "./src/image-frame.js";
 import { drawCharacterLayers } from "./src/scene-character-layers.js";
+import { drawCharacterLayers } from "./src/scene-character-layers.js";
 import { createSceneId, ensureSceneIds } from "./src/scene-identity.js";
 import { formatDialogueLines, parseDialogueLines } from "./src/dialogue-lines.js";
 import { createBrowserLocalTtsEngine } from "./src/browser-local-tts-engine.js";
@@ -255,6 +256,7 @@ const hasGeneratedVideo=Boolean(generatedVideo&&generatedVideo.readyState>=2&&ge
 const hasGeneratedMedia=hasGeneratedVideo||Boolean(generatedFrame);
 if(hasGeneratedVideo){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedVideo,w,h,motionTransform)}
 else if(generatedFrame){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
+drawCharacterLayers(ctx,currentSceneData.characterLayers,key=>getLoadedSceneImage(key),w,h);
 drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h);
 ctx.fillStyle='#fff';ctx.font='bold 21px system-ui';ctx.fillText($('character').value||'Foxy',24,38);if(!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);if(playing){frame++;raf=requestAnimationFrame(draw)}else{raf=0}}
 const storyTemplates={
