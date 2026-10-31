@@ -48,6 +48,9 @@ function buildStructuredStateMemory(modelScenes, baselineScenes) {
     return {
       id: base.id,
       characters: base.characters || [],
+      storyDetail: base.storyDetail || '',
+      visibleAction: base.visibleAction || '',
+      sourceEvents: Array.isArray(base.sourceEvents) ? base.sourceEvents : [],
       startState: scene.startStateData,
       endState: scene.endStateData,
       stateChanges
