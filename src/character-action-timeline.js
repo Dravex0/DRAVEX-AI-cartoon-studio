@@ -89,9 +89,6 @@ export function validateCharacterActionTimeline(scene = {}) {
     else if (cast.size && !cast.has(normalized.actorId.toLocaleLowerCase())) {
       issues.push(issue('phase-actor-not-in-cast', name, 'The phase actor must belong to this scene cast.'));
     }
-    if (normalized.targetId && cast.size && !cast.has(normalized.targetId.toLocaleLowerCase())) {
-      issues.push(issue('phase-target-not-in-cast', name, 'The phase target must belong to this scene cast.'));
-    }
     if (!normalized.evidence || !evidenceSources.some(source => source.includes(normalized.evidence))) {
       issues.push(issue('phase-evidence-ungrounded', name, 'Phase evidence must exactly match scene story, visible-action, or motion text.'));
     }
