@@ -89,3 +89,13 @@ test("rejects invalid scene and timing options", () => {
     artifacts: [{ audioHash: hash("d"), durationMs: 100 }], fps: 0
   }), /fps/);
 });
+
+test("treats special property names as ordinary speaker IDs", () => {
+  const result = assignCharacterVoices({
+    speakers: ["__proto__", "constructor"],
+    availableVoices: ["voice-a", "voice-b"]
+  });
+  assert.equal(Object.getPrototypeOf(result), null);
+  assert.equal(Object.hasOwn(result, "__proto__"), true);
+  assert.equal(Object.hasOwn(result, "constructor"), true);
+});

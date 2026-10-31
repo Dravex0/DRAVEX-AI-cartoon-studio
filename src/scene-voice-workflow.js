@@ -4,7 +4,7 @@ const MAX_DIALOGUE_LINES = 30;
 const clean = (value, max = 120) => String(value ?? "").trim().replace(/\s+/gu, " ").slice(0, max);
 
 export function normalizeSpeakerKey(value) {
-  return clean(value, 120).toLocaleLowerCase();
+  return clean(value, 120).toLowerCase();
 }
 
 function stableHash(value) {
@@ -36,7 +36,7 @@ export function assignCharacterVoices({
     .map(value => value.trim())
     .filter(Boolean))];
   const validVoiceSet = new Set(voices);
-  const assignments = {};
+  const assignments = Object.create(null);
   for (const [speaker, voice] of Object.entries(existingAssignments)) {
     const key = normalizeSpeakerKey(speaker);
     const id = typeof voice === "string" ? voice.trim() : "";

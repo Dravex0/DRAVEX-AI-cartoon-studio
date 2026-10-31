@@ -97,6 +97,14 @@ export function createBrowserLocalTtsEngine({
   let loading = null;
 
   return Object.freeze({
+    get availableVoices() {
+      if (!loaded || loaded.model.runtime !== 'kokoro-js' || typeof loaded.instance?.list_voices !== 'function') return [];
+      try {
+        const voices = loaded.instance.list_voices();
+        return Array.isArray(voices) ? voices.filter(voice => typeof voice === 'string' && voice.trim()) : [];
+      } catch { return []; }
+    },
+
     get status() {
       return loaded ? {
         loaded: true,
