@@ -38,8 +38,8 @@ test('assigns actor-specific timeline actions instead of sharing another charact
       ]
     }
   }, bible);
-  assert.equal(plan[0].action, 'Foxy opens the wooden door.');
-  assert.equal(plan[1].action, 'Bird steps back in surprise.');
+  assert.equal(plan[0].action, 'Foxy notices the door. Foxy opens the wooden door.');
+  assert.equal(plan[1].action, 'Bird steps back in surprise. Bird watches the open doorway.');
   assert.equal(plan.every(item => item.status === 'ready'), true);
 });
 
