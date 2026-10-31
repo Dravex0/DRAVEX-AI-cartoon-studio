@@ -54,6 +54,9 @@ export function validateCharacterActionTimeline(scene = {}) {
   const issues = [];
   const cast = new Set((Array.isArray(scene.characters) ? scene.characters : [])
     .map(value => clean(value, 120).toLocaleLowerCase()).filter(Boolean));
+  const castWasExplicit = typeof scene.characterCastProvided === 'boolean'
+    ? scene.characterCastProvided
+    : Array.isArray(scene.characters);
   const evidenceSources = [scene.storyDetail, ...(Array.isArray(scene.sourceEvents) ? scene.sourceEvents : [])]
     .map(value => clean(value, 2_000)).filter(Boolean);
   const seen = new Set();
@@ -89,7 +92,7 @@ export function validateCharacterActionTimeline(scene = {}) {
 
     if (!normalized.description) issues.push(issue('phase-description-missing', name, 'Every phase needs a concrete visible description.'));
     if (!normalized.actorId) issues.push(issue('phase-actor-missing', name, 'Every phase needs an acting character ID.'));
-    else if (Array.isArray(scene.characters) && !cast.has(normalized.actorId.toLocaleLowerCase())) {
+    else if (castWasExplicit && !cast.has(normalized.actorId.toLocaleLowerCase())) {
       issues.push(issue('phase-actor-not-in-cast', name, 'The phase actor must belong to this scene cast.'));
     }
     if (!normalized.evidence || !evidenceSources.some(source => source.includes(normalized.evidence))) {
