@@ -41,3 +41,16 @@ test('published storyboard workflow rebuilds the event chain after cast and stat
   assert.match(html, /eventChain:buildStoryEventChain\(sceneMetadata\)/);
   assert.match(html, /eventChain:buildStoryEventChain\(preparedScenes\)/);
 });
+
+
+test('scene editor exposes local voice generation and explicitly labels export limitations', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /createBrowserLocalTtsEngine/);
+  assert.match(html, /createVoiceAudioStorage/);
+  assert.match(html, /assignCharacterVoices/);
+  assert.match(html, /buildSceneVoiceTimeline/);
+  assert.match(html, /id="loadSceneVoiceModel"/);
+  assert.match(html, /id="generateSceneVoices"/);
+  assert.match(html, /id="voiceNonCommercialConsent"/);
+  assert.match(html, /not mixed into WebM export yet/);
+});
