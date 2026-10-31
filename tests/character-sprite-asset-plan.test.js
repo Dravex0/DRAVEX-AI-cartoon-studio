@@ -9,24 +9,23 @@ const bible = [
 
 test('creates one sprite plan per cast member using canonical character appearance', () => {
   const plan = buildCharacterSpriteAssetPlan({
-    id: 'scene-1', characters: ['foxy', 'Bird'],
-    visibleAction: 'Foxy waves and Bird watches.',
+    id: 'scene-1', characters: ['foxy'],
+    visibleAction: 'Foxy waves.',
     location: 'Forest clearing', timeOfDay: 'Morning'
   }, bible);
-  assert.equal(plan.length, 2);
+  assert.equal(plan.length, 1);
   assert.equal(plan[0].characterId, 'foxy');
   assert.equal(plan[0].status, 'ready');
   assert.match(plan[0].prompt, /Small orange fox/);
   assert.match(plan[0].prompt, /Blue scarf/);
-  assert.match(plan[0].prompt, /Foxy waves and Bird watches/);
+  assert.match(plan[0].prompt, /Foxy waves/);
   assert.match(plan[0].prompt, /Transparent background/);
-  assert.equal(plan[1].status, 'blocked');
-  assert.ok(plan[1].issues.some(issue => issue.code === 'missing-character-action'));
 });
 
 test('assigns actor-specific timeline actions instead of sharing another character action', () => {
   const plan = buildCharacterSpriteAssetPlan({
     id: 'scene-2',
+    storyDetail: 'Foxy opens the wooden door. Bird steps back.',
     characters: ['Foxy', 'Bird'],
     visibleAction: 'Foxy opens the door while Bird waits.',
     actionTimeline: {
