@@ -5,8 +5,8 @@ import {
   validateSceneStateContinuity
 } from "../src/scene-state-memory.js";
 
-function scene(id, startState, endState, stateChanges = []) {
-  return { id, characters: ["Mira"], startState, endState, stateChanges };
+function scene(id, startState, endState, stateChanges = [], storyDetail = "") {
+  return { id, characters: ["Mira"], startState, endState, stateChanges, storyDetail };
 }
 
 function state({ characterLocation = "village", objectOwner = "Mira", objectState = "held" } = {}) {
@@ -50,7 +50,24 @@ test("accepts an exact evidence-backed state change", () => {
     scene("s2", state({ characterLocation: "castle" }), state({ characterLocation: "castle" }), [
       { entity: "Mira", property: "location", previousValue: "village",
         value: "castle", evidence: "Mira travels from the village to the castle." }
-    ])
+    ], "Mira travels from the village to the castle.")
+  ]);
+  const report = validateSceneStateContinuity(memory);
+  assert.equal(report.passed, true);
+  assert.deepEqual(report.issues, []);
+});
+
+test("accepts a source-backed clothing change between scenes", () => {
+  const previous = state();
+  previous.characters.Mira.clothing = "blue coat";
+  const next = state();
+  next.characters.Mira.clothing = "red dress";
+  const memory = buildSceneStateMemory([
+    scene("s1", previous, previous),
+    scene("s2", next, next, [
+      { entity: "Mira", property: "clothing", previousValue: "blue coat",
+        value: "red dress", evidence: "Mira changes into a red dress." }
+    ], "Mira changes into a red dress.")
   ]);
   const report = validateSceneStateContinuity(memory);
   assert.equal(report.passed, true);
