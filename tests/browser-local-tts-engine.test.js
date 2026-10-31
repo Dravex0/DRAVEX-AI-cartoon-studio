@@ -147,3 +147,42 @@ test("discovers voices from the public Kokoro voices catalog when list_voices on
   assert.equal(generatedWithVoice, "am_adam");
   assert.equal(storage.records.size, 1);
 });
+
+
+test("captures Kokoro stream phonemes with measured PCM chunk boundaries", async () => {
+  const storage = makeStorage();
+  let generateCalled = false;
+  const engine = createBrowserLocalTtsEngine({
+    storage, cryptoRef: webcrypto, environment,
+    kokoroFactory: async () => ({
+      voices: { af_heart: {} },
+      stream: async function* () {
+        yield {
+          text: "Hello.",
+          phonemes: "həlˈoʊ",
+          audio: { audio: Float32Array.from([0.1, 0.2, 0.3]), sampling_rate: 24000 }
+        };
+        yield {
+          text: "World!",
+          phonemes: "wˈɜːld",
+          audio: { audio: Float32Array.from([0.4, 0.5]), sampling_rate: 24000 }
+        };
+      },
+      generate: async () => { generateCalled = true; return validOutput(24000); }
+    })
+  });
+
+  await engine.load({ locale: "en", backend: "wasm" });
+  const result = await engine.synthesize({ text: "Hello. World!" });
+
+  assert.equal(generateCalled, false);
+  assert.equal(result.sampleRate, 24000);
+  assert.equal(result.phonemeChunks.length, 2);
+  assert.equal(result.phonemeChunks[0].text, "Hello.");
+  assert.equal(result.phonemeChunks[0].phonemes, "həlˈoʊ");
+  assert.equal(result.phonemeChunks[0].startMs, 0);
+  assert.equal(result.phonemeChunks[0].endMs, 3 / 24000 * 1000);
+  assert.equal(result.phonemeChunks[1].startMs, 3 / 24000 * 1000);
+  assert.equal(result.phonemeChunks[1].endMs, 5 / 24000 * 1000);
+  assert.equal(storage.records.size, 1);
+});
