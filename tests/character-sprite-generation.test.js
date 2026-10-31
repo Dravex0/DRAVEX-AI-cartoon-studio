@@ -44,11 +44,13 @@ test('binds a generated HTTPS image to the exact stable character and asset IDs'
     assetId: asset.assetId, sceneId: asset.sceneId, characterId: asset.characterId,
     assetRole: asset.assetRole, imageUrl: asset.imageUrl, provider: asset.provider,
     requestId: asset.requestId, seed: asset.seed, model: asset.model,
+    generationStatus: asset.generationStatus, verificationStatus: asset.verificationStatus,
     transparencyStatus: asset.transparencyStatus
   }, {
     assetId: 'scene-1:Foxy', sceneId: 'scene-1', characterId: 'Foxy',
     assetRole: 'character-sprite', imageUrl: 'https://cdn.example.test/foxy.png',
     provider: 'ai-horde', requestId: 'req-1', seed: '42', model: 'model-a',
+    generationStatus: 'generated', verificationStatus: 'not_verified',
     transparencyStatus: 'unverified'
   });
   assert.ok(Number.isFinite(Date.parse(asset.generatedAt)));
