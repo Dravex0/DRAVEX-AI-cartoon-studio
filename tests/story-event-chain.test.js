@@ -225,3 +225,14 @@ test('rejects causal links when the effect scene ID is duplicated', () => {
   assert.equal(graph.edges.some(edge => edge.type === 'causes'), false);
 });
 
+test('does not emit an emotional reaction without source-story evidence', () => {
+  const graph = buildStoryEventChain([{
+    id: 'empty-reaction',
+    storyEventType: 'emotional_reaction',
+    storyDetail: '',
+    characters: ['Foxy']
+  }]);
+  assert.equal(graph.nodes[0].reaction, null);
+  assert.equal(graph.edges.some(edge => edge.type === 'reacts_to'), false);
+});
+
