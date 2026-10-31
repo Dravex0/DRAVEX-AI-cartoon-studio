@@ -235,4 +235,4 @@ test('does not emit an emotional reaction without source-story evidence', () => 
   assert.equal(graph.nodes[0].reaction, null);
   assert.equal(graph.edges.some(edge => edge.type === 'reacts_to'), false);
 });
-\n
+
