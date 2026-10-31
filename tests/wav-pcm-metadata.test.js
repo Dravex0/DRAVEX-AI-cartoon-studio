@@ -41,7 +41,7 @@ test("rejects malformed signature, truncation, unsupported PCM and inconsistent 
 });
 test("rejects empty and frame-misaligned audio data",async()=>{
  await assert.rejects(readWavPcmMetadata(makeWav({frames:0})),/empty/);
- const malformed=makeWav();const v=new DataView(malformed);v.setUint32(40,1,true);v.setUint32(4,v.getUint32(4,true)-4409,true);
+ const malformed=makeWav();const v=new DataView(malformed);v.setUint32(40,1,true);v.setUint32(4,v.getUint32(4,true)-4408,true);
  await assert.rejects(readWavPcmMetadata(malformed),/aligned/);
 });
 test("rejects unsupported input types",async()=>{
