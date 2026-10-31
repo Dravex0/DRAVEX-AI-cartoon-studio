@@ -305,7 +305,7 @@ test('passes a source-backed action timeline from the local director into storyb
       actorId: 'Foxy',
       targetId: 'silver key',
       description: 'Foxy bends down and lifts the silver key.',
-      evidence: 'Foxy kneels beside the silver key'
+      evidence: 'finds a silver key'
     }]
   };
   let prompt = '';
