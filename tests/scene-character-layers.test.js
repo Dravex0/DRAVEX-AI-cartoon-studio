@@ -94,3 +94,42 @@ test('rejects invalid viewport and missing drawing dependencies', () => {
   assert.deepEqual(drawCharacterLayers({}, [{}], () => null, 100, 100), { drawn: 0, skipped: 1 });
   assert.deepEqual(drawCharacterLayers({ drawImage() {} }, [{}], () => null, 0, 100), { drawn: 0, skipped: 1 });
 });
+
+test('attaches a generated HTTPS sprite to a new scene layer', async () => {
+  const { attachCharacterSpriteToSceneLayers } = await import('../src/scene-character-layers.js');
+  const result = attachCharacterSpriteToSceneLayers({}, {
+    characterId: 'Foxy', imageUrl: 'https://cdn.example/foxy.png'
+  });
+  assert.equal(result.status, 'added');
+  assert.deepEqual(result.layers[0], {
+    characterId: 'Foxy', imageUrl: 'https://cdn.example/foxy.png',
+    x: 0.5, y: 0.68, width: 0.28, height: 0.46, rotation: 0,
+    scale: 1, opacity: 1, zIndex: 0, flipX: false, visible: true
+  });
+});
+
+test('updates the existing character sprite while preserving its scene placement', async () => {
+  const { attachCharacterSpriteToSceneLayers } = await import('../src/scene-character-layers.js');
+  const result = attachCharacterSpriteToSceneLayers({
+    characterLayers: [{ characterId: 'Foxy', imageUrl: 'https://cdn.example/old.png', x: 0.22, y: 0.61, scale: 1.4 }]
+  }, { characterId: 'foxy', imageUrl: 'https://cdn.example/new.png' });
+  assert.equal(result.status, 'updated');
+  assert.equal(result.layers.length, 1);
+  assert.equal(result.layers[0].imageUrl, 'https://cdn.example/new.png');
+  assert.equal(result.layers[0].x, 0.22);
+  assert.equal(result.layers[0].y, 0.61);
+  assert.equal(result.layers[0].scale, 1.4);
+});
+
+test('does not attach invalid sprite URLs or exceed the scene layer limit', async () => {
+  const { attachCharacterSpriteToSceneLayers } = await import('../src/scene-character-layers.js');
+  assert.equal(attachCharacterSpriteToSceneLayers({}, { characterId: 'Foxy', imageUrl: 'http://cdn.example/fox.png' }).status, 'invalid');
+  const characterLayers = Array.from({ length: CHARACTER_LAYER_LIMIT }, (_, index) => ({
+    characterId: 'Character ' + index, imageUrl: 'https://cdn.example/' + index + '.png'
+  }));
+  const result = attachCharacterSpriteToSceneLayers({ characterLayers }, {
+    characterId: 'Extra', imageUrl: 'https://cdn.example/extra.png'
+  });
+  assert.equal(result.status, 'limit-reached');
+  assert.equal(result.layers.length, CHARACTER_LAYER_LIMIT);
+});
