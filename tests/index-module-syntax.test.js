@@ -61,12 +61,13 @@ test('scene editor exposes local voice generation and explicitly labels export l
 test('WebM export derives built-in character mouth movement from scheduled local dialogue WAVs', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /buildAudioMouthEnvelope, sampleAudioMouthEnvelope/);
+  assert.match(html, /getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)/);
   assert.match(html, /decodeContext\.decodeAudioData\(await track\.blob\.arrayBuffer\(\)\)/);
   assert.match(html, /exportMouthTracks\.push\(\{sceneIndex:track\.sceneIndex,startMs:track\.startMs,envelope,visemes\}\)/);
   assert.match(html, /performance\.now\(\)-exportMouthOriginTimeMs/);
   assert.match(html, /exportElapsedMs>=track\.startMs/);
   assert.match(html, /sampleAudioMouthEnvelope\(activeMouthTrack\.envelope,mouthTrackTimeMs\)/);
-  assert.match(html, /exportMouthOriginTimeMs=performance\.now\(\);\s*if\(audioScheduledStartAtMs!==null\)\{[\s\S]*?mouthStartOffsetMs=Math\.max\(0,audioScheduledStartAtMs-exportMouthOriginTimeMs\)[\s\S]*?\}\s*recorder\.start\(250\)/);
+  assert.match(html, /recorder\.start\(250\);\s*exportMouthOriginTimeMs=performance\.now\(\);\s*if\(audioScheduledStartAtMs!==null\)\{[\s\S]*?getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)[\s\S]*?\}/);
   assert.match(html, /voiceTracks\.filter\(track=>track\.characterName\.trim\(\)\.toLowerCase\(\)===mainCharacterKey\)/);
   assert.match(html, /lipSyncSkippedTracks\+\+/);
   assert.match(html, /lipSyncSkippedTracks=lipSyncRenderableTracks\.length/);

@@ -133,6 +133,7 @@ import { getPromptCameraTransform } from "./src/prompt-camera-motion.js";
 import { detectSceneActionForScene } from "./src/scene-action.js";
 import { buildExportTimeline } from "./src/export-timeline.js";
 import { buildAudioMouthEnvelope, sampleAudioMouthEnvelope } from "./src/audio-mouth-envelope.js";
+import { getAudioTimelineOffsetMs } from "./src/audio-clock-alignment.js";
 import { buildVisemeTimeline, sampleVisemeTimeline } from "./src/viseme-timeline.js";
 import { createAudioExportSession } from "./src/audio-export.js";
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./src/comfyui-video-provider.js";
@@ -1030,12 +1031,12 @@ $('export').onclick=async()=>{
         cleanup();
       }
     };
+    recorder.start(250);
     exportMouthOriginTimeMs=performance.now();
     if(audioScheduledStartAtMs!==null){
-      const mouthStartOffsetMs=Math.max(0,audioScheduledStartAtMs-exportMouthOriginTimeMs);
+      const mouthStartOffsetMs=getAudioTimelineOffsetMs(audioScheduledStartAtMs,exportMouthOriginTimeMs);
       exportMouthTracks=exportMouthTracks.map(track=>({...track,startMs:track.startMs+mouthStartOffsetMs}));
     }
-    recorder.start(250);
     $('status').textContent=uiLang==='ru'
       ?'Записываем '+timeline.segments.length+' сцен'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+'…'
       :'Recording '+timeline.segments.length+' scenes'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'')+'…';
