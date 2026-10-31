@@ -25,7 +25,8 @@ export async function generateCharacterSpriteAsset({
   const characterId = clean(plan.characterId);
   const assetId = clean(plan.assetId, 240);
   const prompt = String(plan.prompt ?? '').trim().slice(0, 10000);
-  if (plan.status !== 'ready' || !characterId || !assetId || !prompt) {
+  const planningStatus = plan.planningStatus ?? plan.status;
+  if (planningStatus !== 'ready' || !characterId || !assetId || !prompt) {
     throw new Error('The character sprite plan is blocked or incomplete.');
   }
 
@@ -54,6 +55,8 @@ export async function generateCharacterSpriteAsset({
     requestId: clean(result?.requestId, 80),
     seed: clean(result?.seed, 80),
     model: clean(result?.model, 120),
+    generationStatus: 'generated',
+    verificationStatus: 'not_verified',
     transparencyStatus: 'unverified',
     generatedAt: new Date().toISOString()
   };

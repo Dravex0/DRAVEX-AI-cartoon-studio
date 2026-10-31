@@ -80,7 +80,11 @@ export function buildCharacterSpriteAssetPlan(scene = {}, characterBible = []) {
       action,
       prompt,
       negativePrompt: 'background, scenery, extra characters, cropped body, missing feet, text, logo, watermark, costume change, different colors, duplicate limbs',
+      // `status` remains the legacy planning status for existing consumers.
       status: issues.length ? 'blocked' : 'ready',
+      planningStatus: issues.length ? 'blocked' : 'ready',
+      generationStatus: 'not_started',
+      verificationStatus: 'not_verified',
       issues
     };
   });
