@@ -8,7 +8,7 @@ const VOICE_URL = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/re
 const MAX_TEXT_LENGTH = 500;
 
 async function defaultHeadTtsFactory(settings, onerror) {
-  const { HeadTTS } = await import("@met4citizen/headtts");
+  const { HeadTTS } = await import("../vendor/headtts/headtts.mjs");
   return new HeadTTS(settings, onerror);
 }
 
