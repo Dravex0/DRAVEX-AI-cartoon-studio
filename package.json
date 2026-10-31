@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
-    "kokoro-js": "^1.2.1",
-    "@met4citizen/headtts": "^1.4.0"
+    "kokoro-js": "^1.2.1"
   }
 }
