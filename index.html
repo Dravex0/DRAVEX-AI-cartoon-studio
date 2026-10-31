@@ -883,7 +883,7 @@ $('export').onclick=async()=>{
   let stream=null,recorder=null,stopTimer=null,cleaned=false,audioSession=null;
   const chunks=[];
   let audioScheduledStartAtMs=null;
-  let lipSyncSkippedTracks=0;
+  let lipSyncSkippedTracks=0,lipSyncGeneratedMediaTracks=0;
   const cleanup=()=>{
     if(cleaned)return;
     cleaned=true;
@@ -931,11 +931,17 @@ $('export').onclick=async()=>{
     if(voiceTracks.length){
       const mainCharacterKey=String($("character").value||"Foxy").trim().toLowerCase();
       const mainCharacterVoiceTracks=voiceTracks.filter(track=>track.characterName.trim().toLowerCase()===mainCharacterKey);
+      const lipSyncRenderableTracks=mainCharacterVoiceTracks.filter(track=>{
+        const meta=sceneMetadata[track.sceneIndex]||{};
+        const generatedVideo=sceneVideoCache.get(String(meta.id||('scene-index-'+track.sceneIndex)));
+        if(String(meta.generatedImageUrl||'').trim()||generatedVideo){lipSyncGeneratedMediaTracks++;return false}
+        return true;
+      });
       const AudioContextClass=window.AudioContext||window.webkitAudioContext;
-      if(AudioContextClass&&mainCharacterVoiceTracks.length){
+      if(AudioContextClass&&lipSyncRenderableTracks.length){
         const decodeContext=new AudioContextClass();
         try{
-          for(const track of mainCharacterVoiceTracks){
+          for(const track of lipSyncRenderableTracks){
             try{
               const decoded=await decodeContext.decodeAudioData(await track.blob.arrayBuffer());
               const channels=Array.from({length:decoded.numberOfChannels},(_,channel)=>decoded.getChannelData(channel));
@@ -945,8 +951,8 @@ $('export').onclick=async()=>{
             }catch(decodeError){lipSyncSkippedTracks++;console.warn("DRAVEX lip-sync analysis skipped a dialogue track:",decodeError);}
           }
         }finally{await decodeContext.close().catch(()=>{});}
-      }else if(mainCharacterVoiceTracks.length){
-        lipSyncSkippedTracks=mainCharacterVoiceTracks.length;
+      }else if(lipSyncRenderableTracks.length){
+        lipSyncSkippedTracks=lipSyncRenderableTracks.length;
       }
     }
     if(musicFile||voiceTracks.length){
@@ -978,9 +984,14 @@ $('export').onclick=async()=>{
         anchor.click();
         anchor.remove();
         setTimeout(()=>URL.revokeObjectURL(url),5000);
-        const lipSyncWarning=lipSyncSkippedTracks
-          ?(uiLang==='ru'?' · Внимание: синхронизация губ не рассчитана для '+lipSyncSkippedTracks+' реплик.':' · Warning: lip-sync analysis was skipped for '+lipSyncSkippedTracks+' dialogue line(s).')
-          :'';
+        const lipSyncWarnings=[];
+        if(lipSyncSkippedTracks)lipSyncWarnings.push(uiLang==='ru'
+          ?'Анализ синхронизации губ пропущен для '+lipSyncSkippedTracks+' реплик.'
+          :'Lip-sync analysis was skipped for '+lipSyncSkippedTracks+' dialogue line(s).');
+        if(lipSyncGeneratedMediaTracks)lipSyncWarnings.push(uiLang==='ru'
+          ?'Анимация рта не накладывается на AI-изображения и видео для '+lipSyncGeneratedMediaTracks+' реплик.'
+          :'Mouth animation is not composited into AI-generated scene media for '+lipSyncGeneratedMediaTracks+' dialogue line(s).');
+        const lipSyncWarning=lipSyncWarnings.length?' · '+lipSyncWarnings.join(' '):'';
         $('status').textContent=uiLang==='ru'
           ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+lipSyncWarning
           :'Exported '+timeline.segments.length+' scenes · '+timeline.totalDurationSeconds.toFixed(2)+' sec.'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'')+lipSyncWarning;
