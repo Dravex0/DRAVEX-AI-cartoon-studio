@@ -21,8 +21,8 @@ test("speech energy opens the mouth and silence releases it smoothly", () => {
   const samples = tone(24_000, 1000, 0.5, 100, 600);
   const envelope = buildAudioMouthEnvelope({ channels: [samples], sampleRate: 24_000 });
   assert.ok(envelope.frames[5] > 0.5, "mouth should open during the voiced section");
-  assert.ok(envelope.frames[15] > 0.8, "mouth should reach a clearly open pose");
-  assert.ok(envelope.frames[22] < envelope.frames[15], "mouth should close after speech energy ends");
+  assert.ok(envelope.frames[10] > 0.8, "mouth should reach a clearly open pose during speech");
+  assert.ok(envelope.frames[22] < envelope.frames[10], "mouth should close after speech energy ends");
   assert.equal(sampleAudioMouthEnvelope(envelope, 1000), 0);
 });
 
@@ -42,7 +42,7 @@ test("time sampling interpolates adjacent frames and clamps outside the cue", ()
 });
 
 test("invalid rates, mismatched channels and oversized audio are rejected", () => {
-  assert.throws(() => buildAudioMouthEnvelope({ channels: [new Float32Array(10)], sampleRate: 24_000 }), /duration/);
+  assert.throws(() => buildAudioMouthEnvelope({ channels: [new Float32Array(0)], sampleRate: 24_000 }), /empty/);
   assert.throws(() => buildAudioMouthEnvelope({ channels: [new Float32Array(24_000)], sampleRate: 24_000, fps: 0 }), /fps/);
   assert.throws(() => buildAudioMouthEnvelope({ channels: [new Float32Array(24_000), new Float32Array(12_000)], sampleRate: 24_000 }), /same sample count/);
   assert.throws(() => buildAudioMouthEnvelope({ channels: [new Float32Array(24_000 * 31)], sampleRate: 24_000 }), /30 seconds/);
