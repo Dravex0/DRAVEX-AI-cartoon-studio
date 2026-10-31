@@ -1,3 +1,5 @@
+import { applyCharacterActionTimelineToLayers } from './character-action-runtime.js';
+
 const MAX_CHARACTER_LAYERS = 12;
 const clean = (value, max = 2048) => String(value ?? '').trim().slice(0, max);
 const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -42,13 +44,17 @@ export function normalizeCharacterLayers(layers) {
  * Composite independently generated character sprites over a scene background.
  * The resolver owns asset loading; this function only draws already-ready images.
  */
-export function drawCharacterLayers(context, layers, resolveImage, viewportWidth, viewportHeight) {
+export function drawCharacterLayers(context, layers, resolveImage, viewportWidth, viewportHeight, runtime = {}) {
   const width = Number(viewportWidth), height = Number(viewportHeight);
   if (!context || typeof context.drawImage !== 'function' || typeof resolveImage !== 'function'
     || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return { drawn: 0, skipped: Array.isArray(layers) ? layers.length : 0 };
   }
-  const normalized = normalizeCharacterLayers(layers)
+  const baseLayers = normalizeCharacterLayers(layers);
+  const runtimeLayers = runtime && typeof runtime === 'object' && runtime.actionTimeline
+    ? applyCharacterActionTimelineToLayers(baseLayers, runtime.actionTimeline, runtime.progress)
+    : baseLayers;
+  const normalized = runtimeLayers
     .map((layer, index) => ({ layer, index }))
     .filter(item => item.layer.visible)
     .sort((a, b) => a.layer.zIndex - b.layer.zIndex || a.index - b.index);

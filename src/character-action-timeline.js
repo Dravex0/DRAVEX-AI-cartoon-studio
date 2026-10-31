@@ -5,6 +5,29 @@
 const PHASE_ORDER = ['preparation', 'action', 'reaction', 'result'];
 const isRecord = value => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const clean = (value, max = 500) => String(value ?? '').trim().slice(0, max);
+const MOTION_RANGES = {
+  x: [0, 1], y: [0, 1], width: [0.01, 2], height: [0.01, 2],
+  rotation: [-Math.PI * 2, Math.PI * 2], scale: [0.05, 4], opacity: [0, 1]
+};
+
+function normalizeMotionPose(rawPose) {
+  if (!isRecord(rawPose)) return null;
+  const pose = {};
+  for (const [key, range] of Object.entries(MOTION_RANGES)) {
+    const value = rawPose[key];
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    pose[key] = Math.max(range[0], Math.min(range[1], value));
+  }
+  return Object.keys(pose).length ? pose : null;
+}
+
+function normalizePhaseMotion(rawMotion) {
+  if (!isRecord(rawMotion)) return null;
+  const to = normalizeMotionPose(rawMotion.to);
+  if (!to) return null;
+  const from = normalizeMotionPose(rawMotion.from);
+  return { ...(from ? { from } : {}), to };
+}
 
 function issue(code, phase, message) {
   return { code, phase: phase || null, severity: 'error', message };
@@ -21,6 +44,7 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
       if (!isRecord(phase)) return null;
       const start = Number(phase.start);
       const end = Number(phase.end);
+      const motion = phase.motion == null ? undefined : normalizePhaseMotion(phase.motion);
       return {
         phase: clean(phase.phase, 24),
         start: Number.isFinite(start) ? start : null,
@@ -28,7 +52,8 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
         actorId: clean(phase.actorId, 120),
         targetId: clean(phase.targetId, 120) || null,
         description: clean(phase.description, 700),
-        evidence: clean(phase.evidence, 500)
+        evidence: clean(phase.evidence, 500),
+        ...(phase.motion == null ? {} : { motion })
       };
     })
   };
@@ -91,6 +116,7 @@ export function validateCharacterActionTimeline(scene = {}) {
     }
 
     if (!normalized.description) issues.push(issue('phase-description-missing', name, 'Every phase needs a concrete visible description.'));
+    if (phase.motion != null && !normalized.motion) issues.push(issue('phase-motion-invalid', name, 'Motion must provide a numeric target pose with at least one supported transform property.'));
     if (!normalized.actorId) issues.push(issue('phase-actor-missing', name, 'Every phase needs an acting character ID.'));
     else if (castWasExplicit && !cast.has(normalized.actorId.toLocaleLowerCase())) {
       issues.push(issue('phase-actor-not-in-cast', name, 'The phase actor must belong to this scene cast.'));
