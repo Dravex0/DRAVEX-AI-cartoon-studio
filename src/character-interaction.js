@@ -81,14 +81,33 @@ export function inferCharacterInteractions(detail, characterIds = [], language =
   }
   if (!source || names.length < 2) return [];
 
-  const actions = RELATIONS[locale].flatMap(([type, pattern]) => verbOccurrences(source, type, pattern))
-    .sort((left, right) => left.start - right.start || left.end - right.end);
+  const sentences = [...source.matchAll(/[^.!?。！？]+[.!?。！？]?/gu)]
+    .map(match => ({ text: match[0], start: match.index, end: match.index + match[0].length }));
+  const actions = sentences.flatMap(sentence =>
+    RELATIONS[locale].flatMap(([type, pattern]) =>
+      verbOccurrences(sentence.text, type, pattern).map(action => ({
+        ...action,
+        start: action.start + sentence.start,
+        end: action.end + sentence.start,
+        sentenceStart: sentence.start,
+        sentenceEnd: sentence.end
+      }))
+    )
+  ).sort((left, right) => left.start - right.start || left.end - right.end);
   const results = [];
   for (const action of actions) {
-    const before = names.flatMap(name => occurrences(source.slice(0, action.start), name))
-      .sort((a, b) => b.end - a.end);
-    const after = names.flatMap(name => occurrences(source.slice(action.end), name))
-      .map(item => ({ ...item, start: item.start + action.end, end: item.end + action.end }))
+    // Resolve participants only inside the action's own sentence. This prevents
+    // a missing target from being borrowed from the next sentence.
+    const before = names.flatMap(name => occurrences(
+      source.slice(action.sentenceStart, action.start), name
+    ).map(item => ({
+      ...item,
+      start: item.start + action.sentenceStart,
+      end: item.end + action.sentenceStart
+    }))).sort((a, b) => b.end - a.end);
+    const after = names.flatMap(name => occurrences(
+      source.slice(action.end, action.sentenceEnd), name
+    )).map(item => ({ ...item, start: item.start + action.end, end: item.end + action.end }))
       .sort((a, b) => a.start - b.start);
     if (!before.length || !after.length) continue;
     const actor = before[0].name;
