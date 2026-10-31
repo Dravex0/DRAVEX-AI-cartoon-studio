@@ -222,3 +222,47 @@ test('motion prompt does not add timeline constraints for missing or invalid tim
   });
   assert.doesNotMatch(invalid, /Temporal motion constraints/);
 });
+
+
+test('production scene exposes a per-character sprite asset plan grounded in the character bible', () => {
+  const prepared = buildProductionScene({
+    id: 'sprite-scene',
+    title: 'Foxy meets Bird',
+    storyDetail: 'Foxy waves while Bird watches.',
+    visibleAction: 'Foxy waves while Bird watches.',
+    imagePrompt: 'Two friends in a forest clearing.',
+    motionPrompt: 'Foxy waves while Bird watches.',
+    camera: 'Wide two-shot',
+    startState: 'Foxy and Bird face each other.',
+    endState: 'Foxy lowers a paw.',
+    characters: ['Foxy', 'Bird']
+  }, [
+    { characterId: 'Foxy', species: 'Anthropomorphic fox', visualDescription: 'Small orange fox', clothing: 'Blue scarf' },
+    { characterId: 'Bird', species: 'Yellow bird', visualDescription: 'Small round bird', clothing: 'Red cap' }
+  ]);
+  assert.equal(prepared.characterSpriteAssetPlan.length, 2);
+  assert.deepEqual(prepared.characterSpriteAssetPlan.map(asset => asset.characterId), ['Foxy', 'Bird']);
+  assert.ok(prepared.characterSpriteAssetPlan.every(asset => asset.status === 'blocked'));
+  assert.match(prepared.characterSpriteAssetPlan[0].prompt, /Small orange fox/);
+  assert.match(prepared.characterSpriteAssetPlan[1].prompt, /Small round bird/);
+  assert.equal(prepared.characterSpriteAssetPlan[0].assetRole, 'character-sprite');
+  assert.equal(prepared.characterSpriteAssetPlan[0].transparentBackground, true);
+});
+
+test('production scene blocks sprite plans when a cast member lacks a canonical appearance reference', () => {
+  const prepared = buildProductionScene({
+    id: 'missing-reference-scene',
+    title: 'Unknown character',
+    imagePrompt: 'A character stands in a room.',
+    visibleAction: 'A character waves.',
+    motionPrompt: 'A character waves.',
+    camera: 'Medium shot',
+    startState: 'The character stands.',
+    endState: 'The character waves.',
+    characters: ['Unknown']
+  }, []);
+  assert.equal(prepared.characterSpriteAssetPlan.length, 1);
+  assert.equal(prepared.characterSpriteAssetPlan[0].status, 'blocked');
+  assert.equal(prepared.characterSpriteAssetPlan[0].prompt, '');
+  assert.ok(prepared.characterSpriteAssetPlan[0].issues.some(issue => issue.code === 'missing-character-reference'));
+});

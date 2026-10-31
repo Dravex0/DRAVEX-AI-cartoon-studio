@@ -58,7 +58,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="row"><div class="field"><label for="sceneStartState" id="sceneStartStateLabel">Start state</label><textarea id="sceneStartState" rows="2" maxlength="1000"></textarea></div><div class="field"><label for="sceneEndState" id="sceneEndStateLabel">End state</label><textarea id="sceneEndState" rows="2" maxlength="1000"></textarea></div></div>
 <div class="field"><label for="sceneNegativePrompt" id="sceneNegativePromptLabel">Avoid / negative prompt</label><textarea id="sceneNegativePrompt" rows="2" maxlength="2000"></textarea></div>
 <div class="field"><label for="sceneContinuityLock" id="sceneContinuityLockLabel">Continuity lock · details that must not change</label><textarea id="sceneContinuityLock" rows="2" maxlength="2000"></textarea></div>
-<details class="production-details"><summary id="compiledPromptSummary">Preview of the final AI instructions</summary><p class="muted" id="imagePromptPreviewLabel">Image generation instruction</p><pre class="production-preview" id="imagePromptPreview"></pre><p class="muted" id="motionPromptPreviewLabel">Animation instruction</p><pre class="production-preview" id="motionPromptPreview"></pre></details>
+<details class="production-details"><summary id="compiledPromptSummary">Preview of the final AI instructions</summary><p class="muted" id="imagePromptPreviewLabel">Image generation instruction</p><pre class="production-preview" id="imagePromptPreview"></pre><p class="muted" id="motionPromptPreviewLabel">Animation instruction</p><pre class="production-preview" id="motionPromptPreview"></pre><p class="muted" id="spritePlanPreviewLabel">Per-character sprite plan · local preview only</p><pre class="production-preview" id="spritePlanPreview"></pre></details>
 <div class="muted" id="sceneReadiness" role="status" aria-live="polite"></div>
 </div></details>
 <details class="production-details"><summary id="characterBibleSummary">Character consistency reference / Справочник персонажа</summary>
@@ -140,6 +140,7 @@ import { createAudioExportSession } from "./src/audio-export.js";
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./src/comfyui-video-provider.js";
 import { createVideoProviderRegistry, generateVideoWithProvider } from "./src/video-provider-contract.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./src/scene-production.js";
+import { buildCharacterSpriteAssetPlan } from "./src/character-sprite-asset-plan.js";
 import { upsertCharacterReference, mergeCharacterReferences } from "./src/character-reference.js";
 import { prepareStoryCharacterContext } from "./src/story-character-context.js";
 import { normalizeSceneCast } from "./src/scene-cast.js";
@@ -332,6 +333,14 @@ const readiness=validateSceneProductionReadiness(scene,characterBible);
 $('sceneReadiness').textContent=readiness.ready?t.ready:t.incomplete+readiness.issues.map(issue=>t.missing[issue.code]||issue.field).join(', ');
 $('imagePromptPreview').textContent=buildImageGenerationPrompt(scene,characterBible);
 $('motionPromptPreview').textContent=buildMotionGenerationPrompt(scene,characterBible);
+const spritePlan=buildCharacterSpriteAssetPlan(scene,characterBible);
+$('spritePlanPreviewLabel').textContent=uiLang==='ru'?'План спрайтов персонажей · локальный предпросмотр':'Per-character sprite plan · local preview only';
+$('spritePlanPreview').textContent=spritePlan.length?spritePlan.map(asset=>[
+  asset.characterId+' · '+asset.status.toUpperCase(),
+  asset.appearanceReference?'Appearance: '+asset.appearanceReference:'Appearance reference: missing',
+  asset.action?'Action: '+asset.action:'Action: not safely assigned',
+  asset.issues.length?'Blocked: '+asset.issues.map(issue=>issue.code).join(', '):'Prompt: '+asset.prompt
+].join('\n')).join('\n\n'):(uiLang==='ru'?'В сцене пока нет отдельных персонажей.':'No individual characters are assigned to this scene.');
 }
 function renderGeneratedSceneImage(){
 const meta=sceneMetadata[sceneIndex]||{},wrap=$('generatedImageWrap'),image=$('generatedSceneImage');
