@@ -19,8 +19,8 @@ function normalizePose(value) {
   const pose = {};
   for (const key of MOTION_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-    const number = Number(value[key]);
-    if (!Number.isFinite(number)) continue;
+    if (typeof value[key] !== 'number' || !Number.isFinite(value[key])) continue;
+    const number = value[key];
     const [min, max] = MOTION_LIMITS[key];
     pose[key] = Math.max(min, Math.min(max, number));
   }
@@ -47,8 +47,8 @@ export function applyCharacterActionTimelineToLayers(layers, actionTimeline, sce
       || actionTimeline.schemaVersion !== 1 || !Array.isArray(actionTimeline.phases)) {
     return Array.isArray(layers) ? layers.map(layer => ({ ...layer })) : [];
   }
-  const numericProgress = Number(sceneProgress);
-  if (!Number.isFinite(numericProgress)) {
+  const numericProgress = sceneProgress;
+  if (typeof numericProgress !== 'number' || !Number.isFinite(numericProgress)) {
     return layers.map(layer => ({ ...layer }));
   }
   const progress = Math.max(0, Math.min(1, numericProgress));
@@ -63,9 +63,10 @@ export function applyCharacterActionTimelineToLayers(layers, actionTimeline, sce
     let changed = false;
     for (const phase of actionTimeline.phases) {
       if (!isRecord(phase) || String(phase.actorId ?? '').trim().toLocaleLowerCase() !== actorId) continue;
-      const start = Number(phase.start);
-      const end = Number(phase.end);
-      if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || start >= end) continue;
+      const start = phase.start;
+      const end = phase.end;
+      if (typeof start !== 'number' || typeof end !== 'number'
+          || !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || start >= end) continue;
       const motion = phase.motion;
       if (!isRecord(motion)) continue;
       const from = normalizePose(motion.from);
