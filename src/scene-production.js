@@ -1,4 +1,5 @@
 import { normalizeScene, SCENE_DURATION_MIN, SCENE_DURATION_MAX } from './scene-model.js';
+import { validateCharacterActionTimeline } from './character-action-timeline.js';
 
 const safe = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const list = values => Array.isArray(values) ? values.map(value => safe(value, 500)).filter(Boolean) : [];
@@ -39,6 +40,21 @@ export function buildImageGenerationPrompt(scene = {}, characterBible = [], opti
   ].filter(Boolean).join('\n\n');
 }
 
+/** Format validated action phases for downstream motion-generation providers. */
+function actionTimelineInstructions(scene = {}) {
+  if (scene.actionTimeline == null) return '';
+  const report = validateCharacterActionTimeline(scene);
+  if (!report.passed) return '';
+  const duration = Number.isFinite(Number(scene.durationSeconds)) ? Number(scene.durationSeconds) : 3;
+  const phases = scene.actionTimeline.phases.map(phase => {
+    const startSeconds = (Number(phase.start) * duration).toFixed(2);
+    const endSeconds = (Number(phase.end) * duration).toFixed(2);
+    const target = phase.targetId ? `; target: ${safe(phase.targetId, 120)}` : '';
+    return `- ${safe(phase.phase, 24)} (${Math.round(phase.start * 100)}%-${Math.round(phase.end * 100)}%; ${startSeconds}-${endSeconds}s): ${safe(phase.description, 700)}; actor: ${safe(phase.actorId, 120)}${target}`;
+  });
+  return `Character action timeline (follow these phases in order):\\n${phases.join('\\n')}`;
+}
+
 /** Creates a motion-only instruction and keeps the still image description separate. */
 export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
   const characterLock = characterDetails(scene, characterBible);
@@ -46,6 +62,7 @@ export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
     safe(scene.motionPrompt) || safe(scene.visibleAction),
     safe(scene.startState) && `Start state: ${safe(scene.startState, 1000)}`,
     safe(scene.endState) && `End state: ${safe(scene.endState, 1000)}`,
+    actionTimelineInstructions(scene),
     safe(scene.camera) && `Camera movement: ${safe(scene.camera, 1000)}`,
     characterLock.length && `Keep these character designs unchanged: ${characterLock.join(' | ')}`,
     safe(scene.continuityLock) && `Continuity lock: ${safe(scene.continuityLock, 2000)}`,
@@ -87,6 +104,12 @@ export function buildProductionScene(scene = {}, characterBible = [], options = 
 /** Validate required fields and references before sending a scene to a provider. */
 export function validateSceneProductionReadiness(scene = {}, characterBible = []) {
   const issues = [];
+  if (scene.actionTimeline != null) {
+    const timelineReport = validateCharacterActionTimeline(scene);
+    if (!timelineReport.passed) {
+      issues.push({ code: 'invalid-action-timeline', field: 'actionTimeline', details: timelineReport.issues });
+    }
+  }
   if (!safe(scene.title, 200)) issues.push({ code: 'missing-title', field: 'title' });
   if (!safe(scene.imagePrompt) && !safe(scene.prompt) && !safe(scene.description)) issues.push({ code: 'missing-image-prompt', field: 'imagePrompt' });
   if (!safe(scene.motionPrompt) && !safe(scene.visibleAction)) issues.push({ code: 'missing-motion-prompt', field: 'motionPrompt' });
