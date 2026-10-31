@@ -153,3 +153,23 @@ test('normalization preserves the distinction between an omitted and explicit em
     item => item.code === 'phase-actor-not-in-cast'
   ));
 });
+
+test('normalizes explicit per-character motion keyframes for runtime playback', () => {
+  const candidate = structuredClone(scene);
+  candidate.actionTimeline.phases[1].motion = {
+    from: { x: 0.2, y: 0.8 },
+    to: { x: 0.7, y: 0.4, scale: 1.5, ignored: 10 }
+  };
+  const normalized = normalizeScene(candidate).actionTimeline.phases[1].motion;
+  assert.deepEqual(normalized, {
+    from: { x: 0.2, y: 0.8 },
+    to: { x: 0.7, y: 0.4, scale: 1.5 }
+  });
+});
+
+test('rejects a supplied motion block without a valid numeric target pose', () => {
+  const candidate = structuredClone(scene);
+  candidate.actionTimeline.phases[1].motion = { to: { x: null, y: '0.5' } };
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'phase-motion-invalid'));
+});
