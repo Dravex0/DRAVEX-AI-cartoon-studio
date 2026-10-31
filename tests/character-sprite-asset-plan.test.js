@@ -25,14 +25,16 @@ test('creates one sprite plan per cast member using canonical character appearan
 test('assigns actor-specific timeline actions instead of sharing another character action', () => {
   const plan = buildCharacterSpriteAssetPlan({
     id: 'scene-2',
-    storyDetail: 'Foxy opens the wooden door. Bird steps back.',
+    storyDetail: 'Foxy notices the door, opens the wooden door, and Bird steps back in surprise.',
     characters: ['Foxy', 'Bird'],
     visibleAction: 'Foxy opens the door while Bird waits.',
     actionTimeline: {
       schemaVersion: 1,
       phases: [
-        { phase: 'action', start: 0, end: 0.5, actorId: 'Foxy', description: 'Foxy opens the wooden door.', evidence: 'Foxy opens the wooden door' },
-        { phase: 'reaction', start: 0.5, end: 1, actorId: 'Bird', description: 'Bird steps back in surprise.', evidence: 'Bird steps back' }
+        { phase: 'preparation', start: 0, end: 0.15, actorId: 'Foxy', description: 'Foxy notices the door.', evidence: 'Foxy notices the door' },
+        { phase: 'action', start: 0.15, end: 0.55, actorId: 'Foxy', description: 'Foxy opens the wooden door.', evidence: 'opens the wooden door' },
+        { phase: 'reaction', start: 0.55, end: 0.8, actorId: 'Bird', description: 'Bird steps back in surprise.', evidence: 'Bird steps back in surprise' },
+        { phase: 'result', start: 0.8, end: 1, actorId: 'Bird', description: 'Bird watches the open doorway.', evidence: 'open doorway' }
       ]
     }
   }, bible);
