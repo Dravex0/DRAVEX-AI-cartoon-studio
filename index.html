@@ -50,6 +50,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="field"><label for="sceneTitle" id="sceneTitleLabel">Selected scene title</label><input id="sceneTitle" maxlength="80" placeholder="Scene title"></div>
 <div class="field"><label for="sceneDescription" id="sceneDescriptionLabel">Selected scene description</label><textarea id="sceneDescription" rows="3" maxlength="500" placeholder="Describe what happens in this scene"></textarea></div>
 <div class="field"><label for="sceneCharacters" id="sceneCharactersLabel">Characters in this scene · comma-separated</label><input id="sceneCharacters" maxlength="600" placeholder="Foxy, Bird"></div>
+<details class="production-details"><summary id="dialogueSummary">Scene dialogue and narration</summary><div class="field"><label for="sceneDialogue" id="sceneDialogueLabel">One speaker per line</label><textarea id="sceneDialogue" rows="4" maxlength="6000" placeholder="Foxy: Hello!&#10;Narrator: The forest becomes quiet."></textarea><small class="muted" id="sceneDialogueHint">Use “Character: line” or “Character — line”. Unlabelled lines are treated as narration. This saves dialogue text only; voice generation is a later step.</small></div></details>
 <details class="production-details"><summary id="productionSummary">Scene production instructions</summary><div class="production-grid">
 <div class="field"><label for="sceneCamera" id="sceneCameraLabel">Camera / composition</label><textarea id="sceneCamera" rows="2" maxlength="1000"></textarea></div>
 <div class="field"><label for="sceneImagePrompt" id="sceneImagePromptLabel">Image prompt · what the still frame must show</label><textarea id="sceneImagePrompt" rows="3" maxlength="4000"></textarea></div>
@@ -119,6 +120,7 @@ import { directStoryboardWithLocalAI } from "./src/local-story-director.js";
 import { generateImageWithHorde } from "./src/ai-horde-image-provider.js";
 import { drawImageCover } from "./src/image-frame.js";
 import { createSceneId, ensureSceneIds } from "./src/scene-identity.js";
+import { formatDialogueLines, parseDialogueLines } from "./src/dialogue-lines.js";
 import { createSceneVideoStorage } from "./src/scene-video-storage.js";
 import { getPromptCameraTransform } from "./src/prompt-camera-motion.js";
 import { detectSceneActionForScene } from "./src/scene-action.js";
@@ -256,6 +258,14 @@ ru:{title:'Название выбранной сцены',description:'Опис
 };
 function applySceneEditorLanguage(){
 const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;
+const dialogueLabels={
+ en:{summary:'Scene dialogue and narration',label:'One speaker per line',hint:'Use “Character: line” or “Character — line”. Unlabelled lines are treated as narration. This saves dialogue text only; voice generation is a later step.'},
+ ru:{summary:'Диалоги и закадровый текст сцены',label:'Одна реплика на строку',hint:'Формат: «Персонаж: реплика» или «Персонаж — реплика». Строки без имени считаются текстом рассказчика. Здесь сохраняется только текст; генерация голоса будет отдельным этапом.'},
+ uk:{summary:'Діалоги та закадровий текст сцени',label:'Одна репліка на рядок',hint:'Формат: «Персонаж: репліка» або «Персонаж — репліка». Рядки без імені вважаються текстом оповідача. Тут зберігається лише текст; генерація голосу буде окремим етапом.'},
+ es:{summary:'Diálogo y narración de la escena',label:'Un hablante por línea',hint:'Usa “Personaje: texto” o “Personaje — texto”. Las líneas sin nombre se tratan como narración. Aquí solo se guarda el texto; la generación de voz será una etapa posterior.'}
+};
+const dialogue=dialogueLabels[storyLanguage()]||dialogueLabels.en;
+$('dialogueSummary').textContent=dialogue.summary;$('sceneDialogueLabel').textContent=dialogue.label;$('sceneDialogueHint').textContent=dialogue.hint;
 $('sceneTitleLabel').textContent=t.title;$('sceneDescriptionLabel').textContent=t.description;$('sceneCharactersLabel').textContent=t.cast;$('applyScene').textContent=t.apply;$('addScene').textContent=t.add;$('deleteScene').textContent=t.del;
 $('sceneTitle').placeholder=t.titlePlaceholder;$('sceneDescription').placeholder=t.descriptionPlaceholder;
 const labels={production:'productionSummary',camera:'sceneCameraLabel',image:'sceneImagePromptLabel',motion:'sceneMotionPromptLabel',start:'sceneStartStateLabel',end:'sceneEndStateLabel',negative:'sceneNegativePromptLabel',continuity:'sceneContinuityLockLabel',compiled:'compiledPromptSummary',imagePreview:'imagePromptPreviewLabel',motionPreview:'motionPromptPreviewLabel',characters:'characterBibleSummary'};
@@ -323,6 +333,7 @@ const meta=sceneMetadata[sceneIndex]||{};
 $('sceneTitle').value=titles[sceneIndex]||'';
 $('sceneDescription').value=descriptions[sceneIndex]||'';
 $('sceneCharacters').value=(Array.isArray(meta.characters)?meta.characters:[]).join(', ');
+$('sceneDialogue').value=formatDialogueLines(meta.dialogue);
 $('sceneCamera').value=meta.camera||'';
 $('sceneImagePrompt').value=meta.imagePrompt||meta.prompt||descriptions[sceneIndex]||'';
 $('sceneMotionPrompt').value=meta.motionPrompt||meta.visibleAction||descriptions[sceneIndex]||'';
@@ -410,7 +421,7 @@ const imagePrompt=$('sceneImagePrompt').value.trim()||description;
 const motionPrompt=$('sceneMotionPrompt').value.trim()||description;
 const characters=normalizeSceneCast($('sceneCharacters').value,sceneMetadata[sceneIndex]?.characters);
 titles[sceneIndex]=title;descriptions[sceneIndex]=description;
-sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),title,description,characters,prompt:imagePrompt,imagePrompt,visibleAction:motionPrompt,motionPrompt,camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim()};if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
+sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),title,description,characters,dialogue:parseDialogueLines($('sceneDialogue').value,storyLanguage()),prompt:imagePrompt,imagePrompt,visibleAction:motionPrompt,motionPrompt,camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim()};if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
 $('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+title;
 renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=(sceneEditorLabels[uiLang]||sceneEditorLabels.en).updated
 };
