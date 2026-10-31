@@ -15,13 +15,12 @@ function profileAppearance(profile = {}) {
 function characterAction(scene, characterId, castSize) {
   if (scene.actionTimeline != null) {
     const report = validateCharacterActionTimeline(scene);
-    if (report.passed) {
-      const phases = scene.actionTimeline.phases
-        .filter(phase => key(phase.actorId) === key(characterId))
-        .map(phase => clean(phase.description, 700))
-        .filter(Boolean);
-      if (phases.length) return [...new Set(phases)].join(' ');
-    }
+    if (!report.passed) return '';
+    const phases = scene.actionTimeline.phases
+      .filter(phase => key(phase.actorId) === key(characterId))
+      .map(phase => clean(phase.description, 700))
+      .filter(Boolean);
+    return [...new Set(phases)].join(' ');
   }
   // A general action can be assigned safely only when the scene has one character.
   return castSize === 1 ? clean(scene.visibleAction, 1000) : '';
