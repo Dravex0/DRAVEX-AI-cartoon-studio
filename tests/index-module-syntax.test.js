@@ -52,7 +52,7 @@ test('scene editor exposes local voice generation and explicitly labels export l
   assert.match(html, /id="loadSceneVoiceModel"/);
   assert.match(html, /id="generateSceneVoices"/);
   assert.match(html, /id="voiceNonCommercialConsent"/);
-  assert.match(html, /voiceTracks\.push\(\{cueId:cue\.cueId,blob:record\.blob,startMs\}\)/);
+  assert.match(html, /voiceTracks\\.push\\(\\{cueId:cue\\.cueId,blob:record\\.blob,startMs,sceneIndex:segment\\.sceneIndex,characterName:String\\(cue\\.characterName\\|\\|cue\\.characterId\\|\\|\"Narrator\"\\)\\}\\)/);
   assert.match(html, /createAudioExportSession\(\{videoStream:stream,audioElement,volume:Number\(\$\('audioVolume'\)\.value\)\/100,voiceTracks,voiceVolume:0\.9\}\)/);
   assert.match(html, /Generated scene dialogue is mixed into WebM at its scheduled time/);
 });
