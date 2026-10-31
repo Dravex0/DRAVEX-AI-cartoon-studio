@@ -12,6 +12,7 @@ const MOTION_LIMITS = {
   opacity: [0, 1]
 };
 const MOTION_KEYS = Object.keys(MOTION_LIMITS);
+const MOTION_DEFAULTS = { x: 0.5, y: 0.5, width: 0.25, height: 0.4, rotation: 0, scale: 1, opacity: 1 };
 const isRecord = value => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 function normalizePose(value) {
@@ -58,7 +59,7 @@ export function applyCharacterActionTimelineToLayers(layers, actionTimeline, sce
     const pose = {};
     for (const key of MOTION_KEYS) {
       const value = Number(layer[key]);
-      if (Number.isFinite(value)) pose[key] = value;
+      pose[key] = Number.isFinite(value) ? value : MOTION_DEFAULTS[key];
     }
     let changed = false;
     for (const phase of actionTimeline.phases) {
