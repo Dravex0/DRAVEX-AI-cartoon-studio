@@ -93,6 +93,9 @@ export async function createAudioExportSession({
           if (audioElement) await Promise.resolve().then(() => audioElement.play());
           if (closed) throw new Error('Audio export session is already closed.');
           const clockStart = context.currentTime + 0.08;
+          const scheduledStartAtMs = typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now() + Math.max(0, (clockStart - context.currentTime) * 1000)
+            : null;
           for (const track of decodedVoices) {
             const source = context.createBufferSource();
             source.buffer = track.buffer;
@@ -100,6 +103,7 @@ export async function createAudioExportSession({
             source.start(clockStart + track.startMs / 1000);
             voiceSources.push(source);
           }
+          return { scheduledStartAtMs };
         })().catch(error => {
           for (const source of voiceSources.splice(0)) {
             try { source.stop(); } catch {}
