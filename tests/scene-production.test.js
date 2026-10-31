@@ -182,7 +182,7 @@ test('image and motion prompts preserve dedicated character identity anchors', (
   const imagePrompt = buildImageGenerationPrompt(promptScene, [detailedProfile]);
   const motionPrompt = buildMotionGenerationPrompt(promptScene, [detailedProfile]);
   for (const detail of ['Anthropomorphic fox', 'Young adult', 'Small and agile', 'Short swept-back auburn hair', 'Amber', 'Large ears and bushy tail', 'Brass pendant']) {
-    assert.match(imagePrompt, new RegExp(detail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-    assert.match(motionPrompt, new RegExp(detail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.ok(imagePrompt.includes(detail), `image prompt should include: ${detail}`);
+    assert.ok(motionPrompt.includes(detail), `motion prompt should include: ${detail}`);
   }
 });
