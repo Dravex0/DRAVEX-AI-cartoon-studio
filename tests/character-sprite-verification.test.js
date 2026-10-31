@@ -38,7 +38,7 @@ test('rejects malformed dimensions and pixel buffers without throwing', () => {
 
 test('rejects invalid threshold configuration', () => {
   assert.equal(
-    verifySpriteTransparency(rgba([0, 255]), 2, 1, { minTransparentRatio: 0.9 }).reason,
+    verifySpriteTransparency(rgba([0, 255]), 2, 1, { minTransparentRatio: 0.96 }).reason,
     'invalid-thresholds'
   );
 });
