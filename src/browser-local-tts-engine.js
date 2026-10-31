@@ -188,11 +188,18 @@ export function createBrowserLocalTtsEngine({
       if (cleanText.length > MAX_TEXT_LENGTH) throw new RangeError("Dialogue text exceeds 10000 characters.");
       let output;
       if (loaded.model.runtime === "kokoro-js") {
-        const availableVoices = typeof loaded.instance.list_voices === "function"
+        const voiceList = typeof loaded.instance.list_voices === "function"
           ? loaded.instance.list_voices()
           : [];
+        const availableVoices = Array.isArray(voiceList)
+          ? voiceList.filter(voice => typeof voice === "string" && voice.trim())
+          : [];
         const selectedVoice = availableVoices.length
-          ? (availableVoices.includes(voiceId) ? voiceId : DEFAULT_KOKORO_VOICE)
+          ? (availableVoices.includes(voiceId)
+            ? voiceId
+            : availableVoices.includes(DEFAULT_KOKORO_VOICE)
+              ? DEFAULT_KOKORO_VOICE
+              : availableVoices[0])
           : voiceId;
         output = await loaded.instance.generate(cleanText, { voice: selectedVoice });
       } else {
