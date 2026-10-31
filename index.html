@@ -920,7 +920,7 @@ $('export').onclick=async()=>{
         }));
       }
       const imageUrl=String(meta.generatedImageUrl||'').trim();
-      if(imageUrl){
+      if(imageUrl&&!entry?.video){
         getLoadedSceneImage(imageUrl);
         const imageEntry=sceneImageCache.get(imageUrl);
         if(!imageEntry)throw new Error('Could not initialize generated image for scene '+(segment.sceneIndex+1)+'.');
