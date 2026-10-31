@@ -99,3 +99,35 @@ test("treats special property names as ordinary speaker IDs", () => {
   assert.equal(Object.hasOwn(result, "__proto__"), true);
   assert.equal(Object.hasOwn(result, "constructor"), true);
 });
+
+
+test("preserves validated Kokoro phoneme chunks on the scheduled dialogue cue", () => {
+  const chunks = [
+    { text: "Hello.", phonemes: "həlˈoʊ", startMs: 0, endMs: 400 },
+    { text: "World!", phonemes: "wˈɜːld", startMs: 400, endMs: 900 }
+  ];
+  const result = buildSceneVoiceTimeline({
+    sceneId: "phoneme-scene",
+    dialogue: [{ characterId: "Foxy", text: "Hello. World!", language: "en" }],
+    artifacts: [{ audioHash: hash("e"), durationMs: 900, phonemeChunks: chunks }]
+  });
+  assert.deepEqual(result.cues[0].phonemeChunks, chunks);
+});
+
+test("rejects overlapping, out-of-range and malformed phoneme chunks", () => {
+  const dialogue = [{ characterId: "Foxy", text: "Hello" }];
+  const base = { audioHash: hash("f"), durationMs: 900 };
+  assert.throws(() => buildSceneVoiceTimeline({
+    sceneId: "bad-overlap", dialogue,
+    artifacts: [{ ...base, phonemeChunks: [
+      { phonemes: "hə", startMs: 0, endMs: 500 },
+      { phonemes: "lo", startMs: 400, endMs: 900 }
+    ] }]
+  }), /invalid phoneme chunk timing/);
+  assert.throws(() => buildSceneVoiceTimeline({
+    sceneId: "bad-end", dialogue,
+    artifacts: [{ ...base, phonemeChunks: [
+      { phonemes: "hə", startMs: 0, endMs: 901 }
+    ] }]
+  }), /invalid phoneme chunk timing/);
+});
