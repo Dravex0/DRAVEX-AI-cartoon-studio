@@ -150,6 +150,7 @@ import { createVideoProviderRegistry, generateVideoWithProvider } from "./src/vi
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./src/scene-production.js";
 import { buildCharacterSpriteAssetPlan } from "./src/character-sprite-asset-plan.js";
 import { generateCharacterSpriteAsset } from "./src/character-sprite-generation.js";
+import { verifySpriteTransparency } from "./src/character-sprite-verification.js";
 import { upsertCharacterReference, mergeCharacterReferences } from "./src/character-reference.js";
 import { prepareStoryCharacterContext } from "./src/story-character-context.js";
 import { normalizeSceneCast } from "./src/scene-cast.js";
@@ -372,10 +373,42 @@ function renderCharacterSpriteAssets(){
  assets.forEach(asset=>{
   if(!asset||!/^https:\/\//i.test(String(asset.imageUrl||'')))return;
   const card=document.createElement('div');card.className='sprite-result';
-  const image=document.createElement('img');image.src=asset.imageUrl;image.alt=(uiLang==='ru'?'Спрайт персонажа ':'Character sprite ')+String(asset.characterId||'');
-  image.loading='lazy';image.referrerPolicy='no-referrer';
+  const image=document.createElement('img');image.alt=(uiLang==='ru'?'Спрайт персонажа ':'Character sprite ')+String(asset.characterId||'');
+  image.loading='lazy';image.crossOrigin='anonymous';image.referrerPolicy='no-referrer';
   const title=document.createElement('strong');title.textContent=String(asset.characterId||'Character');
-  const note=document.createElement('small');note.textContent=(uiLang==='ru'?'Прозрачность не проверена · только просмотр':'Transparency unverified · preview only');
+  const note=document.createElement('small');
+  const initialTransparency=asset.transparencyStatus||'unverified';
+  note.textContent=uiLang==='ru'?'Прозрачность: '+initialTransparency+' · сходство персонажа не проверено':'Transparency: '+initialTransparency+' · character identity not verified';
+  const sceneId=String(sceneMetadata[sceneIndex]?.id||'');
+  const assetId=String(asset.assetId||'');
+  const updateTransparency=(status,check=null)=>{
+   const resolvedSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===sceneId);
+   if(resolvedSceneIndex>=0){
+    const current=Array.isArray(sceneMetadata[resolvedSceneIndex].characterSpriteAssets)?sceneMetadata[resolvedSceneIndex].characterSpriteAssets:[];
+    sceneMetadata[resolvedSceneIndex]={...sceneMetadata[resolvedSceneIndex],characterSpriteAssets:current.map(item=>item&&String(item.assetId||'')===assetId?{...item,transparencyStatus:status,transparencyCheck:check,verificationStatus:'not_verified',visualIdentityStatus:'not_verified'}:item)};
+   }
+  };
+  image.onload=()=>{
+   try{
+    const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+    const context=canvas.getContext('2d',{willReadFrequently:true});
+    if(!context)throw new Error('Canvas 2D context unavailable');
+    context.drawImage(image,0,0);
+    const check=verifySpriteTransparency(context.getImageData(0,0,canvas.width,canvas.height),canvas.width,canvas.height);
+    updateTransparency(check.status,check);
+    note.textContent=uiLang==='ru'
+      ?(check.passed?'Прозрачность подтверждена':'Прозрачность не пройдена')+' · сходство персонажа не проверено'
+      :(check.passed?'Transparency verified':'Transparency check failed')+' · character identity not verified';
+   }catch(error){
+    updateTransparency('unverified',{reason:'image-pixels-unavailable'});
+    note.textContent=uiLang==='ru'?'Пиксели недоступны (CORS) · проверка не выполнена':'Image pixels unavailable (CORS) · verification not performed';
+   }
+  };
+  image.onerror=()=>{
+   updateTransparency('unverified',{reason:'image-load-failed'});
+   note.textContent=uiLang==='ru'?'Изображение не загрузилось · проверка не выполнена':'Image failed to load · verification not performed';
+  };
+  image.src=asset.imageUrl;
   const link=document.createElement('a');link.href=asset.imageUrl;link.target='_blank';link.rel='noopener noreferrer';link.textContent=uiLang==='ru'?'Открыть изображение':'Open image';
   card.append(image,title,note,link);host.appendChild(card);
  });
