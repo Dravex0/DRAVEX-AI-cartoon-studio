@@ -125,3 +125,40 @@ test('production scene preserves invalid raw duration as a readiness issue after
   assert.equal(prepared.durationSeconds, 3);
   assert.ok(prepared.productionReadiness.issues.some(issue => issue.code === 'invalid-duration'));
 });
+
+
+test('motion prompt serializes validated character action phases with scene-relative seconds', () => {
+  const timelineScene = {
+    ...scene,
+    storyDetail: 'Foxy notices the key, turns the key, and the gate opens.',
+    durationSeconds: 4,
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [
+        { phase: 'preparation', start: 0, end: 0.2, actorId: 'foxy', description: 'Foxy notices and prepares to turn the key.', evidence: 'Foxy notices the key' },
+        { phase: 'action', start: 0.2, end: 0.65, actorId: 'foxy', targetId: 'gate lock', description: 'Foxy turns the key in the lock.', evidence: 'turns the key' },
+        { phase: 'reaction', start: 0.65, end: 0.82, actorId: 'foxy', description: 'Foxy watches as the gate responds.', evidence: 'the gate opens' },
+        { phase: 'result', start: 0.82, end: 1, actorId: 'foxy', description: 'The gate remains open.', evidence: 'the gate opens' }
+      ]
+    }
+  };
+  const prompt = buildMotionGenerationPrompt(timelineScene);
+  assert.match(prompt, /Character action timeline/);
+  assert.match(prompt, /preparation \(0%-20%; 0\.00-0\.80s\)/);
+  assert.match(prompt, /action \(20%-65%; 0\.80-2\.60s\)/);
+  assert.match(prompt, /reaction/);
+  assert.match(prompt, /result/);
+});
+
+test('production readiness rejects malformed supplied action timelines', () => {
+  const result = validateSceneProductionReadiness({
+    ...scene,
+    storyDetail: 'Foxy turns the key.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{ phase: 'reaction', start: 0, end: 1, actorId: 'foxy', description: 'Foxy reacts.', evidence: 'Foxy turns the key.' }]
+    }
+  });
+  assert.equal(result.ready, false);
+  assert.ok(result.issues.some(issue => issue.code === 'invalid-action-timeline'));
+});
