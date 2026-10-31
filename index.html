@@ -882,6 +882,7 @@ $('export').onclick=async()=>{
   const sceneTimers=[];
   let stream=null,recorder=null,stopTimer=null,cleaned=false,audioSession=null;
   const chunks=[];
+  let audioScheduledStartAtMs=null;
   const cleanup=()=>{
     if(cleaned)return;
     cleaned=true;
@@ -950,7 +951,8 @@ $('export').onclick=async()=>{
       if(audioElement){audioElement.loop=true;audioElement.preload='auto';}
       audioSession=await createAudioExportSession({videoStream:stream,audioElement,volume:Number($('audioVolume').value)/100,voiceTracks,voiceVolume:0.9});
       stream=audioSession.stream;
-      await audioSession.start();
+      const audioStartInfo=await audioSession.start();
+      audioScheduledStartAtMs=Number.isFinite(audioStartInfo?.scheduledStartAtMs)?audioStartInfo.scheduledStartAtMs:null;
     }
     const mimeTypes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
     const mimeType=mimeTypes.find(type=>MediaRecorder.isTypeSupported(type));
@@ -984,6 +986,10 @@ $('export').onclick=async()=>{
       }
     };
     exportMouthOriginTimeMs=performance.now();
+    if(audioScheduledStartAtMs!==null){
+      const mouthStartOffsetMs=Math.max(0,audioScheduledStartAtMs-exportMouthOriginTimeMs);
+      exportMouthTracks=exportMouthTracks.map(track=>({...track,startMs:track.startMs+mouthStartOffsetMs}));
+    }
     recorder.start(250);
     $('status').textContent=uiLang==='ru'
       ?'Записываем '+timeline.segments.length+' сцен'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+'…'

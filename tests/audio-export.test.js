@@ -230,7 +230,8 @@ test('schedules decoded dialogue WAV tracks on the shared recording clock', asyn
     MediaStreamClass: h.FakeMediaStream
   });
   assert.deepEqual(session.stream.getTracks().map(track => track.kind), ['video', 'audio']);
-  await session.start();
+  const startInfo = await session.start();
+  assert.equal(Number.isFinite(startInfo.scheduledStartAtMs), true);
   assert.deepEqual(scheduled, [12.08, 13.33]);
   assert.equal(h.events.filter(event => event === 'voice-start').length, 2);
   await session.cleanup();
