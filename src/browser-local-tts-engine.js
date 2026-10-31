@@ -14,6 +14,22 @@ function assertNotAborted(signal) {
   }
 }
 
+function getKokoroVoiceIds(instance) {
+  if (!instance || typeof instance !== "object") return [];
+  // kokoro-js 1.2.1 list_voices() prints a table and returns undefined;
+  // its public voices getter contains the actual voice catalog.
+  let listed;
+  if (typeof instance.list_voices === "function") {
+    try { listed = instance.list_voices(); } catch { listed = null; }
+  }
+  const candidates = Array.isArray(listed)
+    ? listed
+    : instance.voices && typeof instance.voices === "object"
+      ? Object.keys(instance.voices)
+      : [];
+  return [...new Set(candidates.filter(value => typeof value === "string" && value.trim()).map(value => value.trim()))];
+}
+
 function normalizeAudio(output) {
   const audio = output?.audio;
   const sampleRate = Number(output?.sampling_rate ?? output?.sampleRate);
@@ -98,11 +114,8 @@ export function createBrowserLocalTtsEngine({
 
   return Object.freeze({
     get availableVoices() {
-      if (!loaded || loaded.model.runtime !== 'kokoro-js' || typeof loaded.instance?.list_voices !== 'function') return [];
-      try {
-        const voices = loaded.instance.list_voices();
-        return Array.isArray(voices) ? voices.filter(voice => typeof voice === 'string' && voice.trim()) : [];
-      } catch { return []; }
+      if (!loaded || loaded.model.runtime !== "kokoro-js") return [];
+      return getKokoroVoiceIds(loaded.instance);
     },
 
     get status() {
@@ -196,12 +209,7 @@ export function createBrowserLocalTtsEngine({
       if (cleanText.length > MAX_TEXT_LENGTH) throw new RangeError("Dialogue text exceeds 10000 characters.");
       let output;
       if (loaded.model.runtime === "kokoro-js") {
-        const voiceList = typeof loaded.instance.list_voices === "function"
-          ? loaded.instance.list_voices()
-          : [];
-        const availableVoices = Array.isArray(voiceList)
-          ? voiceList.filter(voice => typeof voice === "string" && voice.trim())
-          : [];
+        const availableVoices = getKokoroVoiceIds(loaded.instance);
         const selectedVoice = availableVoices.length
           ? (availableVoices.includes(voiceId)
             ? voiceId
