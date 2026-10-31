@@ -28,7 +28,7 @@ test('reports opaque images and rejects malformed or excessive image buffers', (
 
 test('uses a configurable alpha threshold and rejects invalid alpha samples', () => {
   assert.equal(inspectImageAlphaChannel({ width: 1, height: 1, data: rgba([254]), alphaThreshold: 255 }).status, 'transparent');
-  const data = rgba([255]); data[3] = 300;
+  const data = [0, 0, 0, 300];
   assert.equal(inspectImageAlphaChannel({ width: 1, height: 1, data }).reason, 'invalid-alpha-value');
 });
 
