@@ -81,7 +81,7 @@ export function buildAudioTimeline(cues, fps = 24) {
     }
   }
 
-  const totalFrames = Math.ceil((maxEndMs * fps) / 1000 - 1e-10);
+  const totalFrames = Math.max(0, Math.ceil((maxEndMs * fps) / 1000 - 1e-10));
   return {
     fps,
     tracks,
