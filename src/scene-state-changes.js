@@ -88,37 +88,44 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
       : [clean(fallbackCharacter, 120)].filter(Boolean);
     if (!source || !cast.length) return [];
     const changes = [];
+    // Keep each inferred action inside the sentence that names its actor.
+    // Otherwise an actor mentioned early in a scene can accidentally inherit
+    // another character's action from a later sentence.
+    const sourceSentences = source.match(/[^.!?。！？]+[.!?。！？]?/gu)
+      ?.map(sentence => sentence.trim()).filter(Boolean) ?? [source];
     for (const actorId of cast) {
-      for (const verb of VERBS[locale]) {
-        const found = findEntity(source, actorId, verb);
-        if (!found) continue;
-        const entityId = found.entity;
-        const property = verb.property;
-        const key = 'prop:' + entityId.toLocaleLowerCase() + ':' + property;
-        const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
-        const value = verb.value === 'actor' ? actorId : verb.value;
-        if (previousValue === value) continue;
-        changes.push({ entityType: 'prop', entityId, property, previousValue, value, actorId, evidence: found.evidence });
-        knownStates.set(key, value);
-      }
-      const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
-      const actorMatch = actor.exec(source);
-      if (!actorMatch) continue;
-      const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
-      for (const verb of LOCATION_VERBS[locale]) {
-        const verbMatch = verb.re.exec(afterActor);
-        if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) continue;
-        const place = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
-        if (!place || place.length > 100) continue;
-        const value = verb.value + ':' + place;
-        const key = 'character:' + actorId.toLocaleLowerCase() + ':location';
-        const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
-        if (previousValue === value) continue;
-        changes.push({
-          entityType: 'character', entityId: actorId, property: 'location',
-          previousValue, value, actorId, evidence: clean(source, 1_200)
-        });
-        knownStates.set(key, value);
+      for (const sentence of sourceSentences) {
+        for (const verb of VERBS[locale]) {
+          const found = findEntity(sentence, actorId, verb);
+          if (!found) continue;
+          const entityId = found.entity;
+          const property = verb.property;
+          const key = 'prop:' + entityId.toLocaleLowerCase() + ':' + property;
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          const value = verb.value === 'actor' ? actorId : verb.value;
+          if (previousValue === value) continue;
+          changes.push({ entityType: 'prop', entityId, property, previousValue, value, actorId, evidence: found.evidence });
+          knownStates.set(key, value);
+        }
+        const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
+        const actorMatch = actor.exec(sentence);
+        if (!actorMatch) continue;
+        const afterActor = sentence.slice(actorMatch.index + actorMatch[0].length);
+        for (const verb of LOCATION_VERBS[locale]) {
+          const verbMatch = verb.re.exec(afterActor);
+          if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) continue;
+          const place = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
+          if (!place || place.length > 100) continue;
+          const value = verb.value + ':' + place;
+          const key = 'character:' + actorId.toLocaleLowerCase() + ':location';
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          if (previousValue === value) continue;
+          changes.push({
+            entityType: 'character', entityId: actorId, property: 'location',
+            previousValue, value, actorId, evidence: clean(sentence, 1_200)
+          });
+          knownStates.set(key, value);
+        }
       }
     }
     return changes;

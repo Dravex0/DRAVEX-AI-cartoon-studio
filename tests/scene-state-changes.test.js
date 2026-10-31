@@ -46,3 +46,24 @@ test('does not infer a state change without a known named actor and explicit act
     { storyDetail: 'Foxy might have opened the gate.', characters: ['Foxy'] }
   ], 'en'), [[], []]);
 });
+
+
+test('does not attribute a later character action to an earlier-mentioned character', () => {
+  const changes = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy smiles. Mira picks up the silver key.', characters: ['Foxy', 'Mira'] }
+  ], 'en');
+  assert.equal(changes[0].length, 1);
+  assert.equal(changes[0][0].entityId, 'silver key');
+  assert.equal(changes[0][0].actorId, 'Mira');
+  assert.equal(changes[0][0].value, 'Mira');
+});
+
+test('keeps location evidence inside the sentence that names the moving character', () => {
+  const changes = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy waves. Mira enters the stone castle.', characters: ['Foxy', 'Mira'] }
+  ], 'en');
+  assert.equal(changes[0].length, 1);
+  assert.equal(changes[0][0].entityId, 'Mira');
+  assert.equal(changes[0][0].value, 'inside:stone castle');
+  assert.equal(changes[0][0].evidence, 'Mira enters the stone castle.');
+});
