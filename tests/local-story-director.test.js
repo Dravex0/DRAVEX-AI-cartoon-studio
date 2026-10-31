@@ -262,6 +262,43 @@ test('accepts a local director candidate with consistent structured scene-state 
   assert.equal(result.evaluation.structuredStateMemoryReport.checkedTransitions, goodScenes.length - 1);
 });
 
+test('accepts a structured character location change when its evidence is grounded in the scene story', async () => {
+  const statePlan = {
+    ...basePlan,
+    scenes: basePlan.scenes.map((scene, index) => index === 1 ? {
+      ...scene,
+      storyDetail: 'Foxy enters the stone castle.',
+      stateChanges: [{
+        entityType: 'character',
+        entityId: 'Foxy',
+        property: 'location',
+        previousValue: 'moonlit forest',
+        value: 'stone castle',
+        actorId: 'Foxy',
+        evidence: 'Foxy enters the stone castle.'
+      }]
+    } : scene)
+  };
+  const structured = goodScenes.map(scene => ({
+    ...scene,
+    startStateData: structuredState(),
+    endStateData: structuredState()
+  }));
+  structured[0].endStateData = structuredState('moonlit forest');
+  structured[1].startStateData = structuredState('stone castle');
+  structured[1].endStateData = structuredState('stone castle');
+  const result = await directStoryboardWithLocalAI({
+    runtime: runtimeReturning(structured),
+    basePlan: statePlan
+  });
+  assert.equal(result.usedLocalModel, true, JSON.stringify({
+    reason: result.fallbackReason,
+    issues: result.evaluation?.issues,
+    stateReport: result.evaluation?.structuredStateMemoryReport
+  }));
+  assert.equal(result.evaluation.structuredStateMemoryReport.passed, true);
+});
+
 test('rejects a local director candidate with unexplained structured character teleportation', async () => {
   const structured = goodScenes.map(scene => ({
     ...scene,
