@@ -68,6 +68,10 @@ export function normalizeScene(input = {}, index = 0) {
         }
       : null,
     location: text(scene.location, 500),
+    environmentDescription: text(scene.environmentDescription, 2_000),
+    weather: text(scene.weather, 200),
+    environmentLighting: text(scene.environmentLighting, 300),
+    environmentStyle: text(scene.environmentStyle, 300),
     timeOfDay: text(scene.timeOfDay, 120),
     visibleAction,
     actionTimeline: normalizeCharacterActionTimeline(scene.actionTimeline),
