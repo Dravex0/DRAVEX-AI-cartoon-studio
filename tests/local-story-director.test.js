@@ -292,3 +292,33 @@ test('rejects partially supplied structured state memory instead of silently ski
     issue.code === 'structured-state-continuity-failed'
   ));
 });
+
+
+test('passes a source-backed action timeline from the local director into storyboard QA', async () => {
+  const directed = goodScenes.map(scene => ({ ...scene }));
+  directed[0].actionTimeline = {
+    schemaVersion: 1,
+    phases: [{
+      phase: 'action',
+      start: 0,
+      end: 1,
+      actorId: 'Foxy',
+      targetId: 'silver key',
+      description: 'Foxy bends down and lifts the silver key.',
+      evidence: 'Foxy kneels beside the silver key'
+    }]
+  };
+  let prompt = '';
+  const runtime = runtimeReturning(directed, {
+    generate: async value => {
+      prompt = value;
+      return { text: JSON.stringify({ scenes: directed }), modelId: 'mock-local-model', backend: 'wasm' };
+    }
+  });
+  const result = await directStoryboardWithLocalAI({ runtime, basePlan });
+  assert.equal(result.usedLocalModel, true);
+  assert.equal(result.scenes[0].actionTimeline.phases[0].phase, 'action');
+  assert.equal(result.evaluation.actionTimelineReport.coverage, 20);
+  assert.equal(result.evaluation.actionTimelineReport.integrity, 100);
+  assert.ok(prompt.includes('actionTimeline.phases'));
+});
