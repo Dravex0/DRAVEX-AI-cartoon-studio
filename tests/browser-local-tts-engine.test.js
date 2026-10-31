@@ -122,3 +122,28 @@ test("falls back to the first installed Kokoro voice when the requested and defa
   assert.equal(generatedWithVoice, "uk_custom_voice");
   assert.equal(storage.records.size, 1);
 });
+
+
+test("discovers voices from the public Kokoro voices catalog when list_voices only prints a table", async () => {
+  const storage = makeStorage();
+  let generatedWithVoice;
+  const engine = createBrowserLocalTtsEngine({
+    storage, cryptoRef: webcrypto, environment,
+    kokoroFactory: async () => ({
+      // This matches kokoro-js 1.2.1: console.table(VOICES), no return value.
+      list_voices: () => undefined,
+      voices: { af_heart: {}, af_bella: {}, am_adam: {} },
+      generate: async (text, options) => {
+        generatedWithVoice = options.voice;
+        return validOutput(24000);
+      }
+    })
+  });
+
+  await engine.load({ locale: "en", backend: "wasm" });
+  assert.deepEqual(engine.availableVoices, ["af_heart", "af_bella", "am_adam"]);
+  await engine.synthesize({ text: "Catalog discovery test", voiceId: "am_adam" });
+
+  assert.equal(generatedWithVoice, "am_adam");
+  assert.equal(storage.records.size, 1);
+});
