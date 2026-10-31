@@ -167,3 +167,20 @@ test('does not flag non-adjacent scenes as repeated when their explicit action c
   assert.equal(result.issues.some((entry) => entry.code === 'repeated-content'), false);
 });
 
+test('does not confuse an idle scene with an active action because of shared wording', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'waiting',
+      duration: 3,
+      prompt: 'Aster watches the moon rise above the distant forest.',
+      visibleAction: 'Aster waits beside the ancient silver doorway while blue lights flicker.'
+    },
+    {
+      id: 'running',
+      duration: 3,
+      prompt: 'Aster discovers a hidden map beneath the old wooden table.',
+      visibleAction: 'Aster runs beside the ancient silver doorway while blue lights flicker.'
+    }
+  ]);
+  assert.equal(result.issues.some((entry) => entry.code === 'adjacent-repeat'), false);
+});
