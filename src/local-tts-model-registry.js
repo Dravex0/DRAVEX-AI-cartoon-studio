@@ -87,6 +87,7 @@ export function listLocalTtsModels() {
   return Object.values(MODEL_REGISTRY).map(model => ({
     id: model.id,
     locale: model.locale,
+    languages: [...model.languages],
     modelId: model.modelId,
     license: model.license,
     commercialUse: model.commercialUse,
