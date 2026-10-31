@@ -119,7 +119,7 @@ export function buildSceneVoiceTimeline({
     if (!Number.isFinite(durationMs) || durationMs <= 0) {
       throw new RangeError(`Voice artifact ${index + 1} requires its measured durationMs.`);
     }
-    const startFrame = Math.ceil(cursorMs / frameMs - 1e-10);
+    const startFrame = Math.max(0, Math.ceil(cursorMs / frameMs - 1e-10));
     const cue = {
       cueId: `${id}:dialogue:${index + 1}`,
       characterName,
