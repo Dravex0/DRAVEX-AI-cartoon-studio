@@ -4,6 +4,7 @@ export const SCENE_DURATION_MAX = 30;
 export const DEFAULT_SCENE_DURATION = 3;
 
 import { normalizeCharacterActionTimeline } from './character-action-timeline.js';
+import { normalizeCharacterLayers } from './scene-character-layers.js';
 
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
@@ -32,6 +33,7 @@ export function normalizeScene(input = {}, index = 0) {
     sourceStoryText: text(scene.sourceStoryText, 10_000),
     sourceEvents: uniqueStrings(scene.sourceEvents),
     characters: uniqueStrings(scene.characters ?? (scene.characterId ? [scene.characterId] : [])),
+    characterLayers: normalizeCharacterLayers(scene.characterLayers),
     causalLink: scene.causalLink && typeof scene.causalLink === 'object' && !Array.isArray(scene.causalLink)
       ? {
           type: text(scene.causalLink.type, 40),
