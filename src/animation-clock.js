@@ -22,10 +22,12 @@ export function createAnimationClock(initialTimeMs = 0) {
         lastTimestampMs = null;
         return elapsedMs;
       }
-      if (lastTimestampMs !== null) {
-        elapsedMs += Math.max(0, timestampMs - lastTimestampMs);
+      if (lastTimestampMs === null) {
+        lastTimestampMs = timestampMs;
+      } else if (timestampMs >= lastTimestampMs) {
+        elapsedMs += timestampMs - lastTimestampMs;
+        lastTimestampMs = timestampMs;
       }
-      lastTimestampMs = timestampMs;
       return elapsedMs;
     },
     reset(nextTimeMs = 0) {
