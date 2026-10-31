@@ -139,3 +139,17 @@ test('keeps legacy timelines evaluable when the scene cast is not provided', () 
   const report = validateCharacterActionTimeline(candidate);
   assert.equal(report.passed, true);
 });
+
+test('normalization preserves the distinction between an omitted and explicit empty cast', () => {
+  const legacy = normalizeScene({ ...scene });
+  delete legacy.characters;
+  const normalizedLegacy = normalizeScene({ ...scene, characters: undefined });
+  assert.equal(normalizedLegacy.characterCastProvided, false);
+  assert.equal(validateCharacterActionTimeline(normalizedLegacy).passed, true);
+
+  const explicitEmpty = normalizeScene({ ...scene, characters: [] });
+  assert.equal(explicitEmpty.characterCastProvided, true);
+  assert.ok(validateCharacterActionTimeline(explicitEmpty).issues.some(
+    item => item.code === 'phase-actor-not-in-cast'
+  ));
+});
