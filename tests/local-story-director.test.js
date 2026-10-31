@@ -235,3 +235,60 @@ test('locks scene state changes against local model rewriting', async () => {
   assert.ok(prompt.includes('"lockedStateChanges"'));
   assert.deepEqual(result.scenes[0].stateChanges, statePlan.scenes[0].stateChanges);
 });
+
+
+function structuredState(location = 'moonlit forest') {
+  return {
+    location,
+    time: 'night',
+    weather: null,
+    characters: { Foxy: { location, position: 'standing', pose: null, clothing: 'blue scarf' } },
+    objects: { 'silver key': { location, owner: 'Foxy', state: 'held' } }
+  };
+}
+
+test('accepts a local director candidate with consistent structured scene-state memory', async () => {
+  const structured = goodScenes.map(scene => ({
+    ...scene,
+    startStateData: structuredState(),
+    endStateData: structuredState()
+  }));
+  const result = await directStoryboardWithLocalAI({
+    runtime: runtimeReturning(structured),
+    basePlan
+  });
+  assert.equal(result.usedLocalModel, true);
+  assert.equal(result.evaluation.structuredStateMemoryReport.passed, true);
+  assert.equal(result.evaluation.structuredStateMemoryReport.checkedTransitions, goodScenes.length - 1);
+});
+
+test('rejects a local director candidate with unexplained structured character teleportation', async () => {
+  const structured = goodScenes.map(scene => ({
+    ...scene,
+    startStateData: structuredState(),
+    endStateData: structuredState()
+  }));
+  structured[1].startStateData = structuredState('stone castle');
+  const result = await directStoryboardWithLocalAI({
+    runtime: runtimeReturning(structured),
+    basePlan
+  });
+  assert.equal(result.usedLocalModel, false);
+  assert.equal(result.fallbackReason, 'candidate-failed-story-quality-gate');
+  assert.ok(result.evaluation.structuredStateMemoryReport.issues.some(issue =>
+    issue.code === 'character-teleportation'
+  ));
+});
+
+test('rejects partially supplied structured state memory instead of silently skipping it', async () => {
+  const structured = goodScenes.map(scene => ({ ...scene }));
+  structured[0].startStateData = structuredState();
+  const result = await directStoryboardWithLocalAI({
+    runtime: runtimeReturning(structured),
+    basePlan
+  });
+  assert.equal(result.usedLocalModel, false);
+  assert.ok(result.evaluation.issues.some(issue =>
+    issue.code === 'structured-state-continuity-failed'
+  ));
+});
