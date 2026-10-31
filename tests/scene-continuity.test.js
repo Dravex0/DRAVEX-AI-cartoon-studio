@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateSceneContinuity } from '../src/scene-continuity.js';
 
-test('accepts a clear state hand-off between adjacent scenes', () => {
+test('accepts a clear state hand-off and adequately anchored character profile', () => {
   const report = evaluateSceneContinuity({
     scenes: [
       { id: 's1', startState: 'The red wooden door is closed.', endState: 'The red wooden door is open.', characters: ['Foxy'] },
@@ -13,6 +13,7 @@ test('accepts a clear state hand-off between adjacent scenes', () => {
   assert.equal(report.metrics.stateCoverage, 100);
   assert.ok(report.metrics.stateTransitionConsistency >= 20);
   assert.equal(report.metrics.characterReferenceCoverage, 100);
+  assert.equal(report.metrics.characterIdentityAnchorCoverage, 100);
   assert.equal(report.issues.length, 0);
   assert.equal(report.passed, true);
 });
@@ -26,16 +27,29 @@ test('flags a broken scene-to-scene state hand-off', () => {
   });
   assert.ok(report.issues.some(issue => issue.code === 'state-transition-mismatch'));
   assert.equal(report.metrics.characterReferenceCoverage, null);
+  assert.equal(report.metrics.characterIdentityAnchorCoverage, null);
   assert.equal(report.passed, false);
 });
 
-test('flags missing character profiles without pretending to inspect appearance', () => {
+test('flags missing character profiles and under-specified identity anchors', () => {
   const report = evaluateSceneContinuity({
     scenes: [{ id: 's1', startState: 'Foxy is outside.', endState: 'Foxy enters the forest.', characters: ['Foxy', 'Owl'] }],
     characterBible: [{ characterId: 'Foxy', visualDescription: 'Orange fox' }]
   });
   assert.equal(report.metrics.characterReferenceCoverage, 50);
+  assert.equal(report.metrics.characterIdentityAnchorCoverage, 0);
   assert.ok(report.issues.some(issue => issue.code === 'character-reference-missing' && issue.characterId === 'Owl'));
+  assert.ok(report.issues.some(issue => issue.code === 'character-identity-anchors-incomplete' && issue.characterId === 'Foxy'));
+});
+
+test('accepts two dedicated visual anchors even when the general description is absent', () => {
+  const report = evaluateSceneContinuity({
+    scenes: [{ id: 's1', characters: ['Foxy'] }],
+    characterBible: [{ characterId: 'Foxy', species: 'Anthropomorphic fox', eyeColor: 'Amber' }]
+  });
+  assert.equal(report.metrics.characterIdentityAnchorCoverage, 100);
+  assert.equal(report.issues.length, 1);
+  assert.equal(report.issues[0].code, 'scene-state-incomplete');
 });
 
 test('marks continuity metrics unavailable when there is not enough source data', () => {
@@ -43,6 +57,7 @@ test('marks continuity metrics unavailable when there is not enough source data'
   assert.equal(report.metrics.stateCoverage, 0);
   assert.equal(report.metrics.stateTransitionConsistency, null);
   assert.equal(report.metrics.characterReferenceCoverage, null);
+  assert.equal(report.metrics.characterIdentityAnchorCoverage, null);
   assert.equal(report.overallScore, 0);
 });
 
