@@ -889,7 +889,7 @@ $('export').onclick=async()=>{
         if(!record?.blob)throw new Error('A generated voice file is missing from this device. Regenerate the dialogue before exporting.');
         const startMs=segment.startMs+(Number(cue.startFrame)||0)*(1000/24);
         if(startMs+Number(cue.durationMs||0)>segment.endMs+35)throw new Error('Dialogue exceeds its scene export interval. Regenerate the scene voice timeline.');
-        voiceTracks.push({cueId:cue.cueId,blob:record.blob,startMs,sceneIndex:segment.sceneIndex,characterName:String(cue.characterName||cue.characterId||"Narrator"),text:String(cue.text||""),language:String(cue.language||storyLanguage())});
+        voiceTracks.push({cueId:cue.cueId,blob:record.blob,startMs,sceneIndex:segment.sceneIndex,characterName:String(cue.characterName||cue.characterId||"Narrator"),text:String(cue.text||""),language:String(cue.language||storyLanguage()),phonemeChunks:Array.isArray(cue.phonemeChunks)?cue.phonemeChunks:[]});
       }
     }
     exportMouthTracks=[];
@@ -905,7 +905,7 @@ $('export').onclick=async()=>{
               const decoded=await decodeContext.decodeAudioData(await track.blob.arrayBuffer());
               const channels=Array.from({length:decoded.numberOfChannels},(_,channel)=>decoded.getChannelData(channel));
               const envelope=buildAudioMouthEnvelope({channels,sampleRate:decoded.sampleRate,fps:24});
-              const visemes=buildVisemeTimeline({text:track.text,durationMs:envelope.durationMs,language:track.language,fps:24});
+              const visemes=buildVisemeTimeline({text:track.text,durationMs:envelope.durationMs,language:track.language,fps:24,phonemeChunks:track.phonemeChunks});
               exportMouthTracks.push({sceneIndex:track.sceneIndex,startMs:track.startMs,envelope,visemes});
             }catch(decodeError){console.warn("DRAVEX lip-sync analysis skipped a dialogue track:",decodeError);}
           }

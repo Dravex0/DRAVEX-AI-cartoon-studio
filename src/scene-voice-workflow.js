@@ -131,6 +131,29 @@ export function buildSceneVoiceTimeline({
       durationMs,
       startFrame
     };
+    if (artifact.phonemeChunks != null) {
+      if (!Array.isArray(artifact.phonemeChunks) || artifact.phonemeChunks.length > 120) {
+        throw new RangeError("Voice artifact " + (index + 1) + " has an invalid phoneme chunk list.");
+      }
+      let previousEndMs = 0;
+      cue.phonemeChunks = artifact.phonemeChunks.map((chunk, chunkIndex) => {
+        const startMs = Number(chunk?.startMs);
+        const endMs = Number(chunk?.endMs);
+        const phonemes = clean(chunk?.phonemes, 4000);
+        if (!phonemes || !Number.isFinite(startMs) || !Number.isFinite(endMs)
+          || startMs < 0 || endMs <= startMs || endMs > durationMs + 2
+          || startMs < previousEndMs - 0.5) {
+          throw new RangeError("Voice artifact " + (index + 1) + " has invalid phoneme chunk timing at " + (chunkIndex + 1) + ".");
+        }
+        previousEndMs = endMs;
+        return {
+          text: clean(chunk.text, 2000),
+          phonemes,
+          startMs,
+          endMs
+        };
+      });
+    }
     cursorMs = startFrame * frameMs + durationMs + gapMs;
     return cue;
   });

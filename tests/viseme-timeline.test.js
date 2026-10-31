@@ -39,3 +39,27 @@ test("viseme timeline rejects invalid text, duration, frame rate and oversized i
   assert.throws(() => buildVisemeTimeline({ text: "Hi", durationMs: 1000, fps: 0 }), /fps/);
   assert.throws(() => buildVisemeTimeline({ text: "x".repeat(2001), durationMs: 1000 }), /graphemes/);
 });
+
+
+test("uses measured Kokoro chunk boundaries and broad IPA phoneme classes", () => {
+  const timeline = buildVisemeTimeline({
+    text: "hello world",
+    durationMs: 1000,
+    fps: 24,
+    phonemeChunks: [
+      { phonemes: "aɪ", startMs: 0, endMs: 450 },
+      { phonemes: "bmp", startMs: 450, endMs: 1000 }
+    ]
+  });
+  assert.equal(timeline.source, "kokoro-phoneme-chunks");
+  assert.equal(timeline.alignment, "measured-chunk-bounds-with-approximate-within-chunk-phoneme-timing");
+  assert.ok(timeline.frames.slice(0, 10).includes("open"));
+  assert.ok(timeline.frames.slice(0, 10).includes("wide"));
+  assert.ok(timeline.frames.slice(11).includes("closed"));
+});
+
+test("falls back to text timing when Kokoro phoneme chunks are absent", () => {
+  const timeline = buildVisemeTimeline({ text: "A E O", durationMs: 1000, fps: 24 });
+  assert.equal(timeline.source, "text-grapheme-fallback");
+  assert.ok(timeline.frames.includes("open"));
+});

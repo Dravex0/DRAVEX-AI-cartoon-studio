@@ -208,6 +208,7 @@ export function createBrowserLocalTtsEngine({
       if (!cleanText) throw new TypeError("Dialogue text must not be empty.");
       if (cleanText.length > MAX_TEXT_LENGTH) throw new RangeError("Dialogue text exceeds 10000 characters.");
       let output;
+      let phonemeChunks = [];
       if (loaded.model.runtime === "kokoro-js") {
         const availableVoices = getKokoroVoiceIds(loaded.instance);
         const selectedVoice = availableVoices.length
@@ -217,7 +218,44 @@ export function createBrowserLocalTtsEngine({
               ? DEFAULT_KOKORO_VOICE
               : availableVoices[0])
           : voiceId;
-        output = await loaded.instance.generate(cleanText, { voice: selectedVoice });
+        if (typeof loaded.instance.stream === "function") {
+          const audioParts = [];
+          let streamSampleRate = null;
+          let sampleCursor = 0;
+          for await (const segment of loaded.instance.stream(cleanText, { voice: selectedVoice })) {
+            assertNotAborted(signal);
+            const normalized = normalizeAudio(segment?.audio);
+            if (streamSampleRate != null && normalized.sampleRate !== streamSampleRate) {
+              throw new Error("Kokoro stream changed sample rate between speech chunks.");
+            }
+            streamSampleRate = normalized.sampleRate;
+            const startSample = sampleCursor;
+            sampleCursor += normalized.audio.length;
+            if (sampleCursor > streamSampleRate * MAX_AUDIO_SECONDS) {
+              throw new RangeError("Generated speech exceeds the 10-minute safety limit.");
+            }
+            audioParts.push(normalized.audio);
+            const phonemes = String(segment?.phonemes || "").trim();
+            if (phonemes) {
+              phonemeChunks.push({
+                text: String(segment?.text || "").trim().slice(0, 2000),
+                phonemes: phonemes.slice(0, 4000),
+                startMs: startSample / streamSampleRate * 1000,
+                endMs: sampleCursor / streamSampleRate * 1000
+              });
+            }
+          }
+          if (audioParts.length) {
+            const combined = new Float32Array(sampleCursor);
+            let offset = 0;
+            for (const part of audioParts) {
+              combined.set(part, offset);
+              offset += part.length;
+            }
+            output = { audio: combined, sampling_rate: streamSampleRate };
+          }
+        }
+        if (!output) output = await loaded.instance.generate(cleanText, { voice: selectedVoice });
       } else {
         output = await loaded.instance(cleanText);
       }
@@ -240,7 +278,8 @@ export function createBrowserLocalTtsEngine({
         engine: loaded.engine,
         backend: loaded.backend,
         localInference: true,
-        remoteInference: false
+        remoteInference: false,
+        phonemeChunks
       };
     },
 
