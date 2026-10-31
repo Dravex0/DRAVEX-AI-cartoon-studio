@@ -59,7 +59,7 @@ function actionTimelineInstructions(scene = {}) {
     'When a phase names a target, make the actor interact with that exact target; preserve believable contact, hand/paw occupancy, and object ownership through the interaction and the stated end state.',
     'Only the listed actor performs the phase action. Other characters remain stable unless they have their own explicit phase; do not invent extra gestures, reactions, props, or story events.',
     'Respect the phase time ranges as relative timing within this scene; use smooth anticipation, movement, and settling rather than compressing every phase into one instant.'
-  ].join('\\n');
+  ].join('\n');
 }
 
 /** Creates a motion-only instruction and keeps the still image description separate. */
