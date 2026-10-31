@@ -186,3 +186,39 @@ test('image and motion prompts preserve dedicated character identity anchors', (
     assert.ok(motionPrompt.includes(detail), `motion prompt should include: ${detail}`);
   }
 });
+
+test('motion prompt adds temporal continuity and target-contact constraints for validated timelines', () => {
+  const timelineScene = {
+    ...scene,
+    storyDetail: 'Foxy notices the silver key and turns it in the gate lock.',
+    durationSeconds: 4,
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [
+        { phase: 'preparation', start: 0, end: 0.2, actorId: 'foxy', description: 'Foxy reaches toward the key.', evidence: 'Foxy notices the silver key' },
+        { phase: 'action', start: 0.2, end: 0.75, actorId: 'foxy', targetId: 'gate lock', description: 'Foxy turns the key in the gate lock.', evidence: 'turns it in the gate lock' },
+        { phase: 'result', start: 0.75, end: 1, actorId: 'foxy', description: 'The key remains turned in the lock.', evidence: 'turns it in the gate lock' }
+      ]
+    }
+  };
+  const prompt = buildMotionGenerationPrompt(timelineScene, bible);
+  assert.match(prompt, /do not teleport, reset the pose/);
+  assert.match(prompt, /preserve believable contact, hand\/paw occupancy, and object ownership/);
+  assert.match(prompt, /Only the listed actor performs the phase action/);
+  assert.match(prompt, /Respect the phase time ranges/);
+  assert.match(prompt, /target: gate lock/);
+});
+
+test('motion prompt does not add timeline constraints for missing or invalid timelines', () => {
+  const legacy = buildMotionGenerationPrompt(scene);
+  assert.doesNotMatch(legacy, /Temporal motion constraints/);
+  const invalid = buildMotionGenerationPrompt({
+    ...scene,
+    storyDetail: 'Foxy turns the key.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{ phase: 'reaction', start: 0, end: 1, actorId: 'foxy', description: 'Foxy reacts.', evidence: 'Foxy turns the key.' }]
+    }
+  });
+  assert.doesNotMatch(invalid, /Temporal motion constraints/);
+});
