@@ -1,6 +1,7 @@
 import { evaluateStoryboard } from './ai-evaluation.js';
 import { normalizeScenes } from './scene-model.js';
 import { buildStoryEventChain } from './story-event-chain.js';
+import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-state-memory.js';
 
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
 const isRecord = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -16,6 +17,61 @@ function parseModelScenes(text) {
   return Array.isArray(parsed?.scenes) ? parsed.scenes : null;
 }
 
+function buildStructuredStateMemory(modelScenes, baselineScenes) {
+  const supplied = modelScenes.some(scene =>
+    Object.prototype.hasOwnProperty.call(scene, 'startStateData')
+    || Object.prototype.hasOwnProperty.call(scene, 'endStateData')
+  );
+  if (!supplied) return { supplied: false, report: null };
+
+  const scenes = modelScenes.map((scene, index) => {
+    if (!Object.prototype.hasOwnProperty.call(scene, 'startStateData')
+        || !Object.prototype.hasOwnProperty.call(scene, 'endStateData')) {
+      return null;
+    }
+    const base = baselineScenes[index];
+    const stateChanges = (base.stateChanges || []).flatMap(change => {
+      const entityType = change.entityType === 'prop' ? 'object'
+        : change.entityType === 'character' ? 'character' : null;
+      const property = change.property === 'holder' ? 'owner'
+        : change.property === 'openState' ? 'state' : change.property;
+      if (!entityType || change.value === null || !change.entityId || !property) return [];
+      return [{
+        entity: change.entityId,
+        property,
+        previousValue: change.previousValue,
+        value: change.value,
+        actorId: change.actorId,
+        evidence: change.evidence
+      }];
+    });
+    return {
+      id: base.id,
+      characters: base.characters || [],
+      startState: scene.startStateData,
+      endState: scene.endStateData,
+      stateChanges
+    };
+  });
+
+  if (scenes.some(scene => scene === null)) {
+    return {
+      supplied: true,
+      report: { passed: false, checkedTransitions: 0,
+        issues: [{ code: 'structured-state-memory-incomplete', severity: 'error' }] }
+    };
+  }
+  const memory = buildSceneStateMemory(scenes);
+  if (!memory) {
+    return {
+      supplied: true,
+      report: { passed: false, checkedTransitions: 0,
+        issues: [{ code: 'structured-state-memory-invalid', severity: 'error' }] }
+    };
+  }
+  return { supplied: true, report: validateSceneStateContinuity(memory) };
+}
+
 function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null }) {
   const requiredDetails = basePlan.scenes.map((scene, index) => ({
     scene: index + 1,
@@ -29,7 +85,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
   return [
     'You are DRAVEX, a careful animation film director.',
     'Create a scene-by-scene visual direction for the supplied story.',
-    'Return ONLY valid JSON with this exact top-level shape: {"scenes":[{"title":"...","purpose":"...","visibleAction":"...","camera":"...","imagePrompt":"...","motionPrompt":"...","startState":"...","endState":"..."}]}.',
+    'Return ONLY valid JSON with this exact top-level shape: {"scenes":[{"title":"...","purpose":"...","visibleAction":"...","camera":"...","imagePrompt":"...","motionPrompt":"...","startState":"...","endState":"...","startStateData":{...},"endStateData":{...}}]}.',
     'Return exactly ' + basePlan.scenes.length + ' scenes, in the same order as the supplied source details.',
     'Each visibleAction must describe one concrete, filmable physical action, not a vague feeling or a static pose.',
     'Make every scene action and camera plan distinct. Use specific shot size, angle, and camera movement.',
@@ -46,6 +102,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'Build a strict scene-to-scene hand-off: scene N+1 startState must continue scene N endState. Preserve the exact positions and states of characters, props, clothing, lighting, weather, and location unless the supplied story explicitly changes them.',
     'Do not teleport characters or objects. If a character holds an object at the end of one scene, begin the next scene with that same character still holding it. Carry unresolved actions forward before starting a new action.',
     'Keep startState and endState concrete, visible, and mutually compatible across every adjacent scene.',
+    'Also provide startStateData and endStateData as structured JSON objects: {location,time,weather,characters:{characterId:{location,position,pose,clothing}},objects:{objectId:{location,owner,state}}}. Use null for unknown fields, never guess missing facts. Repeat unchanged known values exactly across scene boundaries. These structured fields must agree with the text states.',
     'The source details below are locked facts. Do not rewrite, reorder, omit, or duplicate them.',
     'LOCKED SOURCE DETAILS: ' + JSON.stringify(requiredDetails),
     'LOCKED EVENT CHAIN: ' + JSON.stringify(eventChain),
@@ -125,6 +182,7 @@ export async function directStoryboardWithLocalAI({
   }));
 
   const expectedStoryDetails = fallback.map(scene => clean(scene.storyDetail, 1_200)).filter(Boolean);
+  const structuredStateMemory = buildStructuredStateMemory(modelScenes, fallback);
   const evaluation = evaluateStoryboard({
     scenes: candidate,
     expectedSceneCount: fallback.length,
@@ -135,6 +193,17 @@ export async function directStoryboardWithLocalAI({
     requireProductionFields: true,
     requireContinuity: true
   });
+  if (structuredStateMemory.supplied) {
+    evaluation.structuredStateMemoryReport = structuredStateMemory.report;
+    if (!structuredStateMemory.report?.passed) {
+      evaluation.issues.push({
+        skill: 'structured-state-memory',
+        code: 'structured-state-continuity-failed',
+        message: 'Structured scene state memory found an incomplete or unexplained state hand-off.'
+      });
+      evaluation.passed = false;
+    }
+  }
   if (!evaluation.passed) return fallbackResult('candidate-failed-story-quality-gate', evaluation);
 
   return {
