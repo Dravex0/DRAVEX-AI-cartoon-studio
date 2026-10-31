@@ -127,7 +127,7 @@ test("rejects overlapping, out-of-range and malformed phoneme chunks", () => {
   assert.throws(() => buildSceneVoiceTimeline({
     sceneId: "bad-end", dialogue,
     artifacts: [{ ...base, phonemeChunks: [
-      { phonemes: "hə", startMs: 0, endMs: 901 }
+      { phonemes: "hə", startMs: 0, endMs: 903 }
     ] }]
   }), /invalid phoneme chunk timing/);
 });
