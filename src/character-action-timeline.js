@@ -44,6 +44,7 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
       if (!isRecord(phase)) return null;
       const start = Number(phase.start);
       const end = Number(phase.end);
+      const motion = phase.motion == null ? undefined : normalizePhaseMotion(phase.motion);
       return {
         phase: clean(phase.phase, 24),
         start: Number.isFinite(start) ? start : null,
@@ -52,7 +53,7 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
         targetId: clean(phase.targetId, 120) || null,
         description: clean(phase.description, 700),
         evidence: clean(phase.evidence, 500),
-        motion: phase.motion == null ? null : normalizePhaseMotion(phase.motion)
+        ...(phase.motion == null ? {} : { motion })
       };
     })
   };
