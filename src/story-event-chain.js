@@ -111,7 +111,7 @@ export function buildStoryEventChain(scenes = []) {
       sourceEvidence: storyEvidence,
       participants: characters,
       action: validInteraction,
-      reaction: clean(scene?.storyEventType, 80) === 'emotional_reaction'
+      reaction: clean(scene?.storyEventType, 80) === 'emotional_reaction' && storyEvidence
         ? { type: 'emotional_reaction', evidence: storyEvidence }
         : null,
       consequence: validCause,
