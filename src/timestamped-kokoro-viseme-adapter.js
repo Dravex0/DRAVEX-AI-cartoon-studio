@@ -42,10 +42,11 @@ export function buildTimestampedKokoroVisemeEvents({
   const events = [];
   let previousStartMs = -1;
   for (let index = 0; index < visemes.length; index++) {
-    const label = String(visemes[index] ?? "");
+    const rawLabel = visemes[index];
+    const label = rawLabel == null ? "" : String(rawLabel);
     const startMs = Number(vtimes[index]);
     const rawDurationMs = Number(vdurations[index]);
-    if (!Object.hasOwn(OCULUS_SHAPES, label)
+    if ((label !== "" && !Object.hasOwn(OCULUS_SHAPES, label))
       || !Number.isFinite(startMs) || !Number.isFinite(rawDurationMs)
       || startMs < 0 || rawDurationMs <= 0 || startMs < previousStartMs
       || startMs >= durationMs + 50 || startMs + rawDurationMs > durationMs + 50) {
@@ -55,7 +56,7 @@ export function buildTimestampedKokoroVisemeEvents({
     const endMs = Math.min(durationMs, startMs + rawDurationMs);
     if (endMs > startMs) {
       events.push({
-        shape: OCULUS_SHAPES[label],
+        shape: label === "" ? "neutral" : OCULUS_SHAPES[label],
         startMs,
         durationMs: endMs - startMs
       });
