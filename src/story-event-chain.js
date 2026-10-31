@@ -21,6 +21,11 @@ export function buildStoryEventChain(scenes = []) {
   const edges = [];
   const knownStates = new Map();
   const sceneIds = new Set(list.map((scene, index) => clean(scene?.id, 120) || `scene_${index + 1}`));
+  const sceneIndexById = new Map();
+  list.forEach((scene, index) => {
+    const id = clean(scene?.id, 120) || `scene_${index + 1}`;
+    if (!sceneIndexById.has(id)) sceneIndexById.set(id, index);
+  });
 
   list.forEach((scene, index) => {
     const sceneId = clean(scene?.id, 120) || `scene_${index + 1}`;
@@ -81,6 +86,7 @@ export function buildStoryEventChain(scenes = []) {
       && clean(causalLink.causeSceneId, 120)
       && clean(causalLink.effectSceneId, 120) === sceneId
       && sceneIds.has(clean(causalLink.causeSceneId, 120))
+      && sceneIndexById.get(clean(causalLink.causeSceneId, 120)) < index
       && clean(causalLink.causeEvidence)
       && causeStoryEvidence.includes(clean(causalLink.causeEvidence))
       && clean(causalLink.evidence)

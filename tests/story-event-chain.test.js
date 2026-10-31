@@ -147,3 +147,47 @@ test('rejects state changes that break the previous-scene hand-off', () => {
   assert.equal(graph.nodes[1].stateChanges.length, 0);
   assert.equal(graph.edges.filter(edge => edge.type === 'changes_state').length, 1);
 });
+
+test('rejects causal links to the same scene or a future scene', () => {
+  const selfCause = buildStoryEventChain([{
+    id: 's1', storyEventType: 'general', storyDetail: 'Therefore, Foxy leaves.',
+    causalLink: {
+      type: 'consequence', causeSceneId: 's1', effectSceneId: 's1',
+      marker: 'Therefore', causeEvidence: 'Therefore, Foxy leaves.',
+      evidence: 'Therefore, Foxy leaves.'
+    }
+  }]);
+  assert.equal(selfCause.nodes[0].consequence, null);
+  assert.deepEqual(selfCause.edges, []);
+
+  const futureCause = buildStoryEventChain([
+    {
+      id: 'effect', storyEventType: 'general', storyDetail: 'As a result, Foxy leaves.',
+      causalLink: {
+        type: 'consequence', causeSceneId: 'cause', effectSceneId: 'effect',
+        marker: 'As a result', causeEvidence: 'The bridge collapses.',
+        evidence: 'As a result, Foxy leaves.'
+      }
+    },
+    { id: 'cause', storyEventType: 'general', storyDetail: 'The bridge collapses.' }
+  ]);
+  assert.equal(futureCause.nodes[0].consequence, null);
+  assert.equal(futureCause.edges.some(edge => edge.type === 'causes'), false);
+});
+
+test('keeps valid causal links from an earlier scene', () => {
+  const graph = buildStoryEventChain([
+    { id: 'cause', storyEventType: 'general', storyDetail: 'The bridge collapses.' },
+    {
+      id: 'effect', storyEventType: 'general', storyDetail: 'As a result, Foxy takes another path.',
+      causalLink: {
+        type: 'consequence', causeSceneId: 'cause', effectSceneId: 'effect',
+        marker: 'As a result', causeEvidence: 'The bridge collapses.',
+        evidence: 'As a result, Foxy takes another path.'
+      }
+    }
+  ]);
+  assert.equal(graph.nodes[1].consequence.causeSceneId, 'cause');
+  assert.ok(graph.edges.some(edge => edge.type === 'causes' && edge.fromSceneId === 'cause' && edge.toSceneId === 'effect'));
+});
+
