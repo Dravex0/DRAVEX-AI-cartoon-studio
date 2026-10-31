@@ -58,9 +58,14 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
       transaction.abort();
       throw error;
     }
-    const value = result && typeof result.then === "function" ? await result : result;
-    await completed;
-    return value;
+    try {
+      const value = result && typeof result.then === "function" ? await result : result;
+      await completed;
+      return value;
+    } catch (error) {
+      try { await completed; } catch {}
+      throw error;
+    }
   }
 
   return {
