@@ -185,3 +185,59 @@ test('reports non-JSON and HTTP errors as typed adapter errors', async () => {
     error => error instanceof ComfyUIAdapterError && error.code === 'HTTP_ERROR'
   );
 });
+
+
+test('rejects non-video responses and MIME types that conflict with the output extension', async () => {
+  for (const [filename, responseType, expectedCode] of [
+    ['result.mp4', 'text/html', 'INVALID_VIDEO_CONTENT_TYPE'],
+    ['result.webm', 'video/mp4', 'VIDEO_CONTENT_TYPE_MISMATCH']
+  ]) {
+    const fetchImpl = async url => {
+      if (String(url).endsWith('/upload/image')) return jsonResponse({ name: 'source.png' });
+      if (String(url).endsWith('/prompt')) return jsonResponse({ prompt_id: 'mime-job' });
+      if (String(url).endsWith('/history/mime-job')) {
+        return jsonResponse({
+          'mime-job': {
+            status: { completed: true, status_str: 'success' },
+            outputs: { '90': { videos: [{ filename, type: 'output' }] } }
+          }
+        });
+      }
+      if (String(url).includes('/view?')) {
+        return new Response(new Blob(['not-trusted-video'], { type: responseType }), { status: 200 });
+      }
+      throw new Error('Unexpected URL: ' + url);
+    };
+    const provider = createComfyUIVideoProvider({
+      baseUrl: 'http://127.0.0.1:8188', workflow, nodeBindings, outputNodeIds: ['90'],
+      fetchImpl, pollIntervalMs: 250
+    });
+    await assert.rejects(provider.generate(request), error => error.code === expectedCode);
+  }
+});
+
+test('normalizes generic binary responses to the MIME type implied by the video extension', async () => {
+  const fetchImpl = async url => {
+    if (String(url).endsWith('/upload/image')) return jsonResponse({ name: 'source.png' });
+    if (String(url).endsWith('/prompt')) return jsonResponse({ prompt_id: 'binary-job' });
+    if (String(url).endsWith('/history/binary-job')) {
+      return jsonResponse({
+        'binary-job': {
+          status: { completed: true, status_str: 'success' },
+          outputs: { '90': { videos: [{ filename: 'binary.mp4', type: 'output' }] } }
+        }
+      });
+    }
+    if (String(url).includes('/view?')) {
+      return new Response(new Blob(['valid-video-payload'], { type: 'application/octet-stream' }), { status: 200 });
+    }
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188', workflow, nodeBindings, outputNodeIds: ['90'],
+    fetchImpl, pollIntervalMs: 250
+  });
+  const result = await provider.generate(request);
+  assert.equal(result.status, 'completed');
+  assert.equal(result.video.type, 'video/mp4');
+});
