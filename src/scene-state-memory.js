@@ -48,6 +48,19 @@ function stateValue(state, kind, entity, property) {
   return group?.[entity]?.[property] ?? null;
 }
 
+function sourceEvidenceMatches(scene, evidence) {
+  if (!known(evidence)) return false;
+  if (scene.storyDetail.includes(evidence) || scene.visibleAction.includes(evidence)) return true;
+
+  return scene.sourceEvents.some(event => {
+    if (typeof event === "string") return event.includes(evidence);
+    if (!isRecord(event)) return false;
+    return ["evidence", "text", "description"].some(field =>
+      typeof event[field] === "string" && event[field].includes(evidence)
+    );
+  });
+}
+
 function transitionKey(entity, property, previousValue, value) {
   return JSON.stringify([entity, property, previousValue, value]);
 }
@@ -81,7 +94,8 @@ export function buildSceneStateMemory(rawScenes) {
  * Validate end-state -> next start-state hand-offs.
  *
  * Missing/null fields are treated as unknown, never as deletion. A transition is
- * accepted only when the next scene contains an exact, evidence-backed stateChange.
+ * accepted only when the next scene contains an exact stateChange whose evidence
+ * is also present in that scene's story detail, visible action, or source events.
  * This is structured-state validation, not visual inspection of rendered frames.
  */
 function validateSceneStateContinuityUnsafe(candidateMemory) {
@@ -118,7 +132,7 @@ function validateSceneStateContinuityUnsafe(candidateMemory) {
     const before = stateEntries(previous.endState);
     const changes = current.stateChanges;
     const authorizedTransitions = new Set(
-      changes.filter(change => known(change.evidence)).map(change =>
+      changes.filter(change => sourceEvidenceMatches(current, change.evidence)).map(change =>
         transitionKey(change.entity, change.property, change.previousValue, change.value))
     );
 
