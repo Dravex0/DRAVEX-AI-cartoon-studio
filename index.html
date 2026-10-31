@@ -128,6 +128,7 @@ import { directStoryboardWithLocalAI } from "./src/local-story-director.js";
 import { generateImageWithHorde } from "./src/ai-horde-image-provider.js";
 import { drawImageCover } from "./src/image-frame.js";
 import { drawCharacterLayers } from "./src/scene-character-layers.js";
+import { attachCharacterSpriteToSceneLayers } from "./src/scene-character-layers.js";
 import { createSceneId, ensureSceneIds } from "./src/scene-identity.js";
 import { formatDialogueLines, parseDialogueLines } from "./src/dialogue-lines.js";
 import { createBrowserLocalTtsEngine } from "./src/browser-local-tts-engine.js";
@@ -412,8 +413,30 @@ function renderCharacterSpriteAssets(){
   };
   image.src=asset.imageUrl;
   verificationImage.src=asset.imageUrl;
+  const addButton=document.createElement('button');addButton.type='button';addButton.className='secondary';
+  const alreadyAttached=(Array.isArray(sceneMetadata[sceneIndex]?.characterLayers)?sceneMetadata[sceneIndex].characterLayers:[]).some(layer=>String(layer?.characterId||'').toLocaleLowerCase()===String(asset.characterId||'').toLocaleLowerCase());
+  addButton.textContent=alreadyAttached?(uiLang==='ru'?'Обновить на сцене':'Update on scene'):(uiLang==='ru'?'Добавить на сцену':'Add to scene');
+  addButton.addEventListener('click',()=>{
+   const resolvedSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===sceneId);
+   if(resolvedSceneIndex<0)return;
+   const result=attachCharacterSpriteToSceneLayers(sceneMetadata[resolvedSceneIndex],asset);
+   if(result.status==='invalid'){
+    $('status').textContent=uiLang==='ru'?'Не удалось добавить спрайт: проверь имя персонажа и HTTPS-ссылку.':'Could not attach sprite: check character ID and HTTPS image URL.';
+    return;
+   }
+   if(result.status==='limit-reached'){
+    $('status').textContent=uiLang==='ru'?'Достигнут лимит слоёв персонажей для сцены.':'Character layer limit reached for this scene.';
+    return;
+   }
+   sceneMetadata[resolvedSceneIndex]={...sceneMetadata[resolvedSceneIndex],characterLayers:result.layers};
+   addButton.textContent=uiLang==='ru'?'Обновить на сцене':'Update on scene';
+   $('status').textContent=uiLang==='ru'
+    ?(result.status==='added'?'Персонаж добавлен на сцену.':'Спрайт персонажа обновлён; положение сохранено.')
+    :(result.status==='added'?'Character added to scene.':'Character sprite updated; placement preserved.');
+   if(!playing)draw();
+  });
   const link=document.createElement('a');link.href=asset.imageUrl;link.target='_blank';link.rel='noopener noreferrer';link.textContent=uiLang==='ru'?'Открыть изображение':'Open image';
-  card.append(image,title,note,link);host.appendChild(card);
+  card.append(image,title,note,addButton,link);host.appendChild(card);
  });
 }
 function syncSceneEditor(){
