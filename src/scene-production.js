@@ -1,5 +1,6 @@
 import { normalizeScene, SCENE_DURATION_MIN, SCENE_DURATION_MAX } from './scene-model.js';
 import { validateCharacterActionTimeline } from './character-action-timeline.js';
+import { buildCharacterSpriteAssetPlan } from './character-sprite-asset-plan.js';
 
 const safe = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const list = values => Array.isArray(values) ? values.map(value => safe(value, 500)).filter(Boolean) : [];
@@ -106,6 +107,7 @@ export function buildProductionScene(scene = {}, characterBible = [], options = 
     ...prepared,
     imageGenerationPrompt: buildImageGenerationPrompt(prepared, characterBible, options),
     motionGenerationPrompt: buildMotionGenerationPrompt(prepared, characterBible),
+    characterSpriteAssetPlan: buildCharacterSpriteAssetPlan(prepared, characterBible),
     productionReadiness: validateSceneProductionReadiness(readinessInput, characterBible)
   };
 }
