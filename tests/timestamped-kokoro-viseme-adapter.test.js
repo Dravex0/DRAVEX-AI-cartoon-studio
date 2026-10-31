@@ -36,7 +36,7 @@ test("rejects mismatched arrays, unknown visemes and invalid timestamp ordering"
     visemes: ["aa", "PP"], vtimes: [200, 100], vdurations: [100, 100], durationMs: 1000
   }), /Invalid timestamped Kokoro viseme/);
   assert.throws(() => buildTimestampedKokoroVisemeEvents({
-    visemes: ["aa"], vtimes: [950], vdurations: [100], durationMs: 1000
+    visemes: ["aa"], vtimes: [950], vdurations: [101], durationMs: 1000
   }), /Invalid timestamped Kokoro viseme/);
 });
 
