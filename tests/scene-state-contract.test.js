@@ -224,6 +224,31 @@ test("normalizeScenes catches hostile proxies", () => {
   assert.equal(normalizeScenes([hostile]), null);
 });
 
+test("revoked proxies fail closed in public normalizers", () => {
+  const revokedRecord = Proxy.revocable({}, {});
+  revokedRecord.revoke();
+  assert.doesNotThrow(() => normalizeState(revokedRecord.proxy));
+  assert.equal(normalizeState(revokedRecord.proxy), null);
+
+  const revokedArray = Proxy.revocable([], {});
+  revokedArray.revoke();
+  assert.doesNotThrow(() => normalizeStateChanges(revokedArray.proxy));
+  assert.equal(normalizeStateChanges(revokedArray.proxy).ok, false);
+});
+
+test("hostile kindResolver option fails closed", () => {
+  const options = {};
+  Object.defineProperty(options, "kindResolver", {
+    get() { throw new Error("hostile options"); }
+  });
+  assert.doesNotThrow(() => normalizeStateChange({
+    entity: "Alice", property: "location", value: "roof"
+  }, options));
+  assert.equal(normalizeStateChange({
+    entity: "Alice", property: "location", value: "roof"
+  }, options).ok, false);
+});
+
 test("emptyState returns a complete fresh structure", () => {
   const first = emptyState();
   const second = emptyState();
