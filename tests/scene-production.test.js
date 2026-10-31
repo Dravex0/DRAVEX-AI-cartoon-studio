@@ -162,3 +162,27 @@ test('production readiness rejects malformed supplied action timelines', () => {
   assert.equal(result.ready, false);
   assert.ok(result.issues.some(issue => issue.code === 'invalid-action-timeline'));
 });
+
+
+test('image and motion prompts preserve dedicated character identity anchors', () => {
+  const detailedProfile = {
+    characterId: 'Foxy',
+    species: 'Anthropomorphic fox',
+    ageRange: 'Young adult',
+    visualDescription: 'Small orange fox',
+    bodyShape: 'Small and agile',
+    hair: 'Short swept-back auburn hair',
+    eyeColor: 'Amber',
+    silhouette: 'Large ears and bushy tail',
+    clothing: 'Blue scarf',
+    signatureAccessories: 'Brass pendant',
+    distinctiveFeatures: 'White tail tip'
+  };
+  const promptScene = { imagePrompt: 'Foxy stands by the gate.', visibleAction: 'Foxy waves.', characters: ['Foxy'] };
+  const imagePrompt = buildImageGenerationPrompt(promptScene, [detailedProfile]);
+  const motionPrompt = buildMotionGenerationPrompt(promptScene, [detailedProfile]);
+  for (const detail of ['Anthropomorphic fox', 'Young adult', 'Small and agile', 'Short swept-back auburn hair', 'Amber', 'Large ears and bushy tail', 'Brass pendant']) {
+    assert.match(imagePrompt, new RegExp(detail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(motionPrompt, new RegExp(detail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+});
