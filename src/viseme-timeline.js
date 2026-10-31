@@ -85,7 +85,7 @@ function buildEventGuidedFrames({ visemeEvents, durationMs, fps, frameCount }) {
     while (cursor < events.length && events[cursor].startMs <= timeMs) cursor++;
     for (let candidate = cursor - 1; candidate >= 0; candidate--) {
       const event = events[candidate];
-      if (event.endMs <= timeMs) break;
+      if (event.endMs <= timeMs) continue;
       if (timeMs >= event.startMs) {
         frames[frame] = event.shape;
         break;
