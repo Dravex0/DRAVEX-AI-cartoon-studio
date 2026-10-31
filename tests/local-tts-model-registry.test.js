@@ -6,6 +6,7 @@ test("selects the permissively licensed English model by locale",()=>{
  const model=getLocalTtsModel("en-US");
  assert.equal(model.available,true);
  assert.equal(model.modelId,"onnx-community/Kokoro-82M-v1.0-ONNX");
+ assert.equal(model.runtime,"kokoro-js");
  assert.equal(model.license,"Apache-2.0");
  assert.equal(model.commercialUse,true);
  assert.equal(model.consentRequired,false);
@@ -18,6 +19,7 @@ test("blocks non-commercial models unless explicitly opted in",()=>{
   const allowed=getLocalTtsModel(locale,{allowNonCommercial:true});
   assert.equal(allowed.available,true);
   assert.equal(allowed.commercialUse,false);
+  assert.equal(allowed.runtime,"transformers-js");
   assert.equal(allowed.consentRequired,true);
   assert.equal(allowed.license,"CC-BY-NC-4.0");
  }

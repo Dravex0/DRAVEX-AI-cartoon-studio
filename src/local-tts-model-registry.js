@@ -1,6 +1,7 @@
 const MODEL_REGISTRY = Object.freeze({
   en: Object.freeze({
     id: "kokoro-en",
+    runtime: "kokoro-js",
     modelId: "onnx-community/Kokoro-82M-v1.0-ONNX",
     locale: "en",
     languages: Object.freeze(["en"]),
@@ -8,11 +9,12 @@ const MODEL_REGISTRY = Object.freeze({
     commercialUse: true,
     dtype: "q8",
     approximateQuantizedWeightBytes: 92_400_000,
-    voiceMode: "model-dependent",
-    notes: "English-only model. Do not assume character-specific voice selection until the selected Transformers.js model path is verified."
+    voiceMode: "multi-voice",
+    notes: "English Kokoro model. Runs through kokoro-js; the model and voice assets are downloaded on explicit load."
   }),
   ru: Object.freeze({
     id: "mms-ru",
+    runtime: "transformers-js",
     modelId: "Xenova/mms-tts-rus",
     locale: "ru",
     languages: Object.freeze(["ru"]),
@@ -25,6 +27,7 @@ const MODEL_REGISTRY = Object.freeze({
   }),
   uk: Object.freeze({
     id: "mms-uk",
+    runtime: "transformers-js",
     modelId: "payam1394/traxlate-mms-tts-ukr",
     locale: "uk",
     languages: Object.freeze(["uk"]),
@@ -37,6 +40,7 @@ const MODEL_REGISTRY = Object.freeze({
   }),
   es: Object.freeze({
     id: "mms-es",
+    runtime: "transformers-js",
     modelId: "Xenova/mms-tts-spa",
     locale: "es",
     languages: Object.freeze(["es"]),
@@ -87,6 +91,7 @@ export function listLocalTtsModels() {
   return Object.values(MODEL_REGISTRY).map(model => ({
     id: model.id,
     locale: model.locale,
+    runtime: model.runtime,
     languages: [...model.languages],
     modelId: model.modelId,
     license: model.license,
