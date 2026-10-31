@@ -33,6 +33,10 @@ export function normalizeScene(input = {}, index = 0) {
     sourceStoryText: text(scene.sourceStoryText, 10_000),
     sourceEvents: uniqueStrings(scene.sourceEvents),
     characters: uniqueStrings(scene.characters ?? (scene.characterId ? [scene.characterId] : [])),
+    // Preserve whether an empty cast was explicitly supplied before normalization.
+    characterCastProvided: typeof scene.characterCastProvided === 'boolean'
+      ? scene.characterCastProvided
+      : Array.isArray(scene.characters) || Boolean(scene.characterId),
     characterLayers: normalizeCharacterLayers(scene.characterLayers),
     causalLink: scene.causalLink && typeof scene.causalLink === 'object' && !Array.isArray(scene.causalLink)
       ? {
