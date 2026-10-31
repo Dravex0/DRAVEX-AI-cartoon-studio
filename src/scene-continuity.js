@@ -14,7 +14,7 @@ const IDENTITY_ANCHOR_FIELDS = Object.freeze([
 ]);
 
 const tokens = value => String(value ?? '').toLocaleLowerCase().normalize('NFKC')
-  .match(/[\\p{L}\\p{N}]+/gu)?.filter(token => token.length > 2 && !STOP_WORDS.has(token)) ?? [];
+  .match(/[\p{L}\p{N}]+/gu)?.filter(token => token.length > 2 && !STOP_WORDS.has(token)) ?? [];
 
 function similarity(left, right) {
   const a = new Set(tokens(left));
