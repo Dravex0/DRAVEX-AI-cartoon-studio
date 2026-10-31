@@ -1,6 +1,7 @@
 import { normalizeScenes } from './scene-model.js';
 import { evaluateSceneContinuity } from './scene-continuity.js';
 import { inferSceneCausalLinks } from './scene-causality.js';
+import { evaluateCharacterActionTimelines } from './character-action-timeline.js';
 
 const normalizeText = value => String(value ?? '').toLocaleLowerCase().normalize('NFKC')
   .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -216,6 +217,15 @@ export function evaluateStoryboard({
     });
   }
 
+  const actionTimelineReport = evaluateCharacterActionTimelines(scenes);
+  if (actionTimelineReport.passed === false) {
+    issues.push({
+      skill: 'action-timeline',
+      code: 'invalid-character-action-timeline',
+      message: 'One or more supplied action timelines have invalid phases, timing, cast references, or source evidence.'
+    });
+  }
+
   const continuityReport = requireContinuity
     ? evaluateSceneContinuity({ scenes, characterBible })
     : null;
@@ -237,6 +247,8 @@ export function evaluateStoryboard({
     causalIntegrity,
     stateChangeIntegrity,
     productionCompleteness,
+    actionTimelineCoverage: actionTimelineReport.coverage,
+    actionTimelineIntegrity: actionTimelineReport.integrity,
     stateCoverage: continuityReport?.metrics.stateCoverage ?? null,
     stateTransitionConsistency: continuityReport?.metrics.stateTransitionConsistency ?? null,
     characterReferenceCoverage: continuityReport?.metrics.characterReferenceCoverage ?? null
@@ -256,6 +268,7 @@ export function evaluateStoryboard({
     overallScore,
     metrics,
     continuityReport,
+    actionTimelineReport,
     passed: overallScore >= 85 && issues.length === 0,
     issues,
     limitations: [
