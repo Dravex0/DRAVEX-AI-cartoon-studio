@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   evaluateCharacterActionTimelines,
-  validateCharacterActionTimeline
+  validateCharacterActionTimeline,
+  normalizeCharacterActionTimeline
 } from '../src/character-action-timeline.js';
 import { evaluateStoryboard } from '../src/ai-evaluation.js';
 import { normalizeScene } from '../src/scene-model.js';
@@ -25,7 +26,7 @@ const scene = {
 };
 
 test('scene normalization preserves action timeline metadata for evaluation', () => {
-  assert.deepEqual(normalizeScene(scene).actionTimeline, scene.actionTimeline);
+  assert.deepEqual(normalizeScene(scene).actionTimeline, normalizeCharacterActionTimeline(scene.actionTimeline));
 });
 
 test('accepts ordered, source-grounded action phases in normalized scene time', () => {
