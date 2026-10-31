@@ -124,3 +124,46 @@ test('handles Symbol duration without throwing', () => {
   const result = validateStoryScenes([{ id: 'symbol-duration', duration: Symbol('bad'), prompt: 'A cat jumps onto a chair.' }]);
   assert.equal(result.totalDurationSeconds, 3);
 });
+
+test('does not flag similar action wording as a repeat when the detected actions differ', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'running',
+      duration: 3,
+      prompt: 'Aster crosses a moonlit courtyard beside a fountain.',
+      visibleAction: 'Aster runs quickly toward the glowing silver doorway in the ancient castle.'
+    },
+    {
+      id: 'walking',
+      duration: 3,
+      prompt: 'Aster enters a quiet library filled with old maps.',
+      visibleAction: 'Aster walks slowly toward the glowing silver doorway in the ancient castle.'
+    }
+  ]);
+  assert.equal(result.issues.some((entry) => entry.code === 'adjacent-repeat'), false);
+});
+
+test('does not flag non-adjacent scenes as repeated when their explicit action classes differ', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'running',
+      duration: 3,
+      prompt: 'Aster crosses a moonlit courtyard beside a fountain.',
+      visibleAction: 'Aster runs quickly toward the glowing silver doorway in the ancient castle.'
+    },
+    {
+      id: 'middle',
+      duration: 3,
+      prompt: 'A silver key falls onto a stone table.',
+      visibleAction: 'The key spins once and stops.'
+    },
+    {
+      id: 'walking',
+      duration: 3,
+      prompt: 'Aster enters a quiet library filled with old maps.',
+      visibleAction: 'Aster walks slowly toward the glowing silver doorway in the ancient castle.'
+    }
+  ]);
+  assert.equal(result.issues.some((entry) => entry.code === 'repeated-content'), false);
+});
+

@@ -1,4 +1,5 @@
 import { normalizeScenes, SCENE_DURATION_MIN, SCENE_DURATION_MAX } from './scene-model.js';
+import { detectSceneAction } from './scene-action.js';
 
 const STOP_WORDS = new Set(['the','and','for','with','from','into','that','this','then','they','their','while','after','before','over','under','his','her','its','are','was','were','onto','through','very','same','shot','scene']);
 const VAGUE_ACTION = /^(?:looks? around|stands? there|is standing|waits?|nothing happens|looks? at (?:the )?(?:camera|viewer)|(?:персонаж )?(?:стоит|смотрит вокруг|жд[её]т)\.?)[.!?]?$/i;
@@ -12,6 +13,16 @@ function similarity(left, right) {
   if (!a.size || !b.size) return 0;
   let overlap = 0; for (const token of a) if (b.has(token)) overlap++;
   return overlap / (a.size + b.size - overlap);
+}
+/**
+ * Compare action text without treating two clearly different action classes as repeats.
+ * This remains a conservative lexical heuristic, not semantic model analysis.
+ */
+function actionSimilarity(left, right) {
+  const leftAction = detectSceneAction(left);
+  const rightAction = detectSceneAction(right);
+  if (leftAction !== 'idle' && rightAction !== 'idle' && leftAction !== rightAction) return 0;
+  return similarity(left, right);
 }
 function cameraShotType(camera) {
   const value = String(camera ?? '').toLowerCase();
@@ -60,8 +71,8 @@ export function validateStoryScenes(rawScenes) {
     if (index > 0) {
       const previous = scenes[index - 1];
       const promptScore = similarity(scene.prompt, previous.prompt);
-      const actionScore = similarity(scene.visibleAction, previous.visibleAction);
-      const fallbackScore = similarity(scene.prompt || scene.visibleAction, previous.prompt || previous.visibleAction);
+      const actionScore = actionSimilarity(scene.visibleAction, previous.visibleAction);
+      const fallbackScore = actionSimilarity(scene.prompt || scene.visibleAction, previous.prompt || previous.visibleAction);
       const score = Math.max(promptScore, actionScore, fallbackScore);
       if (score >= 0.78) issues.push(issue('warning', 'adjacent-repeat', scene.id, `This scene is very similar to the previous scene (${Math.round(score * 100)}% token overlap).`, previous.id));
       const currentShot = cameraShotType(scene.camera);
@@ -74,8 +85,8 @@ export function validateStoryScenes(rawScenes) {
       const prior = scenes[earlier];
       // Check prompt and action separately so changed prose cannot hide a reused action.
       const promptScore = similarity(scene.prompt, prior.prompt);
-      const actionScore = similarity(scene.visibleAction, prior.visibleAction);
-      const fallbackScore = similarity(scene.prompt || scene.visibleAction, prior.prompt || prior.visibleAction);
+      const actionScore = actionSimilarity(scene.visibleAction, prior.visibleAction);
+      const fallbackScore = actionSimilarity(scene.prompt || scene.visibleAction, prior.prompt || prior.visibleAction);
       const score = Math.max(promptScore, actionScore, fallbackScore);
       if (score >= 0.9) {
         issues.push(issue('info', 'repeated-content', scene.id, `Similar content also appears in scene ${earlier + 1}.`, prior.id));
