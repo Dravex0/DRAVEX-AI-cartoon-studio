@@ -99,3 +99,25 @@ test("requires local storage and validates WAV encoder input", () => {
   assert.throws(() => encodePcm16Wav([], 16000), /Float32Array/);
   assert.throws(() => encodePcm16Wav(new Float32Array([1]), 1000), /sampleRate/);
 });
+
+
+test("falls back to the first installed Kokoro voice when the requested and default voices are unavailable", async () => {
+  const storage = makeStorage();
+  let generatedWithVoice;
+  const engine = createBrowserLocalTtsEngine({
+    storage, cryptoRef: webcrypto, environment,
+    kokoroFactory: async () => ({
+      list_voices: () => ["uk_custom_voice", "uk_second_voice"],
+      generate: async (text, options) => {
+        generatedWithVoice = options.voice;
+        return validOutput(24000);
+      }
+    })
+  });
+
+  await engine.load({ locale: "en", backend: "wasm" });
+  await engine.synthesize({ text: "A voice fallback test", voiceId: "missing_voice" });
+
+  assert.equal(generatedWithVoice, "uk_custom_voice");
+  assert.equal(storage.records.size, 1);
+});
