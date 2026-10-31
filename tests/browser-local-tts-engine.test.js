@@ -49,6 +49,7 @@ test("uses local Kokoro runtime and persists verified English speech", async () 
     }
   });
   await engine.load({ locale: "en", backend: "wasm" });
+  assert.deepEqual(engine.availableVoices, ["af_heart", "af_bella"]);
   assert.equal(modelOptions.id, "onnx-community/Kokoro-82M-v1.0-ONNX");
   assert.equal(modelOptions.options.device, "wasm");
   const result = await engine.synthesize({ text: "Hello from DRAVEX", voiceId: "af_bella" });
