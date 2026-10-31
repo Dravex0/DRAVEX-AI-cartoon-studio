@@ -115,3 +115,12 @@ test('legacy storyboard without action timelines remains evaluable', () => {
   assert.equal(report.actionTimelineReport.passed, null);
   assert.equal(report.metrics.actionTimelineCoverage, null);
 });
+
+
+test('does not silently discard a malformed but supplied timeline during scene normalization', () => {
+  const malformed = normalizeScene({ id: 'bad', actionTimeline: { schemaVersion: 1, phases: 'not-an-array' } });
+  assert.notEqual(malformed.actionTimeline, null);
+  const report = evaluateCharacterActionTimelines([malformed]);
+  assert.equal(report.passed, false);
+  assert.ok(report.issues.some(item => item.code === 'timeline-shape-invalid'));
+});
