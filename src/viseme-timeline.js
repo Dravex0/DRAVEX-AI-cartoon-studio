@@ -16,7 +16,7 @@ function graphemes(value) {
 }
 
 function shapeForPhoneme(phoneme) {
-  const base = String(phoneme || "").normalize("NFD").replace(/[\\u0300-\\u036f]/gu, "").toLowerCase();
+  const base = String(phoneme || "").normalize("NFD").replace(/[\u0300-\u036f]/gu, "").toLowerCase();
   if (/^[bmpɱ]$/u.test(base)) return "closed";
   if (/^[fvθð]$/u.test(base)) return "teeth";
   if (/^[aɑæɐʌ]$/u.test(base)) return "open";
