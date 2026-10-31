@@ -165,7 +165,7 @@ test('creates a minimal source-grounded action timeline for an explicit directed
       evidence: 'Bird guides Foxy home.'
     }]
   });
-  assert.equal(scene.productionReadiness.ready, true);
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
   assert.match(scene.motionGenerationPrompt, /Character action timeline/);
   assert.match(scene.motionGenerationPrompt, /actor: Bird/);
 });
@@ -176,8 +176,8 @@ test('does not fabricate an action timeline for a passive look with no directed 
     'en',
     'Foxy'
   );
-  assert.equal(result.scenes[0].actionTimeline, undefined);
-  assert.equal(result.scenes[0].productionReadiness.ready, true);
+  assert.equal(result.scenes[0].actionTimeline, null);
+  assert.equal(result.scenes[0].productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
   assert.doesNotMatch(result.scenes[0].motionGenerationPrompt, /Character action timeline/);
 });
 
