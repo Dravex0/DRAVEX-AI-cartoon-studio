@@ -52,7 +52,7 @@ function actionTimelineInstructions(scene = {}) {
     const target = phase.targetId ? `; target: ${safe(phase.targetId, 120)}` : '';
     return `- ${safe(phase.phase, 24)} (${Math.round(phase.start * 100)}%-${Math.round(phase.end * 100)}%; ${startSeconds}-${endSeconds}s): ${safe(phase.description, 700)}; actor: ${safe(phase.actorId, 120)}${target}`;
   });
-  return `Character action timeline (follow these phases in order):\\n${phases.join('\\n')}`;
+  return `Character action timeline (follow these phases in order):\n${phases.join('\n')}`;
 }
 
 /** Creates a motion-only instruction and keeps the still image description separate. */
