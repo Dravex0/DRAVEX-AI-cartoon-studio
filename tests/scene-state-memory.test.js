@@ -82,3 +82,13 @@ test("duplicate scene and entity IDs are rejected by the strict contract", () =>
     { id: "bad", characters: ["Mira", "Mira"], startState: state(), endState: state() }
   ]), null);
 });
+
+
+test("hostile memory getters fail closed without throwing", () => {
+  const hostile = {};
+  Object.defineProperty(hostile, "schemaVersion", {
+    get() { throw new Error("hostile memory"); }
+  });
+  assert.doesNotThrow(() => validateSceneStateContinuity(hostile));
+  assert.equal(validateSceneStateContinuity(hostile).passed, false);
+});
