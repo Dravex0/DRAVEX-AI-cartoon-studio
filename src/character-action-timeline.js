@@ -54,7 +54,7 @@ export function validateCharacterActionTimeline(scene = {}) {
   const issues = [];
   const cast = new Set((Array.isArray(scene.characters) ? scene.characters : [])
     .map(value => clean(value, 120).toLocaleLowerCase()).filter(Boolean));
-  const evidenceSources = [scene.storyDetail, scene.visibleAction, scene.motionPrompt]
+  const evidenceSources = [scene.storyDetail, ...(Array.isArray(scene.sourceEvents) ? scene.sourceEvents : [])]
     .map(value => clean(value, 2_000)).filter(Boolean);
   const seen = new Set();
   let previousRank = -1;
@@ -93,7 +93,7 @@ export function validateCharacterActionTimeline(scene = {}) {
       issues.push(issue('phase-actor-not-in-cast', name, 'The phase actor must belong to this scene cast.'));
     }
     if (!normalized.evidence || !evidenceSources.some(source => source.includes(normalized.evidence))) {
-      issues.push(issue('phase-evidence-ungrounded', name, 'Phase evidence must exactly match scene story, visible-action, or motion text.'));
+      issues.push(issue('phase-evidence-ungrounded', name, 'Phase evidence must exactly match locked source-story evidence.'));
     }
   });
 
@@ -148,7 +148,7 @@ export function evaluateCharacterActionTimelines(scenes = []) {
     passed: issues.length === 0,
     issues,
     limitations: [
-      'This validates written phase order, timing, cast IDs, and source evidence only.',
+      'This validates written phase order, timing, cast IDs, and locked source-story evidence only.',
       'It does not inspect rendered frames or prove that character animation follows the timeline.'
     ]
   };
