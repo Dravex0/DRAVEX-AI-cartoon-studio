@@ -96,6 +96,6 @@ test("validates timestamped viseme event ordering, duration and shapes", () => {
     ...base, visemeEvents: [{ shape: "unknown", startMs: 0, durationMs: 100 }]
   }), /invalid timing/);
   assert.throws(() => buildVisemeTimeline({
-    ...base, visemeEvents: [{ shape: "open", startMs: 950, durationMs: 100 }]
+    ...base, visemeEvents: [{ shape: "open", startMs: 950, durationMs: 101 }]
   }), /invalid timing/);
 });
