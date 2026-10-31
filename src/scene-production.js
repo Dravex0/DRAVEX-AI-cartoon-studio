@@ -14,7 +14,9 @@ function characterDetails(scene, characterBible) {
     });
   const seen = new Set();
   return entries.map(entry => [
-    entry.characterId, entry.visualDescription, entry.clothing, entry.colors, entry.distinctiveFeatures
+    entry.characterId, entry.species, entry.ageRange, entry.visualDescription, entry.bodyShape,
+    entry.hair, entry.eyeColor, entry.silhouette, entry.clothing, entry.colors,
+    entry.signatureAccessories, entry.distinctiveFeatures
   ].map(value => safe(value, 700)).filter(Boolean).join(' — '))
     .filter(Boolean)
     .filter(details => {

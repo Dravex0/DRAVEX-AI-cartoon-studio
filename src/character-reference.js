@@ -10,7 +10,14 @@ export function normalizeCharacterReference(input = {}) {
     visualDescription: clean(source.visualDescription, 1200),
     clothing: clean(source.clothing, 700),
     colors: clean(source.colors, 300),
-    distinctiveFeatures: clean(source.distinctiveFeatures, 700)
+    distinctiveFeatures: clean(source.distinctiveFeatures, 700),
+    species: clean(source.species, 120),
+    ageRange: clean(source.ageRange, 120),
+    bodyShape: clean(source.bodyShape, 300),
+    hair: clean(source.hair, 300),
+    eyeColor: clean(source.eyeColor, 120),
+    silhouette: clean(source.silhouette, 300),
+    signatureAccessories: clean(source.signatureAccessories, 300)
   };
 }
 

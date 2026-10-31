@@ -56,3 +56,35 @@ test('merges only valid unique profiles and respects the character library limit
   assert.equal(merged.length, CHARACTER_REFERENCE_LIMIT);
   assert.equal(merged.at(-1).characterId, 'new-one');
 });
+
+
+test('normalizes optional identity anchors and bounds their length', () => {
+  const result = normalizeCharacterReference({
+    characterId: 'Foxy',
+    species: 'Anthropomorphic fox',
+    ageRange: 'Young adult',
+    bodyShape: 'Small and agile',
+    hair: 'Short swept-back auburn hair',
+    eyeColor: 'Amber',
+    silhouette: 'Large ears and bushy tail',
+    signatureAccessories: 'Blue scarf and brass pendant'.repeat(20)
+  });
+  assert.equal(result.species, 'Anthropomorphic fox');
+  assert.equal(result.ageRange, 'Young adult');
+  assert.equal(result.bodyShape, 'Small and agile');
+  assert.equal(result.hair, 'Short swept-back auburn hair');
+  assert.equal(result.eyeColor, 'Amber');
+  assert.equal(result.silhouette, 'Large ears and bushy tail');
+  assert.equal(result.signatureAccessories.length, 300);
+});
+
+test('legacy character profiles receive empty defaults for new identity anchors', () => {
+  const result = normalizeCharacterReference({
+    characterId: 'Foxy',
+    visualDescription: 'Small orange fox',
+    clothing: 'Blue scarf'
+  });
+  for (const field of ['species', 'ageRange', 'bodyShape', 'hair', 'eyeColor', 'silhouette', 'signatureAccessories']) {
+    assert.equal(result[field], '');
+  }
+});
