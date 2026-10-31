@@ -78,4 +78,41 @@ export function drawCharacterLayers(context, layers, resolveImage, viewportWidth
   return { drawn, skipped };
 }
 
+
+/**
+ * Attach a generated sprite to its scene as a renderable character layer.
+ * Existing placement is preserved when regenerating the same character sprite.
+ */
+export function attachCharacterSpriteToSceneLayers(scene = {}, asset = {}) {
+  const source = scene && typeof scene === 'object' && !Array.isArray(scene) ? scene : {};
+  const characterId = clean(asset?.characterId, 120);
+  const imageUrl = clean(asset?.imageUrl);
+  if (!characterId || !/^https:\/\//i.test(imageUrl)) {
+    return { status: 'invalid', layers: normalizeCharacterLayers(source.characterLayers) };
+  }
+  const layers = normalizeCharacterLayers(source.characterLayers);
+  const key = characterId.toLocaleLowerCase();
+  const existingIndex = layers.findIndex(layer => layer.characterId.toLocaleLowerCase() === key);
+  if (existingIndex >= 0) {
+    layers[existingIndex] = normalizeCharacterLayer({
+      ...layers[existingIndex],
+      imageUrl
+    }, existingIndex);
+    return { status: 'updated', layers };
+  }
+  if (layers.length >= MAX_CHARACTER_LAYERS) {
+    return { status: 'limit-reached', layers };
+  }
+  layers.push(normalizeCharacterLayer({
+    characterId,
+    imageUrl,
+    x: 0.5,
+    y: 0.68,
+    width: 0.28,
+    height: 0.46,
+    zIndex: layers.length
+  }, layers.length));
+  return { status: 'added', layers };
+}
+
 export const CHARACTER_LAYER_LIMIT = MAX_CHARACTER_LAYERS;
