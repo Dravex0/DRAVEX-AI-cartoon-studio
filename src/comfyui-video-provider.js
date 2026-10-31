@@ -242,8 +242,25 @@ export function createComfyUIVideoProvider({
         const video = await videoResponse.blob();
         if (!video.size) throw new ComfyUIAdapterError('ComfyUI returned an empty video file.', 'EMPTY_VIDEO');
         const extension = Object.keys(Object.fromEntries(VIDEO_EXTENSIONS)).find(ext => clean(item.filename).toLowerCase().endsWith(ext));
-        const mimeType = VIDEO_EXTENSIONS.get(extension) || video.type || 'application/octet-stream';
-        const resultBlob = video.type ? video : new Blob([video], { type: mimeType });
+        const mimeType = VIDEO_EXTENSIONS.get(extension) || 'application/octet-stream';
+        const responseMimeType = clean(video.type, 120).split(';')[0].toLowerCase();
+        if (responseMimeType && responseMimeType !== 'application/octet-stream'
+            && !responseMimeType.startsWith('video/')) {
+          throw new ComfyUIAdapterError(
+            'ComfyUI returned a non-video content type for the selected video output.',
+            'INVALID_VIDEO_CONTENT_TYPE'
+          );
+        }
+        if (responseMimeType && responseMimeType !== 'application/octet-stream'
+            && mimeType !== 'application/octet-stream' && responseMimeType !== mimeType) {
+          throw new ComfyUIAdapterError(
+            `ComfyUI video content type does not match the output file extension (${responseMimeType} vs ${mimeType}).`,
+            'VIDEO_CONTENT_TYPE_MISMATCH'
+          );
+        }
+        const resultBlob = responseMimeType === mimeType
+          ? video
+          : new Blob([video], { type: mimeType });
         context.onProgress?.({ stage: 'completed', promptId, elapsedMs: Date.now() - startedAt });
         return { status: 'completed', taskId: promptId, video: resultBlob };
       }
