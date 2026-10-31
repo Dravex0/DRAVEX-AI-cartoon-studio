@@ -284,9 +284,10 @@ test('accepts a structured character location change when its evidence is ground
     startStateData: structuredState(),
     endStateData: structuredState()
   }));
-  structured[0].endStateData = structuredState('moonlit forest');
-  structured[1].startStateData = structuredState('stone castle');
-  structured[1].endStateData = structuredState('stone castle');
+  const atCastle = structuredState();
+  atCastle.characters.Foxy.location = 'stone castle';
+  structured[1].startStateData = atCastle;
+  structured[1].endStateData = atCastle;
   const result = await directStoryboardWithLocalAI({
     runtime: runtimeReturning(structured),
     basePlan: statePlan
