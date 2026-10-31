@@ -50,7 +50,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="field"><label for="sceneTitle" id="sceneTitleLabel">Selected scene title</label><input id="sceneTitle" maxlength="80" placeholder="Scene title"></div>
 <div class="field"><label for="sceneDescription" id="sceneDescriptionLabel">Selected scene description</label><textarea id="sceneDescription" rows="3" maxlength="500" placeholder="Describe what happens in this scene"></textarea></div>
 <div class="field"><label for="sceneCharacters" id="sceneCharactersLabel">Characters in this scene · comma-separated</label><input id="sceneCharacters" maxlength="600" placeholder="Foxy, Bird"></div>
-<details class="production-details"><summary id="dialogueSummary">Scene dialogue and narration</summary><div class="field"><label for="sceneDialogue" id="sceneDialogueLabel">One speaker per line</label><textarea id="sceneDialogue" rows="4" maxlength="6000" placeholder="Foxy: Hello!&#10;Narrator: The forest becomes quiet."></textarea><small class="muted" id="sceneDialogueHint">Use “Character: line” or “Character — line”. Unlabelled lines are treated as narration. Generate speech locally after adding dialogue.</small><div class="voice-workflow"><label class="consent-row" id="voiceConsentRow" for="voiceNonCommercialConsent"><input id="voiceNonCommercialConsent" type="checkbox"><span id="voiceConsentLabel">I confirm non-commercial use for this restricted local voice model (required for Russian, Ukrainian and Spanish).</span></label><div class="actions"><button class="secondary" id="loadSceneVoiceModel" type="button">Load local voice model</button><button class="secondary" id="generateSceneVoices" type="button" disabled>Generate voices for this scene</button></div><div class="status" id="sceneVoiceStatus" role="status" aria-live="polite">No voice model loaded. Download starts only after you press Load.</div><div class="voice-results" id="sceneVoiceResults"></div></div></div></details>
+<details class="production-details"><summary id="dialogueSummary">Scene dialogue and narration</summary><div class="field"><label for="sceneDialogue" id="sceneDialogueLabel">One speaker per line</label><textarea id="sceneDialogue" rows="4" maxlength="6000" placeholder="Foxy: Hello!&#10;Narrator: The forest becomes quiet."></textarea><small class="muted" id="sceneDialogueHint">Use “Character: line” or “Character — line”. Unlabelled lines are treated as narration. Generate speech locally after adding dialogue.</small><div class="voice-workflow"><div class="field"><label for="sceneVoiceEngineChoice">Voice engine / Движок голоса</label><select id="sceneVoiceEngineChoice"><option value="standard">Standard local TTS · Kokoro / MMS</option><option value="timestamped">Experimental timestamped Kokoro · English only</option></select><small class="muted" id="sceneVoiceEngineHint">Timestamped mode downloads its model after Load and computes mouth timings locally from model token durations.</small></div><label class="consent-row" id="voiceConsentRow" for="voiceNonCommercialConsent"><input id="voiceNonCommercialConsent" type="checkbox"><span id="voiceConsentLabel">I confirm non-commercial use for this restricted local voice model (required for Russian, Ukrainian and Spanish).</span></label><div class="actions"><button class="secondary" id="loadSceneVoiceModel" type="button">Load local voice model</button><button class="secondary" id="generateSceneVoices" type="button" disabled>Generate voices for this scene</button></div><div class="status" id="sceneVoiceStatus" role="status" aria-live="polite">No voice model loaded. Download starts only after you press Load.</div><div class="voice-results" id="sceneVoiceResults"></div></div></div></details>
 <details class="production-details"><summary id="productionSummary">Scene production instructions</summary><div class="production-grid">
 <div class="field"><label for="sceneCamera" id="sceneCameraLabel">Camera / composition</label><textarea id="sceneCamera" rows="2" maxlength="1000"></textarea></div>
 <div class="field"><label for="sceneImagePrompt" id="sceneImagePromptLabel">Image prompt · what the still frame must show</label><textarea id="sceneImagePrompt" rows="3" maxlength="4000"></textarea></div>
@@ -122,6 +122,7 @@ import { drawImageCover } from "./src/image-frame.js";
 import { createSceneId, ensureSceneIds } from "./src/scene-identity.js";
 import { formatDialogueLines, parseDialogueLines } from "./src/dialogue-lines.js";
 import { createBrowserLocalTtsEngine } from "./src/browser-local-tts-engine.js";
+import { createTimestampedKokoroEngine } from "./src/timestamped-kokoro-engine.js";
 import { createVoiceAudioStorage } from "./src/voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./src/scene-voice-workflow.js";
 import { createSceneVideoStorage } from "./src/scene-video-storage.js";
@@ -487,25 +488,40 @@ function getSceneVoiceEngine(){
  if(!window.indexedDB)throw new Error(uiLang==='ru'?'В этом браузере недоступно локальное хранилище аудио.':'IndexedDB local audio storage is unavailable in this browser.');
  if(!window.crypto?.subtle)throw new Error(uiLang==='ru'?'Недоступна Web Crypto для проверки аудиофайлов.':'Web Crypto is unavailable for audio verification.');
  if(!sceneVoiceStorage)sceneVoiceStorage=createVoiceAudioStorage();
- if(!sceneVoiceEngine)sceneVoiceEngine=createBrowserLocalTtsEngine({storage:sceneVoiceStorage});
+ const timestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
+ const currentTimestamped=sceneVoiceEngine?.status.engine==='headtts-timestamped-kokoro';
+ if(sceneVoiceEngine&&timestamped!==currentTimestamped){
+  sceneVoiceEngine.dispose?.();
+  sceneVoiceEngine=null;
+ }
+ if(!sceneVoiceEngine){
+  sceneVoiceEngine=timestamped
+   ?createTimestampedKokoroEngine({storage:sceneVoiceStorage})
+   :createBrowserLocalTtsEngine({storage:sceneVoiceStorage});
+ }
  return sceneVoiceEngine;
 }
 function voiceText(ru,en){return uiLang==='ru'?ru:en}
 function refreshSceneVoiceControls(){
  const locale=storyLanguage();
- const restricted=locale!=='en';
+ const timestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
+ const restricted=locale!=='en'&&!timestamped;
  $('voiceConsentRow').hidden=!restricted;
  $('voiceConsentLabel').textContent=voiceText('Подтверждаю некоммерческое использование этой модели (обязательно для русского, украинского и испанского).','I confirm non-commercial use of this model (required for Russian, Ukrainian and Spanish).');
  $('loadSceneVoiceModel').textContent=voiceText('Загрузить локальную модель голоса','Load local voice model');
  $('generateSceneVoices').textContent=voiceText('Озвучить эту сцену','Generate voices for this scene');
- const loaded=Boolean(sceneVoiceEngine?.status.loaded&&sceneVoiceEngine.status.locale===locale);
- $('loadSceneVoiceModel').disabled=Boolean($('loadSceneVoiceModel').dataset.busy==='true')||(restricted&&!$('voiceNonCommercialConsent').checked);
+ const expectedEngine=timestamped?'headtts-timestamped-kokoro':null;
+ const loaded=Boolean(sceneVoiceEngine?.status.loaded&&sceneVoiceEngine.status.locale===locale
+  &&(timestamped?sceneVoiceEngine.status.engine===expectedEngine:sceneVoiceEngine.status.engine!== 'headtts-timestamped-kokoro'));
+ $('loadSceneVoiceModel').disabled=Boolean($('loadSceneVoiceModel').dataset.busy==='true')
+  ||(timestamped&&locale!=='en')||(restricted&&!$('voiceNonCommercialConsent').checked);
  $('generateSceneVoices').disabled=!loaded||$('generateSceneVoices').dataset.busy==='true';
- if(!loaded&&!sceneVoiceEngine?.status.loaded&&!$('sceneVoiceStatus').dataset.touched){
+ if(timestamped&&locale!=='en'){
+  $('sceneVoiceStatus').textContent=voiceText('Экспериментальный timestamped Kokoro поддерживает только английский. Выбери стандартный движок для этого языка.','Experimental timestamped Kokoro currently supports English only. Choose the standard engine for this language.');
+ }else if(!loaded&&!sceneVoiceEngine?.status.loaded&&!$('sceneVoiceStatus').dataset.touched){
   $('sceneVoiceStatus').textContent=voiceText('Модель не загружена. Загрузка начнётся только после нажатия кнопки.','No voice model loaded. Download starts only after you press Load.');
- }
- if(!loaded&&sceneVoiceEngine?.status.loaded){
-  $('sceneVoiceStatus').textContent=voiceText('Загружена модель другого языка. Нажми Load, чтобы загрузить нужную.','A different language model is loaded. Press Load to switch.');
+ }else if(!loaded&&sceneVoiceEngine?.status.loaded){
+  $('sceneVoiceStatus').textContent=voiceText('Загружен другой движок или язык. Нажми Load, чтобы переключить модель.','A different engine or language is loaded. Press Load to switch.');
  }
 }
 async function renderSceneVoiceAudio(){
@@ -551,8 +567,13 @@ $('loadSceneVoiceModel').addEventListener('click',async()=>{
  const button=$('loadSceneVoiceModel');
  if(button.dataset.busy==='true')return;
  const locale=storyLanguage();
+ const timestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
  const allowNonCommercial=$('voiceNonCommercialConsent').checked;
- if(locale!=='en'&&!allowNonCommercial){
+ if(timestamped&&locale!=='en'){
+  $('sceneVoiceStatus').textContent=voiceText('Timestamped Kokoro доступен только для английского.','Timestamped Kokoro is available for English only.');
+  return;
+ }
+ if(!timestamped&&locale!=='en'&&!allowNonCommercial){
   $('sceneVoiceStatus').textContent=voiceText('Для этой модели требуется явное подтверждение некоммерческого использования.','This model requires explicit non-commercial-use consent.');
   return;
  }
@@ -570,9 +591,11 @@ $('loadSceneVoiceModel').addEventListener('click',async()=>{
    }
   });
   const count=engine.availableVoices.length;
-  $('sceneVoiceStatus').textContent=locale==='en'
-   ?voiceText('Английская локальная модель готова. Доступно голосов: '+count+'.','English local model ready. Available voices: '+count+'.')
-   :voiceText('Локальная модель готова. Эта языковая модель использует один голос.','Local model ready. This language model uses a single speaker voice.');
+  $('sceneVoiceStatus').textContent=timestamped
+   ?voiceText('Timestamped Kokoro готов. Временные метки viseme берутся из длительностей токенов модели.','Timestamped Kokoro ready. Viseme timings come from model token durations.')
+   :locale==='en'
+    ?voiceText('Английская локальная модель готова. Доступно голосов: '+count+'.','English local model ready. Available voices: '+count+'.')
+    :voiceText('Локальная модель готова. Эта языковая модель использует один голос.','Local model ready. This language model uses a single speaker voice.');
  }catch(error){
   $('sceneVoiceStatus').textContent=(error?.message||'Voice model loading failed.');
  }finally{
@@ -646,7 +669,17 @@ $('generateSceneVoices').addEventListener('click',async()=>{
   button.dataset.busy='false';refreshSceneVoiceControls();
  }
 });
+$('sceneVoiceEngineChoice').addEventListener('change',()=>{
+ if(sceneVoiceEngine){sceneVoiceEngine.dispose?.();sceneVoiceEngine=null;}
+ $('sceneVoiceStatus').dataset.touched='false';
+ $('sceneVoiceStatus').textContent=voiceText('Выбран другой движок. Загрузи его отдельно.','Engine selection changed. Load the selected engine.');
+ refreshSceneVoiceControls();
+});
 $('language').addEventListener('change',()=>{
+ if(storyLanguage()!=='en'&&$('sceneVoiceEngineChoice').value==='timestamped'){
+  $('sceneVoiceEngineChoice').value='standard';
+  if(sceneVoiceEngine){sceneVoiceEngine.dispose?.();sceneVoiceEngine=null;}
+ }
  refreshSceneVoiceControls();
  $('sceneVoiceStatus').textContent=voiceText('Язык истории изменён. При необходимости загрузи соответствующую модель.','Story language changed. Load the matching voice model if needed.');
 });
