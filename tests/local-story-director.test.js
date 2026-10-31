@@ -269,7 +269,11 @@ test('accepts a structured character location change when its evidence is ground
     storyDetail: index === 0 ? 'Foxy enters the moonlit forest.'
       : index === 1 ? 'Foxy enters the stone castle.' : scene.storyDetail
   }));
-  const inferredChanges = inferStoryboardStateChanges(sourceScenes, 'en');
+  const inferredChanges = inferStoryboardStateChanges(sourceScenes, 'en', 'Foxy');
+  assert.ok(inferredChanges[1].some(change => change.entityType === 'character'
+    && change.entityId === 'Foxy'
+    && change.previousValue === 'inside:moonlit forest'
+    && change.value === 'inside:stone castle'));
   const statePlan = {
     ...basePlan,
     scenes: sourceScenes.map((scene, index) => ({
