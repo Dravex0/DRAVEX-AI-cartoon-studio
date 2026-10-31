@@ -334,6 +334,7 @@ $('sceneReadiness').textContent=readiness.ready?t.ready:t.incomplete+readiness.i
 $('imagePromptPreview').textContent=buildImageGenerationPrompt(scene,characterBible);
 $('motionPromptPreview').textContent=buildMotionGenerationPrompt(scene,characterBible);
 const spritePlan=buildCharacterSpriteAssetPlan(scene,characterBible);
+$('spritePlanPreviewLabel').textContent=uiLang==='ru'?'План спрайтов персонажей · локальный предпросмотр':'Per-character sprite plan · local preview only';
 $('spritePlanPreview').textContent=spritePlan.length?spritePlan.map(asset=>[
   asset.characterId+' · '+asset.status.toUpperCase(),
   asset.appearanceReference?'Appearance: '+asset.appearanceReference:'Appearance reference: missing',
