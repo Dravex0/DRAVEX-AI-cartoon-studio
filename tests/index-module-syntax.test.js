@@ -69,3 +69,15 @@ test('WebM export derives built-in character mouth movement from scheduled local
   assert.match(html, /exportMouthOriginTimeMs=performance\.now\(\);\s*recorder\.start\(250\)/);
   assert.match(html, /track\.characterName\.trim\(\)\.toLowerCase\(\)!==mainCharacterKey/);
 });
+
+ 
+test('WebM export combines measured dialogue energy with text-guided viseme mouth shapes', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(html.includes('buildVisemeTimeline, sampleVisemeTimeline'));
+  assert.ok(html.includes('text:String(cue.text||""),language:String(cue.language||storyLanguage())'));
+  assert.ok(html.includes('buildVisemeTimeline({text:track.text,durationMs:envelope.durationMs,language:track.language,fps:24})'));
+  assert.ok(html.includes('sampleVisemeTimeline(activeMouthTrack.visemes,mouthTrackTimeMs)'));
+  assert.ok(html.includes("exportViseme==='closed'"));
+  assert.ok(html.includes("exportViseme==='round'"));
+  assert.ok(html.includes("exportViseme==='wide'"));
+});
