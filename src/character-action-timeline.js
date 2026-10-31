@@ -11,7 +11,10 @@ function issue(code, phase, message) {
 }
 
 export function normalizeCharacterActionTimeline(rawTimeline) {
-  if (!isRecord(rawTimeline) || !Array.isArray(rawTimeline.phases)) return null;
+  if (rawTimeline == null) return null;
+  if (!isRecord(rawTimeline) || !Array.isArray(rawTimeline.phases)) {
+    return { schemaVersion: isRecord(rawTimeline) ? rawTimeline.schemaVersion : null, phases: null };
+  }
   return {
     schemaVersion: rawTimeline.schemaVersion,
     phases: rawTimeline.phases.slice(0, 9).map(phase => {
