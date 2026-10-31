@@ -883,6 +883,7 @@ $('export').onclick=async()=>{
   let stream=null,recorder=null,stopTimer=null,cleaned=false,audioSession=null;
   const chunks=[];
   let audioScheduledStartAtMs=null;
+  let lipSyncSkippedTracks=0;
   const cleanup=()=>{
     if(cleaned)return;
     cleaned=true;
@@ -928,22 +929,24 @@ $('export').onclick=async()=>{
     }
     exportMouthTracks=[];
     if(voiceTracks.length){
+      const mainCharacterKey=String($("character").value||"Foxy").trim().toLowerCase();
+      const mainCharacterVoiceTracks=voiceTracks.filter(track=>track.characterName.trim().toLowerCase()===mainCharacterKey);
       const AudioContextClass=window.AudioContext||window.webkitAudioContext;
-      if(AudioContextClass){
+      if(AudioContextClass&&mainCharacterVoiceTracks.length){
         const decodeContext=new AudioContextClass();
         try{
-          const mainCharacterKey=String($("character").value||"Foxy").trim().toLowerCase();
-          for(const track of voiceTracks){
-            if(track.characterName.trim().toLowerCase()!==mainCharacterKey)continue;
+          for(const track of mainCharacterVoiceTracks){
             try{
               const decoded=await decodeContext.decodeAudioData(await track.blob.arrayBuffer());
               const channels=Array.from({length:decoded.numberOfChannels},(_,channel)=>decoded.getChannelData(channel));
               const envelope=buildAudioMouthEnvelope({channels,sampleRate:decoded.sampleRate,fps:24});
               const visemes=buildVisemeTimeline({text:track.text,durationMs:envelope.durationMs,language:track.language,fps:24,phonemeChunks:track.phonemeChunks,visemeEvents:track.visemeEvents});
               exportMouthTracks.push({sceneIndex:track.sceneIndex,startMs:track.startMs,envelope,visemes});
-            }catch(decodeError){console.warn("DRAVEX lip-sync analysis skipped a dialogue track:",decodeError);}
+            }catch(decodeError){lipSyncSkippedTracks++;console.warn("DRAVEX lip-sync analysis skipped a dialogue track:",decodeError);}
           }
         }finally{await decodeContext.close().catch(()=>{});}
+      }else if(mainCharacterVoiceTracks.length){
+        lipSyncSkippedTracks=mainCharacterVoiceTracks.length;
       }
     }
     if(musicFile||voiceTracks.length){
@@ -975,9 +978,12 @@ $('export').onclick=async()=>{
         anchor.click();
         anchor.remove();
         setTimeout(()=>URL.revokeObjectURL(url),5000);
+        const lipSyncWarning=lipSyncSkippedTracks
+          ?(uiLang==='ru'?' · Внимание: синхронизация губ не рассчитана для '+lipSyncSkippedTracks+' реплик.':' · Warning: lip-sync analysis was skipped for '+lipSyncSkippedTracks+' dialogue line(s).')
+          :'';
         $('status').textContent=uiLang==='ru'
-          ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')
-          :'Exported '+timeline.segments.length+' scenes · '+timeline.totalDurationSeconds.toFixed(2)+' sec.'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'');
+          ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+lipSyncWarning
+          :'Exported '+timeline.segments.length+' scenes · '+timeline.totalDurationSeconds.toFixed(2)+' sec.'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'')+lipSyncWarning;
       }catch(error){
         console.error('DRAVEX export failed:',error);
         $('status').textContent=tr('exportFailed');
