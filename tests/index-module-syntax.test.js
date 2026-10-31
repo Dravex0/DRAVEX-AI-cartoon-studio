@@ -61,6 +61,7 @@ test('scene editor exposes local voice generation and explicitly labels export l
 test('WebM export derives built-in character mouth movement from scheduled local dialogue WAVs', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /buildAudioMouthEnvelope, sampleAudioMouthEnvelope/);
+  assert.match(html, /getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)/);
   assert.match(html, /decodeContext\.decodeAudioData\(await track\.blob\.arrayBuffer\(\)\)/);
   assert.match(html, /exportMouthTracks\.push\(\{sceneIndex:track\.sceneIndex,startMs:track\.startMs,envelope,visemes\}\)/);
   assert.match(html, /performance\.now\(\)-exportMouthOriginTimeMs/);
