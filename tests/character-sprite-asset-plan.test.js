@@ -25,7 +25,7 @@ test('creates one sprite plan per cast member using canonical character appearan
 test('assigns actor-specific timeline actions instead of sharing another character action', () => {
   const plan = buildCharacterSpriteAssetPlan({
     id: 'scene-2',
-    storyDetail: 'Foxy notices the door, opens the wooden door, and Bird steps back in surprise.',
+    storyDetail: 'Foxy notices the door, opens the wooden door, and Bird steps back in surprise and watches the open doorway.',
     characters: ['Foxy', 'Bird'],
     visibleAction: 'Foxy opens the door while Bird waits.',
     actionTimeline: {
