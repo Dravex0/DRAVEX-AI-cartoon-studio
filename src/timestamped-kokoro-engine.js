@@ -41,6 +41,10 @@ export function createTimestampedKokoroEngine({
   let backend = null;
 
   return Object.freeze({
+    get availableVoices() {
+      return instance?.isConnected ? ["af_heart"] : [];
+    },
+
     get status() {
       return {
         loaded: Boolean(instance?.isConnected),
@@ -165,7 +169,14 @@ export function createTimestampedKokoroEngine({
     },
 
     dispose() {
-      if (instance && typeof instance.disconnect === "function") instance.disconnect();
+      if (instance?.ww && typeof instance.ww.terminate === "function") {
+        instance.ww.terminate();
+        instance.ww = null;
+      }
+      if (instance?.settings?.audioCtx && instance.settings.audioCtx.state !== "closed") {
+        instance.settings.audioCtx.close().catch(() => {});
+      }
+      if (instance) instance.isConnected = false;
       instance = null;
       backend = null;
     }
