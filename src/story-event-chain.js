@@ -93,6 +93,8 @@ export function buildStoryEventChain(scenes = []) {
       && causeStoryEvidence.includes(clean(causalLink.causeEvidence))
       && clean(causalLink.evidence)
       && storyEvidence.includes(clean(causalLink.evidence))
+      && clean(causalLink.marker, 100)
+      && clean(causalLink.evidence).toLocaleLowerCase().includes(clean(causalLink.marker, 100).toLocaleLowerCase())
       ? {
           type: 'consequence',
           causeSceneId: clean(causalLink.causeSceneId, 120),

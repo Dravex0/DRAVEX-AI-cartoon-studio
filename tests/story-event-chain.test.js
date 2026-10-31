@@ -236,3 +236,18 @@ test('does not emit an emotional reaction without source-story evidence', () => 
   assert.equal(graph.edges.some(edge => edge.type === 'reacts_to'), false);
 });
 
+test('rejects a causal link when its claimed marker is absent from the effect evidence', () => {
+  const graph = buildStoryEventChain([
+    { id: 'cause', storyEventType: 'general', storyDetail: 'The bridge collapses.' },
+    {
+      id: 'effect', storyEventType: 'general', storyDetail: 'Therefore, Foxy takes the forest path.',
+      causalLink: {
+        type: 'consequence', causeSceneId: 'cause', effectSceneId: 'effect',
+        marker: 'Because of this', causeEvidence: 'The bridge collapses.',
+        evidence: 'Therefore, Foxy takes the forest path.'
+      }
+    }
+  ]);
+  assert.equal(graph.nodes[1].consequence, null);
+  assert.equal(graph.edges.some(edge => edge.type === 'causes'), false);
+});
