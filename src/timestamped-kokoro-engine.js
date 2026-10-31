@@ -1,5 +1,6 @@
 import { createVerifiedVoiceArtifactStore } from "./verified-voice-artifact.js";
 import { buildTimestampedKokoroVisemeEvents } from "./timestamped-kokoro-viseme-adapter.js";
+import { readWavPcmMetadata } from "./wav-pcm-metadata.js";
 
 const MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX-timestamped";
 const TRANSFORMERS_MODULE = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js";
@@ -125,19 +126,27 @@ export function createTimestampedKokoroEngine({
         throw new Error("Timestamped Kokoro returned no WAV audio bytes.");
       }
       const blob = new Blob([audio], { type: "audio/wav" });
+      const measuredAudio = await readWavPcmMetadata(blob);
       const durationHint = Number(data?.durationMs);
-      const saved = await artifacts.save({
-        blob,
-        filename: "timestamped-kokoro-" + String(voiceId || "af_heart") + ".wav",
-        engineUsed: "headtts-timestamped-kokoro",
-        expectedDurationMs: Number.isFinite(durationHint) && durationHint > 0 ? durationHint : null,
-        expectedSampleRate: 24000
-      });
+      if (Number.isFinite(durationHint) && durationHint > 0
+        && Math.abs(durationHint - measuredAudio.durationMs) > Math.max(50, measuredAudio.durationMs * 0.02)) {
+        throw new Error("Timestamped Kokoro duration metadata does not match the WAV audio.");
+      }
+      if (measuredAudio.sampleRate !== 24000) {
+        throw new Error("Timestamped Kokoro returned an unexpected WAV sample rate.");
+      }
       const visemeEvents = buildTimestampedKokoroVisemeEvents({
         visemes: data.visemes,
         vtimes: data.vtimes,
         vdurations: data.vdurations,
-        durationMs: saved.durationMs
+        durationMs: measuredAudio.durationMs
+      });
+      const saved = await artifacts.save({
+        blob,
+        filename: "timestamped-kokoro-" + String(voiceId || "af_heart") + ".wav",
+        engineUsed: "headtts-timestamped-kokoro",
+        expectedDurationMs: measuredAudio.durationMs,
+        expectedSampleRate: 24000
       });
       return {
         ...saved,
