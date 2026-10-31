@@ -53,8 +53,14 @@ test('readiness validator identifies missing production fields', () => {
   ]);
 });
 
-test('readiness validator accepts a complete scene', () => {
-  assert.deepEqual(validateSceneProductionReadiness(scene), { ready: true, issues: [] });
+test('readiness validator accepts a complete scene with its character reference', () => {
+  assert.deepEqual(validateSceneProductionReadiness(scene, bible), { ready: true, issues: [] });
+});
+
+test('readiness blocks an explicit scene cast when the character library is empty', () => {
+  const result = validateSceneProductionReadiness(scene, []);
+  assert.equal(result.ready, false);
+  assert.ok(result.issues.some(issue => issue.code === 'missing-character-reference' && issue.characterId === 'foxy'));
 });
 
 test('character reference matching is case-insensitive and includes only characters in the scene', () => {
