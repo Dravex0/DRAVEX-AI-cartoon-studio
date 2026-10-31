@@ -63,3 +63,39 @@ test("falls back to text timing when Kokoro phoneme chunks are absent", () => {
   assert.equal(timeline.source, "text-grapheme-fallback");
   assert.ok(timeline.frames.includes("open"));
 });
+
+
+test("uses model-timestamped viseme events ahead of approximate phoneme fallbacks", () => {
+  const timeline = buildVisemeTimeline({
+    text: "hello",
+    durationMs: 1000,
+    fps: 24,
+    phonemeChunks: [{ phonemes: "a", startMs: 0, endMs: 1000 }],
+    visemeEvents: [
+      { shape: "closed", startMs: 0, durationMs: 200 },
+      { shape: "wide", startMs: 200, durationMs: 250 },
+      { shape: "round", startMs: 600, durationMs: 300 }
+    ]
+  });
+  assert.equal(timeline.source, "timestamped-kokoro-viseme-events");
+  assert.equal(timeline.alignment, "model-token-duration-derived-viseme-timestamps");
+  assert.equal(timeline.frames[1], "closed");
+  assert.equal(timeline.frames[6], "wide");
+  assert.equal(timeline.frames[17], "round");
+});
+
+test("validates timestamped viseme event ordering, duration and shapes", () => {
+  const base = { text: "hello", durationMs: 1000, fps: 24 };
+  assert.throws(() => buildVisemeTimeline({
+    ...base, visemeEvents: [
+      { shape: "wide", startMs: 200, durationMs: 100 },
+      { shape: "open", startMs: 100, durationMs: 100 }
+    ]
+  }), /invalid timing/);
+  assert.throws(() => buildVisemeTimeline({
+    ...base, visemeEvents: [{ shape: "unknown", startMs: 0, durationMs: 100 }]
+  }), /invalid timing/);
+  assert.throws(() => buildVisemeTimeline({
+    ...base, visemeEvents: [{ shape: "open", startMs: 950, durationMs: 100 }]
+  }), /invalid timing/);
+});
