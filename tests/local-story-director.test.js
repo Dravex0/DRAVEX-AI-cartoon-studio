@@ -316,7 +316,7 @@ test('passes a source-backed action timeline from the local director into storyb
     }
   });
   const result = await directStoryboardWithLocalAI({ runtime, basePlan, character: 'Foxy' });
-  assert.equal(result.usedLocalModel, true);
+  assert.equal(result.usedLocalModel, true, JSON.stringify({ reason: result.fallbackReason, issues: result.evaluation?.issues, timeline: result.evaluation?.actionTimelineReport, source: basePlan.scenes[0].storyDetail, cast: basePlan.scenes[0].characters }));
   assert.equal(result.scenes[0].actionTimeline.phases[0].phase, 'action');
   assert.equal(result.evaluation.actionTimelineReport.coverage, 20);
   assert.equal(result.evaluation.actionTimelineReport.integrity, 100);
