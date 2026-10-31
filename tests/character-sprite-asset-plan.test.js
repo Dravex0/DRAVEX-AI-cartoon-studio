@@ -16,6 +16,9 @@ test('creates one sprite plan per cast member using canonical character appearan
   assert.equal(plan.length, 1);
   assert.equal(plan[0].characterId, 'foxy');
   assert.equal(plan[0].status, 'ready');
+  assert.equal(plan[0].planningStatus, 'ready');
+  assert.equal(plan[0].generationStatus, 'not_started');
+  assert.equal(plan[0].verificationStatus, 'not_verified');
   assert.match(plan[0].prompt, /Small orange fox/);
   assert.match(plan[0].prompt, /Blue scarf/);
   assert.match(plan[0].prompt, /Foxy waves/);
@@ -48,6 +51,7 @@ test('blocks missing and empty character references without inventing appearance
     id: 'scene-3', characters: ['Unknown', 'Empty'], visibleAction: 'They stand still.'
   }, [{ characterId: 'Empty' }]);
   assert.equal(plan[0].status, 'blocked');
+  assert.equal(plan[0].planningStatus, 'blocked');
   assert.equal(plan[0].appearanceReference, '');
   assert.equal(plan[0].prompt, '');
   assert.ok(plan[0].issues.some(issue => issue.code === 'missing-character-reference'));
