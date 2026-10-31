@@ -16,7 +16,11 @@ function validateVoiceTracks(tracks) {
     if (!Number.isFinite(startMs) || startMs < 0) {
       throw new RangeError(`Voice track ${index + 1} startMs must be non-negative.`);
     }
-    return { blob: track.blob, startMs, cueId: String(track.cueId || `voice-${index + 1}`) };
+    const durationMs = track.durationMs == null ? null : Number(track.durationMs);
+    if (durationMs !== null && (!Number.isFinite(durationMs) || durationMs <= 0)) {
+      throw new RangeError(`Voice track ${index + 1} durationMs must be a finite positive number.`);
+    }
+    return { blob: track.blob, startMs, durationMs, cueId: String(track.cueId || `voice-${index + 1}`) };
   });
 }
 
@@ -74,6 +78,13 @@ export async function createAudioExportSession({
       const buffer = await context.decodeAudioData(bytes);
       if (!buffer || !Number.isFinite(buffer.duration) || buffer.duration <= 0) {
         throw new Error(`Could not decode dialogue audio: ${track.cueId}`);
+      }
+      if (track.durationMs !== null) {
+        const decodedDurationMs = buffer.duration * 1000;
+        const toleranceMs = Math.max(50, track.durationMs * 0.02);
+        if (Math.abs(decodedDurationMs - track.durationMs) > toleranceMs) {
+          throw new Error(`Decoded dialogue duration does not match timeline metadata: ${track.cueId}`);
+        }
       }
       return { ...track, buffer };
     }));

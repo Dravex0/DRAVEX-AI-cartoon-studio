@@ -263,3 +263,54 @@ test('requires at least one audio source', async () => {
     MediaStreamClass: h.FakeMediaStream
   }), /At least one music element or voice track/);
 });
+
+
+test('rejects invalid expected voice duration metadata', async () => {
+  const h = createHarness();
+  await assert.rejects(() => createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    voiceTracks: [{ blob: new Blob(['wav']), startMs: 0, durationMs: 0 }],
+    AudioContextClass: h.FakeAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  }), /durationMs must be a finite positive number/);
+});
+
+test('rejects decoded dialogue audio whose measured duration conflicts with timeline metadata', async () => {
+  const h = createHarness();
+  let closed = false;
+  class MismatchedVoiceContext extends h.FakeAudioContext {
+    async decodeAudioData() { return { duration: 1.5 }; }
+    async close() { closed = true; await super.close(); }
+  }
+  await assert.rejects(() => createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    voiceTracks: [{
+      cueId: 'scene-1:line-1',
+      blob: new Blob(['wav-a']),
+      startMs: 0,
+      durationMs: 750
+    }],
+    AudioContextClass: MismatchedVoiceContext,
+    MediaStreamClass: h.FakeMediaStream
+  }), /Decoded dialogue duration does not match timeline metadata/);
+  assert.equal(closed, true);
+});
+
+test('accepts decoded dialogue audio within the measured-duration tolerance', async () => {
+  const h = createHarness();
+  class VoiceContext extends h.FakeAudioContext {
+    async decodeAudioData() { return { duration: 0.76 }; }
+  }
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    voiceTracks: [{
+      cueId: 'scene-1:line-1',
+      blob: new Blob(['wav-a']),
+      startMs: 0,
+      durationMs: 750
+    }],
+    AudioContextClass: VoiceContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+  await session.cleanup();
+});
