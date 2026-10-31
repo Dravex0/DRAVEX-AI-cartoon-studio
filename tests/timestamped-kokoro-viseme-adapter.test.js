@@ -39,3 +39,14 @@ test("rejects mismatched arrays, unknown visemes and invalid timestamp ordering"
     visemes: ["aa"], vtimes: [950], vdurations: [100], durationMs: 1000
   }), /Invalid timestamped Kokoro viseme/);
 });
+
+
+test("maps punctuation and silent HeadTTS phonemes to neutral mouth events", () => {
+  const events = buildTimestampedKokoroVisemeEvents({
+    visemes: [null, "aa", null],
+    vtimes: [0, 100, 400],
+    vdurations: [100, 300, 100],
+    durationMs: 500
+  });
+  assert.deepEqual(events.map(event => event.shape), ["neutral", "open", "neutral"]);
+});
