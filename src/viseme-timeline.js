@@ -60,6 +60,41 @@ function buildChunkGuidedFrames({ phonemeChunks, durationMs, fps, frameCount }) 
   return frames;
 }
 
+function buildEventGuidedFrames({ visemeEvents, durationMs, fps, frameCount }) {
+  if (!Array.isArray(visemeEvents) || visemeEvents.length === 0) return null;
+  if (visemeEvents.length > 2000) throw new RangeError("visemeEvents must contain at most 2000 events.");
+  const events = [];
+  let previousStartMs = -1;
+  for (const [index, event] of visemeEvents.entries()) {
+    const startMs = Number(event?.startMs);
+    const eventDurationMs = Number(event?.durationMs);
+    const shape = String(event?.shape || "");
+    if (!Number.isFinite(startMs) || !Number.isFinite(eventDurationMs)
+      || startMs < 0 || eventDurationMs <= 0 || startMs < previousStartMs
+      || startMs >= durationMs + 50 || startMs + eventDurationMs > durationMs + 50
+      || !SHAPES.has(shape)) {
+      throw new RangeError("visemeEvents contains invalid timing or mouth shape at event " + (index + 1) + ".");
+    }
+    previousStartMs = startMs;
+    events.push({ startMs, endMs: Math.min(durationMs, startMs + eventDurationMs), shape });
+  }
+  const frames = new Array(frameCount).fill("neutral");
+  let cursor = 0;
+  for (let frame = 0; frame < frameCount; frame++) {
+    const timeMs = (frame + 0.5) * 1000 / fps;
+    while (cursor < events.length && events[cursor].startMs <= timeMs) cursor++;
+    for (let candidate = cursor - 1; candidate >= 0; candidate--) {
+      const event = events[candidate];
+      if (event.endMs <= timeMs) continue;
+      if (timeMs >= event.startMs) {
+        frames[frame] = event.shape;
+        break;
+      }
+    }
+  }
+  return frames;
+}
+
 function shapeForGrapheme(grapheme, language) {
   if (/^[.!?,;:…—–-]$/u.test(grapheme)) return "neutral";
   if (/^\s+$/u.test(grapheme)) return "neutral";
@@ -90,7 +125,7 @@ function shapeForGrapheme(grapheme, language) {
  * This is not phoneme recognition or forced alignment: graphemes are spread
  * across the measured WAV duration and later gated by its real audio envelope.
  */
-export function buildVisemeTimeline({ text, durationMs, language = "en", fps = 24, phonemeChunks = null } = {}) {
+export function buildVisemeTimeline({ text, durationMs, language = "en", fps = 24, phonemeChunks = null, visemeEvents = null } = {}) {
   const source = String(text ?? "").trim();
   if (!source) throw new TypeError("Dialogue text is required.");
   if (!Number.isFinite(durationMs) || durationMs < MIN_DURATION_MS || durationMs > MAX_DURATION_MS) {
@@ -101,6 +136,18 @@ export function buildVisemeTimeline({ text, durationMs, language = "en", fps = 2
   }
 
   const frameCount = Math.max(1, Math.ceil(durationMs * fps / 1000));
+  const eventFrames = buildEventGuidedFrames({ visemeEvents, durationMs, fps, frameCount });
+  if (eventFrames) {
+    return Object.freeze({
+      fps,
+      frameCount,
+      durationMs,
+      language: String(language || "en").slice(0, 8),
+      source: "timestamped-kokoro-viseme-events",
+      alignment: "model-token-duration-derived-viseme-timestamps",
+      frames: Object.freeze(eventFrames)
+    });
+  }
   const chunkFrames = buildChunkGuidedFrames({ phonemeChunks, durationMs, fps, frameCount });
   if (chunkFrames) {
     return Object.freeze({

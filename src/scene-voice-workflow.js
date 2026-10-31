@@ -131,6 +131,25 @@ export function buildSceneVoiceTimeline({
       durationMs,
       startFrame
     };
+    if (artifact.visemeEvents != null) {
+      if (!Array.isArray(artifact.visemeEvents) || artifact.visemeEvents.length > 2000) {
+        throw new RangeError("Voice artifact " + (index + 1) + " has an invalid viseme event list.");
+      }
+      let previousStartMs = -1;
+      cue.visemeEvents = artifact.visemeEvents.map((event, eventIndex) => {
+        const startMs = Number(event?.startMs);
+        const eventDurationMs = Number(event?.durationMs);
+        const shape = clean(event?.shape, 20);
+        if (!["neutral", "open", "wide", "round", "closed", "teeth"].includes(shape)
+          || !Number.isFinite(startMs) || !Number.isFinite(eventDurationMs)
+          || startMs < 0 || eventDurationMs <= 0 || startMs < previousStartMs
+          || startMs >= durationMs + 50 || startMs + eventDurationMs > durationMs + 50) {
+          throw new RangeError("Voice artifact " + (index + 1) + " has invalid viseme event timing at " + (eventIndex + 1) + ".");
+        }
+        previousStartMs = startMs;
+        return { shape, startMs, durationMs: eventDurationMs };
+      });
+    }
     if (artifact.phonemeChunks != null) {
       if (!Array.isArray(artifact.phonemeChunks) || artifact.phonemeChunks.length > 120) {
         throw new RangeError("Voice artifact " + (index + 1) + " has an invalid phoneme chunk list.");

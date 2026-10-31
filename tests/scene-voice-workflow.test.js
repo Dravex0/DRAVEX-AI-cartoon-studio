@@ -131,3 +131,35 @@ test("rejects overlapping, out-of-range and malformed phoneme chunks", () => {
     ] }]
   }), /invalid phoneme chunk timing/);
 });
+
+
+test("preserves validated timestamped viseme events on dialogue cues", () => {
+  const events = [
+    { shape: "closed", startMs: 0, durationMs: 120 },
+    { shape: "wide", startMs: 120, durationMs: 240 }
+  ];
+  const result = buildSceneVoiceTimeline({
+    sceneId: "timestamped-viseme-scene",
+    dialogue: [{ characterId: "Foxy", text: "Hi", language: "en" }],
+    artifacts: [{ audioHash: hash("7"), durationMs: 500, visemeEvents: events }]
+  });
+  assert.deepEqual(result.cues[0].visemeEvents, events);
+});
+
+test("rejects malformed and unordered timestamped viseme events", () => {
+  const dialogue = [{ characterId: "Foxy", text: "Hi" }];
+  const base = { audioHash: hash("8"), durationMs: 500 };
+  assert.throws(() => buildSceneVoiceTimeline({
+    sceneId: "bad-viseme-order", dialogue,
+    artifacts: [{ ...base, visemeEvents: [
+      { shape: "wide", startMs: 200, durationMs: 100 },
+      { shape: "open", startMs: 100, durationMs: 100 }
+    ] }]
+  }), /invalid viseme event timing/);
+  assert.throws(() => buildSceneVoiceTimeline({
+    sceneId: "bad-viseme-shape", dialogue,
+    artifacts: [{ ...base, visemeEvents: [
+      { shape: "not-a-shape", startMs: 0, durationMs: 100 }
+    ] }]
+  }), /invalid viseme event timing/);
+});
