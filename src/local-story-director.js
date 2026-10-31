@@ -85,7 +85,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
   return [
     'You are DRAVEX, a careful animation film director.',
     'Create a scene-by-scene visual direction for the supplied story.',
-    'Return ONLY valid JSON with this exact top-level shape: {"scenes":[{"title":"...","purpose":"...","visibleAction":"...","camera":"...","imagePrompt":"...","motionPrompt":"...","startState":"...","endState":"...","startStateData":{...},"endStateData":{...}}]}.',
+    'Return ONLY valid JSON with this exact top-level shape: {"scenes":[{"title":"...","purpose":"...","visibleAction":"...","camera":"...","imagePrompt":"...","motionPrompt":"...","startState":"...","endState":"...","startStateData":{...},"endStateData":{...},"actionTimeline":{"schemaVersion":1,"phases":[{"phase":"preparation|action|reaction|result","start":0,"end":1,"actorId":"...","targetId":null,"description":"...","evidence":"exact source-backed phrase"}]}}]}.',
     'Return exactly ' + basePlan.scenes.length + ' scenes, in the same order as the supplied source details.',
     'Each visibleAction must describe one concrete, filmable physical action, not a vague feeling or a static pose.',
     'Make every scene action and camera plan distinct. Use specific shot size, angle, and camera movement.',
@@ -99,6 +99,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'Main character reference: ' + clean(character, 120) + '.',
     'Write all scene text in ' + clean(language, 30) + '.',
     'Keep imagePrompt focused on one still frame; keep motionPrompt focused on movement.',
+    'For each scene, provide actionTimeline.phases in normalized scene time from 0 to 1. Include only phases supported by the scene: preparation, action, reaction, result. Any supplied timeline must include one central action phase; preparation ends before action, reaction starts after action, and result starts after the action and any reaction. Every phase needs an assigned actorId, a concrete description, and evidence copied exactly from locked storyDetail or sourceEvents. Use only characters assigned to that scene. Do not invent reactions or targets; targetId may be null. If the scene is an establishing shot with no character action, set actionTimeline to null.',
     'Build a strict scene-to-scene hand-off: scene N+1 startState must continue scene N endState. Preserve the exact positions and states of characters, props, clothing, lighting, weather, and location unless the supplied story explicitly changes them.',
     'Do not teleport characters or objects. If a character holds an object at the end of one scene, begin the next scene with that same character still holding it. Carry unresolved actions forward before starting a new action.',
     'Keep startState and endState concrete, visible, and mutually compatible across every adjacent scene.',
@@ -177,7 +178,8 @@ export async function directStoryboardWithLocalAI({
       imagePrompt: clean(scene.imagePrompt, 4_000),
       motionPrompt: clean(scene.motionPrompt, 3_000),
       startState: clean(scene.startState, 1_000),
-      endState: clean(scene.endState, 1_000)
+      endState: clean(scene.endState, 1_000),
+      actionTimeline: scene.actionTimeline ?? null
     };
   }));
 
