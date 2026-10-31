@@ -200,3 +200,65 @@ test('allows retry after a transient audio playback failure', async () => {
   assert.equal(h.events.filter(event => event === 'resume').length, 2);
   await session.cleanup();
 });
+
+
+test('schedules decoded dialogue WAV tracks on the shared recording clock', async () => {
+  const h = createHarness();
+  const scheduled = [];
+  class VoiceContext extends h.FakeAudioContext {
+    currentTime = 12;
+    async decodeAudioData(bytes) {
+      assert.ok(bytes instanceof ArrayBuffer);
+      return { duration: 0.75 };
+    }
+    createBufferSource() {
+      return {
+        buffer: null,
+        connect() { h.events.push('voice-connect'); },
+        start(when) { scheduled.push(when); h.events.push('voice-start'); },
+        stop() { h.events.push('voice-stop'); }
+      };
+    }
+  }
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    voiceTracks: [
+      { cueId: 'scene-1:line-1', blob: new Blob(['wav-a']), startMs: 0 },
+      { cueId: 'scene-1:line-2', blob: new Blob(['wav-b']), startMs: 1250 }
+    ],
+    AudioContextClass: VoiceContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+  assert.deepEqual(session.stream.getTracks().map(track => track.kind), ['video', 'audio']);
+  await session.start();
+  assert.deepEqual(scheduled, [12.08, 13.33]);
+  assert.equal(h.events.filter(event => event === 'voice-start').length, 2);
+  await session.cleanup();
+  assert.equal(h.events.filter(event => event === 'voice-stop').length, 2);
+  assert.ok(h.events.includes('close'));
+});
+
+test('rejects dialogue tracks with missing audio or invalid offsets', async () => {
+  const h = createHarness();
+  await assert.rejects(() => createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    voiceTracks: [{ startMs: 0 }],
+    AudioContextClass: h.FakeAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  }), /non-empty audio Blob/);
+  await assert.rejects(() => createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    voiceTracks: [{ blob: new Blob(['wav']), startMs: -1 }],
+    AudioContextClass: h.FakeAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  }), /startMs must be non-negative/);
+});
+
+test('requires at least one audio source', async () => {
+  const h = createHarness();
+  await assert.rejects(() => createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    AudioContextClass: h.FakeAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  }), /At least one music element or voice track/);
+});
