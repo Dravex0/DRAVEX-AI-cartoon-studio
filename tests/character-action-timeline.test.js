@@ -125,3 +125,17 @@ test('does not silently discard a malformed but supplied timeline during scene n
   assert.equal(report.passed, false);
   assert.ok(report.issues.some(item => item.code === 'timeline-shape-invalid'));
 });
+
+test('rejects an action actor when the scene explicitly has an empty cast', () => {
+  const candidate = structuredClone(scene);
+  candidate.characters = [];
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'phase-actor-not-in-cast'));
+});
+
+test('keeps legacy timelines evaluable when the scene cast is not provided', () => {
+  const candidate = structuredClone(scene);
+  delete candidate.characters;
+  const report = validateCharacterActionTimeline(candidate);
+  assert.equal(report.passed, true);
+});

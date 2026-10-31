@@ -89,7 +89,7 @@ export function validateCharacterActionTimeline(scene = {}) {
 
     if (!normalized.description) issues.push(issue('phase-description-missing', name, 'Every phase needs a concrete visible description.'));
     if (!normalized.actorId) issues.push(issue('phase-actor-missing', name, 'Every phase needs an acting character ID.'));
-    else if (cast.size && !cast.has(normalized.actorId.toLocaleLowerCase())) {
+    else if (Array.isArray(scene.characters) && !cast.has(normalized.actorId.toLocaleLowerCase())) {
       issues.push(issue('phase-actor-not-in-cast', name, 'The phase actor must belong to this scene cast.'));
     }
     if (!normalized.evidence || !evidenceSources.some(source => source.includes(normalized.evidence))) {
