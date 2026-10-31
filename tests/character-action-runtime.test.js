@@ -50,7 +50,8 @@ test('ignores unknown actors, malformed phases, and non-finite pose values', () 
     [{ characterId: 'Foxy', x: 0.2 }],
     { schemaVersion: 1, phases: [
       { actorId: 'Wolf', start: 0, end: 1, motion: { to: { x: 0.9 } } },
-      { actorId: 'Foxy', start: 0, end: 1, motion: { to: { x: 'NaN', scale: Infinity } } },
+      { actorId: 'Foxy', start: 0, end: 1, motion: { to: { x: 'NaN', y: null, scale: Infinity } } },
+      { actorId: 'Foxy', start: null, end: 1, motion: { to: { x: 0.9 } } },
       null
     ] },
     0.5
