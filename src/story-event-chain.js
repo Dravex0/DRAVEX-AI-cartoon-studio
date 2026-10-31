@@ -20,10 +20,11 @@ export function buildStoryEventChain(scenes = []) {
   const nodes = [];
   const edges = [];
   const knownStates = new Map();
-  const sceneIds = new Set(list.map((scene, index) => clean(scene?.id, 120) || `scene_${index + 1}`));
+  const sceneIdCounts = new Map();
   const sceneIndexById = new Map();
   list.forEach((scene, index) => {
     const id = clean(scene?.id, 120) || `scene_${index + 1}`;
+    sceneIdCounts.set(id, (sceneIdCounts.get(id) || 0) + 1);
     if (!sceneIndexById.has(id)) sceneIndexById.set(id, index);
   });
 
@@ -85,7 +86,8 @@ export function buildStoryEventChain(scenes = []) {
       && causalLink.type === 'consequence'
       && clean(causalLink.causeSceneId, 120)
       && clean(causalLink.effectSceneId, 120) === sceneId
-      && sceneIds.has(clean(causalLink.causeSceneId, 120))
+      && sceneIdCounts.get(clean(causalLink.causeSceneId, 120)) === 1
+      && sceneIdCounts.get(sceneId) === 1
       && sceneIndexById.get(clean(causalLink.causeSceneId, 120)) < index
       && clean(causalLink.causeEvidence)
       && causeStoryEvidence.includes(clean(causalLink.causeEvidence))
