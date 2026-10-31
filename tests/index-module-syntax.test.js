@@ -56,3 +56,15 @@ test('scene editor exposes local voice generation and explicitly labels export l
   assert.match(html, /createAudioExportSession\(\{videoStream:stream,audioElement,volume:Number\(\$\('audioVolume'\)\.value\)\/100,voiceTracks,voiceVolume:0\.9\}\)/);
   assert.match(html, /Generated scene dialogue is mixed into WebM at its scheduled time/);
 });
+
+
+test('WebM export derives built-in character mouth movement from scheduled local dialogue WAVs', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /buildAudioMouthEnvelope, sampleAudioMouthEnvelope/);
+  assert.match(html, /decodeContext\.decodeAudioData\(await track\.blob\.arrayBuffer\(\)\)/);
+  assert.match(html, /exportMouthTracks\.push\(\{sceneIndex:track\.sceneIndex,startMs:track\.startMs,envelope\}\)/);
+  assert.match(html, /exportElapsedMs>=track\.startMs/);
+  assert.match(html, /sampleAudioMouthEnvelope\(activeMouthTrack\.envelope,exportElapsedMs-activeMouthTrack\.startMs\)/);
+  assert.match(html, /exportMouthOriginFrame=frame;\s*recorder\.start\(250\)/);
+  assert.match(html, /track\.characterName\.trim\(\)\.toLowerCase\(\)!==mainCharacterKey/);
+});
