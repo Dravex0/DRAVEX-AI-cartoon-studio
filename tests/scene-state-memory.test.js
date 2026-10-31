@@ -74,6 +74,19 @@ test("accepts a source-backed clothing change between scenes", () => {
   assert.deepEqual(report.issues, []);
 });
 
+test("rejects state changes whose evidence is not present in the scene source", () => {
+  const memory = buildSceneStateMemory([
+    scene("s1", state(), state()),
+    scene("s2", state({ characterLocation: "castle" }), state({ characterLocation: "castle" }), [
+      { entity: "Mira", property: "location", previousValue: "village",
+        value: "castle", evidence: "Mira travels from the village to the castle." }
+    ], "Mira arrives at the castle.")
+  ]);
+  const report = validateSceneStateContinuity(memory);
+  assert.equal(report.passed, false);
+  assert.ok(report.issues.some(issue => issue.code === "character-teleportation"));
+});
+
 test("null and omitted values remain unknown rather than deletion", () => {
   const memory = buildSceneStateMemory([
     scene("s1", state(), state()),
