@@ -132,3 +132,39 @@ test('removes registered providers cleanly', () => {
   assert.equal(registry.get('temporary'), null);
   assert.equal(registry.remove('temporary'), false);
 });
+
+test('requires a video source for video-to-video requests instead of mislabeling it as an image', () => {
+  const video = { type: 'video/webm' };
+  const valid = validateVideoGenerationRequest({
+    taskType: 'video-to-video',
+    prompt: 'Continue the motion while preserving the original scene.',
+    video,
+    durationSeconds: 4,
+    fps: 24
+  });
+  assert.equal(valid.valid, true);
+  assert.equal(valid.value.video, video);
+  assert.equal(valid.value.image, null);
+
+  const invalid = validateVideoGenerationRequest({
+    taskType: 'video-to-video',
+    prompt: 'Continue the motion.',
+    image: { type: 'image/png' },
+    durationSeconds: 4,
+    fps: 24
+  });
+  assert.equal(invalid.valid, false);
+  assert.deepEqual(invalid.issues, [{ code: 'missing-source-media', field: 'video' }]);
+});
+
+test('text-to-video requests do not require an image or video source', () => {
+  const result = validateVideoGenerationRequest({
+    taskType: 'text-to-video',
+    prompt: 'A sunrise over a quiet mountain lake.',
+    durationSeconds: 4,
+    fps: 24
+  });
+  assert.equal(result.valid, true);
+  assert.equal(result.value.image, null);
+  assert.equal(result.value.video, null);
+});
