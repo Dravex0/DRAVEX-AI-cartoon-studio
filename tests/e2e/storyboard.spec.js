@@ -59,6 +59,25 @@ test('creates a storyboard from a story prompt without remote AI services', asyn
   expect(pageErrors, 'storyboard creation should not throw uncaught JavaScript errors').toEqual([]);
 });
 
+
+test('auto-detects the protagonist and keeps the demo fox out of named-character scenes', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#idea').fill(
+    'Characters:\\nArin — a 17-year-old hero with black hair and blue energy.\\nScene 1: Arin walks through a quiet city square and waits beside a fountain.'
+  );
+  await page.getByRole('button', { name: /start working/i }).click();
+
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await expect(page.locator('#character')).toHaveValue('Arin');
+  await page.locator('#play').click();
+  await page.waitForTimeout(180);
+
+  expect(pageErrors, 'named-character preview playback should not throw JavaScript errors').toEqual([]);
+});
+
 test('keeps advanced AI and rigging controls out of the first-time workflow until requested', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#idea')).toBeVisible();
