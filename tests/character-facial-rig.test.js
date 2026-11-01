@@ -59,3 +59,9 @@ test("persists normalized per-character facial expressions through scene normali
   assert.equal(scene.characterFacialExpressions.fox.name, "blink");
   assert.equal(scene.characterFacialExpressions.fox.eyeOpen, 0);
 });
+
+test("accepts a clean face-base plate as a supported facial layer", () => {
+  const rig = facialRig();
+  rig.parts.unshift({ id: "face-base", role: "face-base", imageUrl: "blob:clean-face" });
+  assert.equal(validateCharacterFacialRig(rig, bodyRig).status, "valid");
+});
