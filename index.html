@@ -154,6 +154,10 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="field"><label for="comfyFrameStep">Frame step (Wan: 8)</label><input id="comfyFrameStep" type="number" min="1" max="120" value="8"></div>
 </div>
 <div class="actions"><button type="button" class="secondary" id="checkComfyConnection">Check local connection / Проверить связь</button><button type="button" id="animateSceneComfy" disabled>Animate this scene / Анимировать сцену</button></div>
+<p class="muted" style="font-size:12px">Создаёт видеоклипы всех сцен по очереди, затем собирает и открывает готовый мультфильм. Недостающие изображения создаются через AI Horde только при отдельном согласии. Для анимации требуется подключённый локальный ComfyUI.</p>
+<div class="actions"><button type="button" id="generateFullFilmComfy" disabled>Создать весь мультфильм</button><button type="button" class="secondary" id="cancelFullFilmComfy" hidden>Отменить</button></div>
+<progress id="fullFilmProgress" max="100" value="0" hidden style="width:100%"></progress>
+<div class="status" id="fullFilmStatus" role="status" aria-live="polite"></div>
 <div class="status" id="comfyStatus" role="status" aria-live="polite">Not connected. Checking the connection does not upload images or submit jobs.</div>
 <video id="comfySceneVideo" controls playsinline hidden></video>
 <div class="actions"><a id="comfyDownloadVideo" class="muted" hidden download="dravex-scene-animation.mp4">Download scene video / Скачать видео сцены</a></div>
@@ -165,7 +169,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="field"><label for="audioVolume">Music volume / Громкость музыки <output id="audioVolumeValue">70%</output></label><input id="audioVolume" type="range" min="0" max="100" value="70"></div>
 <audio id="audioPreview" controls preload="none" hidden></audio><div id="audioStatus" class="muted" role="status" aria-live="polite">No music selected / Музыка не выбрана</div>
 </div>
-<div class="actions"><button class="secondary" id="play" data-i18n="playButton">Play preview</button><button class="secondary" id="export" data-i18n="exportButton">Export WebM test</button></div><p class="muted" style="font-size:12px"><span data-i18n="previewDisclaimer">Preview/export uses a simple canvas animation. Optional local music can be included; generated voice and lip-sync are not implemented yet.</span></p></section>
+<div class="actions"><button class="secondary" id="play" data-i18n="playButton">Play preview</button><button class="secondary" id="export" data-i18n="exportButton">Export WebM test</button></div><p class="muted" style="font-size:12px"><span data-i18n="previewDisclaimer">Preview/export uses a simple canvas animation. Optional local music can be included; generated voice and lip-sync are not implemented yet.</span></p><section id="finalFilmResult" hidden><h3>Готовый мультфильм</h3><video id="finalFilmPlayer" controls playsinline style="width:100%;max-width:900px"></video><div class="actions"><a id="finalFilmDownload" download="dravex-cartoon-film.webm">Скачать готовый мультфильм</a></div></section></section>
 </div><footer class="foot"><span data-i18n="footer">DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to</span></footer>
 </main>
 <script type="module">
@@ -191,6 +195,7 @@ import { createTimestampedKokoroEngine } from "./src/timestamped-kokoro-engine.j
 import { createVoiceAudioStorage } from "./src/voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./src/scene-voice-workflow.js";
 import { createSceneVideoStorage } from "./src/scene-video-storage.js";
+import { generateStoryboardVideos } from "./src/scene-video-batch.js";
 import { syncSceneVideoPlayback } from "./src/scene-video-transport.js";
 import { waitForSceneVideoReady, waitForSceneImageReady } from "./src/scene-video-readiness.js";
 import { createAnimationClock } from "./src/animation-clock.js";
@@ -265,6 +270,7 @@ context.globalAlpha=1;
 const magicParticles=new ParticleEmitter();
 const sceneImageCache=new Map();
 const sceneVideoCache=new Map();
+let finalFilmObjectUrl=null;
 let sceneVideoRestorePromise=Promise.resolve();
 const sceneVideoStorage=createSceneVideoStorage();
 function disposeSceneVideoEntry(entry){
@@ -1287,7 +1293,7 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 }finally{button.disabled=!$('hordeConsent').checked}
 });
 
-let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null;
+let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
 function sceneVideoKey(index,meta=sceneMetadata[index]||{}){ensureSceneIds([meta]);return String(meta.id)}
 function renderComfySceneVideo(){
  const entry=sceneVideoCache.get(sceneVideoKey(sceneIndex));
@@ -1305,7 +1311,7 @@ function comfyBindings(){
  return result;
 }
 function setComfyStatus(message){$('comfyStatus').textContent=message}
-function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow}
+function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow;$('generateFullFilmComfy').disabled=!comfyConnected||!comfyWorkflow||!!fullFilmAbortController}
 $('comfySourceImageFile').addEventListener('change',()=>{
  const file=$('comfySourceImageFile').files?.[0]||null;
  comfySourceImage=file;
@@ -1376,6 +1382,94 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  }catch(error){status.textContent=(error.name==='AbortError'?'Cancelled: ':'Generation failed: ')+(error.code?error.code+' · ':'')+(error.message||'Unknown error');}
  finally{button.disabled=false;$('checkComfyConnection').disabled=false;updateComfyAnimateAvailability();}
 });
+
+$('cancelFullFilmComfy').addEventListener('click',()=>{
+ if(fullFilmAbortController)fullFilmAbortController.abort();
+});
+$('generateFullFilmComfy').addEventListener('click',async()=>{
+ const button=$('generateFullFilmComfy'),cancel=$('cancelFullFilmComfy'),progress=$('fullFilmProgress'),status=$('fullFilmStatus');
+ if(button.disabled||!comfyConnected||!comfyWorkflow)return;
+ await sceneVideoRestorePromise;
+ const controller=new AbortController();
+ fullFilmAbortController=controller;
+ button.disabled=true;cancel.hidden=false;progress.hidden=false;progress.value=0;
+ $('animateSceneComfy').disabled=true;$('checkComfyConnection').disabled=true;
+ const qualityProfiles={standard:{width:512,height:512,steps:20},high:{width:640,height:640,steps:24},ultra:{width:768,height:768,steps:30}};
+ const quality=qualityProfiles[$('imageQuality').value]||qualityProfiles.standard;
+ try{
+  const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
+  const registry=createVideoProviderRegistry();registry.register(provider);
+  const scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
+  status.textContent='Подготовка '+scenes.length+' сцен к генерации…';
+  const report=await generateStoryboardVideos({
+   scenes,
+   signal:controller.signal,
+   hasVideo:(scene,index)=>sceneVideoCache.has(sceneVideoKey(index,scene)),
+   onProgress:state=>{
+    const finished=state.completed+state.skipped+state.failed;
+    progress.value=Math.round(finished/state.total*100);
+    const current=state.currentIndex===undefined?'':' · сцена '+(state.currentIndex+1)+'/'+state.total;
+    const stage=state.stage==='completed'?'Готово':state.stage==='failed'?'Ошибка':state.stage==='skipped'?'Уже готово':'Обработка';
+    status.textContent=stage+current+' · '+finished+'/'+state.total;
+   },
+   generateScene:async(scene,index,{signal})=>{
+    const meta={...scene,id:String(scene.id||sceneMetadata[index]?.id||('scene_'+(index+1)))};
+    meta.imagePrompt=String(meta.imagePrompt||meta.prompt||meta.description||descriptions[index]||meta.title);
+    meta.motionPrompt=String(meta.motionPrompt||meta.visibleAction||meta.description||descriptions[index]||meta.title);
+    meta.visibleAction=String(meta.visibleAction||meta.motionPrompt);
+    meta.camera=String(meta.camera||'Cinematic anime composition with clear subject movement');
+    meta.characters=normalizeSceneCast('',meta.characters);
+    if(!meta.generatedImageUrl){
+     if(!$('hordeConsent').checked)throw new Error('Для отсутствующего изображения сцены '+(index+1)+' нужно отдельно подтвердить отправку текстового промпта в AI Horde.');
+     status.textContent='Создаём изображение сцены '+(index+1)+' из '+scenes.length+' в AI Horde…';
+     const imagePrompt=buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value});
+     const imageResult=await generateImageWithHorde({prompt:imagePrompt,negativePrompt:meta.negativePrompt||'',...quality,signal,onProgress:queue=>{
+      status.textContent='AI Horde · сцена '+(index+1)+' · очередь '+(queue.queuePosition===null?'?':queue.queuePosition);
+     }});
+     meta.generatedImageUrl=imageResult.imageUrl;meta.generatedImageSeed=imageResult.seed;meta.generatedImageModel=imageResult.model;meta.generatedImageWorker=imageResult.workerName;
+     sceneMetadata[index]={...sceneMetadata[index],...meta};
+     if(sceneIndex===index)renderGeneratedSceneImage();
+     updateStoryQA();
+    }
+    if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
+    status.textContent='Загружаем изображение сцены '+(index+1)+' для анимации…';
+    const imageResponse=await fetch(meta.generatedImageUrl,{signal});
+    if(!imageResponse.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+imageResponse.status+'). Проверь CORS или загрузи изображение вручную.');
+    const imageBlob=await imageResponse.blob();
+    if(!imageBlob.size)throw new Error('Изображение сцены пустое.');
+    const prompt=buildMotionGenerationPrompt(meta,characterBible);
+    const duration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
+    const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob},{signal,onProgress:job=>{
+     status.textContent='ComfyUI · сцена '+(index+1)+'/'+scenes.length+' · '+job.stage+' · '+Math.round((job.elapsedMs||0)/1000)+' сек.';
+    }});
+    if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI не вернул готовый видеофайл.');
+    const key=sceneVideoKey(index,meta);
+    const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
+    const filename='dravex-scene-'+(index+1)+extension;
+    attachSceneVideo(index,meta,result.video,filename);
+    await sceneVideoStorage.put(key,result.video,filename);
+    if(sceneIndex===index)renderComfySceneVideo();
+    if(!playing)draw();
+    return result;
+   }
+  });
+  if(report.cancelled){status.textContent='Создание остановлено. Уже готовые сцены сохранены; можно продолжить позже.';return}
+  if(report.failed){
+   const failed=report.results.filter(item=>item.status==='failed').map(item=>'сцена '+(item.index+1)+': '+item.error).join(' · ');
+   status.textContent='Готово '+(report.completed+report.skipped)+' из '+report.total+'. Не удалось создать '+report.failed+' сцен: '+failed+'. Исправь ошибки и запусти повторно — готовые сцены будут пропущены.';
+   return;
+  }
+  progress.value=100;
+  status.textContent='Все '+report.total+' видеосцен готовы. Собираем итоговый мультфильм…';
+  $('export').click();
+ }catch(error){
+  status.textContent=(error.name==='AbortError'?'Создание отменено: ':'Не удалось создать мультфильм: ')+(error.message||'Неизвестная ошибка');
+ }finally{
+  fullFilmAbortController=null;cancel.hidden=true;button.disabled=false;
+  $('checkComfyConnection').disabled=false;updateComfyAnimateAvailability();
+ }
+});
+
 $('play').onclick=()=>{playing=!playing;$('play').textContent=playing?tr('pauseButton'):tr('playButton');syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:playing});if(playing){if(!raf)draw();void startSceneVoicePreview(sceneIndex)}else{void stopSceneVoicePreview()}};
 $('save').onclick=()=>{const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));$('status').textContent=saved?tr('saved'):tr('storageError')};
 $('export').onclick=async()=>{
@@ -1520,13 +1614,15 @@ $('export').onclick=async()=>{
         const blob=new Blob(chunks,{type:recorder.mimeType||'video/webm'});
         if(!blob.size)throw new Error('Recorder produced an empty file');
         const url=URL.createObjectURL(blob);
+        if(finalFilmObjectUrl)URL.revokeObjectURL(finalFilmObjectUrl);
+        finalFilmObjectUrl=url;
+        $('finalFilmPlayer').src=url;$('finalFilmPlayer').hidden=false;$('finalFilmResult').hidden=false;$('finalFilmDownload').href=url;
         const anchor=document.createElement('a');
         anchor.href=url;
         anchor.download='dravex-cartoon-storyboard.webm';
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
-        setTimeout(()=>URL.revokeObjectURL(url),5000);
         const lipSyncWarnings=[];
         if(lipSyncSkippedTracks)lipSyncWarnings.push(uiLang==='ru'
           ?'Анализ синхронизации губ пропущен для '+lipSyncSkippedTracks+' реплик.'
