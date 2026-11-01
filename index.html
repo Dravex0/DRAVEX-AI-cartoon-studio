@@ -29,6 +29,24 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 @media(max-width:420px){.qa-report{padding:12px;border-radius:10px;font-size:12px}.qa-report__summary{font-size:12px}.qa-report__list{gap:6px;padding-left:18px}}
 
 @media(max-width:720px){.layout{grid-template-columns:1fr}.app{padding:16px 12px 32px}.panel{padding:14px}.stage{min-height:220px}.top{margin-bottom:20px}}
+
+/* Full-film progress: visible, mobile-friendly and based only on reported work. */
+.film-progress{margin-top:12px;padding:13px;border:1px solid var(--line);border-radius:14px;background:#10131f}
+.film-progress[hidden]{display:none!important}
+.film-progress__heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px}
+.film-progress__heading strong{font-size:25px;line-height:1.1;color:var(--cyan);font-variant-numeric:tabular-nums}
+.film-progress__heading span{font-size:12px;color:#d9d7ee;text-align:right}
+.film-progress>progress{display:block;width:100%;height:12px;accent-color:var(--cyan)}
+.film-progress__meta{margin-top:7px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.film-progress__scenes{display:grid;gap:7px;margin-top:12px}
+.film-progress__scene{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;padding:8px 9px;border:1px solid #303448;border-radius:9px;background:#171a27}
+.film-progress__scene-name{min-width:0;font-size:12px;font-weight:700;overflow-wrap:anywhere}
+.film-progress__scene-state{font-size:11px;color:var(--muted);text-align:right}
+.film-progress__scene progress{grid-column:1/-1;width:100%;height:5px;accent-color:var(--cyan)}
+.film-progress__scene--completed .film-progress__scene-state{color:#6ee7b7}
+.film-progress__scene--failed .film-progress__scene-state{color:#fca5a5}
+@media(max-width:420px){.film-progress{padding:11px}.film-progress__heading strong{font-size:22px}}
+
 </style>
 </head>
 <body>
@@ -160,7 +178,12 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <video id="comfySceneVideo" controls playsinline hidden></video>
 <div class="actions"><a id="comfyDownloadVideo" class="muted" hidden download="dravex-scene-animation.mp4">Download scene video / Скачать видео сцены</a></div>
 </details>
-<div class="field"><label for="videoGenerationMode">Движок анимации для всего мультфильма</label><select id="videoGenerationMode"><option value="huggingface">Бесплатная облачная очередь · Hugging Face</option><option value="comfyui">Локальный ComfyUI</option></select></div><div class="actions"><button type="button" id="generateFullFilmComfy" disabled>Создать весь мультфильм</button><button type="button" class="secondary" id="cancelFullFilmComfy" hidden>Отменить</button></div><progress id="fullFilmProgress" max="100" value="0" hidden style="width:100%"></progress><div class="status" id="fullFilmStatus" role="status" aria-live="polite"></div>
+<div class="field"><label for="videoGenerationMode">Движок анимации для всего мультфильма</label><select id="videoGenerationMode"><option value="huggingface">Бесплатная облачная очередь · Hugging Face</option><option value="comfyui">Локальный ComfyUI</option></select></div><div class="actions"><button type="button" id="generateFullFilmComfy" disabled>Создать весь мультфильм</button><button type="button" class="secondary" id="cancelFullFilmComfy" hidden>Отменить</button></div><section id="fullFilmProgressPanel" class="film-progress" hidden aria-label="Film creation progress">
+<div class="film-progress__heading"><strong id="fullFilmPercent">0%</strong><span id="fullFilmStage">Ожидание</span></div>
+<progress id="fullFilmProgress" max="100" value="0"></progress>
+<div id="fullFilmProgressMeta" class="film-progress__meta" aria-live="polite">Подробный статус появится после запуска генерации.</div>
+<div id="fullFilmSceneList" class="film-progress__scenes" aria-label="Progress for each scene"></div>
+</section><div class="status" id="fullFilmStatus" role="status" aria-live="polite"></div>
 <div class="generated-image-wrap" id="generatedImageWrap" hidden><img id="generatedSceneImage" alt="AI-generated image for the selected scene"><small class="muted" id="generatedImageMeta"></small><p class="muted" style="font-size:11px">When browser CORS permits, this image is included in the canvas preview and WebM export. / Если браузер разрешает CORS, изображение попадёт в предпросмотр холста и экспорт WebM.</p></div>
 </div>
 <div class="actions"><button class="secondary" id="applyScene">Apply scene edits</button><button class="secondary" id="addScene">Add scene</button><button class="secondary" id="deleteScene">Delete scene</button></div></div><div class="audio-panel">
@@ -194,7 +217,7 @@ import { createTimestampedKokoroEngine } from "./src/timestamped-kokoro-engine.j
 import { createVoiceAudioStorage } from "./src/voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./src/scene-voice-workflow.js";
 import { createSceneVideoStorage } from "./src/scene-video-storage.js";
-import { generateStoryboardVideos } from "./src/scene-video-batch.js";
+import { generateStoryboardVideos, readVideoProgressPercent } from "./src/scene-video-batch.js";
 import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./src/huggingface-zerogpu-video-provider.js";
 import { syncSceneVideoPlayback } from "./src/scene-video-transport.js";
 import { waitForSceneVideoReady, waitForSceneImageReady } from "./src/scene-video-readiness.js";
@@ -1295,6 +1318,52 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 
 let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
 let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
+let filmProgressTracking=false;
+let filmProgressSceneStates=[];
+
+function filmProgressText(ru,en){return uiLang==='ru'?ru:en}
+function setFilmProgress(percent,stage,detail=''){
+ const safePercent=Math.max(0,Math.min(100,Math.floor(Number(percent)||0)));
+ $('fullFilmProgress').value=safePercent;
+ $('fullFilmPercent').textContent=safePercent+'%';
+ $('fullFilmStage').textContent=stage;
+ $('fullFilmProgressMeta').textContent=detail;
+}
+function renderFilmSceneProgress(){
+ const root=$('fullFilmSceneList');
+ root.replaceChildren();
+ filmProgressSceneStates.forEach((scene,index)=>{
+  const row=document.createElement('div');
+  row.className='film-progress__scene'+(scene.status==='completed'||scene.status==='skipped'?' film-progress__scene--completed':'')+(scene.status==='failed'?' film-progress__scene--failed':'');
+  const name=document.createElement('span');
+  name.className='film-progress__scene-name';
+  name.textContent=(index+1)+'. '+scene.title;
+  const state=document.createElement('span');
+  state.className='film-progress__scene-state';
+  state.textContent=scene.label;
+  const bar=document.createElement('progress');
+  bar.max=100;
+  if(Number.isFinite(scene.progress))bar.value=scene.progress;
+  else bar.removeAttribute('value');
+  row.append(name,state,bar);
+  root.append(row);
+ });
+}
+function updateFilmSceneProgress(index,patch){
+ if(!filmProgressSceneStates[index])return;
+ filmProgressSceneStates[index]={...filmProgressSceneStates[index],...patch};
+ renderFilmSceneProgress();
+}
+function updateFilmVideoProgress(activeProgress=null,stageLabel){
+ const total=filmProgressSceneStates.length;
+ if(!total)return;
+ const completed=filmProgressSceneStates.filter(scene=>scene.status==='completed'||scene.status==='skipped').length;
+ const current=Number.isFinite(activeProgress)?Math.max(0,Math.min(100,activeProgress)):0;
+ const percent=Math.floor(((completed+current/100)/total)*85);
+ const label=stageLabel||filmProgressText('Генерация видеосцен','Generating video scenes');
+ setFilmProgress(percent,label,filmProgressText('Готово сцен: ','Scenes ready: ')+completed+'/'+total);
+}
+
 function sceneVideoKey(index,meta=sceneMetadata[index]||{}){ensureSceneIds([meta]);return String(meta.id)}
 function renderComfySceneVideo(){
  const entry=sceneVideoCache.get(sceneVideoKey(sceneIndex));
@@ -1417,14 +1486,15 @@ $('cancelFullFilmComfy').addEventListener('click',()=>{
  if(fullFilmAbortController)fullFilmAbortController.abort();
 });
 $('generateFullFilmComfy').addEventListener('click',async()=>{
- const button=$('generateFullFilmComfy'),cancel=$('cancelFullFilmComfy'),progress=$('fullFilmProgress'),status=$('fullFilmStatus');
+ const button=$('generateFullFilmComfy'),cancel=$('cancelFullFilmComfy'),progress=$('fullFilmProgress'),progressPanel=$('fullFilmProgressPanel'),status=$('fullFilmStatus');
  const mode=$('videoGenerationMode').value;
  if(button.disabled)return;
  if(mode==='huggingface'&&(!hfVideoConnected||!hfVideoClient||!hfHandleFile||!$('hfVideoConsent').checked))return;
  if(mode==='comfyui'&&(!comfyConnected||!comfyWorkflow))return;
  const controller=new AbortController();
  fullFilmAbortController=controller;
- button.disabled=true;cancel.hidden=false;progress.hidden=false;progress.value=0;
+ button.disabled=true;cancel.hidden=false;progressPanel.hidden=false;progress.value=0;
+ filmProgressTracking=true;
  await sceneVideoRestorePromise;
  $('animateSceneComfy').disabled=true;$('checkComfyConnection').disabled=true;
  const qualityProfiles={standard:{width:512,height:512,steps:20},high:{width:640,height:640,steps:24},ultra:{width:768,height:768,steps:30}};
@@ -1435,16 +1505,31 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
    :createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
   const scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
+  filmProgressSceneStates=scenes.map((scene,index)=>{
+   const ready=sceneVideoCache.has(sceneVideoKey(index,scene));
+   return {title:String(scene.title||('Scene '+(index+1))),status:ready?'skipped':'pending',progress:ready?100:0,label:ready?filmProgressText('Уже готово','Already ready'):filmProgressText('Ожидает','Waiting')};
+  });
+  renderFilmSceneProgress();
+  setFilmProgress(0,filmProgressText('Подготовка сцен','Preparing scenes'),filmProgressText('Сцен: ','Scenes: ')+scenes.length);
   status.textContent='Подготовка '+scenes.length+' сцен к генерации…';
   const report=await generateStoryboardVideos({
    scenes,
    signal:controller.signal,
    hasVideo:(scene,index)=>sceneVideoCache.has(sceneVideoKey(index,scene)),
    onProgress:state=>{
+    const index=state.currentIndex;
+    if(Number.isInteger(index)&&filmProgressSceneStates[index]){
+     if(state.stage==='completed')updateFilmSceneProgress(index,{status:'completed',progress:100,label:filmProgressText('Готово','Ready')});
+     else if(state.stage==='failed')updateFilmSceneProgress(index,{status:'failed',progress:0,label:filmProgressText('Ошибка','Failed')});
+     else if(state.stage==='skipped')updateFilmSceneProgress(index,{status:'skipped',progress:100,label:filmProgressText('Уже готово','Already ready')});
+     else if(state.stage==='starting')updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Запуск','Starting')});
+    }
+    const active=Number.isInteger(index)?filmProgressSceneStates[index]:null;
+    updateFilmVideoProgress(active&&active.status==='generating'?active.progress:null,
+      state.stage==='failed'?filmProgressText('Ошибка генерации сцены','Scene generation failed'):filmProgressText('Генерация видеосцен','Generating video scenes'));
     const finished=state.completed+state.skipped+state.failed;
-    progress.value=Math.round(finished/state.total*100);
-    const current=state.currentIndex===undefined?'':' · сцена '+(state.currentIndex+1)+'/'+state.total;
-    const stage=state.stage==='completed'?'Готово':state.stage==='failed'?'Ошибка':state.stage==='skipped'?'Уже готово':'Обработка';
+    const current=Number.isInteger(index)?' · сцена '+(index+1)+'/'+state.total:'';
+    const stage=state.stage==='completed'?'Готово':state.stage==='failed'?'Ошибка':state.stage==='skipped'?'Уже готово':state.stage==='starting'?'Запуск':'Обработка';
     status.textContent=stage+current+' · '+finished+'/'+state.total;
    },
    generateScene:async(scene,index,{signal})=>{
@@ -1456,9 +1541,12 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     meta.characters=normalizeSceneCast('',meta.characters);
     if(!meta.generatedImageUrl){
      if(!$('hordeConsent').checked)throw new Error('Для отсутствующего изображения сцены '+(index+1)+' нужно отдельно подтвердить отправку текстового промпта в AI Horde.');
+     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Создание изображения','Creating scene image')});
+     updateFilmVideoProgress(null,filmProgressText('Подготовка изображений сцен','Preparing scene images'));
      status.textContent='Создаём изображение сцены '+(index+1)+' из '+scenes.length+' в AI Horde…';
      const imagePrompt=buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value});
      const imageResult=await generateImageWithHorde({prompt:imagePrompt,negativePrompt:meta.negativePrompt||'',...quality,signal,onProgress:queue=>{
+      updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Очередь AI Horde','AI Horde queue')});
       status.textContent='AI Horde · сцена '+(index+1)+' · очередь '+(queue.queuePosition===null?'?':queue.queuePosition);
      }});
      meta.generatedImageUrl=imageResult.imageUrl;meta.generatedImageSeed=imageResult.seed;meta.generatedImageModel=imageResult.model;meta.generatedImageWorker=imageResult.workerName;
@@ -1467,6 +1555,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      updateStoryQA();
     }
     if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
+    updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Подготовка к анимации','Preparing animation')});
     status.textContent='Подготавливаем изображение сцены '+(index+1)+' для анимации…';
     let imageInput=meta.generatedImageUrl;
     if(mode==='comfyui'){
@@ -1477,8 +1566,14 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     }
     const prompt=buildMotionGenerationPrompt(meta,characterBible);
     const duration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
+    updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Отправка в видеодвижок','Submitting to video engine')});
     const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput},{signal,onProgress:job=>{
-     status.textContent=(mode==='huggingface'?'Hugging Face · ':'ComfyUI · ')+'сцена '+(index+1)+'/'+scenes.length+' · '+(job.stage||'обработка')+(Number.isFinite(job.etaSeconds)?' · ETA '+Math.round(job.etaSeconds)+' сек.':'')+(Number.isFinite(job.queuePosition)?' · очередь '+job.queuePosition:'');
+     const providerPercent=readVideoProgressPercent(job);
+     const providerStage=String(job.stage||'processing');
+     const sceneLabel=providerStage==='queued'||providerStage==='pending'?filmProgressText('В очереди','Queued'):providerStage==='completed'?filmProgressText('Готово','Ready'):filmProgressText('Генерируется','Generating');
+     updateFilmSceneProgress(index,{status:'generating',progress:providerPercent,label:sceneLabel+(providerPercent===null?' · '+providerStage:' · '+providerPercent+'%')});
+     updateFilmVideoProgress(providerPercent,filmProgressText('Генерация видеосцен','Generating video scenes'));
+     status.textContent=(mode==='huggingface'?'Hugging Face · ':'ComfyUI · ')+'сцена '+(index+1)+'/'+scenes.length+' · '+providerStage+(providerPercent===null?'': ' · '+providerPercent+'%')+(Number.isFinite(job.etaSeconds)?' · ETA '+Math.round(job.etaSeconds)+' сек.':'')+(Number.isFinite(job.queuePosition)?' · очередь '+job.queuePosition:'');
     }});
     if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI не вернул готовый видеофайл.');
     const key=sceneVideoKey(index,meta);
@@ -1491,16 +1586,24 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     return result;
    }
   });
-  if(report.cancelled){status.textContent='Создание остановлено. Уже готовые сцены сохранены; можно продолжить позже.';return}
+  if(report.cancelled){
+   filmProgressTracking=false;
+   setFilmProgress(Math.floor(((report.completed+report.skipped)/report.total)*85),filmProgressText('Создание остановлено','Generation cancelled'),filmProgressText('Готовые сцены сохранены. Можно продолжить позже.','Completed scenes are saved. You can resume later.'));
+   status.textContent='Создание остановлено. Уже готовые сцены сохранены; можно продолжить позже.';return;
+  }
   if(report.failed){
+   filmProgressTracking=false;
    const failed=report.results.filter(item=>item.status==='failed').map(item=>'сцена '+(item.index+1)+': '+item.error).join(' · ');
    status.textContent='Готово '+(report.completed+report.skipped)+' из '+report.total+'. Не удалось создать '+report.failed+' сцен: '+failed+'. Исправь ошибки и запусти повторно — готовые сцены будут пропущены.';
+   setFilmProgress(Math.floor(((report.completed+report.skipped)/report.total)*85),filmProgressText('Есть ошибки сцен','Scene errors'),status.textContent);
    return;
   }
-  progress.value=100;
+  setFilmProgress(85,filmProgressText('Сцены готовы · сборка WebM','Scenes ready · assembling WebM'),filmProgressText('Все видеосцены созданы. Начинается запись итогового мультфильма.','All scene videos are ready. Final film recording is starting.'));
   status.textContent='Все '+report.total+' видеосцен готовы. Собираем итоговый мультфильм…';
   $('export').click();
  }catch(error){
+  filmProgressTracking=false;
+  setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка генерации','Generation failed'),error.message||'Неизвестная ошибка');
   status.textContent=(error.name==='AbortError'?'Создание отменено: ':'Не удалось создать мультфильм: ')+(error.message||'Неизвестная ошибка');
  }finally{
   fullFilmAbortController=null;cancel.hidden=true;button.disabled=false;
@@ -1513,6 +1616,7 @@ $('save').onclick=()=>{const saved=writeLocalStorage('dravex-cartoon-draft',JSON
 $('export').onclick=async()=>{
   if(!canvas.captureStream||!window.MediaRecorder){
     $('status').textContent=tr('unsupported');
+    if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Экспорт не поддерживается','Export unsupported'),tr('unsupported'));filmProgressTracking=false;}
     return;
   }
   const button=$('export');
@@ -1521,6 +1625,7 @@ $('export').onclick=async()=>{
   const timeline=buildExportTimeline(exportScenes,$('duration').value);
   if(!timeline.segments.length){
     $('status').textContent=uiLang==='ru'?'Сначала создай раскадровку.':'Create a storyboard before exporting.';
+    if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Нет сцен для экспорта','No scenes to export'),$('status').textContent);filmProgressTracking=false;}
     return;
   }
   button.disabled=true;
@@ -1529,7 +1634,7 @@ $('export').onclick=async()=>{
   const wasPlaying=playing;
   const originalSceneIndex=sceneIndex;
   const sceneTimers=[];
-  let stream=null,recorder=null,stopTimer=null,cleaned=false,audioSession=null;
+  let stream=null,recorder=null,stopTimer=null,cleaned=false,audioSession=null,exportProgressTimer=null,exportStartedAtMs=null;
   const chunks=[];
   let audioScheduledStartAtMs=null;
   let lipSyncSkippedTracks=0,lipSyncGeneratedMediaTracks=0;
@@ -1537,6 +1642,7 @@ $('export').onclick=async()=>{
     if(cleaned)return;
     cleaned=true;
     if(stopTimer!==null)clearTimeout(stopTimer);
+    if(exportProgressTimer!==null)clearInterval(exportProgressTimer);
     sceneTimers.forEach(timer=>clearTimeout(timer));
     if(stream)stream.getTracks().forEach(track=>track.stop());
     if(audioSession)void audioSession.cleanup();
@@ -1646,6 +1752,7 @@ $('export').onclick=async()=>{
     recorder.onerror=()=>{
       cleanup();
       $('status').textContent=tr('exportFailed');
+      if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка сборки WebM','WebM assembly failed'),tr('exportFailed'));filmProgressTracking=false;}
     };
     recorder.onstop=()=>{
       try{
@@ -1672,9 +1779,11 @@ $('export').onclick=async()=>{
         $('status').textContent=uiLang==='ru'
           ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+lipSyncWarning
           :'Exported '+timeline.segments.length+' scenes · '+timeline.totalDurationSeconds.toFixed(2)+' sec.'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'')+lipSyncWarning;
+        if(filmProgressTracking){setFilmProgress(100,filmProgressText('Мультфильм готов','Film ready'),filmProgressText('WebM создан и добавлен в предпросмотр.','WebM was created and added to the preview.'));filmProgressTracking=false;}
       }catch(error){
         console.error('DRAVEX export failed:',error);
         $('status').textContent=tr('exportFailed');
+        if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка сборки WebM','WebM assembly failed'),error.message||tr('exportFailed'));filmProgressTracking=false;}
       }finally{
         cleanup();
       }
@@ -1688,6 +1797,15 @@ $('export').onclick=async()=>{
     $('status').textContent=uiLang==='ru'
       ?'Записываем '+timeline.segments.length+' сцен'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+'…'
       :'Recording '+timeline.segments.length+' scenes'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'')+'…';
+    if(filmProgressTracking){
+      exportStartedAtMs=performance.now();
+      setFilmProgress(85,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Запись итогового видео…','Recording the final video…'));
+      exportProgressTimer=setInterval(()=>{
+        const fraction=Math.max(0,Math.min(1,(performance.now()-exportStartedAtMs)/Math.max(1,timeline.totalDurationMs)));
+        const percent=85+Math.min(14,Math.floor(fraction*14));
+        setFilmProgress(percent,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Записано примерно ','Recorded approximately ')+Math.round(fraction*100)+'%');
+      },250);
+    }
     timeline.segments.slice(1).forEach(segment=>{
       const timer=setTimeout(()=>{
         sceneIndex=segment.sceneIndex;
@@ -1704,6 +1822,7 @@ $('export').onclick=async()=>{
     console.error('DRAVEX export failed:',error);
     cleanup();
     $('status').textContent=tr('exportFailed');
+    if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка подготовки WebM','WebM preparation failed'),error.message||tr('exportFailed'));filmProgressTracking=false;}
   }
 };
 try{const saved=JSON.parse(readLocalStorage('dravex-cartoon-draft')||'null');if(saved){$('idea').value=saved.idea||$('idea').value;$('uiLanguage').value=saved.uiLanguage||uiLang;uiLang=saved.uiLanguage||uiLang;$('character').value=saved.character||'Foxy';$('style').value=saved.style||'Storybook';$('imageQuality').value=saved.imageQuality||'standard';$('duration').value=saved.duration||'3';$('language').value=saved.language||'en';if(Array.isArray(saved.titles)&&Array.isArray(saved.descriptions)&&saved.titles.length===saved.descriptions.length&&saved.titles.length>0&&saved.titles.length<=12){titles=saved.titles.map(v=>String(v).slice(0,80));descriptions=saved.descriptions.map(v=>String(v).slice(0,500));sceneMetadata=ensureSceneIds(Array.isArray(saved.sceneMetadata)&&saved.sceneMetadata.length===titles.length?saved.sceneMetadata.map(item=>item&&typeof item==='object'?{...item}:{}):titles.map((title,index)=>({title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''})));characterBible=Array.isArray(saved.characterBible)?saved.characterBible.filter(entry=>entry&&typeof entry==='object').slice(0,20).map(entry=>({characterId:String(entry.characterId||'').slice(0,120),visualDescription:String(entry.visualDescription||'').slice(0,700),clothing:String(entry.clothing||'').slice(0,400),colors:String(entry.colors||'').slice(0,200),distinctiveFeatures:String(entry.distinctiveFeatures||'').slice(0,400)})):[];if(!characterBible.length)characterBible=upsertCharacterReference([],{characterId:$('character').value.trim()||'Foxy'});sceneIndex=Math.min(Math.max(0,Number(saved.sceneIndex)||0),titles.length-1)}$('status').textContent=tr('restored')}}catch(e){}
