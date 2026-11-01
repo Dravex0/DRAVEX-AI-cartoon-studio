@@ -153,7 +153,7 @@ test('uploads and restores a facial image from local IndexedDB storage', async (
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
-  await page.getByText(/more settings/i).click();
+  await page.locator('#characterMotionEditor > summary').click();
   await page.locator('#characterRigEditor > summary').click();
   await page.locator('#characterFacialEditor > summary').click();
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pS8AAAAASUVORK5CYII=', 'base64');
