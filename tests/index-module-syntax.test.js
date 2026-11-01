@@ -15,6 +15,13 @@ test('published index loads one external module and the application module parse
 
 
 
+test('preflights every Hugging Face scene against the provider 0.5–5 second duration limit', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.match(app, /if\(mode==='huggingface'\)\s*\{[\s\S]*?const unsupportedIndex=scenes\.findIndex/);
+  assert.match(app, /return seconds<0\.5\|\|seconds>5/);
+  assert.match(app, /Shorten this scene or choose local ComfyUI/);
+});
+
 test('published page imports the prompt-guided motion module', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   assert.match(html, /from ["']\.\/prompt-camera-motion\.js["']/);
