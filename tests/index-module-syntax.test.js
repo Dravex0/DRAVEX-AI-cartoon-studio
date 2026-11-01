@@ -106,9 +106,9 @@ test('WebM export derives built-in character mouth movement from scheduled local
   assert.match(html, /lipSyncSkippedTracks=lipSyncRenderableTracks\.length/);
   assert.match(html, /Lip-sync analysis was skipped for /);
   assert.match(html, /Анализ синхронизации губ пропущен для /);
-  assert.match(html, /lipSyncGeneratedMediaTracks\+\+/);
-  assert.match(html, /Mouth animation is not composited into AI-generated scene media for /);
-  assert.match(html, /Анимация рта не накладывается на AI-изображения и видео для /);
+  assert.match(html, /const lipSyncRenderableTracks=mainCharacterVoiceTracks;/);
+  assert.doesNotMatch(html, /lipSyncGeneratedMediaTracks/);
+  assert.doesNotMatch(html, /Mouth animation is not composited into AI-generated scene media for /);
 });
 
  
@@ -132,6 +132,15 @@ test('published page exposes the experimental English timestamped Kokoro voice e
   assert.ok(html.includes('timestamped&&locale!==\'en\''));
 });
 
+
+test('keeps facial lip-sync analysis enabled over generated scene media', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes('previewMouthTracks=pendingSession.decodedTracks.map(track=>'));
+  assert.ok(app.includes('const lipSyncRenderableTracks=mainCharacterVoiceTracks;'));
+  assert.ok(app.includes('drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs'));
+  assert.ok(!app.includes('if(!hasGeneratedMedia){'));
+  assert.ok(!app.includes('lipSyncGeneratedMediaTracks'));
+});
 
 test('wires landscape and portrait formats through canvas preview and export', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');

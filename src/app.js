@@ -188,17 +188,15 @@ async function startSceneVoicePreview(index=sceneIndex){
   if(token!==previewVoiceRequestToken||!playing||index!==sceneIndex){await pendingSession.cleanup();return;}
   previewVoiceSession=pendingSession;
   previewMouthOriginTimeMs=await pendingSession.start();
-  const generatedVideo=sceneVideoCache.get(String(meta.id||("scene-index-"+index)));
-  const hasGeneratedMedia=Boolean(String(meta.generatedImageUrl||"").trim()||generatedVideo);
-  if(!hasGeneratedMedia){
-   previewMouthTracks=pendingSession.decodedTracks.map(track=>{
-    const decoded=track.buffer;
-    const channels=Array.from({length:decoded.numberOfChannels},(_,channel)=>decoded.getChannelData(channel));
-    const envelope=buildAudioMouthEnvelope({channels,sampleRate:decoded.sampleRate,fps:24});
-    const visemes=buildVisemeTimeline({text:track.text,durationMs:envelope.durationMs,language:track.language,fps:24,phonemeChunks:track.phonemeChunks,visemeEvents:track.visemeEvents});
-    return {sceneIndex:index,characterId:track.characterId,startMs:track.startMs,envelope,visemes};
-   });
-  }
+  // Build facial controls for every scene. drawCharacterLayers applies them only
+  // when a matching character facial rig is attached, including over generated media.
+  previewMouthTracks=pendingSession.decodedTracks.map(track=>{
+   const decoded=track.buffer;
+   const channels=Array.from({length:decoded.numberOfChannels},(_,channel)=>decoded.getChannelData(channel));
+   const envelope=buildAudioMouthEnvelope({channels,sampleRate:decoded.sampleRate,fps:24});
+   const visemes=buildVisemeTimeline({text:track.text,durationMs:envelope.durationMs,language:track.language,fps:24,phonemeChunks:track.phonemeChunks,visemeEvents:track.visemeEvents});
+   return {sceneIndex:index,characterId:track.characterId,startMs:track.startMs,envelope,visemes};
+  });
   if(!raf)draw();
  }catch(error){
   if(pendingSession&&previewVoiceSession===pendingSession){previewVoiceSession=null;await pendingSession.cleanup().catch(()=>{});}
@@ -1458,7 +1456,7 @@ $('export').onclick=async()=>{
   let stream=null,recorder=null,stopTimer=null,cleaned=false,audioSession=null,exportProgressTimer=null,exportStartedAtMs=null;
   const chunks=[];
   let audioScheduledStartAtMs=null;
-  let lipSyncSkippedTracks=0,lipSyncGeneratedMediaTracks=0;
+  let lipSyncSkippedTracks=0;
   const cleanup=()=>{
     if(cleaned)return;
     cleaned=true;
@@ -1533,12 +1531,9 @@ $('export').onclick=async()=>{
     if(voiceTracks.length){
       const mainCharacterKey=String($("character").value||"").trim().toLowerCase();
       const mainCharacterVoiceTracks=voiceTracks.filter(track=>{const meta=sceneMetadata[track.sceneIndex]||{};const speakerKey=String(track.characterId||track.characterName||"").trim().toLowerCase();const hasFacialRig=Array.isArray(meta.characterFacialRigs)&&meta.characterFacialRigs.some(rig=>Boolean(speakerKey)&&[rig?.characterId,track.characterName].some(value=>String(value||"").trim().toLowerCase()===String(rig?.characterId||"").trim().toLowerCase()));return track.characterName.trim().toLowerCase()===mainCharacterKey||hasFacialRig;});
-      const lipSyncRenderableTracks=mainCharacterVoiceTracks.filter(track=>{
-        const meta=sceneMetadata[track.sceneIndex]||{};
-        const generatedVideo=sceneVideoCache.get(String(meta.id||('scene-index-'+track.sceneIndex)));
-        if(String(meta.generatedImageUrl||'').trim()||generatedVideo){lipSyncGeneratedMediaTracks++;return false}
-        return true;
-      });
+      // Generated images/videos are valid lip-sync backgrounds too. The facial
+      // rig compositor overlays mouth parts on top of the scene during canvas export.
+      const lipSyncRenderableTracks=mainCharacterVoiceTracks;
       const AudioContextClass=window.AudioContext||window.webkitAudioContext;
       if(AudioContextClass&&lipSyncRenderableTracks.length){
         const decodeContext=new AudioContextClass();
@@ -1593,9 +1588,6 @@ $('export').onclick=async()=>{
         if(lipSyncSkippedTracks)lipSyncWarnings.push(uiLang==='ru'
           ?'Анализ синхронизации губ пропущен для '+lipSyncSkippedTracks+' реплик.'
           :'Lip-sync analysis was skipped for '+lipSyncSkippedTracks+' dialogue line(s).');
-        if(lipSyncGeneratedMediaTracks)lipSyncWarnings.push(uiLang==='ru'
-          ?'Анимация рта не накладывается на AI-изображения и видео для '+lipSyncGeneratedMediaTracks+' реплик.'
-          :'Mouth animation is not composited into AI-generated scene media for '+lipSyncGeneratedMediaTracks+' dialogue line(s).');
         const lipSyncWarning=lipSyncWarnings.length?' · '+lipSyncWarnings.join(' '):'';
         $('status').textContent=uiLang==='ru'
           ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+lipSyncWarning
