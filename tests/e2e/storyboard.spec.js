@@ -148,3 +148,40 @@ test('renders the detailed full-film progress dashboard without claiming generat
   await expect(page.locator('#fullFilmProgress')).toHaveAttribute('max', '100');
   await expect(page.locator('#fullFilmSceneList')).toBeEmpty();
 });
+
+test('uploads and restores a facial image from local IndexedDB storage', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.goto('/');
+  await page.getByText(/more settings/i).click();
+  await page.locator('#characterRigEditor > summary').click();
+  await page.locator('#characterFacialEditor > summary').click();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pS8AAAAASUVORK5CYII=', 'base64');
+  await page.locator('#facialPartImageFile').setInputFiles({ name: 'face-base.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('#facialAssetUploadStatus')).toContainText(/saved on this device/i);
+  await expect(page.locator('#facialPartImageUrl')).toHaveValue(/^dravex-facial-asset:\/\//);
+  await page.locator('#facialCharacterId').fill('Arin');
+  await page.locator('#facialHeadBoneId').fill('head');
+  await page.locator('#facialPartId').fill('face-base');
+  await page.locator('#facialPartRole').selectOption('face-base');
+  await page.locator('#saveFacialPart').click();
+  await expect(page.locator('#facialEditorStatus')).toContainText(/part added/i);
+  await page.reload();
+  const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('dravex-cartoon-draft') || 'null'));
+  expect(draft.sceneMetadata[0].characterFacialRigs[0].parts[0].imageUrl).toMatch(/^dravex-facial-asset:\/\//);
+  const assetId = draft.sceneMetadata[0].characterFacialRigs[0].parts[0].imageUrl.split('//')[1];
+  const restored = await page.evaluate(async id => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('dravex-cartoon-facial-assets', 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return new Promise((resolve, reject) => {
+      const request = db.transaction('facial-images').objectStore('facial-images').get(id);
+      request.onsuccess = () => resolve({ size: request.result?.blob?.size, type: request.result?.mimeType });
+      request.onerror = () => reject(request.error);
+    });
+  }, assetId);
+  expect(restored).toEqual({ size: png.length, type: 'image/png' });
+  expect(pageErrors).toEqual([]);
+});
