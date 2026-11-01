@@ -143,6 +143,19 @@ export const CHARACTER_RIG_LIMITS = Object.freeze({ bones: MAX_BONES, parts: MAX
 
 
 /** Normalize explicit per-character/per-bone pose offsets stored on a scene. */
+
+/** Resolve saved per-character rig poses using exact IDs first, then case-insensitive fallback. */
+export function characterRigPosesFor(characterId, values = {}) {
+  if (!isRecord(values)) return {};
+  if (Object.prototype.hasOwnProperty.call(values, characterId)) {
+    return isRecord(values[characterId]) ? values[characterId] : {};
+  }
+  const normalizedId = String(characterId).toLowerCase();
+  const matchingKey = Object.keys(values).find(key => key.toLowerCase() === normalizedId);
+  const value = matchingKey === undefined ? null : values[matchingKey];
+  return isRecord(value) ? value : {};
+}
+
 export function normalizeCharacterRigPoses(input = {}) {
   if (!isRecord(input)) return {};
   const result = {};
