@@ -440,6 +440,7 @@ function renderCharacterSpriteAssets(){
     return;
    }
    sceneMetadata[resolvedSceneIndex]={...sceneMetadata[resolvedSceneIndex],characterLayers:result.layers};
+   if(resolvedSceneIndex===sceneIndex)syncCharacterMotionEditor();
    addButton.textContent=uiLang==='ru'?'Обновить на сцене':'Update on scene';
    $('status').textContent=uiLang==='ru'
     ?(result.status==='added'?'Персонаж добавлен на сцену.':'Спрайт персонажа обновлён; положение сохранено.')
