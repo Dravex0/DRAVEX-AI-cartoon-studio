@@ -5,6 +5,7 @@ export const DEFAULT_SCENE_DURATION = 3;
 
 import { normalizeCharacterActionTimeline } from './character-action-timeline.js';
 import { normalizeCharacterLayers } from './scene-character-layers.js';
+import { normalizeCharacterRig } from './character-rig.js';
 
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
@@ -38,6 +39,8 @@ export function normalizeScene(input = {}, index = 0) {
       ? scene.characterCastProvided
       : Array.isArray(scene.characters) || Boolean(scene.characterId),
     characterLayers: normalizeCharacterLayers(scene.characterLayers),
+    // Rig metadata is separate from whole-character sprites until segmented assets are supplied.
+    characterRigs: Array.isArray(scene.characterRigs) ? scene.characterRigs.slice(0, 20).map(normalizeCharacterRig) : [],
     causalLink: scene.causalLink && typeof scene.causalLink === 'object' && !Array.isArray(scene.causalLink)
       ? {
           type: text(scene.causalLink.type, 40),
