@@ -49,7 +49,7 @@ describe('two-bone inverse kinematics foundation', () => {
     assert.equal(result.status, 'solved');
     assert.equal(result.reachable, false);
     close(result.solvedDistance, 1);
-    close(Math.hypot(result.end.x - result.root?.x || result.end.x, result.end.y), 1);
+    close(Math.hypot(result.end.x, result.end.y), 1);
   });
 
   it('clamps a target inside the minimum reach for unequal segments', () => {
