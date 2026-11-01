@@ -51,6 +51,23 @@ test("applies expression controls and timestamped viseme shape to facial parts",
   assert.ok(context.calls.some(call => call[0] === "rotate" && Math.abs(call[1]) > 0));
 });
 
+test("animates a separate jaw layer from the active mouth-opening control", () => {
+  const context = contextRecorder();
+  const candidate = rig();
+  candidate.parts.push({
+    id: "jaw", role: "jaw", imageUrl: "blob:jaw",
+    x: 0.5, y: 0.58, width: 0.09, height: 0.05, zIndex: 4
+  });
+  drawCharacterFacialRigs(context, [candidate], () => ({ width: 20, height: 20 }), 1000, 500, {
+    facialExpressions: { Foxy: { mouthOpen: 0.8 } }
+  });
+  const translations = context.calls.filter(call => call[0] === "translate");
+  const rotations = context.calls.filter(call => call[0] === "rotate");
+  assert.equal(translations.length, 4);
+  assert.ok(translations[3][2] > 0.58 * 500);
+  assert.ok(rotations[3][1] > 0);
+});
+
 test("skips incomplete facial images but leaves fallback responsibility to caller", () => {
   const result = drawCharacterFacialRigs(contextRecorder(), [rig()], key => key === "blob:eye" ? { width: 10, height: 10 } : null, 500, 500);
   assert.equal(result.drawn, 1);
