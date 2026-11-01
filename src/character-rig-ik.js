@@ -76,3 +76,90 @@ export function solveTwoBoneIK({
 export const TWO_BONE_IK_LIMITS = Object.freeze({
   maxSegmentLength: MAX_SEGMENT_LENGTH
 });
+
+
+import { validateCharacterRig } from './character-rig.js';
+
+const normalizeAngle = value => {
+  let angle = value;
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  while (angle < -Math.PI) angle += Math.PI * 2;
+  return angle;
+};
+
+/**
+ * Convert a validated three-pivot limb chain into bone rotation deltas.
+ * The upper, lower, and end bone pivots represent hip, knee, and ankle in
+ * normalized scene coordinates. Segment lengths are measured from those
+ * rest-pose joint coordinates so applying the deltas preserves the authored
+ * limb geometry exactly.
+ */
+export function solveCharacterRigLimbPose(rigInput, {
+  upperBoneId,
+  lowerBoneId,
+  endBoneId,
+  target,
+  bendDirection = 1
+} = {}) {
+  const report = validateCharacterRig(rigInput);
+  if (!report.passed) {
+    return { status: 'invalid-rig', pose: null, issues: report.issues };
+  }
+  const bones = report.rig.bones;
+  const findBone = id => bones.find(bone => bone.id.toLowerCase() === String(id ?? '').toLowerCase());
+  const upper = findBone(upperBoneId);
+  const lower = findBone(lowerBoneId);
+  const end = findBone(endBoneId);
+  if (!upper || !lower || !end || new Set([upper.id, lower.id, end.id].map(id => id.toLowerCase())).size !== 3
+    || lower.parentId?.toLowerCase() !== upper.id.toLowerCase()
+    || end.parentId?.toLowerCase() !== lower.id.toLowerCase()) {
+    return {
+      status: 'invalid-chain',
+      pose: null,
+      issues: [{ code: 'ik-chain-invalid', message: 'The IK chain must contain distinct upper, lower, and end bones connected in that parent order.' }]
+    };
+  }
+  if (![upper, lower, end].every(bone => bone.pivotEnabled)) {
+    return {
+      status: 'missing-pivots',
+      pose: null,
+      issues: [{ code: 'ik-pivots-missing', message: 'The upper, lower, and end bones must each define an enabled joint pivot.' }]
+    };
+  }
+
+  const upperLength = Math.hypot(lower.pivotX - upper.pivotX, lower.pivotY - upper.pivotY);
+  const lowerLength = Math.hypot(end.pivotX - lower.pivotX, end.pivotY - lower.pivotY);
+  const solution = solveTwoBoneIK({
+    root: { x: upper.pivotX, y: upper.pivotY },
+    target,
+    upperLength,
+    lowerLength,
+    bendDirection
+  });
+  if (solution.status !== 'solved') {
+    return {
+      status: 'invalid-limb-geometry',
+      pose: null,
+      issues: [{ code: 'ik-limb-geometry-invalid', message: 'The rest-pose joint spacing must define two finite, non-zero segments within the supported length range.' }]
+    };
+  }
+
+  const restUpperAngle = Math.atan2(lower.pivotY - upper.pivotY, lower.pivotX - upper.pivotX);
+  const restLowerAngle = Math.atan2(end.pivotY - lower.pivotY, end.pivotX - lower.pivotX);
+  const upperDelta = normalizeAngle(solution.angles.upper - restUpperAngle);
+  const lowerDelta = normalizeAngle(solution.angles.lower - restLowerAngle - upperDelta);
+
+  return {
+    status: 'solved',
+    reachable: solution.reachable,
+    target: { x: target.x, y: target.y },
+    solvedEnd: solution.end,
+    joint: solution.joint,
+    segmentLengths: { upper: upperLength, lower: lowerLength },
+    pose: {
+      [upper.id]: { rotation: upperDelta },
+      [lower.id]: { rotation: lowerDelta }
+    },
+    issues: []
+  };
+}
