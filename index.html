@@ -133,6 +133,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div id="characterSpriteResults" class="sprite-results" aria-live="polite"></div>
 </section>
 </details>
+<details class="comfy-panel" id="hfVideoPanel"><summary style="cursor:pointer;font-weight:750">Бесплатная облачная анимация · Hugging Face</summary><p class="muted" style="font-size:12px">Использует публичный Wan 2.2 14B Fast на Hugging Face ZeroGPU. Сцены и изображения отправляются на сервер Hugging Face. Бесплатная квота для аккаунта Free — до 5 минут GPU в сутки; очередь и доступность не гарантируются.</p><div class="field"><label for="hfVideoToken">Hugging Face access token (read) · токен не сохраняется</label><input id="hfVideoToken" type="password" autocomplete="off" spellcheck="false" placeholder="hf_…"><small>Вставь токен только в это поле сайта. Не отправляй его в чат. Он хранится только в памяти открытой вкладки.</small></div><div class="actions"><button type="button" class="secondary" id="connectHfVideo">Подключить бесплатный видеодвижок</button><button type="button" class="secondary" id="clearHfVideoToken">Очистить токен</button></div><label class="consent"><input type="checkbox" id="hfVideoConsent"><span>Я явно согласен отправлять изображения сцен и промпты в публичный Hugging Face Space для генерации видео. / I agree to send scene images and prompts to the public Hugging Face Space.</span></label><div class="status" id="hfVideoStatus" role="status" aria-live="polite">Не подключено. Проверка соединения не отправляет сцены.</div></details>
 <details class="comfy-panel" id="comfyPanel">
 <summary style="cursor:pointer;font-weight:750">Local video animation · ComfyUI / Локальная анимация</summary>
 <p class="muted" style="font-size:12px">Runs only on your configured local/private ComfyUI server. No cloud fallback. First generate or load a still image for this scene. The API workflow JSON is kept in memory and must be selected again after reload.</p>
@@ -154,14 +155,12 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="field"><label for="comfyFrameStep">Frame step (Wan: 8)</label><input id="comfyFrameStep" type="number" min="1" max="120" value="8"></div>
 </div>
 <div class="actions"><button type="button" class="secondary" id="checkComfyConnection">Check local connection / Проверить связь</button><button type="button" id="animateSceneComfy" disabled>Animate this scene / Анимировать сцену</button></div>
-<p class="muted" style="font-size:12px">Создаёт видеоклипы всех сцен по очереди, затем собирает и открывает готовый мультфильм. Недостающие изображения создаются через AI Horde только при отдельном согласии. Для анимации требуется подключённый локальный ComfyUI.</p>
-<div class="actions"><button type="button" id="generateFullFilmComfy" disabled>Создать весь мультфильм</button><button type="button" class="secondary" id="cancelFullFilmComfy" hidden>Отменить</button></div>
-<progress id="fullFilmProgress" max="100" value="0" hidden style="width:100%"></progress>
-<div class="status" id="fullFilmStatus" role="status" aria-live="polite"></div>
+<p class="muted" style="font-size:12px">Локальный движок ComfyUI работает только на твоём компьютере или в частной сети. Для создания видео с телефона выбери Hugging Face и подключи токен.</p>
 <div class="status" id="comfyStatus" role="status" aria-live="polite">Not connected. Checking the connection does not upload images or submit jobs.</div>
 <video id="comfySceneVideo" controls playsinline hidden></video>
 <div class="actions"><a id="comfyDownloadVideo" class="muted" hidden download="dravex-scene-animation.mp4">Download scene video / Скачать видео сцены</a></div>
 </details>
+<div class="field"><label for="videoGenerationMode">Движок анимации для всего мультфильма</label><select id="videoGenerationMode"><option value="huggingface">Бесплатная облачная очередь · Hugging Face</option><option value="comfyui">Локальный ComfyUI</option></select></div><div class="actions"><button type="button" id="generateFullFilmComfy" disabled>Создать весь мультфильм</button><button type="button" class="secondary" id="cancelFullFilmComfy" hidden>Отменить</button></div><progress id="fullFilmProgress" max="100" value="0" hidden style="width:100%"></progress><div class="status" id="fullFilmStatus" role="status" aria-live="polite"></div>
 <div class="generated-image-wrap" id="generatedImageWrap" hidden><img id="generatedSceneImage" alt="AI-generated image for the selected scene"><small class="muted" id="generatedImageMeta"></small><p class="muted" style="font-size:11px">When browser CORS permits, this image is included in the canvas preview and WebM export. / Если браузер разрешает CORS, изображение попадёт в предпросмотр холста и экспорт WebM.</p></div>
 </div>
 <div class="actions"><button class="secondary" id="applyScene">Apply scene edits</button><button class="secondary" id="addScene">Add scene</button><button class="secondary" id="deleteScene">Delete scene</button></div></div><div class="audio-panel">
@@ -169,7 +168,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="field"><label for="audioVolume">Music volume / Громкость музыки <output id="audioVolumeValue">70%</output></label><input id="audioVolume" type="range" min="0" max="100" value="70"></div>
 <audio id="audioPreview" controls preload="none" hidden></audio><div id="audioStatus" class="muted" role="status" aria-live="polite">No music selected / Музыка не выбрана</div>
 </div>
-<div class="actions"><button class="secondary" id="play" data-i18n="playButton">Play preview</button><button class="secondary" id="export" data-i18n="exportButton">Export WebM test</button></div><p class="muted" style="font-size:12px"><span data-i18n="previewDisclaimer">Preview/export uses a simple canvas animation. Optional local music can be included; generated voice and lip-sync are not implemented yet.</span></p><section id="finalFilmResult" hidden><h3>Готовый мультфильм</h3><video id="finalFilmPlayer" controls playsinline style="width:100%;max-width:900px"></video><div class="actions"><a id="finalFilmDownload" download="dravex-cartoon-film.webm">Скачать готовый мультфильм</a></div></section></section>
+<div class="actions"><button class="secondary" id="play" data-i18n="playButton">Play preview</button><button class="secondary" id="export" data-i18n="exportButton">Export WebM test</button></div><p class="muted" style="font-size:12px"><span data-i18n="previewDisclaimer">Generated scene clips are used when available; otherwise the canvas preview is exported. Timed dialogue and optional local music can be included. Lip-sync is still in development.</span></p><section id="finalFilmResult" hidden><h3>Готовый мультфильм</h3><video id="finalFilmPlayer" controls playsinline style="width:100%;max-width:900px"></video><div class="actions"><a id="finalFilmDownload" download="dravex-cartoon-film.webm">Скачать готовый мультфильм</a></div></section></section>
 </div><footer class="foot"><span data-i18n="footer">DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to</span></footer>
 </main>
 <script type="module">
@@ -196,6 +195,7 @@ import { createVoiceAudioStorage } from "./src/voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./src/scene-voice-workflow.js";
 import { createSceneVideoStorage } from "./src/scene-video-storage.js";
 import { generateStoryboardVideos } from "./src/scene-video-batch.js";
+import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./src/huggingface-zerogpu-video-provider.js";
 import { syncSceneVideoPlayback } from "./src/scene-video-transport.js";
 import { waitForSceneVideoReady, waitForSceneImageReady } from "./src/scene-video-readiness.js";
 import { createAnimationClock } from "./src/animation-clock.js";
@@ -222,8 +222,8 @@ import { inferStoryboardStateChanges } from "./src/scene-state-changes.js";
 import { buildStoryEventChain } from "./src/story-event-chain.js";
 const localTextRuntime = createLocalTransformersRuntime();
 const translations={
-en:{freeTag:'FREE · LOCAL-FIRST',previewTag:'CARTOON WORKSPACE · EARLY PREVIEW',headline:'Turn your idea<br>into a story.',intro:'Create a storyboard locally, generate scene dialogue with an on-device voice model, and preview each WAV track. Full AI animation, lip-sync and voice mixing in WebM export are still in development.',createTitle:'01 · Create a story',ideaLabel:'Story idea',ideaPlaceholder:'A curious fox discovers a glowing star in the forest...',characterLabel:'Main character',styleLabel:'Visual style',durationLabel:'Scene duration',seconds3:'3 seconds',seconds5:'5 seconds',seconds8:'8 seconds',storyLanguageLabel:'Story language',createButton:'Start working',qualityLabel:'Image quality',qualityNote:'Applies to optional AI-generated still images. Higher quality takes longer in the free queue.',styleStorybook:'Storybook',styleAnime:'2D Anime',styleFlat2D:'Flat 2D',stylePixelArt:'Pixel Art',style3DAnimated:'3D Animation',style3DRealistic:'Realistic 3D',styleClay3D:'Clay 3D',styleWatercolor:'Watercolor',styleManga:'Comic / Manga',stylePaperCutout:'Paper Cutout',styleStopMotion:'Stop-motion',qualityStandard:'Standard · 512 px',qualityHigh:'High · 640 px',qualityUltra:'Maximum · 768 px',saveButton:'Save draft',readyStatus:'Ready. Your idea stays in this browser unless you export it.',previewTitle:'02 · Preview',playButton:'Play preview',pauseButton:'Pause preview',exportButton:'Export WebM with dialogue',previewDisclaimer:'Generated scene dialogue is mixed into WebM at its scheduled time. Optional local music is mixed as well. Lip-sync and full AI animation are still in development.',footer:'DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to',sceneTitles:['A discovery','A closer look','A new adventure'],sceneDescriptions:['The fox spots a glowing star.','The little star floats nearby.','The fox follows the light.'],sceneLabel:'Scene',ready:'Ready. Your idea stays in this browser unless you export it.',emptyIdea:'Add a story idea first.',created:'Local DRAVEX storyboard created.',saved:'Draft saved in this browser.',storageError:'Browser storage is unavailable; you can still keep this page open.',restored:'Restored draft from this browser.',recording:'Recording a short preview…',exported:'WebM storyboard exported.',unsupported:'WebM recording is not supported by this browser.',exportFailed:'Export failed in this browser. Try Play preview first.'},
-ru:{freeTag:'БЕСПЛАТНО · ЛОКАЛЬНАЯ РАБОТА',previewTag:'РАБОЧЕЕ ПРОСТРАНСТВО МУЛЬТФИЛЬМОВ · РАННИЙ ПРЕДПРОСМОТР',headline:'Преврати идею<br>в историю.',intro:'Создавай раскадровку локально, генерируй диалоги локальной голосовой моделью и экспортируй WebM с репликами по таймлайну и необязательной локальной музыкой. Полная AI-анимация и синхронизация губ ещё разрабатываются.',createTitle:'01 · Создание истории',ideaLabel:'Идея истории',ideaPlaceholder:'Любопытный лисёнок находит светящуюся звезду в лесу…',characterLabel:'Главный персонаж',styleLabel:'Визуальный стиль',durationLabel:'Длительность сцены',seconds3:'3 секунды',seconds5:'5 секунд',seconds8:'8 секунд',storyLanguageLabel:'Язык истории',createButton:'Начать работу',qualityLabel:'Качество изображения',qualityNote:'Настройка применяется к дополнительной AI-генерации отдельных изображений сцен. Высокое качество может дольше ожидать в бесплатной очереди.',styleStorybook:'Книжная иллюстрация',styleAnime:'2D-аниме',styleFlat2D:'Плоский 2D',stylePixelArt:'Пиксель-арт',style3DAnimated:'3D-анимация',style3DRealistic:'Реалистичный 3D',styleClay3D:'Пластилиновая 3D-анимация',styleWatercolor:'Акварель',styleManga:'Комикс / манга',stylePaperCutout:'Бумажная аппликация',styleStopMotion:'Покадровая анимация',qualityStandard:'Стандарт · 512 px',qualityHigh:'Высокое · 640 px',qualityUltra:'Максимум · 768 px',saveButton:'Сохранить черновик',readyStatus:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',previewTitle:'02 · Предпросмотр',playButton:'Воспроизвести',pauseButton:'Пауза',exportButton:'Экспорт WebM с диалогами',previewDisclaimer:'Созданные реплики добавляются в WebM по таймлайну. Необязательная локальная музыка также сводится в файл. Синхронизация губ и полноценная AI-анимация ещё разрабатываются.',footer:'DRAVEX AI Cartoon Studio · Прототип · Платный API не требуется · Используй только материалы, на которые у тебя есть права',sceneTitles:['Открытие','Поближе','Новое приключение'],sceneDescriptions:['Лисёнок замечает светящуюся звезду.','Маленькая звезда парит рядом.','Лисёнок следует за светом.'],sceneLabel:'Сцена',ready:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',emptyIdea:'Сначала добавь идею истории.',created:'Раскадровка создана локальным движком DRAVEX.',saved:'Черновик сохранён в этом браузере.',storageError:'Хранилище браузера недоступно; можно оставить страницу открытой.',restored:'Черновик восстановлен из этого браузера.',recording:'Записываем короткий предпросмотр…',exported:'Раскадровка экспортирована в WebM.',unsupported:'Этот браузер не поддерживает запись WebM.',exportFailed:'Не удалось экспортировать видео. Сначала попробуй запустить предпросмотр.'}
+en:{freeTag:'FREE · LOCAL-FIRST',previewTag:'CARTOON WORKSPACE · EARLY PREVIEW',headline:'Turn your idea<br>into a story.',intro:'Create a storyboard, generate short AI scene clips through the optional free Hugging Face ZeroGPU queue or local ComfyUI, and assemble a WebM with timed dialogue and optional local music. Free cloud GPU is quota-limited; production voice and lip-sync are still in development.',createTitle:'01 · Create a story',ideaLabel:'Story idea',ideaPlaceholder:'A curious fox discovers a glowing star in the forest...',characterLabel:'Main character',styleLabel:'Visual style',durationLabel:'Scene duration',seconds3:'3 seconds',seconds5:'5 seconds',seconds8:'8 seconds',storyLanguageLabel:'Story language',createButton:'Start working',qualityLabel:'Image quality',qualityNote:'Applies to optional AI-generated still images. Higher quality takes longer in the free queue.',styleStorybook:'Storybook',styleAnime:'2D Anime',styleFlat2D:'Flat 2D',stylePixelArt:'Pixel Art',style3DAnimated:'3D Animation',style3DRealistic:'Realistic 3D',styleClay3D:'Clay 3D',styleWatercolor:'Watercolor',styleManga:'Comic / Manga',stylePaperCutout:'Paper Cutout',styleStopMotion:'Stop-motion',qualityStandard:'Standard · 512 px',qualityHigh:'High · 640 px',qualityUltra:'Maximum · 768 px',saveButton:'Save draft',readyStatus:'Ready. Your idea stays in this browser unless you export it.',previewTitle:'02 · Preview',playButton:'Play preview',pauseButton:'Pause preview',exportButton:'Export WebM with dialogue',previewDisclaimer:'Generated scene video clips are used when available; scenes without clips use the still-image/canvas preview. WebM combines the clips with timed dialogue and optional local music. Lip-sync is still in development.',footer:'DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to',sceneTitles:['A discovery','A closer look','A new adventure'],sceneDescriptions:['The fox spots a glowing star.','The little star floats nearby.','The fox follows the light.'],sceneLabel:'Scene',ready:'Ready. Your idea stays in this browser unless you export it.',emptyIdea:'Add a story idea first.',created:'Local DRAVEX storyboard created.',saved:'Draft saved in this browser.',storageError:'Browser storage is unavailable; you can still keep this page open.',restored:'Restored draft from this browser.',recording:'Recording a short preview…',exported:'WebM storyboard exported.',unsupported:'WebM recording is not supported by this browser.',exportFailed:'Export failed in this browser. Try Play preview first.'},
+ru:{freeTag:'БЕСПЛАТНО · ЛОКАЛЬНАЯ РАБОТА',previewTag:'РАБОЧЕЕ ПРОСТРАНСТВО МУЛЬТФИЛЬМОВ · РАННИЙ ПРЕДПРОСМОТР',headline:'Преврати идею<br>в историю.',intro:'Создавай раскадровку, генерируй короткие AI-видеосцены через бесплатную очередь Hugging Face ZeroGPU или локальный ComfyUI и собирай WebM с диалогами и локальной музыкой. Бесплатная облачная квота ограничена; профессиональная озвучка и синхронизация губ ещё разрабатываются.',createTitle:'01 · Создание истории',ideaLabel:'Идея истории',ideaPlaceholder:'Любопытный лисёнок находит светящуюся звезду в лесу…',characterLabel:'Главный персонаж',styleLabel:'Визуальный стиль',durationLabel:'Длительность сцены',seconds3:'3 секунды',seconds5:'5 секунд',seconds8:'8 секунд',storyLanguageLabel:'Язык истории',createButton:'Начать работу',qualityLabel:'Качество изображения',qualityNote:'Настройка применяется к дополнительной AI-генерации отдельных изображений сцен. Высокое качество может дольше ожидать в бесплатной очереди.',styleStorybook:'Книжная иллюстрация',styleAnime:'2D-аниме',styleFlat2D:'Плоский 2D',stylePixelArt:'Пиксель-арт',style3DAnimated:'3D-анимация',style3DRealistic:'Реалистичный 3D',styleClay3D:'Пластилиновая 3D-анимация',styleWatercolor:'Акварель',styleManga:'Комикс / манга',stylePaperCutout:'Бумажная аппликация',styleStopMotion:'Покадровая анимация',qualityStandard:'Стандарт · 512 px',qualityHigh:'Высокое · 640 px',qualityUltra:'Максимум · 768 px',saveButton:'Сохранить черновик',readyStatus:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',previewTitle:'02 · Предпросмотр',playButton:'Воспроизвести',pauseButton:'Пауза',exportButton:'Экспорт WebM с диалогами',previewDisclaimer:'Готовые видеоклипы сцен используются при наличии; для остальных сцен остаётся предпросмотр изображения и холста. WebM объединяет клипы, диалоги по таймлайну и необязательную локальную музыку. Синхронизация губ ещё разрабатывается.',footer:'DRAVEX AI Cartoon Studio · Прототип · Платный API не требуется · Используй только материалы, на которые у тебя есть права',sceneTitles:['Открытие','Поближе','Новое приключение'],sceneDescriptions:['Лисёнок замечает светящуюся звезду.','Маленькая звезда парит рядом.','Лисёнок следует за светом.'],sceneLabel:'Сцена',ready:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',emptyIdea:'Сначала добавь идею истории.',created:'Раскадровка создана локальным движком DRAVEX.',saved:'Черновик сохранён в этом браузере.',storageError:'Хранилище браузера недоступно; можно оставить страницу открытой.',restored:'Черновик восстановлен из этого браузера.',recording:'Записываем короткий предпросмотр…',exported:'Раскадровка экспортирована в WebM.',unsupported:'Этот браузер не поддерживает запись WebM.',exportFailed:'Не удалось экспортировать видео. Сначала попробуй запустить предпросмотр.'}
 };
 function readLocalStorage(key){try{return window.localStorage.getItem(key)}catch(error){return null}}
 function writeLocalStorage(key,value){try{window.localStorage.setItem(key,value);return true}catch(error){return false}}
@@ -1294,6 +1294,7 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 });
 
 let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
+let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
 function sceneVideoKey(index,meta=sceneMetadata[index]||{}){ensureSceneIds([meta]);return String(meta.id)}
 function renderComfySceneVideo(){
  const entry=sceneVideoCache.get(sceneVideoKey(sceneIndex));
@@ -1311,7 +1312,7 @@ function comfyBindings(){
  return result;
 }
 function setComfyStatus(message){$('comfyStatus').textContent=message}
-function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow;$('generateFullFilmComfy').disabled=!comfyConnected||!comfyWorkflow||!!fullFilmAbortController}
+function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow;const mode=$('videoGenerationMode')?.value||'huggingface';const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:comfyConnected&&!!comfyWorkflow;$('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController}
 $('comfySourceImageFile').addEventListener('change',()=>{
  const file=$('comfySourceImageFile').files?.[0]||null;
  comfySourceImage=file;
@@ -1383,21 +1384,55 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  finally{button.disabled=false;$('checkComfyConnection').disabled=false;updateComfyAnimateAvailability();}
 });
 
+
+$('videoGenerationMode').addEventListener('change',updateComfyAnimateAvailability);
+$('hfVideoConsent').addEventListener('change',()=>{if(!$('hfVideoConsent').checked&&fullFilmAbortController&&$('videoGenerationMode').value==='huggingface')fullFilmAbortController.abort();updateComfyAnimateAvailability()});
+$('clearHfVideoToken').addEventListener('click',()=>{
+ if(fullFilmAbortController&&$('videoGenerationMode').value==='huggingface')fullFilmAbortController.abort();
+ $('hfVideoToken').value='';hfVideoClient=null;hfHandleFile=null;hfVideoConnected=false;
+ $('hfVideoStatus').textContent='Токен очищен. Подключись заново при необходимости.';
+ updateComfyAnimateAvailability();
+});
+$('connectHfVideo').addEventListener('click',async()=>{
+ const button=$('connectHfVideo'),status=$('hfVideoStatus'),token=$('hfVideoToken').value.trim();
+ if(!/^hf_[A-Za-z0-9]{10,}$/.test(token)){status.textContent='Введи действительный Hugging Face access token с правом read.';return}
+ button.disabled=true;hfVideoConnected=false;updateComfyAnimateAvailability();
+ try{
+  status.textContent='Подключаемся к публичному видеодвижку Hugging Face…';
+  const {Client,handle_file}=await import('https://cdn.jsdelivr.net/npm/@gradio/client@2.7.2/dist/index.min.js');
+  const client=await Client.connect(HUGGING_FACE_ZERO_GPU_SPACE_ID,{token,events:['data','status'],space_status:spaceStatus=>{
+   status.textContent='Hugging Face Space · '+(spaceStatus.status||'подключение')+' · '+(spaceStatus.message||'');
+  }});
+  const api=await client.view_api();
+  if(!api?.named_endpoints?.['/generate_video'])throw new Error('Публичный Space не предоставил ожидаемый endpoint /generate_video.');
+  hfVideoClient=client;hfHandleFile=handle_file;hfVideoConnected=true;
+  status.textContent='Подключено: Wan 2.2 14B Fast. Токен остаётся только в этой вкладке; квота GPU зависит от аккаунта Hugging Face.';
+ }catch(error){
+  hfVideoClient=null;hfHandleFile=null;hfVideoConnected=false;
+  status.textContent='Не удалось подключить Hugging Face: '+(error.message||'проверь токен, очередь и доступность Space.');
+ }finally{button.disabled=false;updateComfyAnimateAvailability();}
+});
+
 $('cancelFullFilmComfy').addEventListener('click',()=>{
  if(fullFilmAbortController)fullFilmAbortController.abort();
 });
 $('generateFullFilmComfy').addEventListener('click',async()=>{
  const button=$('generateFullFilmComfy'),cancel=$('cancelFullFilmComfy'),progress=$('fullFilmProgress'),status=$('fullFilmStatus');
- if(button.disabled||!comfyConnected||!comfyWorkflow)return;
- await sceneVideoRestorePromise;
+ const mode=$('videoGenerationMode').value;
+ if(button.disabled)return;
+ if(mode==='huggingface'&&(!hfVideoConnected||!hfVideoClient||!hfHandleFile||!$('hfVideoConsent').checked))return;
+ if(mode==='comfyui'&&(!comfyConnected||!comfyWorkflow))return;
  const controller=new AbortController();
  fullFilmAbortController=controller;
  button.disabled=true;cancel.hidden=false;progress.hidden=false;progress.value=0;
+ await sceneVideoRestorePromise;
  $('animateSceneComfy').disabled=true;$('checkComfyConnection').disabled=true;
  const qualityProfiles={standard:{width:512,height:512,steps:20},high:{width:640,height:640,steps:24},ultra:{width:768,height:768,steps:30}};
  const quality=qualityProfiles[$('imageQuality').value]||qualityProfiles.standard;
  try{
-  const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
+  const provider=mode==='huggingface'
+   ?createHuggingFaceZeroGPUVideoProvider({client:hfVideoClient,handleFile:hfHandleFile})
+   :createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
   const scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
   status.textContent='Подготовка '+scenes.length+' сцен к генерации…';
@@ -1432,15 +1467,18 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      updateStoryQA();
     }
     if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
-    status.textContent='Загружаем изображение сцены '+(index+1)+' для анимации…';
-    const imageResponse=await fetch(meta.generatedImageUrl,{signal});
-    if(!imageResponse.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+imageResponse.status+'). Проверь CORS или загрузи изображение вручную.');
-    const imageBlob=await imageResponse.blob();
-    if(!imageBlob.size)throw new Error('Изображение сцены пустое.');
+    status.textContent='Подготавливаем изображение сцены '+(index+1)+' для анимации…';
+    let imageInput=meta.generatedImageUrl;
+    if(mode==='comfyui'){
+     const imageResponse=await fetch(meta.generatedImageUrl,{signal});
+     if(!imageResponse.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+imageResponse.status+'). Проверь CORS или загрузи изображение вручную.');
+     imageInput=await imageResponse.blob();
+     if(!imageInput.size)throw new Error('Изображение сцены пустое.');
+    }
     const prompt=buildMotionGenerationPrompt(meta,characterBible);
     const duration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
-    const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob},{signal,onProgress:job=>{
-     status.textContent='ComfyUI · сцена '+(index+1)+'/'+scenes.length+' · '+job.stage+' · '+Math.round((job.elapsedMs||0)/1000)+' сек.';
+    const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput},{signal,onProgress:job=>{
+     status.textContent=(mode==='huggingface'?'Hugging Face · ':'ComfyUI · ')+'сцена '+(index+1)+'/'+scenes.length+' · '+(job.stage||'обработка')+(Number.isFinite(job.etaSeconds)?' · ETA '+Math.round(job.etaSeconds)+' сек.':'')+(Number.isFinite(job.queuePosition)?' · очередь '+job.queuePosition:'');
     }});
     if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI не вернул готовый видеофайл.');
     const key=sceneVideoKey(index,meta);

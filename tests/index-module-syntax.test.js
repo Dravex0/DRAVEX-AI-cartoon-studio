@@ -54,7 +54,8 @@ test('scene editor exposes local voice generation and explicitly labels export l
   assert.match(html, /id="voiceNonCommercialConsent"/);
   assert.ok(html.includes('voiceTracks.push({cueId:cue.cueId,blob:record.blob,startMs,durationMs:Number(cue.durationMs),sceneIndex:segment.sceneIndex,characterId:String(cue.characterId||cue.characterName||"Narrator"),characterName:String(cue.characterName||cue.characterId||"Narrator"),text:String(cue.text||""),language:String(cue.language||storyLanguage()),phonemeChunks:Array.isArray(cue.phonemeChunks)?cue.phonemeChunks:[],visemeEvents:Array.isArray(cue.visemeEvents)?cue.visemeEvents:[]})'));
   assert.match(html, /createAudioExportSession\(\{videoStream:stream,audioElement,volume:Number\(\$\('audioVolume'\)\.value\)\/100,voiceTracks,voiceVolume:0\.9\}\)/);
-  assert.match(html, /Generated scene dialogue is mixed into WebM at its scheduled time/);
+  assert.match(html, /Generated scene video clips are used when available/);
+  assert.match(html, /WebM combines the clips with timed dialogue and optional local music/);
 });
 
 
