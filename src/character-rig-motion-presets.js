@@ -52,7 +52,7 @@ function poseFor(rig, preset, phase) {
       if (role === 'leftLeg' || role === 'leg') rotation = -0.35 * lift;
       if (role === 'rightLeg') rotation = 0.35 * lift;
     } else if (preset === 'wave') {
-      if (role === 'rightArm' || role === 'arm') rotation = -0.8 + 0.22 * Math.sin(phase * Math.PI * 4);
+      if (role === 'rightArm' || role === 'arm') rotation = -0.8 + 0.22 * Math.sin(phase * Math.PI * 2);
       if (role === 'leftArm') rotation = -0.12;
       if (role === 'head') rotation = 0.06 * Math.sin(phase * Math.PI * 2);
     } else if (preset === 'idle') {
