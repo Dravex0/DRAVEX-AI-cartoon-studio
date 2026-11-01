@@ -57,6 +57,28 @@ describe('character rig foundation', () => {
     assert.ok(Math.abs(moved[0].rotation - 0.35) < 1e-9);
   });
 
+  it('matches bone pose keys without depending on character ID casing', () => {
+    const rig = validRig();
+    const [part] = rig.parts;
+    const moved = applyCharacterRigPose([part], rig, {
+      ROOT: { x: 0.05, rotation: 0.1 },
+      ARM: { x: 0.15, y: -0.1, rotation: 0.25 }
+    });
+    assert.ok(Math.abs(moved[0].x - 0.3) < 1e-9);
+    assert.ok(Math.abs(moved[0].y - 0.1) < 1e-9);
+    assert.ok(Math.abs(moved[0].rotation - 0.35) < 1e-9);
+  });
+
+  it('prefers an exact bone pose key when case variants are both present', () => {
+    const rig = validRig();
+    const [part] = rig.parts;
+    const moved = applyCharacterRigPose([part], rig, {
+      arm: { x: 0.1 },
+      ARM: { x: 0.8 }
+    });
+    assert.equal(moved[0].x, 0.2);
+  });
+
   it('normalizes bounded per-scene rig poses and preserves them through scene normalization', () => {
     const poses = normalizeCharacterRigPoses({
       Foxy: { root: { x: 9, y: -9, rotation: 99, invalid: 2 } },
