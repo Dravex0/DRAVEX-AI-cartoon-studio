@@ -10,6 +10,7 @@ test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   await expect(page.locator('#make')).toBeVisible();
   await expect(page.locator('#imageQuality')).toBeHidden();
   await expect(page.locator('#style')).toBeVisible();
+  await expect(page.locator('#language')).toBeVisible();
   await expect(page.locator('.workflow-step')).toHaveCount(3);
   await expect(page.locator('#generationTools')).not.toHaveAttribute('open', '');
   await page.getByText(/more settings/i).click();
