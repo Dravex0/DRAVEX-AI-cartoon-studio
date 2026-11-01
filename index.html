@@ -67,6 +67,8 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="actions"><button class="secondary" id="applyCharacterRig" type="button">Validate and attach rig / Проверить и подключить</button></div>
 <div class="field"><label for="characterRigPoseJson">Bone pose offsets (JSON)</label><textarea id="characterRigPoseJson" rows="7" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div>
 <div class="actions"><button class="secondary" id="applyCharacterRigPose" type="button">Apply bone pose / Применить позу</button></div>
+<div class="field"><label for="characterRigMotionPreset">Ready motion / Готовое движение</label><select id="characterRigMotionPreset"></select><small class="muted">Presets are generated from recognized bone IDs. Rename bones to root, leftArm, rightArm, leftLeg, rightLeg, or head for the best mapping.</small></div>
+<div class="actions"><button class="secondary" id="generateCharacterRigPreset" type="button">Generate preset / Создать движение</button></div>
 <div class="field"><label for="characterRigTimelineJson">Bone animation keyframes (JSON, time 0–1)</label><textarea id="characterRigTimelineJson" rows="12" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea><small class="muted">Create at least a start frame at 0 and an end frame at 1. Values are normalized offsets; rotation is in radians.</small></div>
 <div class="actions"><button class="secondary" id="applyCharacterRigTimeline" type="button">Validate and apply bone animation / Применить анимацию костей</button></div>
 <div class="status" id="characterRigStatus" role="status" aria-live="polite">Choose a character sprite first. Rig parts render only when every part image is ready.</div>
@@ -151,6 +153,7 @@ import { generateImageWithHorde } from "./src/ai-horde-image-provider.js";
 import { drawImageCover } from "./src/image-frame.js";
 import { drawCharacterLayers } from "./src/scene-character-layers.js";
 import { validateCharacterRigTimeline, sampleCharacterRigTimeline } from "./src/character-rig-timeline.js";
+import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from "./src/character-rig-motion-presets.js";
 import { validateCharacterRig, normalizeCharacterRigPoses } from "./src/character-rig.js";
 import { upsertCharacterMotionPhase } from "./src/character-motion-editor.js";
 import { planCharacterMotionFromActionTimeline } from "./src/character-motion-planner.js";
@@ -507,6 +510,24 @@ function syncCharacterMotionEditor(){
 }
 $('sceneMotionActor').addEventListener('change',syncCharacterMotionEditor);
 $('sceneMotionActor').addEventListener('change',syncCharacterRigEditor);
+$('characterRigMotionPreset').innerHTML=listCharacterRigMotionPresets().map(item=>'<option value="'+item.id+'">'+item.label+'</option>').join('');
+$('generateCharacterRigPreset').addEventListener('click',()=>{
+ const actorId=$('sceneMotionActor').value;
+ const meta=sceneMetadata[sceneIndex]||{};
+ const rig=(meta.characterRigs||[]).find(item=>String(item.characterId||'').toLowerCase()===String(actorId||'').toLowerCase());
+ if(!rig){$('characterRigStatus').textContent='Attach a valid segmented rig first.';return}
+ const result=createCharacterRigMotionPreset(rig,$('characterRigMotionPreset').value);
+ if(result.status!=='ready'){
+  $('characterRigStatus').textContent='Preset unavailable: '+(result.issues||[]).map(issue=>issue.message).join(' ');
+  return;
+ }
+ sceneMetadata[sceneIndex]={...meta,characterRigTimeline:result.timeline};
+ $('characterRigTimelineJson').value=JSON.stringify(result.timeline,null,2);
+ $('characterRigStatus').textContent=result.label+' generated for '+actorId+'. Animated bones: '+(result.animatedBoneIds.join(', ')||'none')+'. '+(result.warnings.join(' ')||'No rig mapping warnings.');
+ sceneMotionSceneIndex=-1;
+ if(!playing)draw();
+});
+
 function rigJsonTemplate(characterId){
  return JSON.stringify({
   schemaVersion:1,characterId,
@@ -537,6 +558,8 @@ function syncCharacterRigEditor(){
  $('applyCharacterRigPose').disabled=!actorId||!rig;
  $('characterRigTimelineJson').disabled=!actorId||!rig;
  $('applyCharacterRigTimeline').disabled=!actorId||!rig;
+ $('characterRigMotionPreset').disabled=!actorId||!rig;
+ $('generateCharacterRigPreset').disabled=!actorId||!rig;
  $('characterRigStatus').textContent=rig
   ? 'Rig loaded for '+actorId+'. '+rig.bones.length+' bones · '+rig.parts.length+' image parts.'
   : 'Choose a character sprite first. Replace the example URL with transparent images for separate body parts.';
