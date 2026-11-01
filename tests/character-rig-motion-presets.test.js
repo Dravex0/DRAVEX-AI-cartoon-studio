@@ -260,6 +260,60 @@ describe('foot-planted walk and run IK integration', () => {
     close(part(end, 'right-ankle-marker').x, 0.58);
   });
 
+  it('keeps both ankle paths on their requested reachable targets at every keyframe', () => {
+    const candidate = rigWithPlantedLegs();
+    const walk = createCharacterRigMotionPreset(candidate, 'walk');
+    const stride = walk.timeline.keyframes.at(-1).poses.Foxy.root.x;
+    const upperLength = Math.hypot(0.04, 0.23);
+    const lowerLength = Math.hypot(0.04, 0.20);
+    const liftHeight = Math.max(0.02, Math.min(0.075, (upperLength + lowerLength) * 0.14));
+    const smooth = value => value * value * (3 - 2 * value);
+
+    for (const frame of walk.timeline.keyframes) {
+      const phase = frame.time;
+      const progressLeft = Math.max(0, Math.min(1, (phase - 0.5) * 2));
+      const progressRight = Math.max(0, Math.min(1, phase * 2));
+      const leftSwing = phase > 0.5;
+      const rightSwing = phase < 0.5;
+      const expectedLeftX = leftSwing ? 0.42 + stride * smooth(progressLeft) : 0.42;
+      const expectedRightX = rightSwing ? 0.58 - stride * (1 - smooth(progressRight)) : 0.58;
+      const expectedLeftY = 0.78 - (leftSwing ? Math.sin(Math.PI * progressLeft) * liftHeight : 0);
+      const expectedRightY = 0.78 - (rightSwing ? Math.sin(Math.PI * progressRight) * liftHeight : 0);
+      const posed = applyCharacterRigPose(candidate.parts, candidate, frame.poses.Foxy);
+      const left = posed.find(part => part.id === 'left-ankle-marker');
+      const right = posed.find(part => part.id === 'right-ankle-marker');
+      close(left.x, expectedLeftX, 2e-4);
+      close(left.y, expectedLeftY, 2e-4);
+      close(right.x, expectedRightX, 2e-4);
+      close(right.y, expectedRightY, 2e-4);
+    }
+  });
+
+  it('falls back atomically when either leg cannot reach its swing target', () => {
+    const candidate = rigWithPlantedLegs();
+    candidate.bones = candidate.bones.map(bone => {
+      if (bone.id === 'leftLeg') return { ...bone, pivotX: 0.42, pivotY: 0.4 };
+      if (bone.id === 'leftLowerLeg') return { ...bone, pivotX: 0.42, pivotY: 0.6 };
+      if (bone.id === 'leftFoot') return { ...bone, pivotX: 0.42, pivotY: 0.5 };
+      if (bone.id === 'rightLeg') return { ...bone, pivotX: 0.58, pivotY: 0.4 };
+      if (bone.id === 'rightLowerLeg') return { ...bone, pivotX: 0.58, pivotY: 0.6 };
+      if (bone.id === 'rightFoot') return { ...bone, pivotX: 0.58, pivotY: 0.5 };
+      return bone;
+    });
+    candidate.parts = candidate.parts.map(part => (
+      part.id === 'left-ankle-marker' || part.id === 'right-ankle-marker'
+        ? { ...part, y: 0.5 } : part
+    ));
+    const result = createCharacterRigMotionPreset(candidate, 'walk');
+    assert.equal(result.status, 'ready');
+    assert.ok(result.warnings.some(message => message.includes('could not reach one or more requested ankle targets')));
+    const frame = result.timeline.keyframes.find(item => item.time === 0.125);
+    assert.ok(frame);
+    assert.equal(frame.poses.Foxy.root?.x, undefined, 'root translation must not be committed on a failed IK frame');
+    close(frame.poses.Foxy.leftLeg.rotation, -Math.sin(Math.PI / 4) * 0.38);
+    close(frame.poses.Foxy.rightLeg.rotation, Math.sin(Math.PI / 4) * 0.38);
+  });
+
   it('uses a longer stride for running than walking', () => {
     const candidate = rigWithPlantedLegs();
     const walk = createCharacterRigMotionPreset(candidate, 'walk');
