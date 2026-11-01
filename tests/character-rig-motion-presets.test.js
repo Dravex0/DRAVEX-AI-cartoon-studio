@@ -50,8 +50,8 @@ describe('procedural character rig motion presets', () => {
   it('creates a jump with vertical root movement and a greeting with arm motion', () => {
     const jump = createCharacterRigMotionPreset(rig(), 'jump');
     const wave = createCharacterRigMotionPreset(rig(), 'wave');
-    assert.ok(jump.timeline.keyframes.some(frame => frame.poses.Foxy.root.y < 0));
-    assert.ok(wave.timeline.keyframes.some(frame => frame.poses.Foxy.rightArm.rotation !== -0.8));
+    assert.ok(jump.timeline.keyframes.some(frame => frame.poses.Foxy?.root?.y < 0));
+    assert.ok(wave.timeline.keyframes.some(frame => frame.poses.Foxy?.rightArm?.rotation !== undefined && frame.poses.Foxy.rightArm.rotation !== -0.8));
   });
 
   it('reports missing limbs instead of claiming they were animated', () => {
