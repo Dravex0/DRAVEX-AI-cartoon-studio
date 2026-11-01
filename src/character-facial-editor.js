@@ -2,7 +2,7 @@ import { validateCharacterFacialRig, createCharacterFacialExpression, normalizeC
 
 const isRecord = value => Boolean(value && typeof value === "object" && !Array.isArray(value));
 const clean = value => String(value ?? "").trim().slice(0, 120);
-const ROLES = new Set(["eye-left", "eye-right", "eyelid-left", "eyelid-right", "brow-left", "brow-right", "mouth", "jaw"]);
+const ROLES = new Set(["face-base", "eye-left", "eye-right", "eyelid-left", "eyelid-right", "brow-left", "brow-right", "mouth", "jaw"]);
 
 /** Upsert one explicitly supplied facial image part and validate its scene/character linkage. */
 export function upsertCharacterFacialPart(scene = {}, input = {}) {
