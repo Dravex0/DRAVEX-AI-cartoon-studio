@@ -172,7 +172,8 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
   if (presetName === 'walk' || presetName === 'run') {
     if (![...roles].some(role => role === 'leftLeg' || role === 'rightLeg' || role === 'leg')) warnings.push('No leg-like bone IDs found; this preset will animate only recognized upper-body/root bones.');
     if (![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) warnings.push('No arm-like bone IDs found; arm swing will be omitted.');
-    if (![...roles].some(role => role === 'foot' || role === 'leftFoot' || role === 'rightFoot')) warnings.push('No foot-like bone IDs found; root bounce cannot be compensated at the feet, so planted-foot contact is not represented.');\n    else if (!plantedGaitChains(rig)) warnings.push('Foot-planting IK is disabled: walk/run requires complete left and right hip-knee-ankle chains with enabled pivots. The legacy motion preset is retained.');
+    if (![...roles].some(role => role === 'foot' || role === 'leftFoot' || role === 'rightFoot')) warnings.push('No foot-like bone IDs found; root bounce cannot be compensated at the feet, so planted-foot contact is not represented.');
+    else if (!plantedGaitChains(rig)) warnings.push('Foot-planting IK is disabled: walk/run requires complete left and right hip-knee-ankle chains with enabled pivots. The legacy motion preset is retained.');
   }
   const lowerLegBones = rig.bones.filter(bone => ['leftLowerLeg', 'rightLowerLeg'].includes(roleOf(bone.id)));
   if (['walk', 'run', 'jump'].includes(presetName) && lowerLegBones.some(bone => !bone.pivotEnabled)) {
