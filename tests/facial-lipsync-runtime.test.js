@@ -15,7 +15,7 @@ function track(characterId, sceneIndex, startMs, shapes, openness) {
 test("samples the active dialogue cue into per-character viseme and mouth controls", () => {
   const result = sampleCharacterFacialLipSync([
     track("Foxy", 2, 1000, ["closed", "open", "round"], [0.1, 0.7, 0.4])
-  ], 2, 1150);
+  ], 2, 1100);
   assert.deepEqual(result.facialVisemes, { Foxy: "open" });
   assert.ok(Math.abs(result.facialMouthOpenness.Foxy - 0.7) < 1e-9);
   assert.deepEqual(result.activeCharacterIds, ["Foxy"]);
