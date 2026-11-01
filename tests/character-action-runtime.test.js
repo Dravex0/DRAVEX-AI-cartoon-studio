@@ -92,3 +92,20 @@ test('drawCharacterLayers consumes derived timeline transforms at render time', 
   });
   assert.ok(calls.some(call => call[0] === 'translate' && call[1] === 50 && call[2] === 52.5));
 });
+
+test('drawCharacterLayers accepts a separate editor-authored motion timeline', () => {
+  const calls = [];
+  const context = {
+    globalAlpha: 1,
+    save() {}, restore() {}, rotate() {}, scale() {},
+    translate(...args) { calls.push(['translate', ...args]); },
+    drawImage() {}
+  };
+  drawCharacterLayers(context, [layers[0]], () => ({ naturalWidth: 10, naturalHeight: 10 }), 100, 100, {
+    motionTimeline: { schemaVersion: 1, phases: [
+      { phase: 'action', actorId: 'Foxy', start: 0, end: 1, motion: { from: { x: 0.2, y: 0.7 }, to: { x: 0.8, y: 0.3 } } }
+    ] },
+    progress: 0.5
+  });
+  assert.ok(calls.some(call => call[0] === 'translate' && call[1] === 50 && call[2] === 50));
+});
