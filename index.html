@@ -67,6 +67,8 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="actions"><button class="secondary" id="applyCharacterRig" type="button">Validate and attach rig / Проверить и подключить</button></div>
 <div class="field"><label for="characterRigPoseJson">Bone pose offsets (JSON)</label><textarea id="characterRigPoseJson" rows="7" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div>
 <div class="actions"><button class="secondary" id="applyCharacterRigPose" type="button">Apply bone pose / Применить позу</button></div>
+<div class="field"><label for="characterRigTimelineJson">Bone animation keyframes (JSON, time 0–1)</label><textarea id="characterRigTimelineJson" rows="12" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea><small class="muted">Create at least a start frame at 0 and an end frame at 1. Values are normalized offsets; rotation is in radians.</small></div>
+<div class="actions"><button class="secondary" id="applyCharacterRigTimeline" type="button">Validate and apply bone animation / Применить анимацию костей</button></div>
 <div class="status" id="characterRigStatus" role="status" aria-live="polite">Choose a character sprite first. Rig parts render only when every part image is ready.</div>
 </details>
 </details>
@@ -148,6 +150,7 @@ import { directStoryboardWithLocalAI } from "./src/local-story-director.js";
 import { generateImageWithHorde } from "./src/ai-horde-image-provider.js";
 import { drawImageCover } from "./src/image-frame.js";
 import { drawCharacterLayers } from "./src/scene-character-layers.js";
+import { validateCharacterRigTimeline, sampleCharacterRigTimeline } from "./src/character-rig-timeline.js";
 import { validateCharacterRig, normalizeCharacterRigPoses } from "./src/character-rig.js";
 import { upsertCharacterMotionPhase } from "./src/character-motion-editor.js";
 import { planCharacterMotionFromActionTimeline } from "./src/character-motion-planner.js";
@@ -290,7 +293,10 @@ const hasGeneratedVideo=Boolean(generatedVideo&&generatedVideo.readyState>=2&&ge
 const hasGeneratedMedia=hasGeneratedVideo||Boolean(generatedFrame);
 if(hasGeneratedVideo){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedVideo,w,h,motionTransform)}
 else if(generatedFrame){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
-drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:sceneMotionProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:currentSceneData.characterRigPoses});
+const sampledRigPoses=currentSceneData.characterRigTimeline?.keyframes?.length
+ ? sampleCharacterRigTimeline(currentSceneData.characterRigTimeline,sceneMotionProgress)
+ : currentSceneData.characterRigPoses;
+drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:sceneMotionProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});
 ctx.fillStyle='#fff';ctx.font='bold 21px system-ui';ctx.fillText($('character').value||'Foxy',24,38);if(!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);if(playing){frame++;raf=requestAnimationFrame(draw)}else{raf=0}}
 const storyTemplates={
 en:{titles:['The beginning','A turning point','The next step'],middle:'A new detail changes the moment.',ending:'The story moves forward.',status:'Local DRAVEX storyboard created.'},
@@ -515,10 +521,22 @@ function syncCharacterRigEditor(){
  $('characterRigJson').value=rig?JSON.stringify(rig,null,2):(actorId?rigJsonTemplate(actorId):'');
  const poses=meta.characterRigPoses?.[actorId]||{};
  $('characterRigPoseJson').value=JSON.stringify(poses,null,2);
+ const rigBones=rig?.bones||[];
+ const neutralPose={};
+ rigBones.forEach(bone=>{neutralPose[bone.id]={x:0,y:0,rotation:0}});
+ const exampleTimeline={schemaVersion:1,keyframes:[
+  {time:0,easing:'linear',poses:{[actorId||'Character']:neutralPose}},
+  {time:1,easing:'ease-in-out',poses:{[actorId||'Character']:Object.fromEntries(rigBones.map(bone=>[bone.id,{x:0,y:0,rotation:bone.id.toLowerCase().includes('arm')?0.25:0}]))}}
+ ]};
+ $('characterRigTimelineJson').value=meta.characterRigTimeline
+  ?JSON.stringify(meta.characterRigTimeline,null,2)
+  :JSON.stringify(exampleTimeline,null,2);
  $('characterRigJson').disabled=!actorId;
  $('characterRigPoseJson').disabled=!actorId||!rig;
  $('applyCharacterRig').disabled=!actorId;
  $('applyCharacterRigPose').disabled=!actorId||!rig;
+ $('characterRigTimelineJson').disabled=!actorId||!rig;
+ $('applyCharacterRigTimeline').disabled=!actorId||!rig;
  $('characterRigStatus').textContent=rig
   ? 'Rig loaded for '+actorId+'. '+rig.bones.length+' bones · '+rig.parts.length+' image parts.'
   : 'Choose a character sprite first. Replace the example URL with transparent images for separate body parts.';
@@ -545,6 +563,33 @@ $('applyCharacterRig').addEventListener('click',()=>{
   if(!playing)draw();
   $('characterRigStatus').textContent='Rig validated and attached: '+report.rig.bones.length+' bones, '+report.rig.parts.length+' parts. Preview uses rig parts when every image loads.';
  }catch(error){$('characterRigStatus').textContent='Invalid JSON: '+error.message}
+});
+$('applyCharacterRigTimeline').addEventListener('click',()=>{
+ const meta=sceneMetadata[sceneIndex]||{};
+ const rigs=Array.isArray(meta.characterRigs)?meta.characterRigs:[];
+ if(!rigs.length){$('characterRigStatus').textContent='Attach at least one valid rig before adding bone animation.';return}
+ try{
+  const parsed=JSON.parse($('characterRigTimelineJson').value);
+  const report=validateCharacterRigTimeline(parsed);
+  if(!report.passed){
+   $('characterRigStatus').textContent='Animation rejected: '+report.issues.map(issue=>issue.message).join(' ');
+   return;
+  }
+  const rigMap=new Map(rigs.map(rig=>[String(rig.characterId||'').toLowerCase(),new Set((rig.bones||[]).map(bone=>String(bone.id||'').toLowerCase()))]));
+  const unknown=[];
+  report.timeline.keyframes.forEach((keyframe,index)=>{
+   Object.entries(keyframe.poses).forEach(([characterId,bones])=>{
+    const allowed=rigMap.get(characterId.toLowerCase());
+    if(!allowed){unknown.push('keyframe '+index+': '+characterId+' has no attached rig');return}
+    Object.keys(bones).forEach(boneId=>{if(!allowed.has(boneId.toLowerCase()))unknown.push('keyframe '+index+': '+characterId+'.'+boneId+' is not in its rig')});
+   });
+  });
+  if(unknown.length){$('characterRigStatus').textContent='Animation references invalid rigs/bones: '+unknown.join('; ');return}
+  sceneMetadata[sceneIndex]={...meta,characterRigTimeline:report.timeline};
+  $('characterRigStatus').textContent='Bone animation validated: '+report.timeline.keyframes.length+' keyframes. Preview and canvas export sample the same timeline.';
+  sceneMotionSceneIndex=-1;
+  if(!playing)draw();
+ }catch(error){$('characterRigStatus').textContent='Invalid animation JSON: '+error.message}
 });
 $('applyCharacterRigPose').addEventListener('click',()=>{
  const actorId=$('sceneMotionActor').value;
