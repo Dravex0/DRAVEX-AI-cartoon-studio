@@ -1,4 +1,5 @@
 import { validateCharacterFacialRig } from "./character-facial-rig.js";
+import { applyCharacterRigPose } from "./character-rig.js";
 
 const clamp = (value, min, max, fallback = 0) => {
   const number = Number(value);
@@ -36,6 +37,7 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
   const visemes = isRecord(runtime.facialVisemes) ? runtime.facialVisemes : {};
   const openness = isRecord(runtime.facialMouthOpenness) ? runtime.facialMouthOpenness : {};
   const expressions = isRecord(runtime.facialExpressions) ? runtime.facialExpressions : {};
+  const rigPoses = isRecord(runtime.rigPoses) ? runtime.rigPoses : {};
   let drawn = 0, skipped = 0;
   const readyCharacterIds = [];
 
@@ -46,6 +48,11 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
     if (!report.passed) { skipped++; continue; }
     const rig = report.rig;
     const expression = expressionFor(rig.characterId, expressions);
+    const bodyPose = isRecord(rigPoses[rig.characterId]) ? rigPoses[rig.characterId] : {};
+    const headBase = bodyRig?.parts?.find(part => String(part?.boneId || "").toLowerCase() === rig.headBoneId.toLowerCase()) || null;
+    const headPosed = headBase ? applyCharacterRigPose([headBase], bodyRig, bodyPose)[0] : null;
+    const headRotationDelta = headBase && headPosed ? headPosed.rotation - headBase.rotation : 0;
+    const headCos = Math.cos(headRotationDelta), headSin = Math.sin(headRotationDelta);
     const viseme = VISEME_OPENNESS[visemes[rig.characterId]] === undefined ? null : visemes[rig.characterId];
     const mouthOpen = viseme === null
       ? clamp(expression.mouthOpen, 0, 1, 0)
@@ -66,6 +73,16 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
         continue;
       }
       let scaleX = 1, scaleY = 1, offsetY = 0, rotation = part.rotation, alpha = 1;
+      let partX = part.x, partY = part.y;
+      if (headBase && headPosed) {
+        const relativeX = part.x - headBase.x, relativeY = part.y - headBase.y;
+        partX = headPosed.x + relativeX * headCos - relativeY * headSin;
+        partY = headPosed.y + relativeX * headSin + relativeY * headCos;
+        rotation += headRotationDelta;
+      } else if (bodyRig) {
+        const delta = applyCharacterRigPose([{ boneId: rig.headBoneId, x: part.x, y: part.y, rotation: part.rotation }], bodyRig, bodyPose)[0];
+        partX = delta.x; partY = delta.y; rotation = delta.rotation;
+      }
       if (part.role === "eye-left" || part.role === "eye-right") scaleY = Math.max(0.025, eyeOpen);
       if (part.role === "eyelid-left" || part.role === "eyelid-right") alpha = 1 - eyeOpen;
       if (part.role === "brow-left" || part.role === "brow-right") {
@@ -79,7 +96,7 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
       context.save();
       try {
         context.globalAlpha *= alpha;
-        context.translate(part.x * width, part.y * height + offsetY);
+        context.translate(partX * width, partY * height + offsetY);
         context.rotate(rotation);
         context.scale(scaleX, scaleY);
         context.drawImage(image, -part.width * width / 2, -part.height * height / 2, part.width * width, part.height * height);

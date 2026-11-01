@@ -65,6 +65,21 @@ test("rejects facial rig whose head bone does not exist in its body rig", () => 
   assert.equal(result.skipped, 1);
 });
 
+test("anchors facial parts to the posed head bone translation and rotation", () => {
+  const context = contextRecorder();
+  const riggedBody = {
+    ...bodyRig,
+    parts: [{ id: "head-part", boneId: "head", imageUrl: "blob:head", x: 0.5, y: 0.4, rotation: 0 }]
+  };
+  drawCharacterFacialRigs(context, [rig()], () => ({ width: 10, height: 10 }), 1000, 500, {
+    characterRigs: [riggedBody],
+    rigPoses: { Foxy: { root: { x: 0.1, y: -0.05 }, head: { rotation: Math.PI / 2 } } }
+  });
+  const translations = context.calls.filter(call => call[0] === "translate");
+  assert.ok(translations.some(call => Math.abs(call[1] - 600) < 1e-9 && Math.abs(call[2] - 175) < 1e-9));
+  assert.ok(context.calls.some(call => call[0] === "rotate" && Math.abs(call[1] - Math.PI / 2) < 1e-9));
+});
+
 test("returns a safe empty result for invalid canvas dimensions", () => {
   const result = drawCharacterFacialRigs(contextRecorder(), [rig()], () => ({ width: 10, height: 10 }), 0, 500);
   assert.deepEqual(result, { drawn: 0, skipped: 1, readyCharacterIds: [] });
