@@ -223,7 +223,8 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
     };
   });
   if (gaitChains && keyframes.some(frame => (
-    typeof frame.poses[rig.characterId]?.[gaitChains.left.root.id]?.x !== 'number'
+    frame.time > 0
+    && !(frame.poses[rig.characterId]?.[gaitChains.left.root.id]?.x > 0)
   ))) {
     warnings.push('Foot-planting IK could not reach one or more requested ankle targets; the complete legacy walk/run pose was kept for those frames.');
   }
