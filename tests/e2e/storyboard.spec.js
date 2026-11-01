@@ -66,7 +66,7 @@ test('auto-detects the protagonist and keeps the demo fox out of named-character
 
   await page.goto('/');
   await page.locator('#idea').fill(
-    'Characters:\\nArin — a 17-year-old hero with black hair and blue energy.\\nScene 1: Arin walks through a quiet city square and waits beside a fountain.'
+    'Characters:\nArin — a 17-year-old hero with black hair and blue energy.\nScene 1: Arin walks through a quiet city square and waits beside a fountain.'
   );
   await page.getByRole('button', { name: /start working/i }).click();
 
