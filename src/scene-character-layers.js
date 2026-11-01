@@ -176,6 +176,7 @@ export function drawCharacterLayers(context, layers, resolveImage, viewportWidth
       height,
       {
         characterRigs: runtime.characterRigs,
+        rigPoses: runtime.rigPoses,
         facialExpressions: runtime.facialExpressions,
         facialVisemes: runtime.facialVisemes,
         facialMouthOpenness: runtime.facialMouthOpenness
