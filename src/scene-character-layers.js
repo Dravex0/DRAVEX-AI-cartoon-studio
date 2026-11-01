@@ -1,5 +1,6 @@
 import { applyCharacterActionTimelineToLayers } from './character-action-runtime.js';
 import { applyCharacterRigPose, validateCharacterRig } from './character-rig.js';
+import { drawCharacterFacialRigs } from './character-facial-renderer.js';
 
 const MAX_CHARACTER_LAYERS = 12;
 const clean = (value, max = 2048) => String(value ?? '').trim().slice(0, max);
@@ -165,8 +166,33 @@ export function drawCharacterLayers(context, layers, resolveImage, viewportWidth
       runtime.rigPoses
     );
   }
-  if (!runtime || runtime.drawRigParts !== true) return { drawn, skipped };
-  return { drawn: drawn + rigResult.drawn, skipped: skipped + rigResult.skipped, rigDrawn: rigResult.drawn, rigSkipped: rigResult.skipped, rigReadyCharacterIds: rigResult.readyCharacterIds };
+  let facialResult = { drawn: 0, skipped: 0, readyCharacterIds: [] };
+  if (runtime && runtime.drawFacialRigs === true) {
+    facialResult = drawCharacterFacialRigs(
+      context,
+      runtime.characterFacialRigs,
+      resolveImage,
+      width,
+      height,
+      {
+        characterRigs: runtime.characterRigs,
+        facialExpressions: runtime.facialExpressions,
+        facialVisemes: runtime.facialVisemes,
+        facialMouthOpenness: runtime.facialMouthOpenness
+      }
+    );
+  }
+  if (!runtime || (runtime.drawRigParts !== true && runtime.drawFacialRigs !== true)) return { drawn, skipped };
+  return {
+    drawn: drawn + rigResult.drawn + facialResult.drawn,
+    skipped: skipped + rigResult.skipped + facialResult.skipped,
+    rigDrawn: rigResult.drawn,
+    rigSkipped: rigResult.skipped,
+    rigReadyCharacterIds: rigResult.readyCharacterIds,
+    facialDrawn: facialResult.drawn,
+    facialSkipped: facialResult.skipped,
+    facialReadyCharacterIds: facialResult.readyCharacterIds
+  };
 }
 
 
