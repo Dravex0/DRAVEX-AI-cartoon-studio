@@ -43,6 +43,7 @@ test('creates a storyboard from a story prompt without remote AI services', asyn
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await page.goto('/');
+  await page.getByText(/more settings/i).click();
   await page.locator('#language').selectOption('en');
   await page.locator('#idea').fill(
     'A young fox finds a glowing blue key in an old forest, follows its light to a hidden gate, opens it, and discovers a peaceful garden.'
