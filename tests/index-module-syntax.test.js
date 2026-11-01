@@ -58,6 +58,16 @@ test('scene editor exposes local voice generation and explicitly labels export l
 });
 
 
+test('facial rig editor exposes bounded part positioning and expression controls', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="characterFacialEditor"/);
+  assert.match(html, /id="facialPartImageUrl"/);
+  assert.match(html, /id="saveFacialPart"/);
+  assert.match(html, /id="applyFacialExpression"/);
+  assert.match(html, /upsertCharacterFacialPart\(sceneMetadata/);
+  assert.match(html, /applyCharacterFacialExpressionToScene\(/);
+});
+
 test('scene Play preview schedules local dialogue and drives facial lip-sync from the same audio clock', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /createVoicePreviewSession/);
