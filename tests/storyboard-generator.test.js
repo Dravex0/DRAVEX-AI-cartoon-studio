@@ -197,7 +197,7 @@ test('creates a single action phase for explicit movement without inventing othe
 
 test('semantic scene intent reaches motion prompt and action timeline for team magic', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nArin — 17-year-old hero with blue energy.\\nElira — mage with silver hair.\\n\\nScene 6: Final Light\\nArin and Elira unite their powers; blue and violet light merge into one beam.',
+    'Characters:\nArin — 17-year-old hero with blue energy.\nElira — mage with silver hair.\n\nScene 6: Final Light\nArin and Elira unite their powers; blue and violet light merge into one beam.',
     'en',
     'Arin'
   );
@@ -212,7 +212,7 @@ test('semantic scene intent reaches motion prompt and action timeline for team m
 
 test('semantic reveal creates a source-grounded action instead of a passive idle scene', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nNox — tall antagonist in black armor.\\n\\nScene 4: The Enemy\\nNox emerges from the ruins as darkness spreads across the ground.',
+    'Characters:\nNox — tall antagonist in black armor.\n\nScene 4: The Enemy\nNox emerges from the ruins as darkness spreads across the ground.',
     'en',
     'Arin'
   );
