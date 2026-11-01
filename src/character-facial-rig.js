@@ -1,6 +1,6 @@
 const MAX_FACIAL_PARTS = 16;
 const MAX_CHARACTERS = 20;
-const ROLES = new Set(["eye-left", "eye-right", "eyelid-left", "eyelid-right", "brow-left", "brow-right", "mouth", "jaw"]);
+const ROLES = new Set(["face-base", "eye-left", "eye-right", "eyelid-left", "eyelid-right", "brow-left", "brow-right", "mouth", "jaw"]);
 const MOUTH_SHAPES = new Set(["neutral", "open", "wide", "round", "closed", "teeth"]);
 const clean = (value, max = 120) => String(value ?? "").trim().slice(0, max);
 const isRecord = value => Boolean(value && typeof value === "object" && !Array.isArray(value));
