@@ -128,7 +128,7 @@ test('published page exposes the experimental English timestamped Kokoro voice e
 
 test('uses a logical 640x360 drawing space on a 1280x720 widescreen export canvas', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
-  assert.match(html, /<canvas id="canvas" width="1280" height="720"/);
-  assert.match(html, /w=640,h=360,t=animationTimeMs\\/1000;ctx\\.setTransform\\(canvas\\.width\\/w,0,0,canvas\\.height\\/h,0,0\\)/);
-  assert.match(html, /standard:\\{width:640,height:384,steps:20\\},high:\\{width:768,height:448,steps:24\\},ultra:\\{width:1024,height:576,steps:30\\}/);
+  assert.ok(html.includes('<canvas id="canvas" width="1280" height="720"'));
+  assert.ok(html.includes('w=640,h=360,t=animationTimeMs/1000;ctx.setTransform(canvas.width/w,0,0,canvas.height/h,0,0);'));
+  assert.ok(html.includes('standard:{width:640,height:384,steps:20},high:{width:768,height:448,steps:24},ultra:{width:1024,height:576,steps:30}'));
 });
