@@ -52,7 +52,7 @@ test('scene editor exposes local voice generation and explicitly labels export l
   assert.match(html, /id="loadSceneVoiceModel"/);
   assert.match(html, /id="generateSceneVoices"/);
   assert.match(html, /id="voiceNonCommercialConsent"/);
-  assert.ok(html.includes('voiceTracks.push({cueId:cue.cueId,blob:record.blob,startMs,durationMs:Number(cue.durationMs),sceneIndex:segment.sceneIndex,characterName:String(cue.characterName||cue.characterId||"Narrator"),text:String(cue.text||""),language:String(cue.language||storyLanguage()),phonemeChunks:Array.isArray(cue.phonemeChunks)?cue.phonemeChunks:[],visemeEvents:Array.isArray(cue.visemeEvents)?cue.visemeEvents:[]})'));
+  assert.ok(html.includes('voiceTracks.push({cueId:cue.cueId,blob:record.blob,startMs,durationMs:Number(cue.durationMs),sceneIndex:segment.sceneIndex,characterId:String(cue.characterId||cue.characterName||"Narrator"),characterName:String(cue.characterName||cue.characterId||"Narrator"),text:String(cue.text||""),language:String(cue.language||storyLanguage()),phonemeChunks:Array.isArray(cue.phonemeChunks)?cue.phonemeChunks:[],visemeEvents:Array.isArray(cue.visemeEvents)?cue.visemeEvents:[]})'));
   assert.match(html, /createAudioExportSession\(\{videoStream:stream,audioElement,volume:Number\(\$\('audioVolume'\)\.value\)\/100,voiceTracks,voiceVolume:0\.9\}\)/);
   assert.match(html, /Generated scene dialogue is mixed into WebM at its scheduled time/);
 });
@@ -63,12 +63,16 @@ test('WebM export derives built-in character mouth movement from scheduled local
   assert.match(html, /buildAudioMouthEnvelope, sampleAudioMouthEnvelope/);
   assert.match(html, /getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)/);
   assert.match(html, /decodeContext\.decodeAudioData\(await track\.blob\.arrayBuffer\(\)\)/);
-  assert.match(html, /exportMouthTracks\.push\(\{sceneIndex:track\.sceneIndex,startMs:track\.startMs,envelope,visemes\}\)/);
+  assert.match(html, /exportMouthTracks\.push\(\{sceneIndex:track\.sceneIndex,characterId:track\.characterId,characterName:track\.characterName,startMs:track\.startMs,envelope,visemes\}\)/);
   assert.match(html, /performance\.now\(\)-exportMouthOriginTimeMs/);
   assert.match(html, /exportElapsedMs>=track\.startMs/);
   assert.match(html, /sampleAudioMouthEnvelope\(activeMouthTrack\.envelope,mouthTrackTimeMs\)/);
+  assert.match(html, /sampleCharacterFacialLipSync\(exportMouthTracks,sceneIndex,exportElapsedMs\)/);
+  assert.match(html, /facialVisemes:facialLipSync\.facialVisemes,facialMouthOpenness:facialLipSync\.facialMouthOpenness/);
   assert.match(html, /recorder\.start\(250\);\s*exportMouthOriginTimeMs=performance\.now\(\);\s*if\(audioScheduledStartAtMs!==null\)\{[\s\S]*?getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)[\s\S]*?\}/);
-  assert.match(html, /voiceTracks\.filter\(track=>track\.characterName\.trim\(\)\.toLowerCase\(\)===mainCharacterKey\)/);
+  assert.match(html, /mainCharacterVoiceTracks=voiceTracks\.filter\(track=>\{/);
+  assert.match(html, /hasFacialRig=Array\.isArray\(meta\.characterFacialRigs\)/);
+  assert.match(html, /hasFacialRig=Array\.isArray\(meta\.characterFacialRigs\)/);
   assert.match(html, /lipSyncSkippedTracks\+\+/);
   assert.match(html, /lipSyncSkippedTracks=lipSyncRenderableTracks\.length/);
   assert.match(html, /Lip-sync analysis was skipped for /);
