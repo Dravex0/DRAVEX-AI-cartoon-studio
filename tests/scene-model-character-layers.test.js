@@ -72,3 +72,18 @@ test('scene normalization preserves rig definitions and bounded pose metadata', 
   assert.equal(scene.characterRigs[0].characterId, 'Foxy');
   assert.deepEqual(scene.characterRigPoses, { Foxy: { root: { x: 0.1, y: -0.1, rotation: 0.2 } } });
 });
+
+test('scene normalization preserves the explicit character rig animation timeline', () => {
+  const scene = normalizeScene({
+    characterRigTimeline: {
+      schemaVersion: 1,
+      keyframes: [
+        { time: 0, poses: { Foxy: { arm: { rotation: 0 } } } },
+        { time: 1, easing: 'ease-in-out', poses: { Foxy: { arm: { rotation: 1 } } } }
+      ]
+    }
+  });
+  assert.equal(scene.characterRigTimeline.schemaVersion, 1);
+  assert.equal(scene.characterRigTimeline.keyframes.length, 2);
+  assert.equal(scene.characterRigTimeline.keyframes[1].easing, 'ease-in-out');
+});
