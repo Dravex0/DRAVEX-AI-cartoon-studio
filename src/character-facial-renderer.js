@@ -82,7 +82,13 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
     const browRotation = clamp(expression.browRotation, -Math.PI, Math.PI, 0);
     const mouthWidth = clamp(expression.mouthWidth, 0.25, 2, 1);
     let rigDrawn = 0;
-    const parts = [...rig.parts].sort((a, b) => a.zIndex - b.zIndex);
+    // Draw an explicitly supplied clean face plate first so it can cover the source mouth.
+    // The renderer does not generate or inpaint this aligned asset.
+    const parts = [...rig.parts].sort((a, b) => {
+      if (a.role === "face-base" && b.role !== "face-base") return -1;
+      if (b.role === "face-base" && a.role !== "face-base") return 1;
+      return a.zIndex - b.zIndex;
+    });
     for (const part of parts) {
       const image = resolveImage(part.imageUrl, rig.characterId);
       const imageWidth = Number(image?.naturalWidth || image?.videoWidth || image?.width);
