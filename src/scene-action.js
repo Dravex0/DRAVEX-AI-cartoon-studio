@@ -68,7 +68,7 @@ const SEMANTIC_ACTIONS = [
   { intent: 'reveal', motionCue: 'surprised', patterns: [
     /\b(?:appears?|emerges?|materializes?|steps out of the shadows|is revealed)\b/i,
     /появля\w*|возника\w*|выходит из тен|возникает среди руин/i,
-    /з[’'ʼ]?явля\\w*|постає|виходить із тін|виникає серед руїн/i,
+    /з[’'ʼ]?явля\w*|постає|виходить із тін|виникає серед руїн/i,
     /aparece\w*|emerge\w*|sale de las sombras/i
   ] },
   { intent: 'warning', motionCue: 'talk', patterns: [
