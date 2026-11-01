@@ -40,7 +40,7 @@ function limbChainFor(rig, side) {
   const foot = byRole(side === 'left' ? 'leftFoot' : 'rightFoot');
   const root = rig.bones.find(bone => roleOf(bone.id) === 'root');
   if (!root || !upper || !lower || !foot
-    || ![root, upper, lower, foot].every(bone => bone.pivotEnabled)
+    || ![upper, lower, foot].every(bone => bone.pivotEnabled)
     || lower.parentId?.toLowerCase() !== upper.id.toLowerCase()
     || foot.parentId?.toLowerCase() !== lower.id.toLowerCase()) return null;
   let ancestor = upper;
