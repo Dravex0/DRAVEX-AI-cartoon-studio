@@ -35,3 +35,15 @@ test("applies bounded facial expression presets to one character", () => {
   assert.equal(result.scene.characterFacialExpressions.Foxy.name, "happy");
   assert.equal(applyCharacterFacialExpressionToScene(scene, "Foxy", "unknown").status, "unknown-expression");
 });
+
+test("adds an explicit clean face-base plate for mouth replacement", () => {
+  const result = upsertCharacterFacialPart(scene, {
+    ...input,
+    partId: "face-base",
+    role: "face-base",
+    imageUrl: "blob:clean-face",
+    zIndex: -100
+  });
+  assert.equal(result.status, "added");
+  assert.equal(result.scene.characterFacialRigs[0].parts[0].role, "face-base");
+});

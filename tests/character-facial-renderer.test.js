@@ -149,3 +149,16 @@ test("returns a safe empty result for invalid canvas dimensions", () => {
   const result = drawCharacterFacialRigs(contextRecorder(), [rig()], () => ({ width: 10, height: 10 }), 0, 500);
   assert.deepEqual(result, { drawn: 0, skipped: 1, readyCharacterIds: [] });
 });
+
+test("draws the clean face-base plate before facial features regardless of z-index", () => {
+  const candidate = rig();
+  candidate.parts.push({
+    id: "face-base", role: "face-base", imageUrl: "blob:face-base",
+    x: 0.5, y: 0.48, width: 0.2, height: 0.2, zIndex: 999
+  });
+  const context = contextRecorder();
+  const images = Object.fromEntries(["eye", "brow", "mouth", "face-base"].map(id => ["blob:" + id, { id, width: 20, height: 20 }]));
+  const result = drawCharacterFacialRigs(context, [candidate], key => images[key], 1000, 500);
+  assert.equal(result.drawn, 4);
+  assert.deepEqual(context.calls.filter(call => call[0] === "drawImage").map(call => call[1]), ["face-base", "eye", "brow", "mouth"]);
+});
