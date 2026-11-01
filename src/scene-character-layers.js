@@ -51,8 +51,11 @@ export function drawCharacterLayers(context, layers, resolveImage, viewportWidth
     return { drawn: 0, skipped: Array.isArray(layers) ? layers.length : 0 };
   }
   const baseLayers = normalizeCharacterLayers(layers);
-  const runtimeLayers = runtime && typeof runtime === 'object' && runtime.actionTimeline
-    ? applyCharacterActionTimelineToLayers(baseLayers, runtime.actionTimeline, runtime.progress)
+  const motionTimeline = runtime && typeof runtime === 'object'
+    ? (runtime.motionTimeline || runtime.actionTimeline)
+    : null;
+  const runtimeLayers = motionTimeline
+    ? applyCharacterActionTimelineToLayers(baseLayers, motionTimeline, runtime.progress)
     : baseLayers;
   const normalized = runtimeLayers
     .map((layer, index) => ({ layer, index }))
