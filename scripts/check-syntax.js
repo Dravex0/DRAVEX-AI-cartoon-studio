@@ -22,11 +22,10 @@ function collectJavaScriptFiles(directory, output = []) {
   return output;
 }
 
+const rootEntries = new Set(readdirSync(ROOT));
 const files = ROOT_CONFIGS
-  .map(file => path.join(ROOT, file))
-  .filter(file => {
-    try { return readdirSync(ROOT).includes(path.basename(file)); } catch { return false; }
-  });
+  .filter(file => rootEntries.has(file))
+  .map(file => path.join(ROOT, file));
 for (const directory of SCAN_DIRECTORIES) {
   const absolute = path.join(ROOT, directory);
   try { files.push(...collectJavaScriptFiles(absolute)); } catch (error) {
@@ -41,4 +40,4 @@ for (const file of files) {
   if (result.status !== 0) process.exit(result.status || 1);
 }
 
-process.stdout.write('Syntax checked ' + files.length + ' JavaScript files.\\n');
+process.stdout.write('Syntax checked ' + files.length + ' JavaScript files.\n');
