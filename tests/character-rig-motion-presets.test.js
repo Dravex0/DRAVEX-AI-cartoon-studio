@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from '../src/character-rig-motion-presets.js';
 import { sampleCharacterRigTimeline } from '../src/character-rig-timeline.js';
+import { applyCharacterRigPose } from '../src/character-rig.js';
 
 const rig = () => ({
   schemaVersion: 1,
@@ -34,7 +35,7 @@ describe('procedural character rig motion presets', () => {
     assert.equal(result.status, 'ready');
     assert.equal(result.timeline.keyframes[0].time, 0);
     assert.equal(result.timeline.keyframes.at(-1).time, 1);
-    assert.equal(result.timeline.keyframes.length, 5);
+    assert.equal(result.timeline.keyframes.length, 9);
     assert.ok(result.animatedBoneIds.includes('leftLeg'));
     assert.ok(result.animatedBoneIds.includes('rightArm'));
   });
@@ -198,4 +199,77 @@ describe('procedural character rig motion presets', () => {
     assert.equal(sampleCharacterRigTimeline(result.timeline, 0.25).Foxy.leftCalf, undefined);
   });
 
+});
+
+
+function rigWithPlantedLegs() {
+  const candidate = rig();
+  candidate.bones.push(
+    { id: 'leftLowerLeg', parentId: 'leftLeg', pivotX: 0.38, pivotY: 0.58 },
+    { id: 'leftFoot', parentId: 'leftLowerLeg', pivotX: 0.42, pivotY: 0.78 },
+    { id: 'rightLowerLeg', parentId: 'rightLeg', pivotX: 0.62, pivotY: 0.58 },
+    { id: 'rightFoot', parentId: 'rightLowerLeg', pivotX: 0.58, pivotY: 0.78 }
+  );
+  candidate.bones = candidate.bones.map(bone => {
+    if (bone.id === 'leftLeg') return { ...bone, pivotX: 0.42, pivotY: 0.35 };
+    if (bone.id === 'rightLeg') return { ...bone, pivotX: 0.58, pivotY: 0.35 };
+    return bone;
+  });
+  candidate.parts.push(
+    { id: 'left-ankle-marker', boneId: 'leftFoot', imageUrl: 'https://assets.example/left-ankle.png', x: 0.42, y: 0.78 },
+    { id: 'right-ankle-marker', boneId: 'rightFoot', imageUrl: 'https://assets.example/right-ankle.png', x: 0.58, y: 0.78 }
+  );
+  return candidate;
+}
+
+describe('foot-planted walk and run IK integration', () => {
+  it('keeps each stance ankle fixed while the opposite foot swings and the root advances', () => {
+    const candidate = rigWithPlantedLegs();
+    const walk = createCharacterRigMotionPreset(candidate, 'walk');
+    assert.equal(walk.status, 'ready');
+    assert.equal(walk.timeline.keyframes.length, 9);
+    assert.equal(walk.warnings.some(message => message.includes('Foot-planting IK is disabled')), false);
+
+    const poseAt = progress => sampleCharacterRigTimeline(walk.timeline, progress).Foxy;
+    const partsAt = progress => applyCharacterRigPose(candidate.parts, candidate, poseAt(progress));
+    const start = partsAt(0);
+    const leftStance = partsAt(0.25);
+    const middle = partsAt(0.5);
+    const rightStance = partsAt(0.75);
+    const end = partsAt(1);
+    const part = (items, id) => items.find(item => item.id === id);
+
+    close(part(start, 'left-ankle-marker').x, 0.42);
+    close(part(leftStance, 'left-ankle-marker').x, 0.42);
+    close(part(start, 'left-ankle-marker').y, 0.78);
+    close(part(leftStance, 'left-ankle-marker').y, 0.78);
+
+    close(part(middle, 'right-ankle-marker').x, 0.58);
+    close(part(rightStance, 'right-ankle-marker').x, 0.58);
+    close(part(middle, 'right-ankle-marker').y, 0.78);
+    close(part(rightStance, 'right-ankle-marker').y, 0.78);
+
+    assert.ok(part(leftStance, 'right-ankle-marker').y < 0.78, 'right foot should be lifted during swing');
+    assert.ok(part(rightStance, 'left-ankle-marker').y < 0.78, 'left foot should be lifted during swing');
+    assert.ok(poseAt(1).root.x > poseAt(0).root.x, 'root should advance across the gait');
+    close(part(end, 'left-ankle-marker').x, 0.42 + poseAt(1).root.x);
+    close(part(end, 'right-ankle-marker').x, 0.58);
+  });
+
+  it('uses a longer stride for running than walking', () => {
+    const candidate = rigWithPlantedLegs();
+    const walk = createCharacterRigMotionPreset(candidate, 'walk');
+    const run = createCharacterRigMotionPreset(candidate, 'run');
+    assert.ok(run.timeline.keyframes.at(-1).poses.Foxy.root.x > walk.timeline.keyframes.at(-1).poses.Foxy.root.x);
+  });
+
+  it('keeps legacy presets and reports why IK is disabled for incomplete leg chains', () => {
+    const candidate = rigWithPlantedLegs();
+    candidate.bones = candidate.bones.filter(bone => bone.id !== 'rightFoot');
+    candidate.parts = candidate.parts.filter(part => part.id !== 'right-ankle-marker');
+    const result = createCharacterRigMotionPreset(candidate, 'walk');
+    assert.equal(result.status, 'ready');
+    assert.ok(result.warnings.some(message => message.includes('Foot-planting IK is disabled')));
+    assert.equal(result.timeline.keyframes.length, 9);
+  });
 });
