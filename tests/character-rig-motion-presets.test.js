@@ -168,4 +168,34 @@ describe('procedural character rig motion presets', () => {
     assert.equal(createCharacterRigMotionPreset({}, 'walk').status, 'invalid-rig');
     assert.equal(createCharacterRigMotionPreset(rig(), 'dance').status, 'unknown-preset');
   });
+  it('warns when only one lower-leg bone has a knee pivot', () => {
+    const candidate = rig();
+    candidate.bones.push(
+      { id: 'leftShin', parentId: 'leftLeg', pivotX: 0.42, pivotY: 0.61 },
+      { id: 'rightShin', parentId: 'rightLeg' }
+    );
+    candidate.parts.push(
+      { id: 'left-shin-part', boneId: 'leftShin', imageUrl: 'https://assets.example/left-shin.png' },
+      { id: 'right-shin-part', boneId: 'rightShin', imageUrl: 'https://assets.example/right-shin.png' }
+    );
+    for (const presetName of ['walk', 'run', 'jump']) {
+      const result = createCharacterRigMotionPreset(candidate, presetName);
+      assert.equal(result.status, 'ready');
+      assert.ok(result.warnings.some(message => message.includes('lower-leg bones have no knee pivots defined')), presetName);
+      const pose = sampleCharacterRigTimeline(result.timeline, 0.25).Foxy;
+      assert.equal(pose.leftShin?.rotation !== undefined, true, presetName);
+      assert.equal(pose.rightShin, undefined, presetName);
+    }
+  });
+
+  it('warns about missing knee pivots during jump as well as walk and run', () => {
+    const candidate = rig();
+    candidate.bones.push({ id: 'leftCalf', parentId: 'leftLeg' });
+    candidate.parts.push({ id: 'calf-part', boneId: 'leftCalf', imageUrl: 'https://assets.example/calf.png' });
+    const result = createCharacterRigMotionPreset(candidate, 'jump');
+    assert.equal(result.status, 'ready');
+    assert.ok(result.warnings.some(message => message.includes('knee pivots are defined')));
+    assert.equal(sampleCharacterRigTimeline(result.timeline, 0.25).Foxy.leftCalf, undefined);
+  });
+
 });
