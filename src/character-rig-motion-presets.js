@@ -114,6 +114,7 @@ function poseFor(rig, preset, phase) {
   const rootBob = preset === 'walk'
     ? Math.abs(cycle) * 0.018
     : preset === 'run' ? Math.abs(cycle) * 0.045 : 0;
+  const gaitChains = ['walk', 'run'].includes(preset) ? plantedGaitChains(rig) : null;
   for (const bone of rig.bones) {
     const role = roleOf(bone.id);
     let rotation = 0, x = 0, y = 0;
@@ -157,6 +158,7 @@ function poseFor(rig, preset, phase) {
     if (!gaitChains && (role === 'leftFoot' || role === 'rightFoot' || role === 'foot')) y = -rootBob;
     if (x || y || rotation) pose[bone.id] = { x: round(clamp(x, -0.5, 0.5)), y: round(clamp(y, -0.5, 0.5)), rotation: round(clamp(rotation, -1.5, 1.5)) };
   }
+  if (gaitChains) applyPlantedGaitPose(rig, pose, phase, preset, rootBob, gaitChains);
   return pose;
 }
 
