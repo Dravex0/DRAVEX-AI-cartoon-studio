@@ -51,6 +51,28 @@ test("applies expression controls and timestamped viseme shape to facial parts",
   assert.ok(context.calls.some(call => call[0] === "rotate" && Math.abs(call[1]) > 0));
 });
 
+test("uses expression preset mouth shape when no dialogue viseme is active", () => {
+  const context = contextRecorder();
+  drawCharacterFacialRigs(context, [rig()], () => ({ width: 20, height: 20 }), 1000, 500, {
+    facialExpressions: { Foxy: { mouthShape: "round", mouthOpen: 0.1 } }
+  });
+  assert.ok(context.calls.some(call => call[0] === "scale"
+    && Math.abs(call[1] - 1) < 1e-9
+    && Math.abs(call[2] - 0.62) < 1e-9));
+});
+
+test("active dialogue viseme overrides the expression preset mouth shape", () => {
+  const context = contextRecorder();
+  drawCharacterFacialRigs(context, [rig()], () => ({ width: 20, height: 20 }), 1000, 500, {
+    facialExpressions: { Foxy: { mouthShape: "round", mouthOpen: 0.1 } },
+    facialVisemes: { Foxy: "open" },
+    facialMouthOpenness: { Foxy: 0.5 }
+  });
+  assert.ok(context.calls.some(call => call[0] === "scale"
+    && Math.abs(call[1] - 1) < 1e-9
+    && Math.abs(call[2] - 0.45) < 1e-9));
+});
+
 test("animates a separate jaw layer from the active mouth-opening control", () => {
   const context = contextRecorder();
   const candidate = rig();
