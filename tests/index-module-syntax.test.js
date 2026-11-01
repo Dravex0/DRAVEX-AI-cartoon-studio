@@ -138,7 +138,7 @@ test('keeps facial lip-sync analysis enabled over generated scene media', () => 
   assert.ok(app.includes('previewMouthTracks=pendingSession.decodedTracks.map(track=>'));
   assert.ok(app.includes('const lipSyncRenderableTracks=mainCharacterVoiceTracks;'));
   assert.ok(app.includes('drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs'));
-  assert.ok(!app.includes('if(!hasGeneratedMedia){\\n   previewMouthTracks='));
+  assert.ok(!app.includes('if(!hasGeneratedMedia){'));
   assert.ok(!app.includes('lipSyncGeneratedMediaTracks'));
 });
 
