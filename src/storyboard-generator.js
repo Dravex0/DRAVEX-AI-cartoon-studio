@@ -96,7 +96,7 @@ function distributeStoryDetails(sentences, beatCount) {
  * Build the requested number of editable beats. Explicit labeled instructions are retained as production metadata.
  * A one-sentence premise still uses clearly scaffolded local suggestions rather than invented plot facts.
  */
-export function buildStoryboardFromText(idea, lang = 'ru', character = 'Foxy') {
+export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   const locale = Object.hasOwn(BEATS, lang) ? lang : 'en';
   const subject = String(character ?? '').trim().slice(0, 120) || (locale === 'ru' || locale === 'uk' ? 'Персонаж' : locale === 'es' ? 'Personaje' : 'Character');
   const brief = parseStoryBrief(idea);
