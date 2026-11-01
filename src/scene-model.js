@@ -7,6 +7,7 @@ import { normalizeCharacterActionTimeline } from './character-action-timeline.js
 import { normalizeCharacterLayers } from './scene-character-layers.js';
 import { normalizeCharacterRig, normalizeCharacterRigPoses } from './character-rig.js';
 import { normalizeCharacterRigTimeline } from './character-rig-timeline.js';
+import { normalizeCharacterFacialRig, normalizeCharacterFacialExpressions } from './character-facial-rig.js';
 
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
@@ -44,6 +45,9 @@ export function normalizeScene(input = {}, index = 0) {
     characterRigs: Array.isArray(scene.characterRigs) ? scene.characterRigs.slice(0, 20).map(normalizeCharacterRig) : [],
     characterRigPoses: normalizeCharacterRigPoses(scene.characterRigPoses),
     characterRigTimeline: normalizeCharacterRigTimeline(scene.characterRigTimeline),
+    // Facial assets and expression controls remain explicit metadata until renderer integration.
+    characterFacialRigs: Array.isArray(scene.characterFacialRigs) ? scene.characterFacialRigs.slice(0, 20).map(normalizeCharacterFacialRig) : [],
+    characterFacialExpressions: normalizeCharacterFacialExpressions(scene.characterFacialExpressions),
     causalLink: scene.causalLink && typeof scene.causalLink === 'object' && !Array.isArray(scene.causalLink)
       ? {
           type: text(scene.causalLink.type, 40),
