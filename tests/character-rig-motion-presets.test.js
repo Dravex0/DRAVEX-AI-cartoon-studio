@@ -309,7 +309,7 @@ describe('foot-planted walk and run IK integration', () => {
     assert.ok(result.warnings.some(message => message.includes('could not reach one or more requested ankle targets')));
     const frame = result.timeline.keyframes.find(item => item.time === 0.125);
     assert.ok(frame);
-    assert.equal(frame.poses.Foxy.root?.x, undefined, 'root translation must not be committed on a failed IK frame');
+    assert.equal(frame.poses.Foxy.root?.x, 0, 'root translation must not be committed on a failed IK frame');
     close(frame.poses.Foxy.leftLeg.rotation, -Math.sin(Math.PI / 4) * 0.38);
     close(frame.poses.Foxy.rightLeg.rotation, Math.sin(Math.PI / 4) * 0.38);
   });
