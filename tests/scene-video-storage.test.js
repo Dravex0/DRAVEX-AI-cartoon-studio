@@ -37,7 +37,10 @@ function createMemoryIndexedDB() {
     return result;
   }
   return {
+    database,
+    openCount: 0,
     open() {
+      this.openCount += 1;
       const result = {};
       queueMicrotask(() => {
         result.result = database;
@@ -65,9 +68,23 @@ test("rejects writes without a stable scene ID or Blob", async () => {
   const storage = createSceneVideoStorage({ indexedDBRef: createMemoryIndexedDB() });
   await assert.rejects(storage.put("", new Blob(["x"])), /stable scene ID/);
   await assert.rejects(storage.put("scene-1", "not-a-blob"), /must be a Blob/);
+  await assert.rejects(storage.put("scene-1", new Blob([])), /must not be empty/);
 });
 
 test("reports when IndexedDB is unavailable", async () => {
   const storage = createSceneVideoStorage({ indexedDBRef: null });
   await assert.rejects(storage.get("scene-1"), /not available/);
+});
+
+test("closes stale connections and reopens after an IndexedDB version change", async () => {
+  const indexedDBRef = createMemoryIndexedDB();
+  const storage = createSceneVideoStorage({ indexedDBRef });
+  await storage.get("scene-1");
+  assert.equal(indexedDBRef.openCount, 1);
+  let closed = 0;
+  indexedDBRef.database.close = () => { closed += 1; };
+  indexedDBRef.database.onversionchange();
+  assert.equal(closed, 1);
+  await storage.get("scene-1");
+  assert.equal(indexedDBRef.openCount, 2);
 });
