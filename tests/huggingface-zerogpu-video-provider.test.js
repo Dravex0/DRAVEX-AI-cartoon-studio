@@ -113,3 +113,44 @@ test("rejects invalid or non-video provider output", async () => {
     image: new Blob(["png"])
   }), /HTTPS video URL/);
 });
+
+test("preserves WebM MIME type instead of relabeling the video as MP4", async () => {
+  const provider = createHuggingFaceZeroGPUVideoProvider({
+    client: { submit: () => createSubmission([
+      { type: "data", data: [{ url: "https://files.example.test/scene.webm" }] }
+    ]) },
+    handleFile: value => value,
+    fetchImpl: async () => ({
+      ok: true,
+      blob: async () => new Blob(["webm"], { type: "video/webm" })
+    })
+  });
+  const result = await provider.generate({
+    taskType: "image-to-video",
+    prompt: "A character waves",
+    image: new Blob(["png"], { type: "image/png" })
+  });
+  assert.equal(result.video.type, "video/webm");
+});
+
+test("infers a generic download MIME type only from a known video extension", async () => {
+  const createProvider = url => createHuggingFaceZeroGPUVideoProvider({
+    client: { submit: () => createSubmission([{ type: "data", data: [{ url }] }]) },
+    handleFile: value => value,
+    fetchImpl: async () => ({
+      ok: true,
+      blob: async () => new Blob(["video"], { type: "application/octet-stream" })
+    })
+  });
+  const input = {
+    taskType: "image-to-video",
+    prompt: "A character waves",
+    image: new Blob(["png"], { type: "image/png" })
+  };
+  const mp4 = await createProvider("https://files.example.test/scene.mp4").generate(input);
+  assert.equal(mp4.video.type, "video/mp4");
+  await assert.rejects(
+    createProvider("https://files.example.test/download?id=123").generate(input),
+    /unknown format/
+  );
+});
