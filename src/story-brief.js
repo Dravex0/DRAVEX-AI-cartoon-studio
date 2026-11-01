@@ -9,7 +9,7 @@ const ALIASES = new Map([
   ['voice', 'voice'], ['voiceover', 'voice'], ['озвучка', 'voice'], ['голос', 'voice'], ['озвучення', 'voice'],
   ['music', 'music'], ['музыка', 'music'], ['музика', 'music'],
   ['language', 'language'], ['язык', 'language'], ['мова', 'language'],
-  ['characters', 'characters'], ['персонажи', 'characters'], ['персонажі', 'characters'], ['главные герои', 'characters'], ['главные персонажи', 'characters'], ['головні герої', 'characters'],
+  ['characters', 'characters'], ['character', 'characters'], ['main character', 'characters'], ['protagonist', 'characters'], ['персонажи', 'characters'], ['персонаж', 'characters'], ['главный персонаж', 'characters'], ['главный герой', 'characters'], ['персонажі', 'characters'], ['головний персонаж', 'characters'], ['головний герой', 'characters'], ['главные герои', 'characters'], ['главные персонажи', 'characters'], ['головні герої', 'characters'], ['personaje principal', 'characters'],
   ['avoid', 'avoid'], ['do not', 'avoid'], ['не добавлять', 'avoid'], ['не добавляй', 'avoid'], ['избегать', 'avoid'], ['не додавати', 'avoid'], ['уникати', 'avoid'],
   ['audience', 'audience'], ['для кого', 'audience'], ['аудитория', 'audience'], ['аудиторія', 'audience'],
   ['animation', 'action'], ['movement', 'action'], ['действия', 'action'], ['движения', 'action'], ['рухи', 'action'], ['анімація', 'action']
