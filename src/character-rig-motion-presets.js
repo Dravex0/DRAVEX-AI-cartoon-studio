@@ -64,7 +64,7 @@ function limbChainFor(rig, side) {
     ? Math.sqrt(Math.max(0, minimumReach * minimumReach - restDy * restDy))
     : 0;
   const outwardMargin = maxHorizontal - Math.abs(restDx);
-  const inwardMargin = Math.abs(restDx) - minHorizontal;
+  const inwardMargin = minHorizontal > 0 ? Math.abs(restDx) - minHorizontal : Number.POSITIVE_INFINITY;
   const safeStride = Math.max(0, Math.min(outwardMargin, inwardMargin));
   const cross = (lower.pivotX - upper.pivotX) * (foot.pivotY - upper.pivotY)
     - (lower.pivotY - upper.pivotY) * (foot.pivotX - upper.pivotX);
@@ -82,7 +82,7 @@ function plantedGaitChains(rig) {
 
 function applyPlantedGaitPose(rig, pose, phase, preset, rootBob, chains) {
   if (!chains) return false;
-  const strideScale = preset === 'run' ? 0.48 : 0.34;
+  const strideScale = preset === 'run' ? 0.15 : 0.12;
   const nominalStride = Math.min(
     chains.left.upperLength + chains.left.lowerLength,
     chains.right.upperLength + chains.right.lowerLength
