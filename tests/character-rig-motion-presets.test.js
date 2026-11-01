@@ -118,7 +118,9 @@ describe('procedural character rig motion presets', () => {
     assert.equal(walk.status, 'ready');
     const walkPose = sampleCharacterRigTimeline(walk.timeline, 0.25).Foxy;
     assert.ok(walkPose.lowerLegL.rotation > 0);
-    assert.equal(walkPose.shin_r.rotation, undefined);
+    assert.equal(walkPose.shin_r, undefined);
+    const rightSwingPose = sampleCharacterRigTimeline(walk.timeline, 0.75).Foxy;
+    assert.ok(rightSwingPose.shin_r.rotation > 0);
     assert.ok(!walk.warnings.some(message => message.includes('knee pivots are defined')));
 
     const run = createCharacterRigMotionPreset(candidate, 'run');
