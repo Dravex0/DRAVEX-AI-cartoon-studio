@@ -1386,8 +1386,9 @@ $('animateSceneComfy').addEventListener('click',async()=>{
 
 
 $('videoGenerationMode').addEventListener('change',updateComfyAnimateAvailability);
-$('hfVideoConsent').addEventListener('change',checked=>{if(!checked&&fullFilmAbortController&&$('videoGenerationMode').value==='huggingface')fullFilmAbortController.abort();updateComfyAnimateAvailability()});
+$('hfVideoConsent').addEventListener('change',()=>{if(!$('hfVideoConsent').checked&&fullFilmAbortController&&$('videoGenerationMode').value==='huggingface')fullFilmAbortController.abort();updateComfyAnimateAvailability()});
 $('clearHfVideoToken').addEventListener('click',()=>{
+ if(fullFilmAbortController&&$('videoGenerationMode').value==='huggingface')fullFilmAbortController.abort();
  $('hfVideoToken').value='';hfVideoClient=null;hfHandleFile=null;hfVideoConnected=false;
  $('hfVideoStatus').textContent='Токен очищен. Подключись заново при необходимости.';
  updateComfyAnimateAvailability();
