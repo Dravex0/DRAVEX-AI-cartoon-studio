@@ -53,24 +53,41 @@ function limbChainFor(rig, side) {
   const upperLength = Math.hypot(lower.pivotX - upper.pivotX, lower.pivotY - upper.pivotY);
   const lowerLength = Math.hypot(foot.pivotX - lower.pivotX, foot.pivotY - lower.pivotY);
   if (!upperLength || !lowerLength || upperLength > 2 || lowerLength > 2) return null;
+  const restDx = foot.pivotX - upper.pivotX;
+  const restDy = foot.pivotY - upper.pivotY;
+  const minimumReach = Math.abs(upperLength - lowerLength);
+  const maximumReach = upperLength + lowerLength;
+  const restDistance = Math.hypot(restDx, restDy);
+  if (restDistance < minimumReach || restDistance > maximumReach) return null;
+  const maxHorizontal = Math.sqrt(Math.max(0, maximumReach * maximumReach - restDy * restDy));
+  const minHorizontal = Math.abs(restDy) < minimumReach
+    ? Math.sqrt(Math.max(0, minimumReach * minimumReach - restDy * restDy))
+    : 0;
+  const outwardMargin = maxHorizontal - Math.abs(restDx);
+  const inwardMargin = Math.abs(restDx) - minHorizontal;
+  const safeStride = Math.max(0, Math.min(outwardMargin, inwardMargin));
   const cross = (lower.pivotX - upper.pivotX) * (foot.pivotY - upper.pivotY)
     - (lower.pivotY - upper.pivotY) * (foot.pivotX - upper.pivotX);
-  return { root, upper, lower, foot, upperLength, lowerLength, bendDirection: cross >= 0 ? 1 : -1 };
+  return { root, upper, lower, foot, upperLength, lowerLength, safeStride, bendDirection: cross >= 0 ? 1 : -1 };
 }
 
 function plantedGaitChains(rig) {
   const left = limbChainFor(rig, 'left');
   const right = limbChainFor(rig, 'right');
-  return left && right && left.root.id === right.root.id ? { left, right } : null;
+  return left && right && left.root.id === right.root.id
+    && Math.min(left.safeStride, right.safeStride) > 0.005
+    ? { left, right, maxSafeStride: Math.min(left.safeStride, right.safeStride) * 0.8 }
+    : null;
 }
 
 function applyPlantedGaitPose(rig, pose, phase, preset, rootBob, chains) {
   if (!chains) return false;
   const strideScale = preset === 'run' ? 0.48 : 0.34;
-  const stride = clamp(Math.min(
+  const nominalStride = Math.min(
     chains.left.upperLength + chains.left.lowerLength,
     chains.right.upperLength + chains.right.lowerLength
-  ) * strideScale, 0.035, preset === 'run' ? 0.16 : 0.12);
+  ) * strideScale;
+  const stride = Math.min(nominalStride, chains.maxSafeStride);
   const liftHeight = clamp(Math.min(
     chains.left.upperLength + chains.left.lowerLength,
     chains.right.upperLength + chains.right.lowerLength
