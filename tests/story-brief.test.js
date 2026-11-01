@@ -36,3 +36,24 @@ test('parses explicit scene duration in seconds and clamps it to the supported r
   assert.equal(parseStoryBrief('Длительность: 90 секунд\nA fox finds a key.').requestedDurationSeconds, 30);
   assert.equal(parseStoryBrief('Duration: cinematic\nA fox finds a key.').requestedDurationSeconds, null);
 });
+
+
+test('recognizes explicit main character labels in English, Russian and Ukrainian', () => {
+  assert.deepEqual(parseStoryBrief('Main character: Arin\nA young guardian protects the city.').characters, ['Arin']);
+  assert.deepEqual(parseStoryBrief('Главный персонаж: Арин\nАрин защищает город.').characters, ['Арин']);
+  assert.deepEqual(parseStoryBrief('Головний герой: Арін\nАрін захищає місто.').characters, ['Арін']);
+});
+
+
+test('extracts character profiles from bullet and comma-separated character descriptions', () => {
+  const brief = parseStoryBrief([
+    'Characters:',
+    '- Arin, 17 years old, black hair and blue energy.',
+    '- Elira, 17 years old, silver hair and light magic.',
+    '- Nox, tall antagonist in black armor.',
+    'Scene 1: The Falling Stars',
+    'Arin stands on a rooftop.'
+  ].join('\n'));
+  assert.deepEqual(brief.characterProfiles.map(profile => profile.characterId), ['Arin', 'Elira', 'Nox']);
+  assert.deepEqual(brief.characters.slice(0, 3), ['Arin', 'Elira', 'Nox']);
+});
