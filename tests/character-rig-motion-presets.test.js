@@ -39,6 +39,17 @@ describe('procedural character rig motion presets', () => {
     assert.ok(result.animatedBoneIds.includes('rightArm'));
   });
 
+  it('keeps cyclic presets linear while easing jump segments', () => {
+    for (const presetName of ['idle', 'walk', 'run', 'wave']) {
+      const result = createCharacterRigMotionPreset(rig(), presetName);
+      assert.equal(result.status, 'ready');
+      assert.ok(result.timeline.keyframes.every(frame => frame.easing === 'linear'), `${presetName} should not pause at each keyframe`);
+    }
+    const jump = createCharacterRigMotionPreset(rig(), 'jump');
+    assert.equal(jump.timeline.keyframes[0].easing, 'linear');
+    assert.ok(jump.timeline.keyframes.slice(1).every(frame => frame.easing === 'ease-in-out'));
+  });
+
   it('creates different run and walk amplitudes', () => {
     const walk = createCharacterRigMotionPreset(rig(), 'walk');
     const run = createCharacterRigMotionPreset(rig(), 'run');
