@@ -1,0 +1,15 @@
+const DB="dravex-cartoon-facial-assets",VERSION=1,STORE="facial-images",MAX=12*1024*1024,TYPES=new Set(["image/png","image/jpeg","image/webp"]);
+const requestResult=r=>new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error("Facial asset storage request failed."));});
+const transactionCompletion=tx=>new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error("Facial asset storage transaction failed."));tx.onabort=()=>reject(tx.error||new Error("Facial asset storage transaction aborted."));});
+/** Browser-local persistence for facial image layers; no network requests are made. */
+export function createFacialAssetStorage({indexedDBRef=globalThis.indexedDB}={}){
+ let dbPromise;
+ function open(){if(!indexedDBRef||typeof indexedDBRef.open!=="function")return Promise.reject(new Error("IndexedDB is not available in this browser."));if(!dbPromise)dbPromise=new Promise((resolve,reject)=>{const r=indexedDBRef.open(DB,VERSION);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE,{keyPath:"assetId"});};r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>{db.close?.();dbPromise=null;};db.onclose=()=>{dbPromise=null;};resolve(db);};r.onerror=()=>{dbPromise=null;reject(r.error||new Error("Could not open facial asset storage."));};r.onblocked=()=>{dbPromise=null;reject(new Error("Facial asset storage is blocked by another tab."));};});return dbPromise;}
+ async function run(fn,mode="readonly"){const db=await open(),tx=db.transaction(STORE,mode),done=transactionCompletion(tx);let request;try{request=fn(tx.objectStore(STORE));}catch(e){tx.abort();throw e;}try{const value=request&&typeof request.then==="function"?await request:request;await done;return value;}catch(e){try{await done;}catch{}throw e;}}
+ return{
+  async put(assetId,blob,filename="facial-part.png"){const id=String(assetId||"").trim();if(!/^[a-zA-Z0-9_-]{8,100}$/.test(id))throw new TypeError("A stable facial asset ID is required.");if(!(typeof Blob!=="undefined"&&blob instanceof Blob))throw new TypeError("Facial image data must be a Blob.");if(!blob.size)throw new TypeError("Facial image Blob must not be empty.");if(blob.size>MAX)throw new RangeError("Facial image must be 12 MB or smaller.");if(!TYPES.has(String(blob.type||"").toLowerCase()))throw new TypeError("Use a PNG, JPEG, or WebP facial image.");const record={assetId:id,blob,filename:String(filename||"facial-part.png").slice(0,180),mimeType:blob.type,byteSize:blob.size,updatedAt:Date.now()};await run(s=>requestResult(s.put(record)),"readwrite");return record;},
+  async get(assetId){const id=String(assetId||"").trim();if(!/^[a-zA-Z0-9_-]{8,100}$/.test(id))return null;return run(s=>requestResult(s.get(id)));},
+  async delete(assetId){const id=String(assetId||"").trim();if(!/^[a-zA-Z0-9_-]{8,100}$/.test(id))return;await run(s=>requestResult(s.delete(id)),"readwrite");}
+ };
+}
+export const FACIAL_ASSET_STORAGE_LIMITS=Object.freeze({maxBytes:MAX,mimeTypes:[...TYPES]});
