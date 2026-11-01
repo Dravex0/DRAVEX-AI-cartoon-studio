@@ -7,8 +7,8 @@ const validRig = () => ({
   schemaVersion: 1,
   characterId: 'fox',
   bones: [
-    { id: 'root', parentId: null, pivotX: 0.5, pivotY: 0.5 },
-    { id: 'arm', parentId: 'root', pivotX: 0.2, pivotY: 0.3 }
+    { id: 'root', parentId: null },
+    { id: 'arm', parentId: 'root' }
   ],
   parts: [{ id: 'arm-left', boneId: 'arm', imageUrl: 'https://cdn.example.test/arm.png', x: 0.1, y: 0.2, width: 0.2, height: 0.3 }]
 });
@@ -43,6 +43,59 @@ describe('character rig foundation', () => {
     const codes = validateCharacterRig(rig).issues.map(issue => issue.code);
     assert.ok(codes.includes('part-image-invalid'));
     assert.ok(codes.includes('part-bone-missing'));
+  });
+
+
+  it('normalizes explicit joint pivots and preserves legacy rigs without pivots', () => {
+    const rig = normalizeCharacterRig(validRig());
+    assert.equal(rig.bones[0].pivotEnabled, false);
+    const withPivot = normalizeCharacterRig({
+      ...validRig(),
+      bones: [{ id: 'root', parentId: null, pivotX: 0.5, pivotY: 0.5 }]
+    });
+    assert.equal(withPivot.bones[0].pivotEnabled, true);
+    assert.equal(withPivot.bones[0].pivotX, 0.5);
+  });
+
+  it('rejects a partially specified joint pivot', () => {
+    const rig = validRig();
+    rig.bones[1].pivotX = 0.25;
+    const report = validateCharacterRig(rig);
+    assert.ok(report.issues.some(issue => issue.code === 'bone-pivot-incomplete'));
+  });
+
+  it('rotates a part around its explicit joint pivot while preserving its size-space coordinates', () => {
+    const rig = {
+      schemaVersion: 1,
+      characterId: 'fox',
+      bones: [{ id: 'root', parentId: null, pivotX: 0.5, pivotY: 0.5 }],
+      parts: [{ id: 'arm', boneId: 'root', imageUrl: 'https://cdn.example.test/arm.png', x: 0.5, y: 0.25, width: 0.2, height: 0.3 }]
+    };
+    const [posed] = applyCharacterRigPose(rig.parts, rig, { root: { rotation: Math.PI / 2 } });
+    assert.ok(Math.abs(posed.x - 0.75) < 1e-9);
+    assert.ok(Math.abs(posed.y - 0.5) < 1e-9);
+    assert.ok(Math.abs(posed.rotation - Math.PI / 2) < 1e-9);
+    assert.equal(posed.width, rig.parts[0].width);
+    assert.equal(posed.height, rig.parts[0].height);
+  });
+
+  it('transforms descendant joint pivots through parent rotations before applying child rotations', () => {
+    const rig = {
+      schemaVersion: 1,
+      characterId: 'fox',
+      bones: [
+        { id: 'root', parentId: null, pivotX: 0.5, pivotY: 0.5 },
+        { id: 'arm', parentId: 'root', pivotX: 0.25, pivotY: 0.5 }
+      ],
+      parts: [{ id: 'hand', boneId: 'arm', imageUrl: 'https://cdn.example.test/hand.png', x: 0.25, y: 0.25, width: 0.1, height: 0.1 }]
+    };
+    const [posed] = applyCharacterRigPose(rig.parts, rig, {
+      root: { rotation: Math.PI / 2 },
+      arm: { rotation: Math.PI / 2 }
+    });
+    assert.ok(Math.abs(posed.x - 0.75) < 1e-9);
+    assert.ok(Math.abs(posed.y - 0.75) < 1e-9);
+    assert.ok(Math.abs(posed.rotation - Math.PI) < 1e-9);
   });
 
   it('inherits parent bone offsets and rotations for child parts', () => {
