@@ -79,6 +79,8 @@ export function normalizeScene(input = {}, index = 0) {
     timeOfDay: text(scene.timeOfDay, 120),
     visibleAction,
     actionTimeline: normalizeCharacterActionTimeline(scene.actionTimeline),
+    // Editor-authored sprite transforms stay separate from semantically validated story actions.
+    characterMotionTimeline: normalizeCharacterActionTimeline(scene.characterMotionTimeline),
     camera: text(scene.camera, 1_000),
     startState: text(scene.startState, 1_000),
     endState: text(scene.endState, 1_000),
