@@ -32,3 +32,25 @@ test('scene normalization rejects duplicate or incomplete character layer record
   assert.equal(scene.characterLayers.length, 1);
   assert.equal(scene.characterLayers[0].imageUrl, 'blob:one');
 });
+
+
+test('scene normalization preserves editor-authored character motion keyframes', () => {
+  const scene = normalizeScene({
+    characterLayers: [{ characterId: 'Foxy', imageUrl: 'https://example.com/fox.png' }],
+    characterMotionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', actorId: 'Foxy', start: 0.2, end: 0.8,
+        motion: { from: { x: 0.2, y: 0.7 }, to: { x: 0.8, y: 0.3, scale: 1.5 } }
+      }]
+    }
+  });
+  assert.equal(scene.characterMotionTimeline.schemaVersion, 1);
+  assert.equal(scene.characterMotionTimeline.phases[0].actorId, 'Foxy');
+  assert.deepEqual(scene.characterMotionTimeline.phases[0].motion.to, { x: 0.8, y: 0.3, scale: 1.5 });
+});
+
+test('legacy scenes without editor-authored motion remain unchanged', () => {
+  const scene = normalizeScene({ title: 'Legacy scene' });
+  assert.equal(scene.characterMotionTimeline, null);
+});
