@@ -103,7 +103,7 @@ describe('procedural character rig motion presets', () => {
     }
   });
 
-  it('animates lower-leg bones as knee bends only when knee pivots are defined', () => {
+  it('animates lower-leg bones as knee bends only when lower-leg bones have no knee pivots defined', () => {
     const candidate = rig();
     candidate.bones.push(
       { id: 'lowerLegL', parentId: 'leftLeg', pivotX: 0.42, pivotY: 0.61 },
@@ -121,7 +121,7 @@ describe('procedural character rig motion presets', () => {
     assert.equal(walkPose.shin_r, undefined);
     const rightSwingPose = sampleCharacterRigTimeline(walk.timeline, 0.75).Foxy;
     assert.ok(rightSwingPose.shin_r.rotation > 0);
-    assert.ok(!walk.warnings.some(message => message.includes('knee pivots are defined')));
+    assert.ok(!walk.warnings.some(message => message.includes('lower-leg bones have no knee pivots defined')));
 
     const run = createCharacterRigMotionPreset(candidate, 'run');
     const runPose = sampleCharacterRigTimeline(run.timeline, 0.25).Foxy;
@@ -134,7 +134,7 @@ describe('procedural character rig motion presets', () => {
     assert.equal(legacyWalk.status, 'ready');
     const legacyPose = sampleCharacterRigTimeline(legacyWalk.timeline, 0.25).Foxy;
     assert.equal(legacyPose.leftShin, undefined);
-    assert.ok(legacyWalk.warnings.some(message => message.includes('knee pivots are defined')));
+    assert.ok(legacyWalk.warnings.some(message => message.includes('lower-leg bones have no knee pivots defined')));
   });
 
   it('creates different run and walk amplitudes', () => {
@@ -168,4 +168,34 @@ describe('procedural character rig motion presets', () => {
     assert.equal(createCharacterRigMotionPreset({}, 'walk').status, 'invalid-rig');
     assert.equal(createCharacterRigMotionPreset(rig(), 'dance').status, 'unknown-preset');
   });
+  it('warns when only one lower-leg bone has a knee pivot', () => {
+    const candidate = rig();
+    candidate.bones.push(
+      { id: 'leftShin', parentId: 'leftLeg', pivotX: 0.42, pivotY: 0.61 },
+      { id: 'rightShin', parentId: 'rightLeg' }
+    );
+    candidate.parts.push(
+      { id: 'left-shin-part', boneId: 'leftShin', imageUrl: 'https://assets.example/left-shin.png' },
+      { id: 'right-shin-part', boneId: 'rightShin', imageUrl: 'https://assets.example/right-shin.png' }
+    );
+    for (const presetName of ['walk', 'run', 'jump']) {
+      const result = createCharacterRigMotionPreset(candidate, presetName);
+      assert.equal(result.status, 'ready');
+      assert.ok(result.warnings.some(message => message.includes('lower-leg bones have no knee pivots defined')), presetName);
+      const pose = sampleCharacterRigTimeline(result.timeline, 0.25).Foxy;
+      assert.equal(pose.leftShin?.rotation !== undefined, true, presetName);
+      assert.equal(pose.rightShin, undefined, presetName);
+    }
+  });
+
+  it('warns about missing knee pivots during jump as well as walk and run', () => {
+    const candidate = rig();
+    candidate.bones.push({ id: 'leftCalf', parentId: 'leftLeg' });
+    candidate.parts.push({ id: 'calf-part', boneId: 'leftCalf', imageUrl: 'https://assets.example/calf.png' });
+    const result = createCharacterRigMotionPreset(candidate, 'jump');
+    assert.equal(result.status, 'ready');
+    assert.ok(result.warnings.some(message => message.includes('lower-leg bones have no knee pivots defined')));
+    assert.equal(sampleCharacterRigTimeline(result.timeline, 0.25).Foxy.leftCalf, undefined);
+  });
+
 });
