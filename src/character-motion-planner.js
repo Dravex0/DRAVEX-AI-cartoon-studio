@@ -8,10 +8,10 @@ const isRecord = value => Boolean(value && typeof value === 'object' && !Array.i
 
 function directionOf(description) {
   const text = String(description ?? '').normalize('NFKC').toLocaleLowerCase();
-  if (/\\b(right|east)\\b|вправо|праворуч|направо|\\bderecha\\b/.test(text)) return 'right';
-  if (/\\b(left|west)\\b|влево|ліворуч|налево|\\bizquierda\\b/.test(text)) return 'left';
-  if (/\\b(up|upward|upwards|above)\\b|вверх|угору|вгору|\\barriba\\b/.test(text)) return 'up';
-  if (/\\b(down|downward|downwards|below)\\b|вниз|донизу|\\babajo\\b/.test(text)) return 'down';
+  if (/\b(right|east)\b|вправо|праворуч|направо|\bderecha\b/.test(text)) return 'right';
+  if (/\b(left|west)\b|влево|ліворуч|налево|\bizquierda\b/.test(text)) return 'left';
+  if (/\b(up|upward|upwards|above)\b|вверх|угору|вгору|\barriba\b/.test(text)) return 'up';
+  if (/\b(down|downward|downwards|below)\b|вниз|донизу|\babajo\b/.test(text)) return 'down';
   return null;
 }
 
