@@ -170,7 +170,7 @@ import { drawImageCover } from "./src/image-frame.js";
 import { drawCharacterLayers } from "./src/scene-character-layers.js";
 import { validateCharacterRigTimeline, sampleCharacterRigTimeline } from "./src/character-rig-timeline.js";
 import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from "./src/character-rig-motion-presets.js";
-import { validateCharacterRig, normalizeCharacterRigPoses } from "./src/character-rig.js";
+import { validateCharacterRig, normalizeCharacterRigPoses, characterRigPosesFor } from "./src/character-rig.js";
 import { upsertCharacterMotionPhase } from "./src/character-motion-editor.js";
 import { planCharacterMotionFromActionTimeline } from "./src/character-motion-planner.js";
 import { attachCharacterSpriteToSceneLayers } from "./src/scene-character-layers.js";
@@ -622,7 +622,7 @@ function syncCharacterRigEditor(){
  const actorId=$('sceneMotionActor').value;
  const rig=(meta.characterRigs||[]).find(item=>String(item.characterId||'').toLowerCase()===String(actorId||'').toLowerCase());
  $('characterRigJson').value=rig?JSON.stringify(rig,null,2):(actorId?rigJsonTemplate(actorId):'');
- const poses=meta.characterRigPoses?.[actorId]||{};
+ const poses=characterRigPosesFor(actorId,meta.characterRigPoses);
  $('characterRigPoseJson').value=JSON.stringify(poses,null,2);
  const rigBones=rig?.bones||[];
  const neutralPose={};
