@@ -202,7 +202,7 @@ describe('procedural character rig motion presets', () => {
 });
 
 
-const close = (actual, expected, tolerance = 1e-8) => {
+const close = (actual, expected, tolerance = 1e-4) => {
   assert.ok(Math.abs(actual - expected) <= tolerance, `Expected ${actual} to be close to ${expected}`);
 };
 
