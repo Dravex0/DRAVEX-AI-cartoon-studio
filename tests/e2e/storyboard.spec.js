@@ -60,7 +60,7 @@ test('creates a storyboard from a story prompt without remote AI services', asyn
 });
 
 
-test('auto-detects the protagonist and keeps the demo fox out of named-character scenes', async ({ page }) => {
+test('auto-detects the protagonist and plays the named-character preview without runtime errors', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
