@@ -17,10 +17,13 @@ const roleOf = boneId => {
   // Accept both word-order and common L/R suffix conventions after ID normalization.
   if (/left.*(arm|hand|shoulder)|(arm|hand|shoulder).*left|l(arm|hand|upperarm|shoulder)|(arm|hand|upperarm|shoulder)l/.test(id)) return 'leftArm';
   if (/right.*(arm|hand|shoulder)|(arm|hand|shoulder).*right|r(arm|hand|upperarm|shoulder)|(arm|hand|upperarm|shoulder)r/.test(id)) return 'rightArm';
-  if (/left.*(leg|foot|thigh)|(leg|foot|thigh).*left|l(leg|foot|thigh)|(leg|foot|thigh)l/.test(id)) return 'leftLeg';
-  if (/right.*(leg|foot|thigh)|(leg|foot|thigh).*right|r(leg|foot|thigh)|(leg|foot|thigh)r/.test(id)) return 'rightLeg';
+  if (/left.*(foot|ankle|heel|toe)|(foot|ankle|heel|toe).*left|l(foot|ankle|heel|toe)|(foot|ankle|heel|toe)l/.test(id)) return 'leftFoot';
+  if (/right.*(foot|ankle|heel|toe)|(foot|ankle|heel|toe).*right|r(foot|ankle|heel|toe)|(foot|ankle|heel|toe)r/.test(id)) return 'rightFoot';
+  if (/foot|ankle|heel|toe/.test(id)) return 'foot';
+  if (/left.*(leg|thigh)|(leg|thigh).*left|l(leg|thigh)|(leg|thigh)l/.test(id)) return 'leftLeg';
+  if (/right.*(leg|thigh)|(leg|thigh).*right|r(leg|thigh)|(leg|thigh)r/.test(id)) return 'rightLeg';
   if (/arm|hand|shoulder/.test(id)) return 'arm';
-  if (/leg|foot|thigh/.test(id)) return 'leg';
+  if (/leg|thigh/.test(id)) return 'leg';
   return 'other';
 };
 const round = value => Math.round(value * 10000) / 10000;
@@ -29,6 +32,9 @@ function poseFor(rig, preset, phase) {
   const pose = {};
   const cycle = Math.sin(phase * Math.PI * 2);
   const lift = Math.max(0, Math.sin(phase * Math.PI * 2));
+  const rootBob = preset === 'walk'
+    ? Math.abs(cycle) * 0.018
+    : preset === 'run' ? Math.abs(cycle) * 0.045 : 0;
   for (const bone of rig.bones) {
     const role = roleOf(bone.id);
     let rotation = 0, x = 0, y = 0;
@@ -37,14 +43,14 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightArm') rotation = -cycle * 0.32;
       if (role === 'leftLeg' || role === 'leg') rotation = -cycle * 0.38;
       if (role === 'rightLeg') rotation = cycle * 0.38;
-      if (role === 'root') y = Math.abs(cycle) * 0.018;
+      if (role === 'root') y = rootBob;
       if (role === 'head') rotation = -cycle * 0.025;
     } else if (preset === 'run') {
       if (role === 'leftArm' || role === 'arm') rotation = cycle * 0.62;
       if (role === 'rightArm') rotation = -cycle * 0.62;
       if (role === 'leftLeg' || role === 'leg') rotation = -cycle * 0.72;
       if (role === 'rightLeg') rotation = cycle * 0.72;
-      if (role === 'root') y = Math.abs(cycle) * 0.045;
+      if (role === 'root') y = rootBob;
       if (role === 'head') rotation = -cycle * 0.04;
     } else if (preset === 'jump') {
       if (role === 'root') y = -0.2 * lift;
@@ -61,6 +67,9 @@ function poseFor(rig, preset, phase) {
       if (role === 'head') rotation = 0.025 * Math.sin(phase * Math.PI * 2);
       if (role === 'leftArm' || role === 'rightArm' || role === 'arm') rotation = 0.018 * Math.sin(phase * Math.PI * 2);
     }
+    // Counter the root's vertical bounce at foot bones so the planted foot
+    // does not inherit that extra body motion. This is not full inverse kinematics.
+    if (role === 'leftFoot' || role === 'rightFoot' || role === 'foot') y = -rootBob;
     if (x || y || rotation) pose[bone.id] = { x: round(clamp(x, -0.5, 0.5)), y: round(clamp(y, -0.5, 0.5)), rotation: round(clamp(rotation, -1.5, 1.5)) };
   }
   return pose;
@@ -78,6 +87,7 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
   if (presetName === 'walk' || presetName === 'run') {
     if (![...roles].some(role => role === 'leftLeg' || role === 'rightLeg' || role === 'leg')) warnings.push('No leg-like bone IDs found; this preset will animate only recognized upper-body/root bones.');
     if (![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) warnings.push('No arm-like bone IDs found; arm swing will be omitted.');
+    if (![...roles].some(role => role === 'foot' || role === 'leftFoot' || role === 'rightFoot')) warnings.push('No foot-like bone IDs found; root bounce cannot be compensated at the feet, so planted-foot contact is not represented.');
   }
   if (presetName === 'wave' && ![...roles].some(role => role === 'rightArm' || role === 'arm')) {
     warnings.push('No right-arm or generic arm bone found; the greeting gesture cannot be represented by this rig.');
