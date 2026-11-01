@@ -1316,6 +1316,16 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
    :createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
   const scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
+  if(mode==='huggingface'){
+   const unsupportedIndex=scenes.findIndex(scene=>{
+    const seconds=Number(scene.durationSeconds??scene.duration??$('duration').value)||3;
+    return seconds<0.5||seconds>5;
+   });
+   if(unsupportedIndex>=0){
+    const seconds=Number(scenes[unsupportedIndex].durationSeconds??scenes[unsupportedIndex].duration??$('duration').value)||3;
+    throw new RangeError('Hugging Face Wan 2.2 supports scene clips from 0.5 to 5 seconds. Scene '+(unsupportedIndex+1)+' is set to '+seconds+' seconds. Shorten this scene or choose local ComfyUI.');
+   }
+  }
   filmProgressSceneStates=scenes.map((scene,index)=>{
    const ready=sceneVideoCache.has(sceneVideoKey(index,scene));
    return {title:String(scene.title||('Scene '+(index+1))),status:ready?'skipped':'pending',progress:ready?100:0,label:ready?filmProgressText('Уже готово','Already ready'):filmProgressText('Ожидает','Waiting')};
