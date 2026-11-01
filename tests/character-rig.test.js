@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeCharacterRig, normalizeCharacterRigPoses, validateCharacterRig, applyCharacterRigPose } from '../src/character-rig.js';
+import { normalizeCharacterRig, normalizeCharacterRigPoses, validateCharacterRig, applyCharacterRigPose, characterRigPosesFor } from '../src/character-rig.js';
 import { normalizeScene } from '../src/scene-model.js';
 
 const validRig = () => ({
@@ -77,6 +77,16 @@ describe('character rig foundation', () => {
       ARM: { x: 0.8 }
     });
     assert.equal(moved[0].x, 0.2);
+  });
+
+
+  it('resolves saved character rig poses case-insensitively with exact-key precedence', () => {
+    const lowerCase = { root: { x: 0.25 } };
+    const upperCase = { root: { x: 0.75 } };
+    assert.equal(characterRigPosesFor('Foxy', { foxy: lowerCase }), lowerCase);
+    assert.equal(characterRigPosesFor('Foxy', { foxy: lowerCase, Foxy: upperCase }), upperCase);
+    assert.deepEqual(characterRigPosesFor('Missing', { foxy: lowerCase }), {});
+    assert.deepEqual(characterRigPosesFor('Foxy', null), {});
   });
 
   it('normalizes bounded per-scene rig poses and preserves them through scene normalization', () => {
