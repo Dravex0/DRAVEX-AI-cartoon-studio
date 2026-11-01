@@ -1,6 +1,9 @@
 import { getCanvasDimensions, normalizeCanvasFormat } from './canvas-format.js';
 
-const clampIndex = value => Math.max(0, Math.floor(Number(value) || 0));
+const clampIndex = value => {
+  const index = Number(value);
+  return Number.isFinite(index) ? Math.max(0, Math.floor(index)) : 0;
+};
 
 /**
  * Return normalized composition anchors for a scene.

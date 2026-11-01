@@ -25,4 +25,7 @@ test('places portrait scene elements within a tall composition', () => {
 test('supports the 9:16 alias and safely normalizes scene indices', () => {
   assert.deepEqual(getSceneComposition('9:16', -4), getSceneComposition('portrait', 0));
   assert.equal(getSceneComposition('unknown', 1).format, 'landscape');
+  assert.deepEqual(getSceneComposition('portrait', Number.POSITIVE_INFINITY), getSceneComposition('portrait', 0));
+  assert.deepEqual(getSceneComposition('landscape', Number.NaN), getSceneComposition('landscape', 0));
+  assert.deepEqual(getSceneComposition('landscape', 5_000_000_000), getSceneComposition('landscape', 0));
 });
