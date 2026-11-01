@@ -58,16 +58,26 @@ test('scene editor exposes local voice generation and explicitly labels export l
 });
 
 
+test('scene Play preview schedules local dialogue and drives facial lip-sync from the same audio clock', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /createVoicePreviewSession/);
+  assert.match(html, /previewMouthOriginTimeMs=await pendingSession.start\(\)/);
+  assert.match(html, /previewMouthTracks=pendingSession\.decodedTracks\.map/);
+  assert.match(html, /startSceneVoicePreview\(sceneIndex\)/);
+  assert.match(html, /stopSceneVoicePreview\(\)/);
+  assert.match(html, /activeMouthTracks=exportMouthOriginTimeMs!==null\?exportMouthTracks:previewMouthTracks/);
+});
 test('WebM export derives built-in character mouth movement from scheduled local dialogue WAVs', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /buildAudioMouthEnvelope, sampleAudioMouthEnvelope/);
   assert.match(html, /getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)/);
   assert.match(html, /decodeContext\.decodeAudioData\(await track\.blob\.arrayBuffer\(\)\)/);
   assert.match(html, /exportMouthTracks\.push\(\{sceneIndex:track\.sceneIndex,characterId:track\.characterId,characterName:track\.characterName,startMs:track\.startMs,envelope,visemes\}\)/);
-  assert.match(html, /performance\.now\(\)-exportMouthOriginTimeMs/);
+  assert.match(html, /mouthClockOrigin=exportMouthOriginTimeMs!==null\?exportMouthOriginTimeMs:previewMouthOriginTimeMs/);
+  assert.match(html, /performance\.now\(\)-mouthClockOrigin/);
   assert.match(html, /exportElapsedMs>=track\.startMs/);
   assert.match(html, /sampleAudioMouthEnvelope\(activeMouthTrack\.envelope,mouthTrackTimeMs\)/);
-  assert.match(html, /sampleCharacterFacialLipSync\(exportMouthTracks,sceneIndex,exportElapsedMs\)/);
+  assert.match(html, /sampleCharacterFacialLipSync\(activeMouthTracks,sceneIndex,exportElapsedMs\)/);
   assert.match(html, /facialVisemes:facialLipSync\.facialVisemes,facialMouthOpenness:facialLipSync\.facialMouthOpenness/);
   assert.match(html, /recorder\.start\(250\);\s*exportMouthOriginTimeMs=performance\.now\(\);\s*if\(audioScheduledStartAtMs!==null\)\{[\s\S]*?getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)[\s\S]*?\}/);
   assert.match(html, /mainCharacterVoiceTracks=voiceTracks\.filter\(track=>\{/);
