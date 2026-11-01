@@ -202,7 +202,7 @@ describe('procedural character rig motion presets', () => {
 });
 
 
-function rigWithPlantedLegs() {
+const close = (actual, expected, tolerance = 1e-8) => {\n  assert.ok(Math.abs(actual - expected) <= tolerance, `Expected ${actual} to be close to ${expected}`);\n};\n\nfunction rigWithPlantedLegs() {
   const candidate = rig();
   candidate.bones.push(
     { id: 'leftLowerLeg', parentId: 'leftLeg', pivotX: 0.38, pivotY: 0.58 },
