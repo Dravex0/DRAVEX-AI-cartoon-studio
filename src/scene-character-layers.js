@@ -7,6 +7,15 @@ const clean = (value, max = 2048) => String(value ?? '').trim().slice(0, max);
 const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const clamp = (value, min, max, fallback) => Math.max(min, Math.min(max, finite(value, fallback)));
 
+function characterValueFor(characterId, values) {
+  if (!values || typeof values !== 'object' || Array.isArray(values)) return undefined;
+  if (Object.prototype.hasOwnProperty.call(values, characterId)) return values[characterId];
+  const normalizedId = String(characterId).toLowerCase();
+  const matchingKey = Object.keys(values).find(key => key.toLowerCase() === normalizedId);
+  return matchingKey === undefined ? undefined : values[matchingKey];
+}
+
+
 /** Normalize one independently rendered character sprite. Coordinates and size are viewport-relative. */
 export function normalizeCharacterLayer(input = {}, index = 0) {
   const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
@@ -61,9 +70,9 @@ export function drawCharacterRigParts(context, rigs, resolveImage, viewportWidth
     if (!report.passed) { skipped++; continue; }
     const rig = report.rig;
     const characterId = rig.characterId;
-    const pose = poses && typeof poses === 'object' && !Array.isArray(poses)
-      && poses[characterId] && typeof poses[characterId] === 'object'
-      ? poses[characterId] : {};
+    const candidatePose = characterValueFor(characterId, poses);
+    const pose = candidatePose && typeof candidatePose === 'object' && !Array.isArray(candidatePose)
+      ? candidatePose : {};
     const posedParts = applyCharacterRigPose(rig.parts, rig, pose);
     const prepared = posedParts.map(part => {
       const image = resolveImage(part.imageUrl, characterId);
