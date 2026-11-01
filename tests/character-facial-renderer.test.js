@@ -47,7 +47,7 @@ test("applies expression controls and timestamped viseme shape to facial parts",
   });
   assert.equal(result.drawn, 3);
   assert.ok(context.calls.some(call => call[0] === "scale" && call[1] === 1 && call[2] === 0.5));
-  assert.ok(context.calls.some(call => call[0] === "scale" && call[1] === 1.2 && call[2] === 0.72));
+  assert.ok(context.calls.some(call => call[0] === "scale" && Math.abs(call[1] - 1.2) < 1e-9 && Math.abs(call[2] - 0.72) < 1e-9));
   assert.ok(context.calls.some(call => call[0] === "rotate" && Math.abs(call[1]) > 0));
 });
 
