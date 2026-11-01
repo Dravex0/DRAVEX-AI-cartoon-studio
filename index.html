@@ -502,6 +502,7 @@ $('applyCharacterMotion').addEventListener('click',()=>{
      to:{x:number('sceneMotionX'),y:number('sceneMotionY'),scale:number('sceneMotionScale'),rotation:number('sceneMotionRotation')*Math.PI/180,opacity:number('sceneMotionOpacity')}
    });
    sceneMetadata[sceneIndex]={...meta,characterMotionTimeline:timeline};
+   sceneMotionSceneIndex=-1;
    $('characterMotionStatus').textContent='Motion saved for '+actorId+'. Play the scene or export to see the movement.';
    if(!playing)draw();
  }catch(error){$('characterMotionStatus').textContent=error.message||'Invalid motion settings.'}
