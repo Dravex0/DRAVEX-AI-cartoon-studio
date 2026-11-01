@@ -58,7 +58,17 @@ export function createVoiceAudioStorage({ indexedDBRef = globalThis.indexedDB } 
             database.createObjectStore(STORE_NAME, { keyPath: "audioHash" });
           }
         };
-        request.onsuccess = () => resolve(request.result);
+        request.onsuccess = () => {
+          const database = request.result;
+          database.onversionchange = () => {
+            database.close?.();
+            databasePromise = null;
+          };
+          database.onclose = () => {
+            databasePromise = null;
+          };
+          resolve(database);
+        };
         request.onerror = () => {
           databasePromise = null;
           reject(request.error || new Error("Could not open voice audio storage."));
