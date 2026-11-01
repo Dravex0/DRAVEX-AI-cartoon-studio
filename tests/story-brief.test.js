@@ -36,3 +36,10 @@ test('parses explicit scene duration in seconds and clamps it to the supported r
   assert.equal(parseStoryBrief('Длительность: 90 секунд\nA fox finds a key.').requestedDurationSeconds, 30);
   assert.equal(parseStoryBrief('Duration: cinematic\nA fox finds a key.').requestedDurationSeconds, null);
 });
+
+
+test('recognizes explicit main character labels in English, Russian and Ukrainian', () => {
+  assert.deepEqual(parseStoryBrief('Main character: Arin\\nA young guardian protects the city.').characters, ['Arin']);
+  assert.deepEqual(parseStoryBrief('Главный персонаж: Арин\\nАрин защищает город.').characters, ['Арин']);
+  assert.deepEqual(parseStoryBrief('Головний герой: Арін\\nАрін захищає місто.').characters, ['Арін']);
+});
