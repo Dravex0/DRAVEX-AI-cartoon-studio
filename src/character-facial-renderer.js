@@ -93,6 +93,11 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
         scaleX = mouthWidth;
         scaleY = Math.max(0.04, viseme === null ? Math.max(mouthOpen, 0.04) : mouthOpen);
       }
+      if (part.role === "jaw") {
+        // A separate jaw layer follows mouth opening instead of remaining static.
+        offsetY += mouthOpen * part.height * height * 0.12;
+        rotation += mouthOpen * 0.18;
+      }
       context.save();
       try {
         context.globalAlpha *= alpha;
