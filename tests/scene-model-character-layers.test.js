@@ -54,3 +54,21 @@ test('legacy scenes without editor-authored motion remain unchanged', () => {
   const scene = normalizeScene({ title: 'Legacy scene' });
   assert.equal(scene.characterMotionTimeline, null);
 });
+
+test('scene normalization preserves rig definitions and bounded pose metadata', () => {
+  const scene = normalizeScene({
+    characterRigs: [{
+      schemaVersion: 1,
+      characterId: 'Foxy',
+      bones: [{ id: 'root', parentId: null }],
+      parts: [{
+        id: 'body', boneId: 'root', imageUrl: 'https://cdn.example.test/body.png',
+        x: 0.5, y: 0.5, width: 0.3, height: 0.5
+      }]
+    }],
+    characterRigPoses: { Foxy: { root: { x: 0.1, y: -0.1, rotation: 0.2 } } }
+  });
+  assert.equal(scene.characterRigs.length, 1);
+  assert.equal(scene.characterRigs[0].characterId, 'Foxy');
+  assert.deepEqual(scene.characterRigPoses, { Foxy: { root: { x: 0.1, y: -0.1, rotation: 0.2 } } });
+});
