@@ -53,7 +53,10 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
     const headPosed = headBase ? applyCharacterRigPose([headBase], bodyRig, bodyPose)[0] : null;
     const headRotationDelta = headBase && headPosed ? headPosed.rotation - headBase.rotation : 0;
     const headCos = Math.cos(headRotationDelta), headSin = Math.sin(headRotationDelta);
-    const viseme = VISEME_OPENNESS[visemes[rig.characterId]] === undefined ? null : visemes[rig.characterId];
+    // Dialogue visemes take priority; otherwise use the expression preset mouth shape.
+    const explicitViseme = VISEME_OPENNESS[visemes[rig.characterId]] === undefined ? null : visemes[rig.characterId];
+    const expressionViseme = VISEME_OPENNESS[expression.mouthShape] === undefined ? null : expression.mouthShape;
+    const viseme = explicitViseme || expressionViseme;
     const mouthOpen = viseme === null
       ? clamp(expression.mouthOpen, 0, 1, 0)
       : Math.max(clamp(expression.mouthOpen, 0, 1, 0), VISEME_OPENNESS[viseme])
