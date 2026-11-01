@@ -12,7 +12,7 @@ const VISEME_OPENNESS = Object.freeze({
   open: 0.9,
   wide: 0.28,
   round: 0.62,
-  closed: 0.02,
+  closed: 0,
   teeth: 0.24
 });
 
@@ -110,7 +110,7 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
       }
       if (part.role === "mouth") {
         scaleX = mouthWidth;
-        scaleY = Math.max(0.04, viseme === null ? Math.max(mouthOpen, 0.04) : mouthOpen);
+        scaleY = hasDialogueViseme ? mouthOpen : Math.max(0.04, mouthOpen);
       }
       if (part.role === "jaw") {
         // A separate jaw layer follows mouth opening instead of remaining static.
