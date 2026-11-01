@@ -77,3 +77,48 @@ test('does not let fallback description override an explicit motion prompt', asy
     description: 'The fox runs through the forest.'
   }), 'walk');
 });
+
+
+test('classifies combined character powers as team magic, not jumping', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  const result = inferSceneActionIntent('Arin and Elira unite their powers and combine blue energy with light magic.');
+  assert.equal(result.intent, 'team_magic');
+  assert.equal(result.motionCue, 'magic');
+  assert.equal(result.confidence, 0.9);
+});
+
+test('classifies an energy collision as a distinct battle event', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  const result = inferSceneActionIntent('Their blue and dark energy collide in a powerful clash.');
+  assert.equal(result.intent, 'energy_clash');
+  assert.equal(result.motionCue, 'magic');
+});
+
+test('distinguishes defense, evasion, attack, awakening, reveal and warning', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  const examples = [
+    ['Nox blocks the blue blade with his armor.', 'defend'],
+    ['Arin dodges the incoming strike.', 'dodge'],
+    ['Arin attacks with an energy blade.', 'attack'],
+    ['Blue energy awakens around Arin’s hand.', 'power_up'],
+    ['Nox appears among the ruins.', 'reveal'],
+    ['Elira warns Arin about the ancient darkness.', 'warning']
+  ];
+  for (const [story, expected] of examples) {
+    assert.equal(inferSceneActionIntent(story).intent, expected, story);
+  }
+});
+
+test('supports Russian and Ukrainian semantic scene actions', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  assert.equal(inferSceneActionIntent('Арин и Элира объединяют свои силы и магию.').intent, 'team_magic');
+  assert.equal(inferSceneActionIntent('Нокс появляется среди руин.').intent, 'reveal');
+  assert.equal(inferSceneActionIntent('Арін та Еліра поєднують свої сили й енергію.').intent, 'team_magic');
+  assert.equal(inferSceneActionIntent('Нокс з’являється серед руїн.').intent, 'reveal');
+});
+
+test('keeps semantic labels separate from supported renderer movement cues', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  const result = inferSceneActionIntent('Arin and Elira combine their powers.');
+  assert.ok(['idle', 'walk', 'run', 'jump', 'turn', 'float', 'vanish', 'magic', 'talk', 'surprised', 'sad', 'happy', 'dance'].includes(result.motionCue));
+});
