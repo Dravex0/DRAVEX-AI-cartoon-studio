@@ -98,8 +98,10 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
     if (![...roles].some(role => role === 'leftLeg' || role === 'rightLeg' || role === 'leg')) warnings.push('No leg-like bone IDs found; this preset will animate only recognized upper-body/root bones.');
     if (![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) warnings.push('No arm-like bone IDs found; arm swing will be omitted.');
     if (![...roles].some(role => role === 'foot' || role === 'leftFoot' || role === 'rightFoot')) warnings.push('No foot-like bone IDs found; root bounce cannot be compensated at the feet, so planted-foot contact is not represented.');
-    const lowerLegBones = rig.bones.filter(bone => ['leftLowerLeg', 'rightLowerLeg'].includes(roleOf(bone.id)));
-    if (lowerLegBones.length && !lowerLegBones.some(bone => bone.pivotEnabled)) warnings.push('Lower-leg bones were found but no knee pivots are defined; knee bending is omitted to avoid rotating around an unknown joint.');
+  }
+  const lowerLegBones = rig.bones.filter(bone => ['leftLowerLeg', 'rightLowerLeg'].includes(roleOf(bone.id)));
+  if (['walk', 'run', 'jump'].includes(presetName) && lowerLegBones.some(bone => !bone.pivotEnabled)) {
+    warnings.push('One or more lower-leg bones have no knee pivots defined; knee bending is omitted for those bones to avoid rotating around an unknown joint.');
   }
   if (presetName === 'wave' && ![...roles].some(role => role === 'rightArm' || role === 'arm')) {
     warnings.push('No right-arm or generic arm bone found; the greeting gesture cannot be represented by this rig.');
