@@ -1355,7 +1355,7 @@ $('export').onclick=async()=>{
     exportMouthTracks=[];
     if(voiceTracks.length){
       const mainCharacterKey=String($("character").value||"Foxy").trim().toLowerCase();
-      const mainCharacterVoiceTracks=voiceTracks.filter(track=>track.characterName.trim().toLowerCase()===mainCharacterKey);
+      const mainCharacterVoiceTracks=voiceTracks.filter(track=>{const meta=sceneMetadata[track.sceneIndex]||{};const speakerKey=String(track.characterId||track.characterName||"").trim().toLowerCase();const hasFacialRig=Array.isArray(meta.characterFacialRigs)&&meta.characterFacialRigs.some(rig=>Boolean(speakerKey)&&[rig?.characterId,track.characterName].some(value=>String(value||"").trim().toLowerCase()===String(rig?.characterId||"").trim().toLowerCase()));return track.characterName.trim().toLowerCase()===mainCharacterKey||hasFacialRig;});
       const lipSyncRenderableTracks=mainCharacterVoiceTracks.filter(track=>{
         const meta=sceneMetadata[track.sceneIndex]||{};
         const generatedVideo=sceneVideoCache.get(String(meta.id||('scene-index-'+track.sceneIndex)));
