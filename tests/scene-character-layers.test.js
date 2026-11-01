@@ -166,6 +166,27 @@ test('draws a complete validated segmented rig with inherited parent bone transf
   assert.ok(calls.some(call => call[0] === 'drawImage' && call[1] === image));
 });
 
+test('draws rig poses when the character ID casing differs', () => {
+  const calls = [];
+  const context = {
+    save() {}, restore() {},
+    translate(...args) { calls.push(['translate', ...args]); },
+    rotate() {},
+    drawImage() {}
+  };
+  const rig = {
+    schemaVersion: 1, characterId: 'Foxy',
+    bones: [{ id: 'root', parentId: null }],
+    parts: [{ id: 'body', boneId: 'root', imageUrl: 'blob:part', x: 0.5, y: 0.5, width: 0.2, height: 0.4 }]
+  };
+  const result = drawCharacterRigParts(
+    context, [rig], () => ({ naturalWidth: 20, naturalHeight: 20 }), 100, 100,
+    { foxy: { root: { x: 0.2, y: -0.1 } } }
+  );
+  assert.equal(result.drawn, 1);
+  assert.ok(calls.some(call => call[0] === 'translate' && call[1] === 70 && call[2] === 40));
+});
+
 test('keeps whole-sprite rendering available when a rig part image is not ready', () => {
   const context = {
     globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
