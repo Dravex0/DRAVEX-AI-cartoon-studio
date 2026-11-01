@@ -36,6 +36,36 @@ test('uses a widescreen 16:9 720p canvas for preview and WebM export', async ({ 
   await expect(page.locator('#imageQuality option[value="ultra"]')).toHaveText('Maximum · 1024×576');
 });
 
+test('switches to a true 9:16 portrait canvas and persists the format for WebM capture', async ({ page }) => {
+  await page.goto('/');
+  await page.getByText(/more settings/i).click();
+  await page.locator('#canvasFormat').selectOption('portrait');
+
+  const dimensions = await page.locator('#canvas').evaluate(canvas => ({
+    width: canvas.width,
+    height: canvas.height
+  }));
+  expect(dimensions).toEqual({ width: 720, height: 1280 });
+  expect(dimensions.width / dimensions.height).toBeCloseTo(9 / 16, 5);
+
+  const captureDimensions = await page.locator('#canvas').evaluate(canvas => {
+    const stream = canvas.captureStream(24);
+    const settings = stream.getVideoTracks()[0].getSettings();
+    stream.getTracks().forEach(track => track.stop());
+    return { width: settings.width, height: settings.height };
+  });
+  expect(captureDimensions).toEqual({ width: 720, height: 1280 });
+
+  await expect(page.locator('#imageQuality option[value="standard"]')).toHaveText('Standard · 384×640');
+  await expect(page.locator('#imageQuality option[value="high"]')).toHaveText('High · 448×768');
+  await expect(page.locator('#imageQuality option[value="ultra"]')).toHaveText('Maximum · 576×1024');
+
+  await page.reload();
+  await expect(page.locator('#canvasFormat')).toHaveValue('portrait');
+  await expect(page.locator('#canvas')).toHaveJSProperty('width', 720);
+  await expect(page.locator('#canvas')).toHaveJSProperty('height', 1280);
+});
+
 test('localizes style and quality options and restores the saved creative setup', async ({ page }) => {
   await page.goto('/');
   await page.locator('#uiLanguage').selectOption('ru');
