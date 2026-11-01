@@ -9,7 +9,7 @@ test('assembles a storyboard into a non-empty playable WebM file', async ({ page
   await page.locator('#idea').fill(
     'A little fox discovers a glowing key in an old forest, follows its light to a hidden gate, opens it, and enters a peaceful garden.'
   );
-  await page.getByRole('button', { name: /start working/i }).click();
+  await page.locator('#make').click();
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
 
@@ -47,6 +47,6 @@ test('assembles a storyboard into a non-empty playable WebM file', async ({ page
   expect(film.source).toBe('blob:');
   expect(film.duration).toBeGreaterThan(0);
   expect(film.size).toBeGreaterThan(0);
-  expect(film.type).toMatch(/video\/webm/i);
+  expect(film.type).toMatch(/video\\/webm/i);
   expect(pageErrors, 'export should not throw uncaught browser errors').toEqual([]);
 });
