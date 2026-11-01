@@ -58,6 +58,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="row"><div class="field"><label for="sceneMotionScale">Target scale (0.05–4)</label><input id="sceneMotionScale" type="number" min="0.05" max="4" step="0.05" value="1"></div><div class="field"><label for="sceneMotionRotation">Rotation (degrees)</label><input id="sceneMotionRotation" type="number" min="-360" max="360" step="5" value="0"></div></div>
 <div class="field"><label for="sceneMotionOpacity">Target opacity (0–1)</label><input id="sceneMotionOpacity" type="number" min="0" max="1" step="0.05" value="1"></div>
 <div class="actions"><button class="secondary" id="applyCharacterMotion" type="button">Apply motion keyframes / Применить движение</button></div>
+<div class="actions"><button class="secondary" id="generateCharacterMotion" type="button">Generate motion from story actions / Создать движение по сценарию</button></div>
 <div class="status" id="characterMotionStatus" role="status" aria-live="polite">Add a generated character sprite to enable motion controls.</div>
 </details>
 <details class="production-details"><summary id="dialogueSummary">Scene dialogue and narration</summary><div class="field"><label for="sceneDialogue" id="sceneDialogueLabel">One speaker per line</label><textarea id="sceneDialogue" rows="4" maxlength="6000" placeholder="Foxy: Hello!&#10;Narrator: The forest becomes quiet."></textarea><small class="muted" id="sceneDialogueHint">Use “Character: line” or “Character — line”. Unlabelled lines are treated as narration. Generate speech locally after adding dialogue.</small><div class="voice-workflow"><div class="field"><label for="sceneVoiceEngineChoice">Voice engine / Движок голоса</label><select id="sceneVoiceEngineChoice"><option value="standard">Standard local TTS · Kokoro / MMS</option><option value="timestamped">Experimental timestamped Kokoro · English only</option></select><small class="muted" id="sceneVoiceEngineHint">Timestamped mode downloads its model after Load and computes mouth timings locally from model token durations.</small></div><label class="consent-row" id="voiceConsentRow" for="voiceNonCommercialConsent"><input id="voiceNonCommercialConsent" type="checkbox"><span id="voiceConsentLabel">I confirm non-commercial use for this restricted local voice model (required for Russian, Ukrainian and Spanish).</span></label><div class="actions"><button class="secondary" id="loadSceneVoiceModel" type="button">Load local voice model</button><button class="secondary" id="generateSceneVoices" type="button" disabled>Generate voices for this scene</button></div><div class="status" id="sceneVoiceStatus" role="status" aria-live="polite">No voice model loaded. Download starts only after you press Load.</div><div class="voice-results" id="sceneVoiceResults"></div></div></div></details>
@@ -139,6 +140,7 @@ import { generateImageWithHorde } from "./src/ai-horde-image-provider.js";
 import { drawImageCover } from "./src/image-frame.js";
 import { drawCharacterLayers } from "./src/scene-character-layers.js";
 import { upsertCharacterMotionPhase } from "./src/character-motion-editor.js";
+import { planCharacterMotionFromActionTimeline } from "./src/character-motion-planner.js";
 import { attachCharacterSpriteToSceneLayers } from "./src/scene-character-layers.js";
 import { createSceneId, ensureSceneIds } from "./src/scene-identity.js";
 import { formatDialogueLines, parseDialogueLines } from "./src/dialogue-lines.js";
@@ -506,6 +508,20 @@ $('applyCharacterMotion').addEventListener('click',()=>{
    $('characterMotionStatus').textContent='Motion saved for '+actorId+'. Play the scene or export to see the movement.';
    if(!playing)draw();
  }catch(error){$('characterMotionStatus').textContent=error.message||'Invalid motion settings.'}
+});
+$('generateCharacterMotion').addEventListener('click',()=>{
+ const meta=sceneMetadata[sceneIndex]||{};
+ const result=planCharacterMotionFromActionTimeline(meta,meta.characterLayers||[]);
+ if(!result.timeline){
+   $('characterMotionStatus').textContent=result.reason||'No safe motion plan could be generated.';
+   return;
+ }
+ sceneMetadata[sceneIndex]={...meta,characterMotionTimeline:result.timeline};
+ sceneMotionSceneIndex=-1;
+ const skipped=result.skipped?.length||0;
+ $('characterMotionStatus').textContent='Generated '+result.generatedCount+' motion keyframe phases from grounded story actions.'+(skipped?' Skipped '+skipped+' ambiguous or unavailable action(s).':'')+' Preview and canvas export use this motion timeline.';
+ syncCharacterMotionEditor();
+ if(!playing)draw();
 });
 function syncSceneEditor(){
 const meta=sceneMetadata[sceneIndex]||{};
