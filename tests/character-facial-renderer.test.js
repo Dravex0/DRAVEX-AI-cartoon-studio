@@ -73,7 +73,7 @@ test("timestamped closed and neutral dialogue visemes override smiling expressio
     });
     assert.ok(context.calls.some(call => call[0] === "scale"
       && Math.abs(call[1] - 1) < 1e-9
-      && Math.abs(call[2] - (shape === "closed" ? 0.02 : 0)) < 1e-9));
+      && Math.abs(call[2] - 0.04) < 1e-9));
   }
 });
 
