@@ -47,8 +47,8 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightArm') rotation = -cycle * 0.32;
       if (role === 'leftLeg' || role === 'leg') rotation = -cycle * 0.38;
       if (role === 'rightLeg') rotation = cycle * 0.38;
-      if (role === 'leftLowerLeg') rotation = lift * 0.42;
-      if (role === 'rightLowerLeg') rotation = Math.max(0, -cycle) * 0.42;
+      if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = lift * 0.42;
+      if (role === 'rightLowerLeg' && bone.pivotEnabled) rotation = Math.max(0, -cycle) * 0.42;
       if (role === 'root') y = rootBob;
       if (role === 'head') rotation = -cycle * 0.025;
     } else if (preset === 'run') {
@@ -56,8 +56,8 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightArm') rotation = -cycle * 0.62;
       if (role === 'leftLeg' || role === 'leg') rotation = -cycle * 0.72;
       if (role === 'rightLeg') rotation = cycle * 0.72;
-      if (role === 'leftLowerLeg') rotation = lift * 0.68;
-      if (role === 'rightLowerLeg') rotation = Math.max(0, -cycle) * 0.68;
+      if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = lift * 0.68;
+      if (role === 'rightLowerLeg' && bone.pivotEnabled) rotation = Math.max(0, -cycle) * 0.68;
       if (role === 'root') y = rootBob;
       if (role === 'head') rotation = -cycle * 0.04;
     } else if (preset === 'jump') {
@@ -66,8 +66,8 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightArm') rotation = 0.55 * lift;
       if (role === 'leftLeg' || role === 'leg') rotation = -0.35 * lift;
       if (role === 'rightLeg') rotation = 0.35 * lift;
-      if (role === 'leftLowerLeg') rotation = 0.24 * lift;
-      if (role === 'rightLowerLeg') rotation = 0.24 * lift;
+      if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = 0.24 * lift;
+      if (role === 'rightLowerLeg' && bone.pivotEnabled) rotation = 0.24 * lift;
     } else if (preset === 'wave') {
       if (role === 'rightArm' || role === 'arm') rotation = -0.8 + 0.22 * Math.sin(phase * Math.PI * 2);
       if (role === 'leftArm') rotation = -0.12;
