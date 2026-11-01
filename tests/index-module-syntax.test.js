@@ -73,7 +73,7 @@ test('WebM export derives built-in character mouth movement from scheduled local
   assert.match(html, /getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)/);
   assert.match(html, /decodeContext\.decodeAudioData\(await track\.blob\.arrayBuffer\(\)\)/);
   assert.match(html, /exportMouthTracks\.push\(\{sceneIndex:track\.sceneIndex,characterId:track\.characterId,characterName:track\.characterName,startMs:track\.startMs,envelope,visemes\}\)/);
-  assert.match(html, /performance\.now\(\)-exportMouthOriginTimeMs/);
+  assert.match(html, /mouthClockOrigin=exportMouthOriginTimeMs!==null\?exportMouthOriginTimeMs:previewMouthOriginTimeMs/);\n  assert.match(html, /performance\.now\(\)-mouthClockOrigin/);
   assert.match(html, /exportElapsedMs>=track\.startMs/);
   assert.match(html, /sampleAudioMouthEnvelope\(activeMouthTrack\.envelope,mouthTrackTimeMs\)/);
   assert.match(html, /sampleCharacterFacialLipSync\(exportMouthTracks,sceneIndex,exportElapsedMs\)/);
