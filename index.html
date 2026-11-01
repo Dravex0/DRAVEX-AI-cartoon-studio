@@ -50,6 +50,16 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="field"><label for="sceneTitle" id="sceneTitleLabel">Selected scene title</label><input id="sceneTitle" maxlength="80" placeholder="Scene title"></div>
 <div class="field"><label for="sceneDescription" id="sceneDescriptionLabel">Selected scene description</label><textarea id="sceneDescription" rows="3" maxlength="500" placeholder="Describe what happens in this scene"></textarea></div>
 <div class="field"><label for="sceneCharacters" id="sceneCharactersLabel">Characters in this scene · comma-separated</label><input id="sceneCharacters" maxlength="600" placeholder="Foxy, Bird"></div>
+<details class="production-details" id="characterMotionEditor"><summary>Character motion / Движение персонажа</summary>
+<p class="muted" style="font-size:12px">Set an explicit start and end transform for a sprite. This is manual keyframe animation, not AI pose inference. It is used by preview and canvas export.</p>
+<div class="field"><label for="sceneMotionActor">Sprite / Персонаж</label><select id="sceneMotionActor"><option value="">Add a character sprite to this scene first</option></select></div>
+<div class="row"><div class="field"><label for="sceneMotionStart">Start (0–1)</label><input id="sceneMotionStart" type="number" min="0" max="0.99" step="0.05" value="0"></div><div class="field"><label for="sceneMotionEnd">End (0–1)</label><input id="sceneMotionEnd" type="number" min="0.01" max="1" step="0.05" value="1"></div></div>
+<div class="row"><div class="field"><label for="sceneMotionX">Target X (0–1)</label><input id="sceneMotionX" type="number" min="0" max="1" step="0.01" value="0.5"></div><div class="field"><label for="sceneMotionY">Target Y (0–1)</label><input id="sceneMotionY" type="number" min="0" max="1" step="0.01" value="0.5"></div></div>
+<div class="row"><div class="field"><label for="sceneMotionScale">Target scale (0.05–4)</label><input id="sceneMotionScale" type="number" min="0.05" max="4" step="0.05" value="1"></div><div class="field"><label for="sceneMotionRotation">Rotation (degrees)</label><input id="sceneMotionRotation" type="number" min="-360" max="360" step="5" value="0"></div></div>
+<div class="field"><label for="sceneMotionOpacity">Target opacity (0–1)</label><input id="sceneMotionOpacity" type="number" min="0" max="1" step="0.05" value="1"></div>
+<div class="actions"><button class="secondary" id="applyCharacterMotion" type="button">Apply motion keyframes / Применить движение</button></div>
+<div class="status" id="characterMotionStatus" role="status" aria-live="polite">Add a generated character sprite to enable motion controls.</div>
+</details>
 <details class="production-details"><summary id="dialogueSummary">Scene dialogue and narration</summary><div class="field"><label for="sceneDialogue" id="sceneDialogueLabel">One speaker per line</label><textarea id="sceneDialogue" rows="4" maxlength="6000" placeholder="Foxy: Hello!&#10;Narrator: The forest becomes quiet."></textarea><small class="muted" id="sceneDialogueHint">Use “Character: line” or “Character — line”. Unlabelled lines are treated as narration. Generate speech locally after adding dialogue.</small><div class="voice-workflow"><div class="field"><label for="sceneVoiceEngineChoice">Voice engine / Движок голоса</label><select id="sceneVoiceEngineChoice"><option value="standard">Standard local TTS · Kokoro / MMS</option><option value="timestamped">Experimental timestamped Kokoro · English only</option></select><small class="muted" id="sceneVoiceEngineHint">Timestamped mode downloads its model after Load and computes mouth timings locally from model token durations.</small></div><label class="consent-row" id="voiceConsentRow" for="voiceNonCommercialConsent"><input id="voiceNonCommercialConsent" type="checkbox"><span id="voiceConsentLabel">I confirm non-commercial use for this restricted local voice model (required for Russian, Ukrainian and Spanish).</span></label><div class="actions"><button class="secondary" id="loadSceneVoiceModel" type="button">Load local voice model</button><button class="secondary" id="generateSceneVoices" type="button" disabled>Generate voices for this scene</button></div><div class="status" id="sceneVoiceStatus" role="status" aria-live="polite">No voice model loaded. Download starts only after you press Load.</div><div class="voice-results" id="sceneVoiceResults"></div></div></div></details>
 <details class="production-details"><summary id="productionSummary">Scene production instructions</summary><div class="production-grid">
 <div class="field"><label for="sceneCamera" id="sceneCameraLabel">Camera / composition</label><textarea id="sceneCamera" rows="2" maxlength="1000"></textarea></div>
@@ -128,6 +138,7 @@ import { directStoryboardWithLocalAI } from "./src/local-story-director.js";
 import { generateImageWithHorde } from "./src/ai-horde-image-provider.js";
 import { drawImageCover } from "./src/image-frame.js";
 import { drawCharacterLayers } from "./src/scene-character-layers.js";
+import { upsertCharacterMotionPhase } from "./src/character-motion-editor.js";
 import { attachCharacterSpriteToSceneLayers } from "./src/scene-character-layers.js";
 import { createSceneId, ensureSceneIds } from "./src/scene-identity.js";
 import { formatDialogueLines, parseDialogueLines } from "./src/dialogue-lines.js";
@@ -267,7 +278,7 @@ const hasGeneratedVideo=Boolean(generatedVideo&&generatedVideo.readyState>=2&&ge
 const hasGeneratedMedia=hasGeneratedVideo||Boolean(generatedFrame);
 if(hasGeneratedVideo){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedVideo,w,h,motionTransform)}
 else if(generatedFrame){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
-drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{actionTimeline:currentSceneData.actionTimeline,progress:sceneMotionProgress});
+drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:sceneMotionProgress});
 ctx.fillStyle='#fff';ctx.font='bold 21px system-ui';ctx.fillText($('character').value||'Foxy',24,38);if(!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);if(playing){frame++;raf=requestAnimationFrame(draw)}else{raf=0}}
 const storyTemplates={
 en:{titles:['The beginning','A turning point','The next step'],middle:'A new detail changes the moment.',ending:'The story moves forward.',status:'Local DRAVEX storyboard created.'},
@@ -439,6 +450,61 @@ function renderCharacterSpriteAssets(){
   card.append(image,title,note,addButton,link);host.appendChild(card);
  });
 }
+function syncCharacterMotionEditor(){
+ const meta=sceneMetadata[sceneIndex]||{};
+ const select=$('sceneMotionActor');
+ const layers=Array.isArray(meta.characterLayers)?meta.characterLayers:[];
+ const selected=select.value;
+ select.replaceChildren();
+ layers.forEach(layer=>{
+   const option=document.createElement('option');
+   option.value=String(layer.characterId||'');
+   option.textContent=String(layer.characterId||'Character');
+   select.appendChild(option);
+ });
+ if(layers.some(layer=>String(layer.characterId||'')===selected))select.value=selected;
+ const actor=layers.find(layer=>String(layer.characterId||'')===select.value)||layers[0];
+ if(!actor){
+   const option=document.createElement('option');option.value='';option.textContent='Add a character sprite to this scene first';select.appendChild(option);
+   select.disabled=true;$('applyCharacterMotion').disabled=true;
+   $('characterMotionStatus').textContent='Add a generated character sprite to enable motion controls.';
+   return;
+ }
+ select.disabled=false;$('applyCharacterMotion').disabled=false;
+ const phase=(meta.characterMotionTimeline?.phases||[]).find(item=>String(item.actorId||'').toLowerCase()===String(actor.characterId||'').toLowerCase());
+ const from=phase?.motion?.from||actor;
+ const to=phase?.motion?.to||actor;
+ $('sceneMotionStart').value=phase?.start??0;
+ $('sceneMotionEnd').value=phase?.end??1;
+ $('sceneMotionX').value=to.x??actor.x??0.5;
+ $('sceneMotionY').value=to.y??actor.y??0.5;
+ $('sceneMotionScale').value=to.scale??actor.scale??1;
+ $('sceneMotionRotation').value=Math.round((to.rotation??actor.rotation??0)*180/Math.PI);
+ $('sceneMotionOpacity').value=to.opacity??actor.opacity??1;
+ $('characterMotionStatus').textContent=phase
+   ? 'Motion keyframes loaded for '+actor.characterId+'. Preview and export use this timeline.'
+   : 'No motion keyframes yet. The current sprite transform will be used as the start pose.';
+}
+$('sceneMotionActor').addEventListener('change',syncCharacterMotionEditor);
+$('applyCharacterMotion').addEventListener('click',()=>{
+ const meta=sceneMetadata[sceneIndex]||{};
+ const actorId=$('sceneMotionActor').value;
+ const layer=(meta.characterLayers||[]).find(item=>String(item.characterId||'')===actorId);
+ if(!layer){$('characterMotionStatus').textContent='Add a character sprite to this scene first.';return}
+ const number=id=>Number($(id).value);
+ try{
+   const timeline=upsertCharacterMotionPhase(meta.characterMotionTimeline,{
+     actorId,
+     start:number('sceneMotionStart'),
+     end:number('sceneMotionEnd'),
+     from:{x:Number(layer.x),y:Number(layer.y),scale:Number(layer.scale),rotation:Number(layer.rotation),opacity:Number(layer.opacity)},
+     to:{x:number('sceneMotionX'),y:number('sceneMotionY'),scale:number('sceneMotionScale'),rotation:number('sceneMotionRotation')*Math.PI/180,opacity:number('sceneMotionOpacity')}
+   });
+   sceneMetadata[sceneIndex]={...meta,characterMotionTimeline:timeline};
+   $('characterMotionStatus').textContent='Motion saved for '+actorId+'. Play the scene or export to see the movement.';
+   if(!playing)draw();
+ }catch(error){$('characterMotionStatus').textContent=error.message||'Invalid motion settings.'}
+});
 function syncSceneEditor(){
 const meta=sceneMetadata[sceneIndex]||{};
 $('sceneTitle').value=titles[sceneIndex]||'';
@@ -456,6 +522,7 @@ updateProductionPreview();
 renderCharacterBible();
 renderGeneratedSceneImage();
 renderCharacterSpriteAssets();
+syncCharacterMotionEditor();
 renderComfySceneVideo();
 renderSceneVoiceAudio();
 refreshSceneVoiceControls();
