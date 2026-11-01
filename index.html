@@ -537,6 +537,11 @@ $('generateCharacterRigPreset').addEventListener('click',()=>{
  }
  sceneMetadata[sceneIndex]={...meta,characterRigTimeline:result.timeline};
  $('characterRigTimelineJson').value=JSON.stringify(result.timeline,null,2);
+ $('characterRigScrubber').disabled=false;
+ $('resetCharacterRigScrubber').disabled=false;
+ rigPreviewProgress=0;
+ $('characterRigScrubber').value='0';
+ $('characterRigScrubberValue').textContent='0%';
  $('characterRigStatus').textContent=result.label+' generated for '+actorId+'. Animated bones: '+(result.animatedBoneIds.join(', ')||'none')+'. '+(result.warnings.join(' ')||'No rig mapping warnings.');
  sceneMotionSceneIndex=-1;
  if(!playing)draw();
@@ -625,6 +630,11 @@ $('applyCharacterRigTimeline').addEventListener('click',()=>{
   });
   if(unknown.length){$('characterRigStatus').textContent='Animation references invalid rigs/bones: '+unknown.join('; ');return}
   sceneMetadata[sceneIndex]={...meta,characterRigTimeline:report.timeline};
+  $('characterRigScrubber').disabled=false;
+  $('resetCharacterRigScrubber').disabled=false;
+  rigPreviewProgress=0;
+  $('characterRigScrubber').value='0';
+  $('characterRigScrubberValue').textContent='0%';
   $('characterRigStatus').textContent='Bone animation validated: '+report.timeline.keyframes.length+' keyframes. Preview and canvas export sample the same timeline.';
   sceneMotionSceneIndex=-1;
   if(!playing)draw();
