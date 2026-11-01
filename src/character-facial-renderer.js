@@ -67,11 +67,16 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
     const explicitVisemeValue = characterValueFor(rig.characterId, visemes);
     const explicitViseme = VISEME_OPENNESS[explicitVisemeValue] === undefined ? null : explicitVisemeValue;
     const expressionViseme = VISEME_OPENNESS[expression.mouthShape] === undefined ? null : expression.mouthShape;
-    const viseme = explicitViseme || expressionViseme;
-    const mouthOpen = viseme === null
-      ? clamp(expression.mouthOpen, 0, 1, 0)
-      : Math.max(clamp(expression.mouthOpen, 0, 1, 0), VISEME_OPENNESS[viseme])
-        * clamp(characterValueFor(rig.characterId, openness), 0, 1, 1);
+    const hasDialogueViseme = explicitViseme !== null;
+    const viseme = hasDialogueViseme ? explicitViseme : expressionViseme;
+    const dialogueOpenness = clamp(characterValueFor(rig.characterId, openness), 0, 1, 1);
+    // Timestamped dialogue phonemes are authoritative: closed/neutral sounds
+    // must close the mouth even when the character's expression is smiling.
+    const mouthOpen = hasDialogueViseme
+      ? VISEME_OPENNESS[explicitViseme] * dialogueOpenness
+      : viseme === null
+        ? clamp(expression.mouthOpen, 0, 1, 0)
+        : Math.max(clamp(expression.mouthOpen, 0, 1, 0), VISEME_OPENNESS[viseme]);
     const eyeOpen = clamp(expression.eyeOpen, 0, 1, 1);
     const browY = clamp(expression.browY, -1, 1, 0);
     const browRotation = clamp(expression.browRotation, -Math.PI, Math.PI, 0);

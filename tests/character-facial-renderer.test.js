@@ -63,6 +63,20 @@ test("matches expression and dialogue controls when character ID casing differs"
     && Math.abs(call[2] - 0.45) < 1e-9));
 });
 
+test("timestamped closed and neutral dialogue visemes override smiling expression mouth opening", () => {
+  for (const shape of ["closed", "neutral"]) {
+    const context = contextRecorder();
+    drawCharacterFacialRigs(context, [rig()], () => ({ width: 20, height: 20 }), 1000, 500, {
+      facialExpressions: { Foxy: { name: "happy", mouthOpen: 0.8, mouthShape: "wide" } },
+      facialVisemes: { Foxy: shape },
+      facialMouthOpenness: { Foxy: 1 }
+    });
+    assert.ok(context.calls.some(call => call[0] === "scale"
+      && Math.abs(call[1] - 1) < 1e-9
+      && Math.abs(call[2] - 0.04) < 1e-9));
+  }
+});
+
 test("uses expression preset mouth shape when no dialogue viseme is active", () => {
   const context = contextRecorder();
   drawCharacterFacialRigs(context, [rig()], () => ({ width: 20, height: 20 }), 1000, 500, {
