@@ -88,6 +88,22 @@ export function drawCharacterRigParts(context, rigs, resolveImage, viewportWidth
   return { drawn, skipped, readyCharacterIds };
 }
 
+function getReadyRigCharacterIds(rigs, resolveImage) {
+  const ready = new Set();
+  for (const input of Array.isArray(rigs) ? rigs.slice(0, 20) : []) {
+    const report = validateCharacterRig(input);
+    if (!report.passed) continue;
+    const imagesReady = report.rig.parts.every(part => {
+      const image = resolveImage(part.imageUrl, report.rig.characterId);
+      const imageWidth = Number(image?.naturalWidth || image?.videoWidth || image?.width);
+      const imageHeight = Number(image?.naturalHeight || image?.videoHeight || image?.height);
+      return Boolean(image && Number.isFinite(imageWidth) && Number.isFinite(imageHeight) && imageWidth > 0 && imageHeight > 0);
+    });
+    if (imagesReady) ready.add(report.rig.characterId.toLocaleLowerCase());
+  }
+  return ready;
+}
+
 /**
  * Composite independently generated character sprites over a scene background.
  * The resolver owns asset loading; this function only draws already-ready images.
@@ -105,9 +121,12 @@ export function drawCharacterLayers(context, layers, resolveImage, viewportWidth
   const runtimeLayers = motionTimeline
     ? applyCharacterActionTimelineToLayers(baseLayers, motionTimeline, runtime.progress)
     : baseLayers;
+  const readyRigIds = runtime && runtime.drawRigParts === true && runtime.preferRigParts === true
+    ? getReadyRigCharacterIds(runtime.characterRigs, resolveImage)
+    : new Set();
   const normalized = runtimeLayers
     .map((layer, index) => ({ layer, index }))
-    .filter(item => item.layer.visible)
+    .filter(item => item.layer.visible && !readyRigIds.has(item.layer.characterId.toLocaleLowerCase()))
     .sort((a, b) => a.layer.zIndex - b.layer.zIndex || a.index - b.index);
   let drawn = 0, skipped = Array.isArray(layers) ? layers.length - normalized.length : 0;
   for (const { layer } of normalized) {
