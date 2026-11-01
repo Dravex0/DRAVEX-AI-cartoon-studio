@@ -103,7 +103,7 @@ describe('procedural character rig motion presets', () => {
     }
   });
 
-  it('animates lower-leg bones as knee bends only when knee pivots are defined', () => {
+  it('animates lower-leg bones as knee bends only when lower-leg bones have no knee pivots defined', () => {
     const candidate = rig();
     candidate.bones.push(
       { id: 'lowerLegL', parentId: 'leftLeg', pivotX: 0.42, pivotY: 0.61 },
@@ -121,7 +121,7 @@ describe('procedural character rig motion presets', () => {
     assert.equal(walkPose.shin_r, undefined);
     const rightSwingPose = sampleCharacterRigTimeline(walk.timeline, 0.75).Foxy;
     assert.ok(rightSwingPose.shin_r.rotation > 0);
-    assert.ok(!walk.warnings.some(message => message.includes('knee pivots are defined')));
+    assert.ok(!walk.warnings.some(message => message.includes('lower-leg bones have no knee pivots defined')));
 
     const run = createCharacterRigMotionPreset(candidate, 'run');
     const runPose = sampleCharacterRigTimeline(run.timeline, 0.25).Foxy;
@@ -134,7 +134,7 @@ describe('procedural character rig motion presets', () => {
     assert.equal(legacyWalk.status, 'ready');
     const legacyPose = sampleCharacterRigTimeline(legacyWalk.timeline, 0.25).Foxy;
     assert.equal(legacyPose.leftShin, undefined);
-    assert.ok(legacyWalk.warnings.some(message => message.includes('knee pivots are defined')));
+    assert.ok(legacyWalk.warnings.some(message => message.includes('lower-leg bones have no knee pivots defined')));
   });
 
   it('creates different run and walk amplitudes', () => {
@@ -194,7 +194,7 @@ describe('procedural character rig motion presets', () => {
     candidate.parts.push({ id: 'calf-part', boneId: 'leftCalf', imageUrl: 'https://assets.example/calf.png' });
     const result = createCharacterRigMotionPreset(candidate, 'jump');
     assert.equal(result.status, 'ready');
-    assert.ok(result.warnings.some(message => message.includes('knee pivots are defined')));
+    assert.ok(result.warnings.some(message => message.includes('lower-leg bones have no knee pivots defined')));
     assert.equal(sampleCharacterRigTimeline(result.timeline, 0.25).Foxy.leftCalf, undefined);
   });
 
