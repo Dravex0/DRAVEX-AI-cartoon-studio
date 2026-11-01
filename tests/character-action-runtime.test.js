@@ -117,8 +117,8 @@ test('supports ease-in, ease-out, and ease-in-out interpolation profiles', () =>
   ] });
   const atHalf = easing => applyCharacterActionTimelineToLayers(source, makeTimeline(easing), 0.5)[0].x;
   assert.equal(atHalf('linear'), 0.5);
-  assert.equal(atHalf('ease-in'), 0.35);
-  assert.equal(atHalf('ease-out'), 0.65);
+  assert.ok(Math.abs(atHalf('ease-in') - 0.35) < 1e-9);
+  assert.ok(Math.abs(atHalf('ease-out') - 0.65) < 1e-9);
   assert.equal(atHalf('ease-in-out'), 0.5);
 });
 
@@ -129,5 +129,5 @@ test('unknown easing safely falls back to linear runtime interpolation', () => {
       { actorId: 'Foxy', start: 0, end: 1, easing: 'spring-rocket', motion: { from: { x: 0.2 }, to: { x: 0.8 } } }
     ] }, 0.25
   );
-  assert.equal(result[0].x, 0.35);
+  assert.ok(Math.abs(result[0].x - 0.35) < 1e-9);
 });
