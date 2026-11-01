@@ -6,6 +6,20 @@ import { buildSceneBackgroundPrompt } from './scene-background-prompt.js';
 const safe = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const list = values => Array.isArray(values) ? values.map(value => safe(value, 500)).filter(Boolean) : [];
 
+const VISUAL_STYLE_PROMPTS = Object.freeze({
+  'Storybook': 'storybook illustration, warm hand-painted textures, expressive friendly shapes',
+  'Anime-inspired': 'high-quality 2D Japanese anime artwork, expressive character design, clean line art and cinematic lighting',
+  'Flat 2D': 'clean flat 2D animation design, simple shapes, crisp outlines and controlled colors',
+  'Pixel art': 'carefully composed pixel art, consistent pixel scale, readable silhouettes and limited palette',
+  '3D animated': 'polished stylized 3D animated feature-film frame, expressive 3D characters, detailed materials, cinematic global illumination',
+  '3D realistic': 'cinematic realistic 3D render, physically based materials, natural lighting, detailed environments and believable proportions',
+  'Clay 3D': 'stylized 3D clay animation, handcrafted clay textures, soft studio lighting and tactile shapes',
+  'Watercolor': 'traditional watercolor illustration, visible pigment washes, soft paper texture and delicate edges',
+  'Comic / manga': 'detailed manga and comic-book illustration, confident ink lines, expressive framing and controlled screentone',
+  'Paper cutout': 'layered paper-cut illustration, tactile paper fibers, clear depth between cutout layers and soft shadows',
+  'Stop-motion': 'stop-motion animation frame, handcrafted miniature sets, tactile materials and subtle practical lighting'
+});
+
 function characterDetails(scene, characterBible) {
   const hasExplicitCast = Array.isArray(scene?.characters);
   const names = new Set(list(scene?.characters).map(name => name.toLocaleLowerCase()));
@@ -34,6 +48,7 @@ export function buildImageGenerationPrompt(scene = {}, characterBible = [], opti
   const characterLock = characterDetails(scene, characterBible);
   return [
     safe(scene.imagePrompt) || safe(scene.prompt) || safe(scene.description),
+    VISUAL_STYLE_PROMPTS[safe(options.visualStyle, 80)] && `Visual art direction: ${VISUAL_STYLE_PROMPTS[safe(options.visualStyle, 80)]}. Keep this style consistent across every scene.`,
     safe(scene.location) && `Location: ${safe(scene.location, 500)}`,
     safe(scene.timeOfDay) && `Time: ${safe(scene.timeOfDay, 120)}`,
     safe(scene.camera) && `Composition and camera: ${safe(scene.camera, 1000)}`,
