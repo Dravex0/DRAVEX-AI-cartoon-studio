@@ -193,3 +193,32 @@ test('creates a single action phase for explicit movement without inventing othe
   assert.equal(timeline.phases[0].actorId, 'Foxy');
   assert.equal(timeline.phases[0].evidence, 'Foxy runs through the forest.');
 });
+
+
+test('semantic scene intent reaches motion prompt and action timeline for team magic', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\\nArin — 17-year-old hero with blue energy.\\nElira — mage with silver hair.\\n\\nScene 6: Final Light\\nArin and Elira unite their powers; blue and violet light merge into one beam.',
+    'en',
+    'Arin'
+  );
+  const scene = result.scenes[0];
+  assert.equal(scene.semanticActionIntent.intent, 'team_magic');
+  assert.equal(scene.actionTimeline.phases[0].actorId, 'Arin');
+  assert.equal(scene.actionTimeline.phases[0].targetId, 'Elira');
+  assert.match(scene.actionTimeline.phases[0].description, /combine their powers/);
+  assert.match(scene.motionGenerationPrompt, /team_magic/);
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+});
+
+test('semantic reveal creates a source-grounded action instead of a passive idle scene', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\\nNox — tall antagonist in black armor.\\n\\nScene 4: The Enemy\\nNox emerges from the ruins as darkness spreads across the ground.',
+    'en',
+    'Arin'
+  );
+  const scene = result.scenes[0];
+  assert.equal(scene.semanticActionIntent.intent, 'reveal');
+  assert.ok(scene.actionTimeline);
+  assert.equal(scene.actionTimeline.phases[0].actorId, 'Nox');
+  assert.match(scene.motionGenerationPrompt, /reveal/);
+});
