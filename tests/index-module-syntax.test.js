@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 test('published index loads one external module and the application module parses', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   const appPath = new URL('../src/app.js', import.meta.url);
-  assert.match(html, /<script type="module" src="\.\/app\.js"><\/script>/);
+  assert.match(html, /<script type="module" src="\.\/src\/app\.js"><\/script>/);
   const result = spawnSync(process.execPath, ['--check', appPath.pathname], {
     encoding: 'utf8'
   });
