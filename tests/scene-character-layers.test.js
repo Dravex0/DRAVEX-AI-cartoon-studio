@@ -161,7 +161,7 @@ test('draws a complete validated segmented rig with inherited parent bone transf
     Foxy: { root: { x: 0.05 }, arm: { rotation: 0.25 } }
   });
   assert.deepEqual(result, { drawn: 1, skipped: 0, readyCharacterIds: ['Foxy'] });
-  assert.ok(calls.some(call => call[0] === 'translate' && call[1] === 250 && call[2] === 150));
+  assert.ok(calls.some(call => call[0] === 'translate' && Math.abs(call[1] - 250) < 1e-9 && Math.abs(call[2] - 150) < 1e-9));
   assert.ok(calls.some(call => call[0] === 'rotate' && call[1] === 0.25));
   assert.ok(calls.some(call => call[0] === 'drawImage' && call[1] === image));
 });

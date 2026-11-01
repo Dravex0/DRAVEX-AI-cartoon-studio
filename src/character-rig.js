@@ -19,11 +19,14 @@ function poseForBone(pose, boneId) {
 
 function normalizeBone(input = {}) {
   const source = isRecord(input) ? input : {};
+  const hasPivotX = typeof source.pivotX === 'number' && Number.isFinite(source.pivotX);
+  const hasPivotY = typeof source.pivotY === 'number' && Number.isFinite(source.pivotY);
   return {
     id: clean(source.id),
     parentId: clean(source.parentId) || null,
     pivotX: clamp(source.pivotX, -2, 2),
     pivotY: clamp(source.pivotY, -2, 2),
+    pivotEnabled: typeof source.pivotEnabled === 'boolean' ? source.pivotEnabled : hasPivotX && hasPivotY,
     length: clamp(source.length, 0, 2)
   };
 }
@@ -69,6 +72,13 @@ export function validateCharacterRig(input = {}) {
     if (!bone.id) issues.push({ code: 'bone-id-missing', message: 'Every bone needs an ID.' });
     else if (boneIds.has(bone.id.toLowerCase())) issues.push({ code: 'bone-id-duplicate', message: 'Bone IDs must be unique.' });
     boneIds.add(bone.id.toLowerCase());
+  }
+  for (const [index, sourceBone] of (Array.isArray(input?.bones) ? input.bones : []).slice(0, MAX_BONES).entries()) {
+    const hasPivotX = typeof sourceBone?.pivotX === 'number' && Number.isFinite(sourceBone.pivotX);
+    const hasPivotY = typeof sourceBone?.pivotY === 'number' && Number.isFinite(sourceBone.pivotY);
+    if (hasPivotX !== hasPivotY) {
+      issues.push({ code: 'bone-pivot-incomplete', message: 'A bone pivot must define both pivotX and pivotY, or omit both.' });
+    }
   }
   const roots = rig.bones.filter(bone => !bone.parentId);
   if (rig.bones.length && roots.length !== 1) issues.push({ code: 'rig-root-count-invalid', message: 'A rig must have exactly one root bone.' });
@@ -120,20 +130,43 @@ export function applyCharacterRigPose(parts, rigInput, pose = {}) {
     if (!isRecord(part)) return part;
     let current = bones.get(clean(part.boneId).toLowerCase());
     if (!current) return { ...part };
-    let x = 0, y = 0, rotation = 0;
+    const chain = [];
     const visited = new Set();
     while (current && !visited.has(current.id.toLowerCase())) {
       visited.add(current.id.toLowerCase());
-      const delta = poseForBone(pose, current.id);
-      x += clamp(delta.x, -2, 2);
-      y += clamp(delta.y, -2, 2);
-      rotation += clamp(delta.rotation, -Math.PI * 2, Math.PI * 2);
+      chain.push(current);
       current = current.parentId ? bones.get(current.parentId.toLowerCase()) : null;
+    }
+    chain.reverse();
+
+    // Affine transform from the part's rest position into its posed position.
+    // Pivot coordinates share the normalized viewport coordinate space with part x/y.
+    let a = 1, b = 0, c = 0, d = 1, e = 0, f = 0;
+    let rotation = 0;
+    for (const bone of chain) {
+      const delta = poseForBone(pose, bone.id);
+      const boneRotation = clamp(delta.rotation, -Math.PI * 2, Math.PI * 2);
+      if (bone.pivotEnabled && boneRotation !== 0) {
+        const pivotX = a * bone.pivotX + c * bone.pivotY + e;
+        const pivotY = b * bone.pivotX + d * bone.pivotY + f;
+        const cos = Math.cos(boneRotation), sin = Math.sin(boneRotation);
+        const nextA = cos * a - sin * b;
+        const nextB = sin * a + cos * b;
+        const nextC = cos * c - sin * d;
+        const nextD = sin * c + cos * d;
+        const nextE = pivotX + cos * (e - pivotX) - sin * (f - pivotY);
+        const nextF = pivotY + sin * (e - pivotX) + cos * (f - pivotY);
+        a = nextA; b = nextB; c = nextC; d = nextD; e = nextE; f = nextF;
+      }
+      // Keep legacy pose offsets in viewport space; descendants inherit every ancestor offset.
+      e += clamp(delta.x, -2, 2);
+      f += clamp(delta.y, -2, 2);
+      rotation += boneRotation;
     }
     return {
       ...part,
-      x: finite(part.x) + x,
-      y: finite(part.y) + y,
+      x: a * finite(part.x) + c * finite(part.y) + e,
+      y: b * finite(part.x) + d * finite(part.y) + f,
       rotation: finite(part.rotation) + rotation
     };
   });
