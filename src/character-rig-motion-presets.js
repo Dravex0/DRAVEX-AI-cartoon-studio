@@ -14,10 +14,11 @@ const roleOf = boneId => {
   const id = normalizeId(boneId);
   if (/root|hips|pelvis|torso|body|spine/.test(id)) return 'root';
   if (/head|neck/.test(id)) return 'head';
-  if (/left.*arm|arm.*left|larm|upperarm_l|shoulder_l/.test(id)) return 'leftArm';
-  if (/right.*arm|arm.*right|rarm|upperarm_r|shoulder_r/.test(id)) return 'rightArm';
-  if (/left.*leg|leg.*left|lleg|thigh_l|foot_l/.test(id)) return 'leftLeg';
-  if (/right.*leg|leg.*right|rleg|thigh_r|foot_r/.test(id)) return 'rightLeg';
+  // Accept both word-order and common L/R suffix conventions after ID normalization.
+  if (/left.*(arm|hand|shoulder)|(arm|hand|shoulder).*left|l(arm|hand|upperarm|shoulder)|(arm|hand|upperarm|shoulder)l/.test(id)) return 'leftArm';
+  if (/right.*(arm|hand|shoulder)|(arm|hand|shoulder).*right|r(arm|hand|upperarm|shoulder)|(arm|hand|upperarm|shoulder)r/.test(id)) return 'rightArm';
+  if (/left.*(leg|foot|thigh)|(leg|foot|thigh).*left|l(leg|foot|thigh)|(leg|foot|thigh)l/.test(id)) return 'leftLeg';
+  if (/right.*(leg|foot|thigh)|(leg|foot|thigh).*right|r(leg|foot|thigh)|(leg|foot|thigh)r/.test(id)) return 'rightLeg';
   if (/arm|hand|shoulder/.test(id)) return 'arm';
   if (/leg|foot|thigh/.test(id)) return 'leg';
   return 'other';

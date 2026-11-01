@@ -50,6 +50,33 @@ describe('procedural character rig motion presets', () => {
     assert.ok(jump.timeline.keyframes.slice(1).every(frame => frame.easing === 'ease-in-out'));
   });
 
+  it('recognizes left/right hand and foot bone naming conventions', () => {
+    const namingSets = [
+      { leftArm: 'leftHand', rightArm: 'rightHand', leftLeg: 'leftFoot', rightLeg: 'rightFoot' },
+      { leftArm: 'upperArmL', rightArm: 'upperArmR', leftLeg: 'footL', rightLeg: 'footR' }
+    ];
+    for (const names of namingSets) {
+      const candidate = rig();
+      const replacements = {
+        leftArm: names.leftArm, rightArm: names.rightArm,
+        leftLeg: names.leftLeg, rightLeg: names.rightLeg
+      };
+      candidate.bones = candidate.bones.map(bone => ({
+        ...bone, id: replacements[bone.id] || bone.id
+      }));
+      candidate.parts = candidate.parts.map(part => ({
+        ...part, boneId: replacements[part.boneId] || part.boneId
+      }));
+      const result = createCharacterRigMotionPreset(candidate, 'walk');
+      assert.equal(result.status, 'ready');
+      const pose = sampleCharacterRigTimeline(result.timeline, 0.25).Foxy;
+      assert.ok(pose[names.leftArm].rotation > 0, names.leftArm);
+      assert.ok(pose[names.rightArm].rotation < 0, names.rightArm);
+      assert.ok(pose[names.leftLeg].rotation < 0, names.leftLeg);
+      assert.ok(pose[names.rightLeg].rotation > 0, names.rightLeg);
+    }
+  });
+
   it('creates different run and walk amplitudes', () => {
     const walk = createCharacterRigMotionPreset(rig(), 'walk');
     const run = createCharacterRigMotionPreset(rig(), 'run');
