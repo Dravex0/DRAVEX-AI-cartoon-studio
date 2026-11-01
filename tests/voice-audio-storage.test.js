@@ -37,7 +37,10 @@ function createMemoryIndexedDB() {
     return result;
   }
   return {
+    database,
+    openCount: 0,
     open() {
+      this.openCount += 1;
       const result = {};
       queueMicrotask(() => {
         result.result = database;
@@ -80,4 +83,17 @@ test("rejects malformed hashes, empty blobs, and invalid metadata", async () => 
 test("reports when IndexedDB is unavailable", async () => {
   const storage = createVoiceAudioStorage({ indexedDBRef: null });
   await assert.rejects(storage.get(HASH), /not available/);
+});
+
+test("closes stale connections and reopens after an IndexedDB version change", async () => {
+  const indexedDBRef = createMemoryIndexedDB();
+  const storage = createVoiceAudioStorage({ indexedDBRef });
+  await storage.get(HASH);
+  assert.equal(indexedDBRef.openCount, 1);
+  let closed = 0;
+  indexedDBRef.database.close = () => { closed += 1; };
+  indexedDBRef.database.onversionchange();
+  assert.equal(closed, 1);
+  await storage.get(HASH);
+  assert.equal(indexedDBRef.openCount, 2);
 });

@@ -33,7 +33,17 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
             database.createObjectStore(STORE_NAME, { keyPath: "sceneId" });
           }
         };
-        request.onsuccess = () => resolve(request.result);
+        request.onsuccess = () => {
+          const database = request.result;
+          database.onversionchange = () => {
+            database.close?.();
+            databasePromise = null;
+          };
+          database.onclose = () => {
+            databasePromise = null;
+          };
+          resolve(database);
+        };
         request.onerror = () => {
           databasePromise = null;
           reject(request.error || new Error("Could not open scene video storage."));
@@ -75,7 +85,9 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
       if (!(typeof Blob !== "undefined" && blob instanceof Blob)) {
         throw new TypeError("Scene video data must be a Blob.");
       }
-      const record = { sceneId: key, blob, filename: String(filename || "scene-video.webm"), updatedAt: Date.now() };
+      if (blob.size === 0) throw new TypeError("Scene video Blob must not be empty.");
+      const safeFilename = String(filename || "scene-video.webm").slice(0, 180);
+      const record = { sceneId: key, blob, filename: safeFilename, updatedAt: Date.now() };
       await run(store => requestResult(store.put(record)), "readwrite");
       return record;
     },
