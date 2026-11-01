@@ -20,12 +20,28 @@ test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   expect(pageErrors, 'the page should not throw uncaught JavaScript errors').toEqual([]);
 });
 
+
+test('uses a widescreen 16:9 720p canvas for preview and WebM export', async ({ page }) => {
+  await page.goto('/');
+  const dimensions = await page.locator('#canvas').evaluate(canvas => ({
+    width: canvas.width,
+    height: canvas.height
+  }));
+  expect(dimensions).toEqual({ width: 1280, height: 720 });
+  expect(dimensions.width / dimensions.height).toBeCloseTo(16 / 9, 5);
+
+  await page.getByText(/more settings/i).click();
+  await expect(page.locator('#imageQuality option[value="standard"]')).toHaveText('Standard · 640×384');
+  await expect(page.locator('#imageQuality option[value="high"]')).toHaveText('High · 768×448');
+  await expect(page.locator('#imageQuality option[value="ultra"]')).toHaveText('Maximum · 1024×576');
+});
+
 test('localizes style and quality options and restores the saved creative setup', async ({ page }) => {
   await page.goto('/');
   await page.locator('#uiLanguage').selectOption('ru');
   await expect(page.locator('#make')).toHaveText('Начать работу');
   await expect(page.locator('#style option[value="3D animated"]')).toHaveText('3D-анимация');
-  await expect(page.locator('#imageQuality option[value="ultra"]')).toHaveText('Максимум · 768 px');
+  await expect(page.locator('#imageQuality option[value="ultra"]')).toHaveText('Максимум · 1024×576');
 
   await page.getByText(/дополнительные настройки/i).click();
   await page.locator('#style').selectOption('3D animated');
