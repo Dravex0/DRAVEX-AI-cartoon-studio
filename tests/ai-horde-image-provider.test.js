@@ -40,6 +40,22 @@ test('submits an anonymous, SFW, explicitly shared prompt and retrieves the fini
   assert.equal(progress.length, 1);
 });
 
+test('passes selected image dimensions and step count to the provider request', async () => {
+  let submittedBody = null;
+  const fetchImpl = async (url, options) => {
+    if (url.endsWith('/generate/async')) {
+      submittedBody = JSON.parse(options.body);
+      return response({ id: 'quality-request' }, 202);
+    }
+    if (url.endsWith('/generate/check/quality-request')) return response({ done: true, finished: 1 });
+    return response({ generations: [{ img: 'https://cdn.example.test/quality.webp' }] });
+  };
+  await generateImageWithHorde({ prompt: 'A cinematic scene.', width: 768, height: 768, steps: 30, fetchImpl, pollIntervalMs: 0 });
+  assert.equal(submittedBody.params.width, 768);
+  assert.equal(submittedBody.params.height, 768);
+  assert.equal(submittedBody.params.steps, 30);
+});
+
 test('rejects an empty prompt without making a network request', async () => {
   let called = false;
   await assert.rejects(() => generateImageWithHorde({ prompt: ' ', fetchImpl: async () => { called = true; } }), /Add an image prompt/);
