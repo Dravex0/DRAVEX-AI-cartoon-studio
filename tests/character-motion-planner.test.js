@@ -79,3 +79,9 @@ test('does not mutate scene, action timeline, or sprite layers', () => {
   assert.deepEqual(scene, before);
   assert.deepEqual(layers, layerBefore);
 });
+
+test('assigns ease-out and ease-in profiles to jump rise and landing', () => {
+  const result = planCharacterMotionFromActionTimeline(makeScene('jumps over the stone'), layers);
+  assert.equal(result.timeline.phases[0].easing, 'ease-out');
+  assert.equal(result.timeline.phases[1].easing, 'ease-in');
+});
