@@ -173,3 +173,18 @@ test('rejects a supplied motion block without a valid numeric target pose', () =
   const report = validateCharacterActionTimeline(candidate);
   assert.ok(report.issues.some(item => item.code === 'phase-motion-invalid'));
 });
+
+test('normalizes and validates supported motion easing profiles', () => {
+  const candidate = structuredClone(scene);
+  candidate.actionTimeline.phases[1].easing = 'ease-in-out';
+  const normalized = normalizeScene(candidate).actionTimeline.phases[1];
+  assert.equal(normalized.easing, 'ease-in-out');
+  assert.equal(validateCharacterActionTimeline(candidate).passed, true);
+});
+
+test('rejects unsupported motion easing profiles', () => {
+  const candidate = structuredClone(scene);
+  candidate.actionTimeline.phases[1].easing = 'spring-rocket';
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'phase-easing-invalid'));
+});

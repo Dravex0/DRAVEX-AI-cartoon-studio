@@ -3,6 +3,7 @@
  * This checks timeline metadata only; it does not prove that rendered motion matches it.
  */
 const PHASE_ORDER = ['preparation', 'action', 'reaction', 'result'];
+const MOTION_EASINGS = new Set(['linear', 'ease-in', 'ease-out', 'ease-in-out']);
 const isRecord = value => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const clean = (value, max = 500) => String(value ?? '').trim().slice(0, max);
 const MOTION_RANGES = {
@@ -53,6 +54,7 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
         targetId: clean(phase.targetId, 120) || null,
         description: clean(phase.description, 700),
         evidence: clean(phase.evidence, 500),
+        ...(phase.easing == null ? {} : { easing: clean(phase.easing, 24) }),
         ...(phase.motion == null ? {} : { motion })
       };
     })
@@ -117,6 +119,7 @@ export function validateCharacterActionTimeline(scene = {}) {
 
     if (!normalized.description) issues.push(issue('phase-description-missing', name, 'Every phase needs a concrete visible description.'));
     if (phase.motion != null && !normalized.motion) issues.push(issue('phase-motion-invalid', name, 'Motion must provide a numeric target pose with at least one supported transform property.'));
+    if (phase.easing != null && !MOTION_EASINGS.has(normalized.easing)) issues.push(issue('phase-easing-invalid', name, 'Motion easing must be linear, ease-in, ease-out, or ease-in-out.'));
     if (!normalized.actorId) issues.push(issue('phase-actor-missing', name, 'Every phase needs an acting character ID.'));
     else if (castWasExplicit && !cast.has(normalized.actorId.toLocaleLowerCase())) {
       issues.push(issue('phase-actor-not-in-cast', name, 'The phase actor must belong to this scene cast.'));

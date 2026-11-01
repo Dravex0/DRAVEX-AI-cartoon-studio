@@ -2,6 +2,7 @@ const LIMITS = {
   x: [0, 1], y: [0, 1], width: [0.01, 2], height: [0.01, 2],
   rotation: [-Math.PI * 2, Math.PI * 2], scale: [0.05, 4], opacity: [0, 1]
 };
+const EASINGS = new Set(['linear', 'ease-in', 'ease-out', 'ease-in-out']);
 const isRecord = value => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 function normalizePose(value, required = false) {
@@ -44,6 +45,7 @@ export function upsertCharacterMotionPhase(timeline, input = {}) {
     end,
     description: 'Motion configured manually in the scene editor.',
     evidence: 'manual-editor',
+    easing: EASINGS.has(input.easing) ? input.easing : 'ease-in-out',
     motion: { ...(Object.keys(from).length ? { from } : {}), to }
   });
   phases.sort((a, b) => a.start - b.start || a.actorId.localeCompare(b.actorId));

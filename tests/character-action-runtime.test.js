@@ -109,3 +109,25 @@ test('drawCharacterLayers accepts a separate editor-authored motion timeline', (
   });
   assert.ok(calls.some(call => call[0] === 'translate' && call[1] === 50 && call[2] === 50));
 });
+
+test('supports ease-in, ease-out, and ease-in-out interpolation profiles', () => {
+  const source = [{ characterId: 'Foxy', x: 0.2 }];
+  const makeTimeline = easing => ({ schemaVersion: 1, phases: [
+    { actorId: 'Foxy', start: 0, end: 1, easing, motion: { from: { x: 0.2 }, to: { x: 0.8 } } }
+  ] });
+  const atHalf = easing => applyCharacterActionTimelineToLayers(source, makeTimeline(easing), 0.5)[0].x;
+  assert.equal(atHalf('linear'), 0.5);
+  assert.ok(Math.abs(atHalf('ease-in') - 0.35) < 1e-9);
+  assert.ok(Math.abs(atHalf('ease-out') - 0.65) < 1e-9);
+  assert.equal(atHalf('ease-in-out'), 0.5);
+});
+
+test('unknown easing safely falls back to linear runtime interpolation', () => {
+  const result = applyCharacterActionTimelineToLayers(
+    [{ characterId: 'Foxy', x: 0.2 }],
+    { schemaVersion: 1, phases: [
+      { actorId: 'Foxy', start: 0, end: 1, easing: 'spring-rocket', motion: { from: { x: 0.2 }, to: { x: 0.8 } } }
+    ] }, 0.25
+  );
+  assert.ok(Math.abs(result[0].x - 0.35) < 1e-9);
+});

@@ -44,3 +44,17 @@ test('limits motion phases to eight unique characters', () => {
     actorId: 'Ninth', start: 0, end: 1, to: { x: 0.5 }
   }), /at most eight/);
 });
+
+test('stores a supported easing profile on manual motion phases', () => {
+  const result = upsertCharacterMotionPhase(null, {
+    actorId: 'Foxy', start: 0, end: 1, easing: 'ease-out', to: { x: 0.8 }
+  });
+  assert.equal(result.phases[0].easing, 'ease-out');
+});
+
+test('defaults unsupported editor easing to smooth ease-in-out', () => {
+  const result = upsertCharacterMotionPhase(null, {
+    actorId: 'Foxy', start: 0, end: 1, easing: 'bounce', to: { x: 0.8 }
+  });
+  assert.equal(result.phases[0].easing, 'ease-in-out');
+});

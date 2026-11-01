@@ -25,7 +25,7 @@ function basePose(layer) {
   };
 }
 
-function phase(actorId, start, end, from, to, source, suffix = '') {
+function phase(actorId, start, end, from, to, source, suffix = '', easing = 'ease-in-out') {
   return {
     phase: 'action',
     actorId,
@@ -34,6 +34,7 @@ function phase(actorId, start, end, from, to, source, suffix = '') {
     description: clean(source.description) + suffix,
     evidence: source.evidence,
     motion: { from: { ...from }, to: { ...to } },
+    easing,
     generatedBy: 'rule-based-story-motion-planner'
   };
 }
@@ -93,8 +94,8 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
       const apex = { ...from, y: clamp(from.y - 0.14, 0.05, 0.95), scale: clamp(from.scale * 1.04, 0.05, 4) };
       const midpoint = (source.start + source.end) / 2;
       plan = [
-        phase(actorId, source.start, midpoint, from, apex, source, ' (jump: rise)'),
-        phase(actorId, midpoint, source.end, apex, from, source, ' (jump: land)')
+        phase(actorId, source.start, midpoint, from, apex, source, ' (jump: rise)', 'ease-out'),
+        phase(actorId, midpoint, source.end, apex, from, source, ' (jump: land)', 'ease-in')
       ];
       to = from;
     } else if (action === 'turn' && /turns? around|поворот на месте|разворачивается|розвертається|обертається навколо себе|gira sobre sí mismo/i.test(description)) {

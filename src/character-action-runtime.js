@@ -28,6 +28,14 @@ function normalizePose(value) {
   return Object.keys(pose).length ? pose : null;
 }
 
+function easeProgress(progress, easing) {
+  const p = Math.max(0, Math.min(1, progress));
+  if (easing === 'ease-in') return p * p;
+  if (easing === 'ease-out') return 1 - (1 - p) * (1 - p);
+  if (easing === 'ease-in-out') return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+  return p;
+}
+
 function interpolatePose(from, to, progress) {
   const result = { ...from };
   for (const key of MOTION_KEYS) {
@@ -76,7 +84,8 @@ export function applyCharacterActionTimelineToLayers(layers, actionTimeline, sce
       const startPose = { ...pose, ...(from || {}) };
       if (progress < end) {
         const localProgress = (progress - start) / (end - start);
-        Object.assign(pose, interpolatePose(startPose, to, localProgress));
+        const easedProgress = easeProgress(localProgress, phase.easing);
+        Object.assign(pose, interpolatePose(startPose, to, easedProgress));
         changed = true;
         break;
       }
