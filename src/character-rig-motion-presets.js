@@ -85,7 +85,9 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
     const time = index / (preset.frames - 1);
     return {
       time: round(time),
-      easing: index === 0 ? 'linear' : 'ease-in-out',
+      // Cyclic motions must keep moving through intermediate frames; easing each
+      // segment independently introduces an artificial stop at every keyframe.
+      easing: presetName === 'jump' && index > 0 ? 'ease-in-out' : 'linear',
       poses: { [rig.characterId]: poseFor(rig, presetName, time) }
     };
   });
