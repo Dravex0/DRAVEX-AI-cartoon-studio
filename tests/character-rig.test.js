@@ -163,4 +163,26 @@ describe('character rig foundation', () => {
     const unchanged = applyCharacterRigPose([part], { ...rig, bones: [] }, { arm: { x: 1 } });
     assert.equal(unchanged[0].x, part.x);
   });
+  it('rejects an enabled joint pivot when its coordinates are missing or non-finite', () => {
+    for (const invalidBone of [
+      { id: 'arm', parentId: 'root', pivotEnabled: true },
+      { id: 'arm', parentId: 'root', pivotEnabled: true, pivotX: 0.25 },
+      { id: 'arm', parentId: 'root', pivotEnabled: true, pivotX: 0.25, pivotY: Number.NaN }
+    ]) {
+      const rig = validRig();
+      rig.bones[1] = invalidBone;
+      const report = validateCharacterRig(rig);
+      assert.equal(report.passed, false);
+      assert.ok(report.issues.some(issue => issue.code === 'bone-pivot-incomplete'));
+    }
+  });
+
+  it('keeps a pivot disabled when no joint coordinates are provided', () => {
+    const rig = validRig();
+    rig.bones[1].pivotEnabled = false;
+    const report = validateCharacterRig(rig);
+    assert.equal(report.passed, true);
+    assert.equal(report.rig.bones[1].pivotEnabled, false);
+  });
+
 });

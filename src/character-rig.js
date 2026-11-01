@@ -76,8 +76,8 @@ export function validateCharacterRig(input = {}) {
   for (const [index, sourceBone] of (Array.isArray(input?.bones) ? input.bones : []).slice(0, MAX_BONES).entries()) {
     const hasPivotX = typeof sourceBone?.pivotX === 'number' && Number.isFinite(sourceBone.pivotX);
     const hasPivotY = typeof sourceBone?.pivotY === 'number' && Number.isFinite(sourceBone.pivotY);
-    if (hasPivotX !== hasPivotY) {
-      issues.push({ code: 'bone-pivot-incomplete', message: 'A bone pivot must define both pivotX and pivotY, or omit both.' });
+    if (hasPivotX !== hasPivotY || (sourceBone?.pivotEnabled === true && (!hasPivotX || !hasPivotY))) {
+      issues.push({ code: 'bone-pivot-incomplete', message: 'An enabled bone pivot must define both finite pivotX and pivotY coordinates; otherwise omit both coordinates and disable the pivot.' });
     }
   }
   const roots = rig.bones.filter(bone => !bone.parentId);
