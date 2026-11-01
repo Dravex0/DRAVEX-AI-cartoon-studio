@@ -16,8 +16,17 @@ const VISEME_OPENNESS = Object.freeze({
   teeth: 0.24
 });
 
+function characterValueFor(characterId, values) {
+  if (!isRecord(values)) return undefined;
+  if (Object.prototype.hasOwnProperty.call(values, characterId)) return values[characterId];
+  const normalizedId = String(characterId).toLowerCase();
+  const matchingKey = Object.keys(values).find(key => key.toLowerCase() === normalizedId);
+  return matchingKey === undefined ? undefined : values[matchingKey];
+}
+
 function expressionFor(characterId, expressions) {
-  return isRecord(expressions) && isRecord(expressions[characterId]) ? expressions[characterId] : {};
+  const expression = characterValueFor(characterId, expressions);
+  return isRecord(expression) ? expression : {};
 }
 
 /**
@@ -48,19 +57,21 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
     if (!report.passed) { skipped++; continue; }
     const rig = report.rig;
     const expression = expressionFor(rig.characterId, expressions);
-    const bodyPose = isRecord(rigPoses[rig.characterId]) ? rigPoses[rig.characterId] : {};
+    const candidateBodyPose = characterValueFor(rig.characterId, rigPoses);
+    const bodyPose = isRecord(candidateBodyPose) ? candidateBodyPose : {};
     const headBase = bodyRig?.parts?.find(part => String(part?.boneId || "").toLowerCase() === rig.headBoneId.toLowerCase()) || null;
     const headPosed = headBase ? applyCharacterRigPose([headBase], bodyRig, bodyPose)[0] : null;
     const headRotationDelta = headBase && headPosed ? headPosed.rotation - headBase.rotation : 0;
     const headCos = Math.cos(headRotationDelta), headSin = Math.sin(headRotationDelta);
     // Dialogue visemes take priority; otherwise use the expression preset mouth shape.
-    const explicitViseme = VISEME_OPENNESS[visemes[rig.characterId]] === undefined ? null : visemes[rig.characterId];
+    const explicitVisemeValue = characterValueFor(rig.characterId, visemes);
+    const explicitViseme = VISEME_OPENNESS[explicitVisemeValue] === undefined ? null : explicitVisemeValue;
     const expressionViseme = VISEME_OPENNESS[expression.mouthShape] === undefined ? null : expression.mouthShape;
     const viseme = explicitViseme || expressionViseme;
     const mouthOpen = viseme === null
       ? clamp(expression.mouthOpen, 0, 1, 0)
       : Math.max(clamp(expression.mouthOpen, 0, 1, 0), VISEME_OPENNESS[viseme])
-        * clamp(openness[rig.characterId], 0, 1, 1);
+        * clamp(characterValueFor(rig.characterId, openness), 0, 1, 1);
     const eyeOpen = clamp(expression.eyeOpen, 0, 1, 1);
     const browY = clamp(expression.browY, -1, 1, 0);
     const browRotation = clamp(expression.browRotation, -Math.PI, Math.PI, 0);
