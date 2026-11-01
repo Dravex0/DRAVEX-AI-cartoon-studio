@@ -53,7 +53,7 @@ test('extracts character profiles from bullet and comma-separated character desc
     '- Nox, tall antagonist in black armor.',
     'Scene 1: The Falling Stars',
     'Arin stands on a rooftop.'
-  ].join('\\n'));
+  ].join('\n'));
   assert.deepEqual(brief.characterProfiles.map(profile => profile.characterId), ['Arin', 'Elira', 'Nox']);
   assert.deepEqual(brief.characters.slice(0, 3), ['Arin', 'Elira', 'Nox']);
 });
