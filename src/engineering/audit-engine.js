@@ -4,7 +4,10 @@ const SHARED_TESTS = {
   "src/engineering/agent-registry.js":["tests/engineering-system.test.js"],
   "src/engineering/audit-engine.js":["tests/engineering-system.test.js"],
   "src/engineering/index.js":["tests/engineering-system.test.js"],
-  "src/engineering/task-planner.js":["tests/engineering-system.test.js"]
+  "src/engineering/task-planner.js":["tests/engineering-system.test.js"],
+  "src/engineering/change-gate.js":["tests/engineering-change-gate.test.js"],
+  "src/engineering/code-provider-contract.js":["tests/engineering-code-provider-contract.test.js"],
+  "src/app.js":["tests/index-module-syntax.test.js"]
 };
 const SECRET_PATTERNS = [
   {id:"github-token",pattern:/\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b|\bgithub_pat_[A-Za-z0-9_]{30,}\b/g},

@@ -52,6 +52,9 @@ test("audit recognizes configured shared test files", () => {
   const report = runEngineeringAudit({ files: [
     "package.json","README.md","index.html",".github/workflows/quality.yml",
     "src/engineering/audit-engine.js","tests/engineering-system.test.js",
+    "src/engineering/change-gate.js","tests/engineering-change-gate.test.js",
+    "src/engineering/code-provider-contract.js","tests/engineering-code-provider-contract.test.js",
+    "src/app.js","tests/index-module-syntax.test.js",
     "src/scene-model.js","tests/story-qa.test.js"
   ]});
   assert.equal(report.findingCount, 0);
