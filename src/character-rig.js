@@ -128,3 +128,28 @@ export function applyCharacterRigPose(parts, rigInput, pose = {}) {
 }
 
 export const CHARACTER_RIG_LIMITS = Object.freeze({ bones: MAX_BONES, parts: MAX_PARTS });
+
+
+/** Normalize explicit per-character/per-bone pose offsets stored on a scene. */
+export function normalizeCharacterRigPoses(input = {}) {
+  if (!isRecord(input)) return {};
+  const result = {};
+  for (const [characterId, rawBones] of Object.entries(input).slice(0, 20)) {
+    const characterKey = clean(characterId);
+    if (!characterKey || !isRecord(rawBones)) continue;
+    const bones = {};
+    for (const [boneId, rawPose] of Object.entries(rawBones).slice(0, MAX_BONES)) {
+      const boneKey = clean(boneId);
+      if (!boneKey || !isRecord(rawPose)) continue;
+      const pose = {};
+      if (typeof rawPose.x === 'number' && Number.isFinite(rawPose.x)) pose.x = clamp(rawPose.x, -2, 2);
+      if (typeof rawPose.y === 'number' && Number.isFinite(rawPose.y)) pose.y = clamp(rawPose.y, -2, 2);
+      if (typeof rawPose.rotation === 'number' && Number.isFinite(rawPose.rotation)) {
+        pose.rotation = clamp(rawPose.rotation, -Math.PI * 2, Math.PI * 2);
+      }
+      if (Object.keys(pose).length) bones[boneKey] = pose;
+    }
+    if (Object.keys(bones).length) result[characterKey] = bones;
+  }
+  return result;
+}
