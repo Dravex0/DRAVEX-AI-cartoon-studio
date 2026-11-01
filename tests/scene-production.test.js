@@ -26,6 +26,17 @@ test('image prompt builder includes scene, setting, camera, character bible and 
   assert.match(prompt, /No extra characters/);
 });
 
+test('image prompt builder adds the selected visual style as explicit art direction', () => {
+  const prompt = buildImageGenerationPrompt(scene, bible, { visualStyle: '3D animated' });
+  assert.match(prompt, /polished stylized 3D animated feature-film frame/);
+  assert.match(prompt, /Keep this style consistent across every scene/);
+});
+
+test('unknown visual styles do not add undefined or unsafe prompt text', () => {
+  const prompt = buildImageGenerationPrompt(scene, bible, { visualStyle: 'unrecognized-style' });
+  assert.doesNotMatch(prompt, /undefined|unrecognized-style/);
+});
+
 test('image prompt builder can omit negative text when a provider accepts it separately', () => {
   const prompt = buildImageGenerationPrompt(scene, bible, { includeNegative: false });
   assert.match(prompt, /silver key/);
