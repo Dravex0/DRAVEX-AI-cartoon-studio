@@ -669,9 +669,10 @@ $("saveFacialPart").addEventListener("click",()=>{
  const result=upsertCharacterFacialPart(sceneMetadata[sceneIndex]||{},{characterId:$("facialCharacterId").value,headBoneId:$("facialHeadBoneId").value,partId:$("facialPartId").value,role:$("facialPartRole").value,imageUrl:$("facialPartImageUrl").value,x:Number($("facialPartX").value),y:Number($("facialPartY").value),width:Number($("facialPartWidth").value),height:Number($("facialPartHeight").value),rotation:Number($("facialPartRotation").value)*Math.PI/180,zIndex:Number($("facialPartZIndex").value)});
  if(result.status==="invalid"){$("facialEditorStatus").textContent=result.issues.map(issue=>issue.message).join(" ");return;}
  sceneMetadata[sceneIndex]=result.scene;
+ const draftSaved=writeLocalStorage("dravex-cartoon-draft",JSON.stringify({idea:$("idea").value,character:$("character").value,style:$("style").value,canvasFormat:activeCanvasFormat,imageQuality:$("imageQuality").value,duration:$("duration").value,language:$("language").value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
  if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
  syncFacialRigEditor();if(!playing)draw();
- $("facialEditorStatus").textContent=result.status==="updated"?"Facial part updated. / Часть лица обновлена.":"Facial part added. / Часть лица добавлена.";
+ $("facialEditorStatus").textContent=(result.status==="updated"?"Facial part updated. / Часть лица обновлена.":"Facial part added. / Часть лица добавлена.")+(draftSaved?" Draft saved.":" Draft could not be saved; use Save project.");
 });
 $("removeFacialPart").addEventListener("click",()=>{
  const characterId=String($("facialCharacterId").value||"").trim(),partId=$("facialPartSelect").value;
