@@ -1386,7 +1386,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
 
 
 $('videoGenerationMode').addEventListener('change',updateComfyAnimateAvailability);
-$('hfVideoConsent').addEventListener('change',updateComfyAnimateAvailability);
+$('hfVideoConsent').addEventListener('change',checked=>{if(!checked&&fullFilmAbortController&&$('videoGenerationMode').value==='huggingface')fullFilmAbortController.abort();updateComfyAnimateAvailability()});
 $('clearHfVideoToken').addEventListener('click',()=>{
  $('hfVideoToken').value='';hfVideoClient=null;hfHandleFile=null;hfVideoConnected=false;
  $('hfVideoStatus').textContent='Токен очищен. Подключись заново при необходимости.';
@@ -1421,10 +1421,10 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
  if(button.disabled)return;
  if(mode==='huggingface'&&(!hfVideoConnected||!hfVideoClient||!hfHandleFile||!$('hfVideoConsent').checked))return;
  if(mode==='comfyui'&&(!comfyConnected||!comfyWorkflow))return;
- await sceneVideoRestorePromise;
  const controller=new AbortController();
  fullFilmAbortController=controller;
  button.disabled=true;cancel.hidden=false;progress.hidden=false;progress.value=0;
+ await sceneVideoRestorePromise;
  $('animateSceneComfy').disabled=true;$('checkComfyConnection').disabled=true;
  const qualityProfiles={standard:{width:512,height:512,steps:20},high:{width:640,height:640,steps:24},ultra:{width:768,height:768,steps:30}};
  const quality=qualityProfiles[$('imageQuality').value]||qualityProfiles.standard;
@@ -1466,14 +1466,17 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      updateStoryQA();
     }
     if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
-    status.textContent='Загружаем изображение сцены '+(index+1)+' для анимации…';
-    const imageResponse=await fetch(meta.generatedImageUrl,{signal});
-    if(!imageResponse.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+imageResponse.status+'). Проверь CORS или загрузи изображение вручную.');
-    const imageBlob=await imageResponse.blob();
-    if(!imageBlob.size)throw new Error('Изображение сцены пустое.');
+    status.textContent='Подготавливаем изображение сцены '+(index+1)+' для анимации…';
+    let imageInput=meta.generatedImageUrl;
+    if(mode==='comfyui'){
+     const imageResponse=await fetch(meta.generatedImageUrl,{signal});
+     if(!imageResponse.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+imageResponse.status+'). Проверь CORS или загрузи изображение вручную.');
+     imageInput=await imageResponse.blob();
+     if(!imageInput.size)throw new Error('Изображение сцены пустое.');
+    }
     const prompt=buildMotionGenerationPrompt(meta,characterBible);
     const duration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
-    const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob},{signal,onProgress:job=>{
+    const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput},{signal,onProgress:job=>{
      status.textContent=(mode==='huggingface'?'Hugging Face · ':'ComfyUI · ')+'сцена '+(index+1)+'/'+scenes.length+' · '+(job.stage||'обработка')+(Number.isFinite(job.etaSeconds)?' · ETA '+Math.round(job.etaSeconds)+' сек.':'')+(Number.isFinite(job.queuePosition)?' · очередь '+job.queuePosition:'');
     }});
     if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI не вернул готовый видеофайл.');
