@@ -39,8 +39,8 @@ function sceneHeading(line) {
 }
 
 function parseCharacterLine(line) {
-  const normalized = clean(line, 1800).replace(/^\\s*[-*•]\\s*/u, '');
-  const match = normalized.match(/^([^—–,:-]{1,80}?)\\s*(?:[—–-]|,\\s*|:\\s*)(.{3,})$/u);
+  const normalized = clean(line, 1800).replace(/^\s*[-*•]\s*/u, '');
+  const match = normalized.match(/^([^—–,:-]{1,80}?)\s*(?:[—–-]|,\s*|:\s*)(.{3,})$/u);
   if (!match) return null;
   const characterId = clean(match[1], 80).replace(/[.:]+$/u, '');
   return characterId ? { characterId, visualDescription: clean(match[2], 1200), clothing: '', colors: '', distinctiveFeatures: '' } : null;
