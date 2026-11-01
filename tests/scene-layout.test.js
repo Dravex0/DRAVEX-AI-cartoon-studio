@@ -14,7 +14,8 @@ test('places portrait scene elements within a tall composition', () => {
   const layout = getSceneComposition('portrait', 0);
   assert.equal(layout.width, 360);
   assert.equal(layout.height, 640);
-  assert.ok(layout.star.x > 0 && layout.star.x < 1);
+  assert.equal(layout.star.x, 0.5);
+  assert.equal(layout.character.x, 0.5);
   assert.ok(layout.star.y < layout.character.y);
   assert.ok(layout.character.y > 0.7);
   assert.equal(layout.character.scale, 0.78);
