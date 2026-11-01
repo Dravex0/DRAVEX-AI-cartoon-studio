@@ -15,6 +15,24 @@ test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   expect(pageErrors, 'the page should not throw uncaught JavaScript errors').toEqual([]);
 });
 
+test('localizes style and quality options and restores the saved creative setup', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#uiLanguage').selectOption('ru');
+  await expect(page.locator('#make')).toHaveText('Начать работу');
+  await expect(page.locator('#style option[value="3D animated"]')).toHaveText('3D-анимация');
+  await expect(page.locator('#imageQuality option[value="ultra"]')).toHaveText('Максимум · 768 px');
+
+  await page.locator('#style').selectOption('3D animated');
+  await page.locator('#imageQuality').selectOption('ultra');
+  await page.locator('#save').click();
+  await expect(page.locator('#status')).toContainText('Черновик сохранён');
+
+  await page.reload();
+  await expect(page.locator('#uiLanguage')).toHaveValue('ru');
+  await expect(page.locator('#style')).toHaveValue('3D animated');
+  await expect(page.locator('#imageQuality')).toHaveValue('ultra');
+});
+
 test('creates a storyboard from a story prompt without remote AI services', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
