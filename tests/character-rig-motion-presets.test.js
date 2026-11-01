@@ -52,8 +52,8 @@ describe('procedural character rig motion presets', () => {
 
   it('recognizes left/right hand and foot bone naming conventions', () => {
     const namingSets = [
-      { leftArm: 'leftHand', rightArm: 'rightHand', leftLeg: 'leftFoot', rightLeg: 'rightFoot' },
-      { leftArm: 'upperArmL', rightArm: 'upperArmR', leftLeg: 'footL', rightLeg: 'footR' }
+      { leftArm: 'leftHand', rightArm: 'rightHand', leftLeg: 'leftThigh', rightLeg: 'rightThigh' },
+      { leftArm: 'upperArmL', rightArm: 'upperArmR', leftLeg: 'thighL', rightLeg: 'thighR' }
     ];
     for (const names of namingSets) {
       const candidate = rig();
@@ -74,6 +74,32 @@ describe('procedural character rig motion presets', () => {
       assert.ok(pose[names.rightArm].rotation < 0, names.rightArm);
       assert.ok(pose[names.leftLeg].rotation < 0, names.leftLeg);
       assert.ok(pose[names.rightLeg].rotation > 0, names.rightLeg);
+    }
+  });
+
+  it('recognizes foot and ankle bones and compensates for root bounce', () => {
+    const namingSets = [
+      ['leftFoot', 'rightFoot'],
+      ['ankle_l', 'rightAnkle'],
+      ['footL', 'footR']
+    ];
+    for (const [leftFoot, rightFoot] of namingSets) {
+      const candidate = rig();
+      candidate.bones.push(
+        { id: leftFoot, parentId: 'leftLeg' },
+        { id: rightFoot, parentId: 'rightLeg' }
+      );
+      candidate.parts.push(
+        { id: 'foot-left-part', boneId: leftFoot, imageUrl: 'https://assets.example/foot-left.png' },
+        { id: 'foot-right-part', boneId: rightFoot, imageUrl: 'https://assets.example/foot-right.png' }
+      );
+      const result = createCharacterRigMotionPreset(candidate, 'walk');
+      assert.equal(result.status, 'ready');
+      const pose = sampleCharacterRigTimeline(result.timeline, 0.25).Foxy;
+      assert.equal(pose.root.y, 0.018);
+      assert.equal(pose[leftFoot].y, -0.018);
+      assert.equal(pose[rightFoot].y, -0.018);
+      assert.equal(result.warnings.some(message => message.includes('root bounce cannot be compensated')), false);
     }
   });
 
