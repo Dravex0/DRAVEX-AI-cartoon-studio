@@ -758,10 +758,10 @@ $('generateCharacterMotion').addEventListener('click',()=>{
 function syncFacialRigEditor(){
  const meta=sceneMetadata[sceneIndex]||{};
  const rigs=Array.isArray(meta.characterFacialRigs)?meta.characterFacialRigs:[];
- const characterId=rigs[0]?.characterId||meta.characters?.[0]||$("character").value||"Foxy";
+ const characterId=String($("facialCharacterId")?.value||"").trim()||rigs[0]?.characterId||meta.characters?.[0]||$("character").value||"Foxy";
  const rig=rigs.find(item=>String(item?.characterId||"").toLowerCase()===String(characterId).toLowerCase())||null;
  $("facialCharacterId").value=characterId;
- $("facialHeadBoneId").value=rig?.headBoneId||"head";
+ $("facialHeadBoneId").value=rig?.headBoneId||$("facialHeadBoneId").value||"head";
  const select=$("facialPartSelect"),previous=select.value;
  select.replaceChildren(new Option("New part / Новая часть",""));
  for(const part of rig?.parts||[])select.add(new Option(String(part.id)+" · "+String(part.role),String(part.id)));
