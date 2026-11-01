@@ -133,6 +133,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div id="characterSpriteResults" class="sprite-results" aria-live="polite"></div>
 </section>
 </details>
+<details class="comfy-panel" id="hfVideoPanel"><summary style="cursor:pointer;font-weight:750">Бесплатная облачная анимация · Hugging Face</summary><p class="muted" style="font-size:12px">Использует публичный Wan 2.2 14B Fast на Hugging Face ZeroGPU. Сцены и изображения отправляются на сервер Hugging Face. Бесплатная квота ограничена: у бесплатного аккаунта обычно 5 минут GPU в сутки; доступность и очередь не гарантируются.</p><div class="field"><label for="hfVideoToken">Hugging Face access token (read) · токен не сохраняется</label><input id="hfVideoToken" type="password" autocomplete="off" spellcheck="false" placeholder="hf_…"><small>Вставь токен только в это поле сайта. Не отправляй его в чат. Он хранится только в памяти открытой вкладки.</small></div><div class="actions"><button type="button" class="secondary" id="connectHfVideo">Подключить бесплатный видеодвижок</button><button type="button" class="secondary" id="clearHfVideoToken">Очистить токен</button></div><label class="consent"><input type="checkbox" id="hfVideoConsent"><span>Я явно согласен отправлять изображения сцен и промпты в публичный Hugging Face Space для генерации видео. / I agree to send scene images and prompts to the public Hugging Face Space.</span></label><div class="status" id="hfVideoStatus" role="status" aria-live="polite">Не подключено. Проверка соединения не отправляет сцены.</div></details>
 <details class="comfy-panel" id="comfyPanel">
 <summary style="cursor:pointer;font-weight:750">Local video animation · ComfyUI / Локальная анимация</summary>
 <p class="muted" style="font-size:12px">Runs only on your configured local/private ComfyUI server. No cloud fallback. First generate or load a still image for this scene. The API workflow JSON is kept in memory and must be selected again after reload.</p>
@@ -155,7 +156,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 </div>
 <div class="actions"><button type="button" class="secondary" id="checkComfyConnection">Check local connection / Проверить связь</button><button type="button" id="animateSceneComfy" disabled>Animate this scene / Анимировать сцену</button></div>
 <p class="muted" style="font-size:12px">Создаёт видеоклипы всех сцен по очереди, затем собирает и открывает готовый мультфильм. Недостающие изображения создаются через AI Horde только при отдельном согласии. Для анимации требуется подключённый локальный ComfyUI.</p>
-<div class="actions"><button type="button" id="generateFullFilmComfy" disabled>Создать весь мультфильм</button><button type="button" class="secondary" id="cancelFullFilmComfy" hidden>Отменить</button></div>
+<div class="field"><label for="videoGenerationMode">Движок анимации для всего мультфильма</label><select id="videoGenerationMode"><option value="huggingface">Бесплатная облачная очередь · Hugging Face</option><option value="comfyui">Локальный ComfyUI</option></select></div><div class="actions"><button type="button" id="generateFullFilmComfy" disabled>Создать весь мультфильм</button><button type="button" class="secondary" id="cancelFullFilmComfy" hidden>Отменить</button></div>
 <progress id="fullFilmProgress" max="100" value="0" hidden style="width:100%"></progress>
 <div class="status" id="fullFilmStatus" role="status" aria-live="polite"></div>
 <div class="status" id="comfyStatus" role="status" aria-live="polite">Not connected. Checking the connection does not upload images or submit jobs.</div>
@@ -196,6 +197,7 @@ import { createVoiceAudioStorage } from "./src/voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./src/scene-voice-workflow.js";
 import { createSceneVideoStorage } from "./src/scene-video-storage.js";
 import { generateStoryboardVideos } from "./src/scene-video-batch.js";
+import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./src/huggingface-zerogpu-video-provider.js";
 import { syncSceneVideoPlayback } from "./src/scene-video-transport.js";
 import { waitForSceneVideoReady, waitForSceneImageReady } from "./src/scene-video-readiness.js";
 import { createAnimationClock } from "./src/animation-clock.js";
@@ -1294,6 +1296,7 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 });
 
 let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
+let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
 function sceneVideoKey(index,meta=sceneMetadata[index]||{}){ensureSceneIds([meta]);return String(meta.id)}
 function renderComfySceneVideo(){
  const entry=sceneVideoCache.get(sceneVideoKey(sceneIndex));
@@ -1311,7 +1314,7 @@ function comfyBindings(){
  return result;
 }
 function setComfyStatus(message){$('comfyStatus').textContent=message}
-function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow;$('generateFullFilmComfy').disabled=!comfyConnected||!comfyWorkflow||!!fullFilmAbortController}
+function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow;const mode=$('videoGenerationMode')?.value||'huggingface';const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:comfyConnected&&!!comfyWorkflow;$('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController}
 $('comfySourceImageFile').addEventListener('change',()=>{
  const file=$('comfySourceImageFile').files?.[0]||null;
  comfySourceImage=file;
@@ -1383,12 +1386,43 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  finally{button.disabled=false;$('checkComfyConnection').disabled=false;updateComfyAnimateAvailability();}
 });
 
+
+$('videoGenerationMode').addEventListener('change',updateComfyAnimateAvailability);
+$('hfVideoConsent').addEventListener('change',updateComfyAnimateAvailability);
+$('clearHfVideoToken').addEventListener('click',()=>{
+ $('hfVideoToken').value='';hfVideoClient=null;hfHandleFile=null;hfVideoConnected=false;
+ $('hfVideoStatus').textContent='Токен очищен. Подключись заново при необходимости.';
+ updateComfyAnimateAvailability();
+});
+$('connectHfVideo').addEventListener('click',async()=>{
+ const button=$('connectHfVideo'),status=$('hfVideoStatus'),token=$('hfVideoToken').value.trim();
+ if(!/^hf_[A-Za-z0-9]{10,}$/.test(token)){status.textContent='Введи действительный Hugging Face access token с правом read.';return}
+ button.disabled=true;hfVideoConnected=false;updateComfyAnimateAvailability();
+ try{
+  status.textContent='Подключаемся к публичному видеодвижку Hugging Face…';
+  const {Client,handle_file}=await import('https://cdn.jsdelivr.net/npm/@gradio/client@2.7.2/dist/index.min.js');
+  const client=await Client.connect(HUGGING_FACE_ZERO_GPU_SPACE_ID,{token,events:['data','status'],space_status:spaceStatus=>{
+   status.textContent='Hugging Face Space · '+(spaceStatus.status||'подключение')+' · '+(spaceStatus.message||'');
+  }});
+  const api=await client.view_api();
+  if(!api?.named_endpoints?.['/generate_video'])throw new Error('Публичный Space не предоставил ожидаемый endpoint /generate_video.');
+  hfVideoClient=client;hfHandleFile=handle_file;hfVideoConnected=true;
+  status.textContent='Подключено: Wan 2.2 14B Fast. Токен остаётся только в этой вкладке; квота GPU зависит от аккаунта Hugging Face.';
+ }catch(error){
+  hfVideoClient=null;hfHandleFile=null;hfVideoConnected=false;
+  status.textContent='Не удалось подключить Hugging Face: '+(error.message||'проверь токен, очередь и доступность Space.');
+ }finally{button.disabled=false;updateComfyAnimateAvailability();}
+});
+
 $('cancelFullFilmComfy').addEventListener('click',()=>{
  if(fullFilmAbortController)fullFilmAbortController.abort();
 });
 $('generateFullFilmComfy').addEventListener('click',async()=>{
  const button=$('generateFullFilmComfy'),cancel=$('cancelFullFilmComfy'),progress=$('fullFilmProgress'),status=$('fullFilmStatus');
- if(button.disabled||!comfyConnected||!comfyWorkflow)return;
+ const mode=$('videoGenerationMode').value;
+ if(button.disabled)return;
+ if(mode==='huggingface'&&(!hfVideoConnected||!hfVideoClient||!hfHandleFile||!$('hfVideoConsent').checked))return;
+ if(mode==='comfyui'&&(!comfyConnected||!comfyWorkflow))return;
  await sceneVideoRestorePromise;
  const controller=new AbortController();
  fullFilmAbortController=controller;
@@ -1397,7 +1431,9 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
  const qualityProfiles={standard:{width:512,height:512,steps:20},high:{width:640,height:640,steps:24},ultra:{width:768,height:768,steps:30}};
  const quality=qualityProfiles[$('imageQuality').value]||qualityProfiles.standard;
  try{
-  const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
+  const provider=mode==='huggingface'
+   ?createHuggingFaceZeroGPUVideoProvider({client:hfVideoClient,handleFile:hfHandleFile})
+   :createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
   const scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
   status.textContent='Подготовка '+scenes.length+' сцен к генерации…';
@@ -1440,7 +1476,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const prompt=buildMotionGenerationPrompt(meta,characterBible);
     const duration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
     const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob},{signal,onProgress:job=>{
-     status.textContent='ComfyUI · сцена '+(index+1)+'/'+scenes.length+' · '+job.stage+' · '+Math.round((job.elapsedMs||0)/1000)+' сек.';
+     status.textContent=(mode==='huggingface'?'Hugging Face · ':'ComfyUI · ')+'сцена '+(index+1)+'/'+scenes.length+' · '+(job.stage||'обработка')+(Number.isFinite(job.etaSeconds)?' · ETA '+Math.round(job.etaSeconds)+' сек.':'')+(Number.isFinite(job.queuePosition)?' · очередь '+job.queuePosition:'');
     }});
     if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI не вернул готовый видеофайл.');
     const key=sceneVideoKey(index,meta);
