@@ -26,7 +26,7 @@ function normalizeBone(input = {}) {
     parentId: clean(source.parentId) || null,
     pivotX: clamp(source.pivotX, -2, 2),
     pivotY: clamp(source.pivotY, -2, 2),
-    pivotEnabled: hasPivotX && hasPivotY,
+    pivotEnabled: typeof source.pivotEnabled === 'boolean' ? source.pivotEnabled : hasPivotX && hasPivotY,
     length: clamp(source.length, 0, 2)
   };
 }
