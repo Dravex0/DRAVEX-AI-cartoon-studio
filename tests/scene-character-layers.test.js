@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   CHARACTER_LAYER_LIMIT,
   drawCharacterLayers,
+  drawCharacterRigParts,
   normalizeCharacterLayer,
   normalizeCharacterLayers
 } from '../src/scene-character-layers.js';
@@ -132,4 +133,104 @@ test('does not attach invalid sprite URLs or exceed the scene layer limit', asyn
   });
   assert.equal(result.status, 'limit-reached');
   assert.equal(result.layers.length, CHARACTER_LAYER_LIMIT);
+});
+
+test('draws a complete validated segmented rig with inherited parent bone transforms', () => {
+  const calls = [];
+  const context = {
+    save() { calls.push(['save']); },
+    restore() { calls.push(['restore']); },
+    translate(...args) { calls.push(['translate', ...args]); },
+    rotate(...args) { calls.push(['rotate', ...args]); },
+    drawImage(...args) { calls.push(['drawImage', ...args]); }
+  };
+  const rig = {
+    schemaVersion: 1,
+    characterId: 'Foxy',
+    bones: [
+      { id: 'root', parentId: null },
+      { id: 'arm', parentId: 'root' }
+    ],
+    parts: [{
+      id: 'left-arm', boneId: 'arm', imageUrl: 'blob:arm',
+      x: 0.2, y: 0.3, width: 0.1, height: 0.2, rotation: 0, zIndex: 1
+    }]
+  };
+  const image = { naturalWidth: 40, naturalHeight: 80 };
+  const result = drawCharacterRigParts(context, [rig], () => image, 1000, 500, {
+    Foxy: { root: { x: 0.05 }, arm: { rotation: 0.25 } }
+  });
+  assert.deepEqual(result, { drawn: 1, skipped: 0, readyCharacterIds: ['Foxy'] });
+  assert.ok(calls.some(call => call[0] === 'translate' && call[1] === 250 && call[2] === 150));
+  assert.ok(calls.some(call => call[0] === 'rotate' && call[1] === 0.25));
+  assert.ok(calls.some(call => call[0] === 'drawImage' && call[1] === image));
+});
+
+test('keeps whole-sprite rendering available when a rig part image is not ready', () => {
+  const context = {
+    globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
+    drawImage() {}
+  };
+  const rig = {
+    schemaVersion: 1, characterId: 'Foxy',
+    bones: [{ id: 'root', parentId: null }],
+    parts: [{ id: 'body', boneId: 'root', imageUrl: 'blob:missing', x: 0.5, y: 0.5, width: 0.2, height: 0.4 }]
+  };
+  const result = drawCharacterLayers(context, [
+    { characterId: 'Foxy', imageUrl: 'blob:full', x: 0.5, y: 0.5 }
+  ], key => key === 'blob:full' ? { naturalWidth: 100, naturalHeight: 100 } : null, 500, 500, {
+    drawRigParts: true, characterRigs: [rig]
+  });
+  assert.equal(result.drawn, 1);
+  assert.equal(result.rigDrawn, 0);
+  assert.equal(result.rigSkipped, 1);
+  assert.deepEqual(result.rigReadyCharacterIds, []);
+});
+
+test('can composite ready rig parts alongside legacy character layers when explicitly enabled', () => {
+  const calls = [];
+  const context = {
+    globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
+    drawImage(image) { calls.push(image); }
+  };
+  const rigImage = { naturalWidth: 20, naturalHeight: 20 };
+  const spriteImage = { naturalWidth: 100, naturalHeight: 100 };
+  const rig = {
+    schemaVersion: 1, characterId: 'Foxy',
+    bones: [{ id: 'root', parentId: null }],
+    parts: [{ id: 'body', boneId: 'root', imageUrl: 'blob:part', x: 0.5, y: 0.5, width: 0.2, height: 0.4 }]
+  };
+  const result = drawCharacterLayers(context, [
+    { characterId: 'Foxy', imageUrl: 'blob:sprite' }
+  ], key => key === 'blob:part' ? rigImage : spriteImage, 500, 500, {
+    drawRigParts: true, characterRigs: [rig], rigPoses: { Foxy: { root: { y: 0.1 } } }
+  });
+  assert.equal(result.drawn, 2);
+  assert.equal(result.rigDrawn, 1);
+  assert.deepEqual(result.rigReadyCharacterIds, ['Foxy']);
+  assert.deepEqual(calls, [spriteImage, rigImage]);
+});
+
+test('prefers complete rig parts and suppresses the matching whole sprite without counting it skipped', () => {
+  const calls = [];
+  const context = {
+    globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
+    drawImage(image) { calls.push(image); }
+  };
+  const rigImage = { naturalWidth: 20, naturalHeight: 20 };
+  const spriteImage = { naturalWidth: 100, naturalHeight: 100 };
+  const rig = {
+    schemaVersion: 1, characterId: 'Foxy',
+    bones: [{ id: 'root', parentId: null }],
+    parts: [{ id: 'body', boneId: 'root', imageUrl: 'blob:part', x: 0.5, y: 0.5, width: 0.2, height: 0.4 }]
+  };
+  const result = drawCharacterLayers(context, [
+    { characterId: 'Foxy', imageUrl: 'blob:sprite' }
+  ], key => key === 'blob:part' ? rigImage : spriteImage, 500, 500, {
+    drawRigParts: true, preferRigParts: true, characterRigs: [rig]
+  });
+  assert.equal(result.drawn, 1);
+  assert.equal(result.skipped, 0);
+  assert.equal(result.rigDrawn, 1);
+  assert.deepEqual(calls, [rigImage]);
 });

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeCharacterRig, validateCharacterRig, applyCharacterRigPose } from '../src/character-rig.js';
+import { normalizeCharacterRig, normalizeCharacterRigPoses, validateCharacterRig, applyCharacterRigPose } from '../src/character-rig.js';
 import { normalizeScene } from '../src/scene-model.js';
 
 const validRig = () => ({
@@ -43,6 +43,28 @@ describe('character rig foundation', () => {
     const codes = validateCharacterRig(rig).issues.map(issue => issue.code);
     assert.ok(codes.includes('part-image-invalid'));
     assert.ok(codes.includes('part-bone-missing'));
+  });
+
+  it('inherits parent bone offsets and rotations for child parts', () => {
+    const rig = validRig();
+    const [part] = rig.parts;
+    const moved = applyCharacterRigPose([part], rig, {
+      root: { x: 0.05, rotation: 0.1 },
+      arm: { x: 0.15, y: -0.1, rotation: 0.25 }
+    });
+    assert.ok(Math.abs(moved[0].x - 0.3) < 1e-9);
+    assert.ok(Math.abs(moved[0].y - 0.1) < 1e-9);
+    assert.ok(Math.abs(moved[0].rotation - 0.35) < 1e-9);
+  });
+
+  it('normalizes bounded per-scene rig poses and preserves them through scene normalization', () => {
+    const poses = normalizeCharacterRigPoses({
+      Foxy: { root: { x: 9, y: -9, rotation: 99, invalid: 2 } },
+      ignored: null
+    });
+    assert.deepEqual(poses, { Foxy: { root: { x: 2, y: -2, rotation: Math.PI * 2 } } });
+    const scene = normalizeScene({ characterRigPoses: { Foxy: { root: { x: 0.2, y: 0.1 } } } });
+    assert.deepEqual(scene.characterRigPoses, { Foxy: { root: { x: 0.2, y: 0.1 } } });
   });
 
   it('applies only explicit finite bone pose deltas and safely preserves invalid rigs', () => {
