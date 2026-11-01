@@ -25,10 +25,10 @@ export function getSceneComposition(format = 'landscape', sceneIndex = 0) {
     format: normalizedFormat,
     width: logicalWidth,
     height: logicalHeight,
-    star: { x: star[0] / 640, y: star[1] / 360 },
+    star: { x: star[0] / logicalWidth, y: star[1] / logicalHeight },
     character: {
-      x: fox[0] / 640,
-      y: fox[1] / 360,
+      x: fox[0] / logicalWidth,
+      y: fox[1] / logicalHeight,
       scale: normalizedFormat === 'portrait' ? 0.78 : 1
     },
     ground: normalizedFormat === 'portrait'
