@@ -20,6 +20,10 @@ const roleOf = boneId => {
   if (/left.*(foot|ankle|heel|toe)|(foot|ankle|heel|toe).*left|l(foot|ankle|heel|toe)|(foot|ankle|heel|toe)l/.test(id)) return 'leftFoot';
   if (/right.*(foot|ankle|heel|toe)|(foot|ankle|heel|toe).*right|r(foot|ankle|heel|toe)|(foot|ankle|heel|toe)r/.test(id)) return 'rightFoot';
   if (/foot|ankle|heel|toe/.test(id)) return 'foot';
+  // Check lower-leg names before generic leg patterns so shins/calves do not
+  // receive the same swing rotation as the upper leg.
+  if (/left.*(lowerleg|shin|calf)|(lowerleg|shin|calf).*left|l(lowerleg|shin|calf)|(lowerleg|shin|calf)l/.test(id)) return 'leftLowerLeg';
+  if (/right.*(lowerleg|shin|calf)|(lowerleg|shin|calf).*right|r(lowerleg|shin|calf)|(lowerleg|shin|calf)r/.test(id)) return 'rightLowerLeg';
   if (/left.*(leg|thigh)|(leg|thigh).*left|l(leg|thigh)|(leg|thigh)l/.test(id)) return 'leftLeg';
   if (/right.*(leg|thigh)|(leg|thigh).*right|r(leg|thigh)|(leg|thigh)r/.test(id)) return 'rightLeg';
   if (/arm|hand|shoulder/.test(id)) return 'arm';
@@ -43,6 +47,8 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightArm') rotation = -cycle * 0.32;
       if (role === 'leftLeg' || role === 'leg') rotation = -cycle * 0.38;
       if (role === 'rightLeg') rotation = cycle * 0.38;
+      if (role === 'leftLowerLeg') rotation = lift * 0.42;
+      if (role === 'rightLowerLeg') rotation = Math.max(0, -cycle) * 0.42;
       if (role === 'root') y = rootBob;
       if (role === 'head') rotation = -cycle * 0.025;
     } else if (preset === 'run') {
@@ -50,6 +56,8 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightArm') rotation = -cycle * 0.62;
       if (role === 'leftLeg' || role === 'leg') rotation = -cycle * 0.72;
       if (role === 'rightLeg') rotation = cycle * 0.72;
+      if (role === 'leftLowerLeg') rotation = lift * 0.68;
+      if (role === 'rightLowerLeg') rotation = Math.max(0, -cycle) * 0.68;
       if (role === 'root') y = rootBob;
       if (role === 'head') rotation = -cycle * 0.04;
     } else if (preset === 'jump') {
@@ -58,6 +66,8 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightArm') rotation = 0.55 * lift;
       if (role === 'leftLeg' || role === 'leg') rotation = -0.35 * lift;
       if (role === 'rightLeg') rotation = 0.35 * lift;
+      if (role === 'leftLowerLeg') rotation = 0.24 * lift;
+      if (role === 'rightLowerLeg') rotation = 0.24 * lift;
     } else if (preset === 'wave') {
       if (role === 'rightArm' || role === 'arm') rotation = -0.8 + 0.22 * Math.sin(phase * Math.PI * 2);
       if (role === 'leftArm') rotation = -0.12;
@@ -88,6 +98,8 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
     if (![...roles].some(role => role === 'leftLeg' || role === 'rightLeg' || role === 'leg')) warnings.push('No leg-like bone IDs found; this preset will animate only recognized upper-body/root bones.');
     if (![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) warnings.push('No arm-like bone IDs found; arm swing will be omitted.');
     if (![...roles].some(role => role === 'foot' || role === 'leftFoot' || role === 'rightFoot')) warnings.push('No foot-like bone IDs found; root bounce cannot be compensated at the feet, so planted-foot contact is not represented.');
+    const lowerLegBones = rig.bones.filter(bone => ['leftLowerLeg', 'rightLowerLeg'].includes(roleOf(bone.id)));
+    if (lowerLegBones.length && !lowerLegBones.some(bone => bone.pivotEnabled)) warnings.push('Lower-leg bones were found but no knee pivots are defined; knee bending is omitted to avoid rotating around an unknown joint.');
   }
   if (presetName === 'wave' && ![...roles].some(role => role === 'rightArm' || role === 'arm')) {
     warnings.push('No right-arm or generic arm bone found; the greeting gesture cannot be represented by this rig.');
