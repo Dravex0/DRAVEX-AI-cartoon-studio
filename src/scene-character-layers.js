@@ -128,7 +128,10 @@ export function drawCharacterLayers(context, layers, resolveImage, viewportWidth
     .map((layer, index) => ({ layer, index }))
     .filter(item => item.layer.visible && !readyRigIds.has(item.layer.characterId.toLocaleLowerCase()))
     .sort((a, b) => a.layer.zIndex - b.layer.zIndex || a.index - b.index);
-  let drawn = 0, skipped = Array.isArray(layers) ? layers.length - normalized.length : 0;
+  const suppressedSpriteCount = runtime && runtime.preferRigParts === true
+    ? runtimeLayers.filter(layer => layer?.visible !== false && readyRigIds.has(String(layer?.characterId || '').toLocaleLowerCase())).length
+    : 0;
+  let drawn = 0, skipped = Array.isArray(layers) ? Math.max(0, layers.length - normalized.length - suppressedSpriteCount) : 0;
   for (const { layer } of normalized) {
     const image = resolveImage(layer.imageUrl, layer.characterId);
     const imageWidth = Number(image?.naturalWidth || image?.videoWidth || image?.width);
