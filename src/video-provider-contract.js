@@ -19,6 +19,7 @@ export function validateVideoGenerationRequest(input = {}) {
   const durationSeconds = finite(input.durationSeconds);
   const fps = finite(input.fps ?? 24);
   const image = input.image ?? null;
+  const video = input.video ?? null;
 
   if (!VIDEO_TASK_TYPES.includes(taskType)) issues.push({ code: 'unsupported-task-type', field: 'taskType' });
   if (!prompt) issues.push({ code: 'missing-prompt', field: 'prompt' });
@@ -26,8 +27,11 @@ export function validateVideoGenerationRequest(input = {}) {
     issues.push({ code: 'invalid-duration', field: 'durationSeconds' });
   }
   if (fps === null || fps < 1 || fps > 60) issues.push({ code: 'invalid-fps', field: 'fps' });
-  if ((taskType === 'image-to-video' || taskType === 'video-to-video') && !image) {
+  if (taskType === 'image-to-video' && !image) {
     issues.push({ code: 'missing-source-media', field: 'image' });
+  }
+  if (taskType === 'video-to-video' && !video) {
+    issues.push({ code: 'missing-source-media', field: 'video' });
   }
 
   return {
@@ -40,7 +44,8 @@ export function validateVideoGenerationRequest(input = {}) {
       durationSeconds,
       fps,
       aspectRatio: text(input.aspectRatio, 20) || 'source',
-      image,
+      image: taskType === 'image-to-video' ? image : null,
+      video: taskType === 'video-to-video' ? video : null,
       seed: Number.isInteger(input.seed) && input.seed >= 0 ? input.seed : null
     } : null
   };
