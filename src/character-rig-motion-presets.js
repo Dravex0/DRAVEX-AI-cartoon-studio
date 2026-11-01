@@ -93,8 +93,10 @@ function applyPlantedGaitPose(rig, pose, phase, preset, rootBob, chains) {
     chains.right.upperLength + chains.right.lowerLength
   ) * (preset === 'run' ? 0.22 : 0.14), 0.02, preset === 'run' ? 0.11 : 0.075);
   const rootX = phase * stride;
-  const rootPose = pose[chains.left.root.id] || {};
-  pose[chains.left.root.id] = { ...rootPose, x: round(rootX), y: round(rootBob) };
+  const candidatePose = { ...pose };
+  const rootPose = candidatePose[chains.left.root.id] || {};
+  candidatePose[chains.left.root.id] = { ...rootPose, x: round(rootX), y: round(rootBob) };
+  const solvedLegs = [];
 
   for (const [side, chain] of [['left', chains.left], ['right', chains.right]]) {
     const isLeft = side === 'left';
@@ -117,10 +119,18 @@ function applyPlantedGaitPose(rig, pose, phase, preset, rootBob, chains) {
       target,
       bendDirection: chain.bendDirection
     });
-    if (solved.status !== 'solved') return false;
-    pose[chain.upper.id] = { ...(pose[chain.upper.id] || {}), rotation: round(solved.pose[chain.upper.id].rotation) };
-    pose[chain.lower.id] = { ...(pose[chain.lower.id] || {}), rotation: round(solved.pose[chain.lower.id].rotation) };
+    // A clamped IK solution is mathematically valid but cannot plant the
+    // requested ankle. Reject it instead of silently accepting foot sliding.
+    if (solved.status !== 'solved' || solved.reachable !== true) return false;
+    solvedLegs.push({ chain, solved });
   }
+  // Commit both legs together. If either solve fails, retain the complete
+  // legacy pose instead of mixing one IK leg with one procedural leg.
+  for (const { chain, solved } of solvedLegs) {
+    candidatePose[chain.upper.id] = { ...(candidatePose[chain.upper.id] || {}), rotation: round(solved.pose[chain.upper.id].rotation) };
+    candidatePose[chain.lower.id] = { ...(candidatePose[chain.lower.id] || {}), rotation: round(solved.pose[chain.lower.id].rotation) };
+  }
+  Object.assign(pose, candidatePose);
   return true;
 }
 
@@ -201,6 +211,7 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
   if (presetName === 'wave' && ![...roles].some(role => role === 'rightArm' || role === 'arm')) {
     warnings.push('No right-arm or generic arm bone found; the greeting gesture cannot be represented by this rig.');
   }
+  const gaitChains = ['walk', 'run'].includes(presetName) ? plantedGaitChains(rig) : null;
   const keyframes = Array.from({ length: preset.frames }, (_, index) => {
     const time = index / (preset.frames - 1);
     return {
@@ -211,6 +222,11 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
       poses: { [rig.characterId]: poseFor(rig, presetName, time) }
     };
   });
+  if (gaitChains && keyframes.some(frame => (
+    typeof frame.poses[rig.characterId]?.[gaitChains.left.root.id]?.x !== 'number'
+  ))) {
+    warnings.push('Foot-planting IK could not reach one or more requested ankle targets; the complete legacy walk/run pose was kept for those frames.');
+  }
   const timeline = { schemaVersion: 1, keyframes };
   const timelineReport = validateCharacterRigTimeline(timeline);
   if (!timelineReport.passed) return { status: 'invalid-timeline', preset: presetName, timeline: null, issues: timelineReport.issues };
