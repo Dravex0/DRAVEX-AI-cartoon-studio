@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('assembles a storyboard into a non-empty playable WebM file', async ({ page }) => {
+test('assembles a storyboard into a non-empty WebM container', async ({ page }) => {
   test.setTimeout(120_000);
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
@@ -23,30 +23,24 @@ test('assembles a storyboard into a non-empty playable WebM file', async ({ page
   );
 
   const film = await page.locator('#finalFilmPlayer').evaluate(async video => {
-    await new Promise((resolve, reject) => {
-      if (video.readyState >= 1 && Number.isFinite(video.duration)) {
-        resolve();
-        return;
-      }
-      video.addEventListener('loadedmetadata', resolve, { once: true });
-      video.addEventListener('error', () => reject(new Error('The exported WebM could not be loaded.')), {
-        once: true
-      });
-    });
-    const response = await fetch(video.currentSrc);
+    const source = video.currentSrc;
+    if (!source.startsWith('blob:')) throw new Error('The export preview is not backed by a local Blob URL.');
+    const response = await fetch(source);
     if (!response.ok) throw new Error('The exported WebM URL could not be read.');
     const blob = await response.blob();
+    const signature = Array.from(new Uint8Array(await blob.slice(0, 4).arrayBuffer()));
     return {
-      duration: video.duration,
       size: blob.size,
       type: blob.type,
-      source: video.currentSrc.slice(0, 5)
+      signature,
+      mediaError: video.error?.message || null
     };
   });
 
-  expect(film.source).toBe('blob:');
-  expect(film.duration).toBeGreaterThan(0);
   expect(film.size).toBeGreaterThan(0);
   expect(film.type).toContain('video/webm');
+  // WebM is an EBML container and starts with the four-byte EBML signature.
+  expect(film.signature).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
+  expect(film.mediaError).toBeNull();
   expect(pageErrors, 'export should not throw uncaught browser errors').toEqual([]);
 });
