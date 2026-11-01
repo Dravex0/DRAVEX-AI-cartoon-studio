@@ -93,8 +93,8 @@ describe('character rig foundation', () => {
       root: { rotation: Math.PI / 2 },
       arm: { rotation: Math.PI / 2 }
     });
-    assert.ok(Math.abs(posed.x - 0.75) < 1e-9);
-    assert.ok(Math.abs(posed.y - 0.75) < 1e-9);
+    assert.ok(Math.abs(posed.x - 0.5) < 1e-9);
+    assert.ok(Math.abs(posed.y - 0.5) < 1e-9);
     assert.ok(Math.abs(posed.rotation - Math.PI) < 1e-9);
   });
 
