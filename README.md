@@ -36,7 +36,7 @@ npm run build
 npm run dev
 ```
 
-The Vite build is a separate development bundle. The root `index.html` is the published standalone workspace and now uses the deterministic director engine to vary preview framing from scene text and camera metadata. The storyboard is currently planned by a deterministic local engine; it is not yet a trained generative neural model.
+The Vite build is a separate development bundle. The root `index.html` is the published standalone workspace. Preview and WebM export use a 1280×720 (16:9) canvas with a 640×360 logical drawing space; AI still-image profiles use landscape dimensions to reduce destructive cropping into the widescreen frame. The deterministic director engine varies preview framing from scene text and camera metadata. The storyboard is currently planned by a deterministic local engine; it is not yet a trained generative neural model.
 
 ## Current limitations
 
