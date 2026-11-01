@@ -5,6 +5,18 @@ const isRecord = value => Boolean(value && typeof value === 'object' && !Array.i
 const finite = (value, fallback = 0) => typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 const clamp = (value, min, max, fallback = 0) => Math.max(min, Math.min(max, finite(value, fallback)));
 
+function poseForBone(pose, boneId) {
+  if (!isRecord(pose)) return {};
+  if (Object.prototype.hasOwnProperty.call(pose, boneId)) {
+    return isRecord(pose[boneId]) ? pose[boneId] : {};
+  }
+  const normalizedId = String(boneId).toLowerCase();
+  const matchingKey = Object.keys(pose).find(key => key.toLowerCase() === normalizedId);
+  const value = matchingKey === undefined ? null : pose[matchingKey];
+  return isRecord(value) ? value : {};
+}
+
+
 function normalizeBone(input = {}) {
   const source = isRecord(input) ? input : {};
   return {
@@ -112,7 +124,7 @@ export function applyCharacterRigPose(parts, rigInput, pose = {}) {
     const visited = new Set();
     while (current && !visited.has(current.id.toLowerCase())) {
       visited.add(current.id.toLowerCase());
-      const delta = isRecord(pose[current.id]) ? pose[current.id] : {};
+      const delta = poseForBone(pose, current.id);
       x += clamp(delta.x, -2, 2);
       y += clamp(delta.y, -2, 2);
       rotation += clamp(delta.rotation, -Math.PI * 2, Math.PI * 2);
