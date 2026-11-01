@@ -34,7 +34,7 @@ test("submits an image-to-video job with the Wan 2.2 fast profile and downloads 
     taskType: "image-to-video",
     prompt: "Anime hero raises a glowing hand",
     negativePrompt: "flicker",
-    durationSeconds: 7,
+    durationSeconds: 5,
     image
   }, { onProgress: value => progress.push(value) });
 
@@ -42,6 +42,7 @@ test("submits an image-to-video job with the Wan 2.2 fast profile and downloads 
   assert.equal(calls[0][1][0].fileBlob, image);
   assert.equal(calls[0][1][1], "Anime hero raises a glowing hand");
   assert.equal(calls[0][1][2], 4);
+  assert.equal(calls[0][1][4], 5);
   assert.equal(calls[0][1][4], 5);
   assert.equal(result.status, "completed");
   assert.equal(result.video.type, "video/mp4");
@@ -57,6 +58,22 @@ test("rejects missing images and unsupported task types", async () => {
   });
   await assert.rejects(provider.generate({ taskType: "text-to-video", prompt: "x" }), /image-to-video/);
   await assert.rejects(provider.generate({ taskType: "image-to-video", prompt: "x" }), /source image/);
+});
+
+test("rejects durations outside the actual Wan 2.2 0.5–5 second range before submitting", async () => {
+  let submitCalls = 0;
+  const provider = createHuggingFaceZeroGPUVideoProvider({
+    client: { submit: () => { submitCalls += 1; return createSubmission([]); } },
+    handleFile: value => value
+  });
+  const image = new Blob(["png"], { type: "image/png" });
+  for (const durationSeconds of [0.25, 5.01, 8, 30, Number.NaN]) {
+    await assert.rejects(
+      provider.generate({ taskType: "image-to-video", prompt: "move", image, durationSeconds }),
+      /0.5 to 5 seconds/
+    );
+  }
+  assert.equal(submitCalls, 0);
 });
 
 test("cancels a running Gradio job when the signal aborts", async () => {
