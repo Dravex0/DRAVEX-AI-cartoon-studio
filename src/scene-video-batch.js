@@ -66,6 +66,10 @@ export async function generateStoryboardVideos({
     throw new TypeError("hasVideo and onProgress must be functions.");
   }
 
+  const notifyProgress = update => {
+    try { onProgress(update); } catch { /* UI progress must not change generation results. */ }
+  };
+
   const report = {
     total: scenes.length,
     completed: 0,
@@ -84,11 +88,11 @@ export async function generateStoryboardVideos({
     if (hasVideo(scene, index)) {
       report.skipped += 1;
       report.results.push({ index, status: "skipped" });
-      onProgress({ ...report, currentIndex: index, stage: "skipped" });
+      notifyProgress({ ...report, currentIndex: index, stage: "skipped" });
       continue;
     }
 
-    onProgress({ ...report, currentIndex: index, stage: "starting" });
+    notifyProgress({ ...report, currentIndex: index, stage: "starting" });
     try {
       const result = await generateScene(scene, index, { signal });
       if (signal?.aborted) throw abortError();
@@ -97,7 +101,7 @@ export async function generateStoryboardVideos({
       }
       report.completed += 1;
       report.results.push({ index, status: "completed", result });
-      onProgress({ ...report, currentIndex: index, stage: "completed" });
+      notifyProgress({ ...report, currentIndex: index, stage: "completed" });
     } catch (error) {
       if (error?.name === "AbortError" || signal?.aborted) {
         report.cancelled = true;
@@ -109,7 +113,7 @@ export async function generateStoryboardVideos({
         status: "failed",
         error: String(error?.message || "Unknown scene generation error")
       });
-      onProgress({ ...report, currentIndex: index, stage: "failed" });
+      notifyProgress({ ...report, currentIndex: index, stage: "failed" });
     }
   }
 
