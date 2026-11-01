@@ -165,6 +165,7 @@ export function drawCharacterLayers(context, layers, resolveImage, viewportWidth
       runtime.rigPoses
     );
   }
+  if (!runtime || runtime.drawRigParts !== true) return { drawn, skipped };
   return { drawn: drawn + rigResult.drawn, skipped: skipped + rigResult.skipped, rigDrawn: rigResult.drawn, rigSkipped: rigResult.skipped, rigReadyCharacterIds: rigResult.readyCharacterIds };
 }
 
