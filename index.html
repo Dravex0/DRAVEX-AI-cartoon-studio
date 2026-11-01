@@ -57,6 +57,7 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="row"><div class="field"><label for="sceneMotionX">Target X (0–1)</label><input id="sceneMotionX" type="number" min="0" max="1" step="0.01" value="0.5"></div><div class="field"><label for="sceneMotionY">Target Y (0–1)</label><input id="sceneMotionY" type="number" min="0" max="1" step="0.01" value="0.5"></div></div>
 <div class="row"><div class="field"><label for="sceneMotionScale">Target scale (0.05–4)</label><input id="sceneMotionScale" type="number" min="0.05" max="4" step="0.05" value="1"></div><div class="field"><label for="sceneMotionRotation">Rotation (degrees)</label><input id="sceneMotionRotation" type="number" min="-360" max="360" step="5" value="0"></div></div>
 <div class="field"><label for="sceneMotionOpacity">Target opacity (0–1)</label><input id="sceneMotionOpacity" type="number" min="0" max="1" step="0.05" value="1"></div>
+<div class="field"><label for="sceneMotionEasing">Motion smoothness / Плавность движения</label><select id="sceneMotionEasing"><option value="linear">Linear / Равномерно</option><option value="ease-in">Ease in / Плавный старт</option><option value="ease-out">Ease out / Плавная остановка</option><option value="ease-in-out" selected>Ease in-out / Плавное начало и завершение</option></select></div>
 <div class="actions"><button class="secondary" id="applyCharacterMotion" type="button">Apply motion keyframes / Применить движение</button></div>
 <div class="actions"><button class="secondary" id="generateCharacterMotion" type="button">Generate motion from story actions / Создать движение по сценарию</button></div>
 <div class="status" id="characterMotionStatus" role="status" aria-live="polite">Add a generated character sprite to enable motion controls.</div>
@@ -484,6 +485,7 @@ function syncCharacterMotionEditor(){
  $('sceneMotionScale').value=to.scale??actor.scale??1;
  $('sceneMotionRotation').value=Math.round((to.rotation??actor.rotation??0)*180/Math.PI);
  $('sceneMotionOpacity').value=to.opacity??actor.opacity??1;
+ $('sceneMotionEasing').value=phase?.easing||'ease-in-out';
  $('characterMotionStatus').textContent=phase
    ? 'Motion keyframes loaded for '+actor.characterId+'. Preview and export use this timeline.'
    : 'No motion keyframes yet. The current sprite transform will be used as the start pose.';
@@ -500,6 +502,7 @@ $('applyCharacterMotion').addEventListener('click',()=>{
      actorId,
      start:number('sceneMotionStart'),
      end:number('sceneMotionEnd'),
+     easing:$('sceneMotionEasing').value,
      from:{x:Number(layer.x),y:Number(layer.y),scale:Number(layer.scale),rotation:Number(layer.rotation),opacity:Number(layer.opacity)},
      to:{x:number('sceneMotionX'),y:number('sceneMotionY'),scale:number('sceneMotionScale'),rotation:number('sceneMotionRotation')*Math.PI/180,opacity:number('sceneMotionOpacity')}
    });
