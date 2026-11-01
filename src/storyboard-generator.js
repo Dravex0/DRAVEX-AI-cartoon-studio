@@ -9,7 +9,7 @@ import { inferSceneCausalLinks } from './scene-causality.js';
 import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
-import { detectSceneAction } from './scene-action.js';
+import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -157,21 +157,40 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     scene.interactions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
       : [];
-    // Add a minimal action-only timeline only when source text supports a character action
-    // or a directed interaction. Do not invent preparation, reaction, or aftermath phases.
+    // Semantic story intent is separate from renderer movement presets and is now
+    // carried into the actual motion prompt and validated action timeline.
+    const semanticIntent = inferSceneActionIntent(scene.storyDetail);
+    scene.semanticActionIntent = semanticIntent;
+    const semanticIsActionable = !['unknown', 'descriptive'].includes(semanticIntent.intent);
+    const semanticMotionInstruction = semanticIsActionable
+      ? `Perform the story event "${semanticIntent.intent}" using this source-grounded action: ${scene.storyDetail}`
+      : '';
+    scene.motionPrompt = [scene.visibleAction, semanticMotionInstruction].filter(Boolean).join('. ');
+    // Add one action phase only when source text supports a movement, semantic event,
+    // or directed interaction. Never fabricate setup/reaction/aftermath phases.
     const sourceAction = detectSceneAction(scene.storyDetail);
     const primaryInteraction = scene.interactions[0] || null;
-    const actionActor = primaryInteraction?.actorId || scene.characters[0] || '';
     const actionEvidence = (Array.isArray(scene.sourceEvents) ? scene.sourceEvents : [])
       .find(evidence => typeof evidence === 'string' && evidence.trim()) || scene.storyDetail;
-    if (actionActor && actionEvidence && (sourceAction !== 'idle' || primaryInteraction)) {
+    const semanticNeedsPair = semanticIntent.intent === 'team_magic' || semanticIntent.intent === 'energy_clash';
+    const actionActor = primaryInteraction?.actorId || scene.characters[0] || '';
+    const actionTarget = primaryInteraction?.targetId ||
+      (semanticNeedsPair && scene.characters.length > 1 ? scene.characters[1] : null);
+    const canRepresentSemanticPair = !semanticNeedsPair || Boolean(actionTarget);
+    if (actionActor && actionEvidence && canRepresentSemanticPair &&
+        (sourceAction !== 'idle' || primaryInteraction || semanticIsActionable)) {
+      const semanticDescription = semanticIsActionable
+        ? semanticNeedsPair
+          ? `${scene.characters[0]} and ${actionTarget} combine their powers as described in the source event: ${scene.storyDetail}`
+          : `Perform the ${semanticIntent.intent} event: ${scene.storyDetail}`
+        : scene.visibleAction || scene.storyDetail;
       scene.actionTimeline = {
         schemaVersion: 1,
         phases: [{
           phase: 'action', start: 0, end: 1,
           actorId: actionActor,
-          targetId: primaryInteraction?.targetId || null,
-          description: scene.visibleAction || scene.storyDetail,
+          targetId: actionTarget || null,
+          description: semanticDescription,
           evidence: actionEvidence
         }]
       };
