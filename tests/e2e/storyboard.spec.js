@@ -74,3 +74,12 @@ test('keeps advanced AI and rigging controls out of the first-time workflow unti
   await expect(page.locator('#generateSceneImage')).toBeVisible();
   await expect(page.locator('#generateCharacterSprites')).toBeVisible();
 });
+
+
+test('renders the detailed full-film progress dashboard without claiming generation has started', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#fullFilmProgressPanel')).toBeHidden();
+  await expect(page.locator('#fullFilmPercent')).toHaveText('0%');
+  await expect(page.locator('#fullFilmProgress')).toHaveAttribute('max', '100');
+  await expect(page.locator('#fullFilmSceneList')).toBeEmpty();
+});
