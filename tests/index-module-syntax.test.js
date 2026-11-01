@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 test('published index loads one external module and the application module parses', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   const appPath = new URL('../src/app.js', import.meta.url);
-  assert.match(html, /<script type="module" src="\.\/src\/app\.js"><\/script>/);
+  assert.match(html, /<script type="module" src="\.\/app\.js"><\/script>/);
   const result = spawnSync(process.execPath, ['--check', appPath.pathname], {
     encoding: 'utf8'
   });
@@ -17,7 +17,7 @@ test('published index loads one external module and the application module parse
 
 test('published page imports the prompt-guided motion module', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
-  assert.match(html, /from ["']\.\/src\/prompt-camera-motion\.js["']/);
+  assert.match(html, /from ["']\.\/prompt-camera-motion\.js["']/);
   assert.match(html, /getPromptCameraTransform\(currentSceneData\.motionPrompt/);
 });
 
@@ -30,7 +30,7 @@ test('local AI director receives and preserves the saved character bible', () =>
 
 test('published page wires source-grounded state changes into storyboard scenes and local AI', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
-  assert.match(html, /from ["']\.\/src\/scene-state-changes\.js["']/);
+  assert.match(html, /from ["']\.\/scene-state-changes\.js["']/);
   assert.match(html, /inferStoryboardStateChanges\(preparedScenes,lang,character\)/);
   assert.match(html, /inferStoryboardStateChanges\(castScenes,language,character\)/);
 });
@@ -38,7 +38,7 @@ test('published page wires source-grounded state changes into storyboard scenes 
 
 test('published storyboard workflow rebuilds the event chain after cast and state inference', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
-  assert.match(html, /from ["']\.\/src\/story-event-chain\.js["']/);
+  assert.match(html, /from ["']\.\/story-event-chain\.js["']/);
   assert.match(html, /eventChain:buildStoryEventChain\(sceneMetadata\)/);
   assert.match(html, /eventChain:buildStoryEventChain\(preparedScenes\)/);
 });
