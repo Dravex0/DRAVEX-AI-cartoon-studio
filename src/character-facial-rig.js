@@ -13,7 +13,7 @@ function normalizePart(input = {}, index = 0) {
   return {
     id: clean(source.id),
     role: clean(source.role, 32).toLowerCase(),
-    imageUrl: /^(https:\/\/|blob:)/i.test(imageUrl) ? imageUrl : "",
+    imageUrl: /^(https:\/\/|blob:|dravex-facial-asset:)/i.test(imageUrl) ? imageUrl : "",
     x: clamp(source.x, -1, 1),
     y: clamp(source.y, -1, 1),
     width: clamp(source.width, 0.001, 1, 0.1),
@@ -48,7 +48,7 @@ export function validateCharacterFacialRig(input = {}, bodyRig = null) {
     else if (ids.has(key)) issues.push({ code: "facial-part-id-duplicate", message: "Facial part IDs must be unique." });
     ids.add(key);
     if (!ROLES.has(part.role)) issues.push({ code: "facial-part-role-invalid", message: "Facial part role is not supported." });
-    if (!part.imageUrl) issues.push({ code: "facial-part-image-invalid", message: "Every facial part needs an HTTPS or local blob image URL." });
+    if (!part.imageUrl) issues.push({ code: "facial-part-image-invalid", message: "Every facial part needs an HTTPS, local blob, or saved local facial asset URL." });
   }
   if (bodyRig) {
     const body = bodyRig && typeof bodyRig === "object" ? bodyRig : {};
