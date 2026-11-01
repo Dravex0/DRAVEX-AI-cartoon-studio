@@ -106,14 +106,23 @@ export function applyCharacterRigPose(parts, rigInput, pose = {}) {
   const bones = new Map(report.rig.bones.map(bone => [bone.id.toLowerCase(), bone]));
   return parts.map(part => {
     if (!isRecord(part)) return part;
-    const bone = bones.get(clean(part.boneId).toLowerCase());
-    if (!bone) return { ...part };
-    const delta = isRecord(pose[bone.id]) ? pose[bone.id] : {};
+    let current = bones.get(clean(part.boneId).toLowerCase());
+    if (!current) return { ...part };
+    let x = 0, y = 0, rotation = 0;
+    const visited = new Set();
+    while (current && !visited.has(current.id.toLowerCase())) {
+      visited.add(current.id.toLowerCase());
+      const delta = isRecord(pose[current.id]) ? pose[current.id] : {};
+      x += clamp(delta.x, -2, 2);
+      y += clamp(delta.y, -2, 2);
+      rotation += clamp(delta.rotation, -Math.PI * 2, Math.PI * 2);
+      current = current.parentId ? bones.get(current.parentId.toLowerCase()) : null;
+    }
     return {
       ...part,
-      x: finite(part.x) + clamp(delta.x, -2, 2),
-      y: finite(part.y) + clamp(delta.y, -2, 2),
-      rotation: finite(part.rotation) + clamp(delta.rotation, -Math.PI * 2, Math.PI * 2)
+      x: finite(part.x) + x,
+      y: finite(part.y) + y,
+      rotation: finite(part.rotation) + rotation
     };
   });
 }
