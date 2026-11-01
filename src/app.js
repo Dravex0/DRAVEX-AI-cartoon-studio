@@ -23,6 +23,7 @@ import { createTimestampedKokoroEngine } from "./timestamped-kokoro-engine.js";
 import { createVoiceAudioStorage } from "./voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./scene-voice-workflow.js";
 import { createSceneVideoStorage } from "./scene-video-storage.js";
+import { createFacialAssetStorage } from "./facial-asset-storage.js";
 import { generateStoryboardVideos, readVideoProgressPercent } from "./scene-video-batch.js";
 import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./huggingface-zerogpu-video-provider.js";
 import { syncSceneVideoPlayback } from "./scene-video-transport.js";
@@ -108,6 +109,7 @@ const sceneVideoCache=new Map();
 let finalFilmObjectUrl=null;
 let sceneVideoRestorePromise=Promise.resolve();
 const sceneVideoStorage=createSceneVideoStorage();
+const facialAssetStorage=createFacialAssetStorage();
 function disposeSceneVideoEntry(entry){
  if(!entry)return;
  entry.video.pause();
@@ -155,8 +157,11 @@ image.crossOrigin='anonymous';
 image.decoding='async';
 image.onload=()=>{entry.state='ready';if(!playing)draw()};
 image.onerror=()=>{entry.state='error';if(sceneMetadata[sceneIndex]?.generatedImageUrl===key)$('imageGenerationStatus').textContent=uiLang==='ru'?'Изображение создано, но браузер не разрешил встроить его в холст из-за ограничений CORS. Оно остаётся доступно в карточке сцены.':'Image generated, but browser CORS rules prevented placing it on the export canvas. It remains available in the scene preview card.'};
-image.src=key;
 sceneImageCache.set(key,entry);
+if(key.startsWith("dravex-facial-asset://")){
+const assetId=key.slice("dravex-facial-asset://".length);
+facialAssetStorage.get(assetId).then(record=>{if(!record?.blob)throw new Error("Saved facial image is missing from this device.");entry.objectUrl=URL.createObjectURL(record.blob);image.src=entry.objectUrl;}).catch(error=>{entry.state='error';console.warn("Could not restore local facial image:",error);if(!playing)draw();});
+}else image.src=key;
 }
 return entry.state==='ready'&&entry.image.naturalWidth>0?entry.image:null;
 }
@@ -649,13 +654,25 @@ syncFacialRigEditor();
 }
 ['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock','sceneCharacters'].forEach(id=>$(id).addEventListener('input',updateProductionPreview));
 $("facialPartSelect").addEventListener("change",syncFacialRigEditor);
+$("facialPartImageFile").addEventListener("change",async event=>{
+const file=event.target.files?.[0];if(!file)return;const status=$("facialAssetUploadStatus");
+try{
+const randomId=globalThis.crypto?.randomUUID?.().replace(/-/g,"")||Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+const assetId="faceasset_"+randomId;await facialAssetStorage.put(assetId,file,file.name);
+$("facialPartImageUrl").value="dravex-facial-asset://"+assetId;
+status.textContent=uiLang==="ru"?"Изображение сохранено только на этом устройстве.":"Image saved on this device only.";
+const saved=writeLocalStorage("dravex-cartoon-draft",JSON.stringify({idea:$("idea").value,character:$("character").value,style:$("style").value,canvasFormat:activeCanvasFormat,imageQuality:$("imageQuality").value,duration:$("duration").value,language:$("language").value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
+if(!saved)status.textContent+=" Draft storage is full; save the project manually.";
+}catch(error){status.textContent=error.message||"Could not save facial image.";event.target.value="";}
+});
 $("saveFacialPart").addEventListener("click",()=>{
  const result=upsertCharacterFacialPart(sceneMetadata[sceneIndex]||{},{characterId:$("facialCharacterId").value,headBoneId:$("facialHeadBoneId").value,partId:$("facialPartId").value,role:$("facialPartRole").value,imageUrl:$("facialPartImageUrl").value,x:Number($("facialPartX").value),y:Number($("facialPartY").value),width:Number($("facialPartWidth").value),height:Number($("facialPartHeight").value),rotation:Number($("facialPartRotation").value)*Math.PI/180,zIndex:Number($("facialPartZIndex").value)});
  if(result.status==="invalid"){$("facialEditorStatus").textContent=result.issues.map(issue=>issue.message).join(" ");return;}
  sceneMetadata[sceneIndex]=result.scene;
+ const draftSaved=writeLocalStorage("dravex-cartoon-draft",JSON.stringify({idea:$("idea").value,character:$("character").value,style:$("style").value,canvasFormat:activeCanvasFormat,imageQuality:$("imageQuality").value,duration:$("duration").value,language:$("language").value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
  if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
  syncFacialRigEditor();if(!playing)draw();
- $("facialEditorStatus").textContent=result.status==="updated"?"Facial part updated. / Часть лица обновлена.":"Facial part added. / Часть лица добавлена.";
+ $("facialEditorStatus").textContent=(result.status==="updated"?"Facial part updated. / Часть лица обновлена.":"Facial part added. / Часть лица добавлена.")+(draftSaved?" Draft saved.":" Draft could not be saved; use Save project.");
 });
 $("removeFacialPart").addEventListener("click",()=>{
  const characterId=String($("facialCharacterId").value||"").trim(),partId=$("facialPartSelect").value;

@@ -21,7 +21,7 @@ export function upsertCharacterFacialPart(scene = {}, input = {}) {
   if (!headBoneId) issues.push({ code: "facial-editor-head-bone-missing", message: "Enter the head bone ID from the body rig." });
   if (!partId) issues.push({ code: "facial-editor-part-id-missing", message: "Enter a unique facial part ID." });
   if (!ROLES.has(role)) issues.push({ code: "facial-editor-role-invalid", message: "Choose a supported facial part role." });
-  if (!/^(https:\/\/|blob:)/i.test(imageUrl)) issues.push({ code: "facial-editor-image-invalid", message: "Use an HTTPS image URL or a current local blob URL." });
+  if (!/^(https:\/\/|blob:|dravex-facial-asset:)/i.test(imageUrl)) issues.push({ code: "facial-editor-image-invalid", message: "Use HTTPS, a current local blob URL, or a saved local facial asset." });
   if (x < -1 || x > 1 || y < -1 || y > 1 || width < 0.001 || width > 1 || height < 0.001 || height > 1 || Math.abs(rotation) > Math.PI * 2 || Math.abs(zIndex) > 1000) {
     issues.push({ code: "facial-editor-geometry-invalid", message: "Part geometry is outside the supported bounds." });
   }

@@ -65,3 +65,5 @@ test("accepts a clean face-base plate as a supported facial layer", () => {
   rig.parts.unshift({ id: "face-base", role: "face-base", imageUrl: "blob:clean-face" });
   assert.equal(validateCharacterFacialRig(rig, bodyRig).status, "valid");
 });
+
+test("accepts stable references to persisted local facial assets", () => { const rig=facialRig(); rig.parts[0].imageUrl="dravex-facial-asset://faceasset_123456"; assert.equal(validateCharacterFacialRig(rig,bodyRig).status,"valid"); });
