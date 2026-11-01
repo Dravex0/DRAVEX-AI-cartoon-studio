@@ -7,5 +7,5 @@ test('repository syntax checker covers source, tests, scripts, vendor and app co
   const script = fileURLToPath(new URL('../scripts/check-syntax.js', import.meta.url));
   const result = spawnSync(process.execPath, [script], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr || result.stdout || 'repository syntax check failed');
-  assert.match(result.stdout, /Syntax checked \d+ JavaScript files/);
+  assert.match(result.stdout, /Syntax checked [0-9]+ JavaScript files\./);
 });
