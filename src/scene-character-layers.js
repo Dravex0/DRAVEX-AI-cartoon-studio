@@ -1,4 +1,5 @@
 import { applyCharacterActionTimelineToLayers } from './character-action-runtime.js';
+import { applyCharacterRigPose, validateCharacterRig } from './character-rig.js';
 
 const MAX_CHARACTER_LAYERS = 12;
 const clean = (value, max = 2048) => String(value ?? '').trim().slice(0, max);
@@ -38,6 +39,53 @@ export function normalizeCharacterLayers(layers) {
     result.push(layer);
   }
   return result;
+}
+
+/**
+ * Draw segmented character parts using a validated rig and explicit bone pose deltas.
+ * Part x/y/width/height are viewport-relative; rotation is in radians.
+ * A complete rig is drawn only when every referenced part image is ready, so callers
+ * can safely retain the legacy whole-sprite layer as a fallback.
+ */
+export function drawCharacterRigParts(context, rigs, resolveImage, viewportWidth, viewportHeight, poses = {}) {
+  const width = Number(viewportWidth), height = Number(viewportHeight);
+  if (!context || typeof context.drawImage !== 'function' || typeof resolveImage !== 'function'
+    || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return { drawn: 0, skipped: Array.isArray(rigs) ? rigs.length : 0, readyCharacterIds: [] };
+  }
+  let drawn = 0, skipped = 0;
+  const readyCharacterIds = [];
+  for (const input of Array.isArray(rigs) ? rigs.slice(0, 20) : []) {
+    const report = validateCharacterRig(input);
+    if (!report.passed) { skipped++; continue; }
+    const rig = report.rig;
+    const characterId = rig.characterId;
+    const pose = poses && typeof poses === 'object' && !Array.isArray(poses)
+      && poses[characterId] && typeof poses[characterId] === 'object'
+      ? poses[characterId] : {};
+    const posedParts = applyCharacterRigPose(rig.parts, rig, pose);
+    const prepared = posedParts.map(part => {
+      const image = resolveImage(part.imageUrl, characterId);
+      const imageWidth = Number(image?.naturalWidth || image?.videoWidth || image?.width);
+      const imageHeight = Number(image?.naturalHeight || image?.videoHeight || image?.height);
+      return { part, image, ready: Boolean(image && Number.isFinite(imageWidth) && Number.isFinite(imageHeight) && imageWidth > 0 && imageHeight > 0) };
+    });
+    if (prepared.some(item => !item.ready)) { skipped++; continue; }
+    readyCharacterIds.push(characterId);
+    prepared.sort((a, b) => a.part.zIndex - b.part.zIndex);
+    for (const { part, image } of prepared) {
+      context.save();
+      try {
+        context.translate(part.x * width, part.y * height);
+        context.rotate(part.rotation);
+        context.drawImage(image, -part.width * width / 2, -part.height * height / 2, part.width * width, part.height * height);
+        drawn++;
+      } finally {
+        context.restore();
+      }
+    }
+  }
+  return { drawn, skipped, readyCharacterIds };
 }
 
 /**
@@ -84,7 +132,18 @@ export function drawCharacterLayers(context, layers, resolveImage, viewportWidth
       context.restore();
     }
   }
-  return { drawn, skipped };
+  let rigResult = { drawn: 0, skipped: 0, readyCharacterIds: [] };
+  if (runtime && runtime.drawRigParts === true) {
+    rigResult = drawCharacterRigParts(
+      context,
+      runtime.characterRigs,
+      resolveImage,
+      width,
+      height,
+      runtime.rigPoses
+    );
+  }
+  return { drawn: drawn + rigResult.drawn, skipped: skipped + rigResult.skipped, rigDrawn: rigResult.drawn, rigSkipped: rigResult.skipped, rigReadyCharacterIds: rigResult.readyCharacterIds };
 }
 
 
