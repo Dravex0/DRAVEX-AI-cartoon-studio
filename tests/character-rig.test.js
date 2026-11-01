@@ -49,6 +49,7 @@ describe('character rig foundation', () => {
   it('normalizes explicit joint pivots and preserves legacy rigs without pivots', () => {
     const rig = normalizeCharacterRig(validRig());
     assert.equal(rig.bones[0].pivotEnabled, false);
+    assert.equal(normalizeCharacterRig(rig).bones[0].pivotEnabled, false, 'normalizing a normalized legacy rig must not activate a default pivot');
     const withPivot = normalizeCharacterRig({
       ...validRig(),
       bones: [{ id: 'root', parentId: null, pivotX: 0.5, pivotY: 0.5 }]
