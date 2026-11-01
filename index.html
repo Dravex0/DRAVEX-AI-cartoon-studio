@@ -755,6 +755,25 @@ $('generateCharacterMotion').addEventListener('click',()=>{
  syncCharacterMotionEditor();
  if(!playing)draw();
 });
+function syncFacialRigEditor(){
+ const meta=sceneMetadata[sceneIndex]||{};
+ const rigs=Array.isArray(meta.characterFacialRigs)?meta.characterFacialRigs:[];
+ const characterId=rigs[0]?.characterId||meta.characters?.[0]||$("character").value||"Foxy";
+ const rig=rigs.find(item=>String(item?.characterId||"").toLowerCase()===String(characterId).toLowerCase())||null;
+ $("facialCharacterId").value=characterId;
+ $("facialHeadBoneId").value=rig?.headBoneId||"head";
+ const select=$("facialPartSelect"),previous=select.value;
+ select.replaceChildren(new Option("New part / Новая часть",""));
+ for(const part of rig?.parts||[])select.add(new Option(String(part.id)+" · "+String(part.role),String(part.id)));
+ select.value=(rig?.parts||[]).some(part=>String(part.id)===previous)?previous:"";
+ const part=(rig?.parts||[]).find(item=>String(item.id)===select.value)||null;
+ $("facialPartId").value=part?.id||"";$("facialPartRole").value=part?.role||"eye-left";$("facialPartImageUrl").value=part?.imageUrl||"";
+ $("facialPartX").value=String(part?.x??0.5);$("facialPartY").value=String(part?.y??0.5);$("facialPartWidth").value=String(part?.width??0.1);$("facialPartHeight").value=String(part?.height??0.1);
+ $("facialPartRotation").value=String((Number(part?.rotation)||0)*180/Math.PI);$("facialPartZIndex").value=String(part?.zIndex??10);
+ const expression=meta.characterFacialExpressions?.[characterId]||{};
+ $("facialExpressionPreset").value=expression.name||"neutral";$("facialEyeOpen").value=String(expression.eyeOpen??1);$("facialMouthOpen").value=String(expression.mouthOpen??0);$("facialBrowY").value=String(expression.browY??0);$("facialMouthWidth").value=String(expression.mouthWidth??1);
+ $("removeFacialPart").disabled=!part;
+}
 function syncSceneEditor(){
 const meta=sceneMetadata[sceneIndex]||{};
 $('sceneTitle').value=titles[sceneIndex]||'';
@@ -777,8 +796,32 @@ syncCharacterRigEditor();
 renderComfySceneVideo();
 renderSceneVoiceAudio();
 refreshSceneVoiceControls();
+syncFacialRigEditor();
 }
 ['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock','sceneCharacters'].forEach(id=>$(id).addEventListener('input',updateProductionPreview));
+$("facialPartSelect").addEventListener("change",syncFacialRigEditor);
+$("saveFacialPart").addEventListener("click",()=>{
+ const result=upsertCharacterFacialPart(sceneMetadata[sceneIndex]||{},{characterId:$("facialCharacterId").value,headBoneId:$("facialHeadBoneId").value,partId:$("facialPartId").value,role:$("facialPartRole").value,imageUrl:$("facialPartImageUrl").value,x:Number($("facialPartX").value),y:Number($("facialPartY").value),width:Number($("facialPartWidth").value),height:Number($("facialPartHeight").value),rotation:Number($("facialPartRotation").value)*Math.PI/180,zIndex:Number($("facialPartZIndex").value)});
+ if(result.status==="invalid"){$("facialEditorStatus").textContent=result.issues.map(issue=>issue.message).join(" ");return;}
+ sceneMetadata[sceneIndex]=result.scene;
+ if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
+ syncFacialRigEditor();if(!playing)draw();
+ $("facialEditorStatus").textContent=result.status==="updated"?"Facial part updated. / Часть лица обновлена.":"Facial part added. / Часть лица добавлена.";
+});
+$("removeFacialPart").addEventListener("click",()=>{
+ const characterId=String($("facialCharacterId").value||"").trim(),partId=$("facialPartSelect").value;
+ if(!characterId||!partId)return;
+ const meta=sceneMetadata[sceneIndex]||{},rigs=Array.isArray(meta.characterFacialRigs)?meta.characterFacialRigs:[];
+ const next=rigs.map(rig=>String(rig.characterId).toLowerCase()===characterId.toLowerCase()?{...rig,parts:(rig.parts||[]).filter(part=>String(part.id)!==partId)}:rig).filter(rig=>rig.parts?.length);
+ sceneMetadata[sceneIndex]={...meta,characterFacialRigs:next};syncFacialRigEditor();if(!playing)draw();
+ $("facialEditorStatus").textContent="Facial part removed. / Часть лица удалена.";
+});
+$("applyFacialExpression").addEventListener("click",()=>{
+ const result=applyCharacterFacialExpressionToScene(sceneMetadata[sceneIndex]||{},$("facialCharacterId").value,$("facialExpressionPreset").value,{eyeOpen:Number($("facialEyeOpen").value),mouthOpen:Number($("facialMouthOpen").value),browY:Number($("facialBrowY").value),mouthWidth:Number($("facialMouthWidth").value)});
+ if(result.status!=="ready"){$("facialEditorStatus").textContent=result.issues.map(issue=>issue.message).join(" ");return;}
+ sceneMetadata[sceneIndex]=result.scene;if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
+ if(!playing)draw();$("facialEditorStatus").textContent="Expression applied to preview. / Эмоция применена к предпросмотру.";
+});
 function updateStoryQA(){
   const safeText=value=>{
     if(value===null||value===undefined)return '';
