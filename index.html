@@ -61,6 +61,14 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="actions"><button class="secondary" id="applyCharacterMotion" type="button">Apply motion keyframes / Применить движение</button></div>
 <div class="actions"><button class="secondary" id="generateCharacterMotion" type="button">Generate motion from story actions / Создать движение по сценарию</button></div>
 <div class="status" id="characterMotionStatus" role="status" aria-live="polite">Add a generated character sprite to enable motion controls.</div>
+<details class="production-details" id="characterRigEditor"><summary>2D rig parts / Части персонажа</summary>
+<p class="muted" style="font-size:12px">Advanced setup: provide separate transparent image files for body parts and connect them to bones. A single full-body image is not automatically separated. Use HTTPS image URLs; local blob URLs are temporary and will not survive a page reload.</p>
+<div class="field"><label for="characterRigJson">Rig definition (JSON)</label><textarea id="characterRigJson" rows="12" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div>
+<div class="actions"><button class="secondary" id="applyCharacterRig" type="button">Validate and attach rig / Проверить и подключить</button></div>
+<div class="field"><label for="characterRigPoseJson">Bone pose offsets (JSON)</label><textarea id="characterRigPoseJson" rows="7" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div>
+<div class="actions"><button class="secondary" id="applyCharacterRigPose" type="button">Apply bone pose / Применить позу</button></div>
+<div class="status" id="characterRigStatus" role="status" aria-live="polite">Choose a character sprite first. Rig parts render only when every part image is ready.</div>
+</details>
 </details>
 <details class="production-details"><summary id="dialogueSummary">Scene dialogue and narration</summary><div class="field"><label for="sceneDialogue" id="sceneDialogueLabel">One speaker per line</label><textarea id="sceneDialogue" rows="4" maxlength="6000" placeholder="Foxy: Hello!&#10;Narrator: The forest becomes quiet."></textarea><small class="muted" id="sceneDialogueHint">Use “Character: line” or “Character — line”. Unlabelled lines are treated as narration. Generate speech locally after adding dialogue.</small><div class="voice-workflow"><div class="field"><label for="sceneVoiceEngineChoice">Voice engine / Движок голоса</label><select id="sceneVoiceEngineChoice"><option value="standard">Standard local TTS · Kokoro / MMS</option><option value="timestamped">Experimental timestamped Kokoro · English only</option></select><small class="muted" id="sceneVoiceEngineHint">Timestamped mode downloads its model after Load and computes mouth timings locally from model token durations.</small></div><label class="consent-row" id="voiceConsentRow" for="voiceNonCommercialConsent"><input id="voiceNonCommercialConsent" type="checkbox"><span id="voiceConsentLabel">I confirm non-commercial use for this restricted local voice model (required for Russian, Ukrainian and Spanish).</span></label><div class="actions"><button class="secondary" id="loadSceneVoiceModel" type="button">Load local voice model</button><button class="secondary" id="generateSceneVoices" type="button" disabled>Generate voices for this scene</button></div><div class="status" id="sceneVoiceStatus" role="status" aria-live="polite">No voice model loaded. Download starts only after you press Load.</div><div class="voice-results" id="sceneVoiceResults"></div></div></div></details>
 <details class="production-details"><summary id="productionSummary">Scene production instructions</summary><div class="production-grid">
@@ -140,6 +148,7 @@ import { directStoryboardWithLocalAI } from "./src/local-story-director.js";
 import { generateImageWithHorde } from "./src/ai-horde-image-provider.js";
 import { drawImageCover } from "./src/image-frame.js";
 import { drawCharacterLayers } from "./src/scene-character-layers.js";
+import { validateCharacterRig, normalizeCharacterRigPoses } from "./src/character-rig.js";
 import { upsertCharacterMotionPhase } from "./src/character-motion-editor.js";
 import { planCharacterMotionFromActionTimeline } from "./src/character-motion-planner.js";
 import { attachCharacterSpriteToSceneLayers } from "./src/scene-character-layers.js";
@@ -491,6 +500,69 @@ function syncCharacterMotionEditor(){
    : 'No motion keyframes yet. The current sprite transform will be used as the start pose.';
 }
 $('sceneMotionActor').addEventListener('change',syncCharacterMotionEditor);
+$('sceneMotionActor').addEventListener('change',syncCharacterRigEditor);
+function rigJsonTemplate(characterId){
+ return JSON.stringify({
+  schemaVersion:1,characterId,
+  bones:[{id:'root',parentId:null,pivotX:0.5,pivotY:0.5}],
+  parts:[{id:'body',boneId:'root',imageUrl:'https://example.com/replace-with-body.png',x:0.5,y:0.5,width:0.3,height:0.5,rotation:0,zIndex:0}]
+ },null,2);
+}
+function syncCharacterRigEditor(){
+ const meta=sceneMetadata[sceneIndex]||{};
+ const actorId=$('sceneMotionActor').value;
+ const rig=(meta.characterRigs||[]).find(item=>String(item.characterId||'').toLowerCase()===String(actorId||'').toLowerCase());
+ $('characterRigJson').value=rig?JSON.stringify(rig,null,2):(actorId?rigJsonTemplate(actorId):'');
+ const poses=meta.characterRigPoses?.[actorId]||{};
+ $('characterRigPoseJson').value=JSON.stringify(poses,null,2);
+ $('characterRigJson').disabled=!actorId;
+ $('characterRigPoseJson').disabled=!actorId||!rig;
+ $('applyCharacterRig').disabled=!actorId;
+ $('applyCharacterRigPose').disabled=!actorId||!rig;
+ $('characterRigStatus').textContent=rig
+  ? 'Rig loaded for '+actorId+'. '+rig.bones.length+' bones · '+rig.parts.length+' image parts.'
+  : 'Choose a character sprite first. Replace the example URL with transparent images for separate body parts.';
+}
+$('applyCharacterRig').addEventListener('click',()=>{
+ const actorId=$('sceneMotionActor').value;
+ if(!actorId){$('characterRigStatus').textContent='Add a character sprite to this scene first.';return}
+ try{
+  const parsed=JSON.parse($('characterRigJson').value);
+  const report=validateCharacterRig(parsed);
+  if(!report.passed){
+   $('characterRigStatus').textContent='Rig rejected: '+report.issues.map(issue=>issue.message).join(' ');
+   return;
+  }
+  if(report.rig.characterId.toLowerCase()!==actorId.toLowerCase()){
+   $('characterRigStatus').textContent='Rig characterId must match selected sprite: '+actorId+'.';
+   return;
+  }
+  const meta=sceneMetadata[sceneIndex]||{};
+  const rigs=(meta.characterRigs||[]).filter(item=>String(item.characterId||'').toLowerCase()!==actorId.toLowerCase());
+  rigs.push(report.rig);
+  sceneMetadata[sceneIndex]={...meta,characterRigs:rigs};
+  syncCharacterRigEditor();
+  if(!playing)draw();
+  $('characterRigStatus').textContent='Rig validated and attached: '+report.rig.bones.length+' bones, '+report.rig.parts.length+' parts. Preview uses rig parts when every image loads.';
+ }catch(error){$('characterRigStatus').textContent='Invalid JSON: '+error.message}
+});
+$('applyCharacterRigPose').addEventListener('click',()=>{
+ const actorId=$('sceneMotionActor').value;
+ const meta=sceneMetadata[sceneIndex]||{};
+ const rig=(meta.characterRigs||[]).find(item=>String(item.characterId||'').toLowerCase()===String(actorId||'').toLowerCase());
+ if(!rig){$('characterRigStatus').textContent='Attach a valid rig first.';return}
+ try{
+  const parsed=JSON.parse($('characterRigPoseJson').value);
+  const normalized=normalizeCharacterRigPoses({[actorId]:parsed})[actorId]||{};
+  const validBoneIds=new Set(rig.bones.map(bone=>bone.id.toLowerCase()));
+  const unknown=Object.keys(normalized).filter(id=>!validBoneIds.has(id.toLowerCase()));
+  if(unknown.length){$('characterRigStatus').textContent='Unknown bone IDs: '+unknown.join(', ');return}
+  sceneMetadata[sceneIndex]={...meta,characterRigPoses:{...(meta.characterRigPoses||{}),[actorId]:normalized}};
+  $('characterRigStatus').textContent='Bone pose saved for '+actorId+'. Preview and canvas export use the same scene compositor.';
+  if(!playing)draw();
+ }catch(error){$('characterRigStatus').textContent='Invalid pose JSON: '+error.message}
+});
+
 $('applyCharacterMotion').addEventListener('click',()=>{
  const meta=sceneMetadata[sceneIndex]||{};
  const actorId=$('sceneMotionActor').value;
@@ -544,6 +616,7 @@ renderCharacterBible();
 renderGeneratedSceneImage();
 renderCharacterSpriteAssets();
 syncCharacterMotionEditor();
+syncCharacterRigEditor();
 renderComfySceneVideo();
 renderSceneVoiceAudio();
 refreshSceneVoiceControls();
