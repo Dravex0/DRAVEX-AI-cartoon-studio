@@ -49,7 +49,10 @@ export function createHuggingFaceZeroGPUVideoProvider({
       if (!request.image) throw new TypeError("A source image is required.");
       if (context.signal?.aborted) throw abortError();
 
-      const duration = Math.max(0.5, Math.min(5, Number(request.durationSeconds) || 3));
+      const duration = Number(request.durationSeconds ?? 3);
+      if (!Number.isFinite(duration) || duration < 0.5 || duration > 5) {
+        throw new RangeError("Wan 2.2 ZeroGPU supports scene durations from 0.5 to 5 seconds. Choose 3 or 5 seconds, or use ComfyUI for longer clips.");
+      }
       const imageInput = handleFile(request.image);
       const submission = client.submit(API_NAME, [
         imageInput,
