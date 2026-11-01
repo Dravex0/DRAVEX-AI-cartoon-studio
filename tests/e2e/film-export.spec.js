@@ -47,6 +47,6 @@ test('assembles a storyboard into a non-empty playable WebM file', async ({ page
   expect(film.source).toBe('blob:');
   expect(film.duration).toBeGreaterThan(0);
   expect(film.size).toBeGreaterThan(0);
-  expect(film.type).toMatch(/video\\/webm/i);
+  expect(film.type).toContain('video/webm');
   expect(pageErrors, 'export should not throw uncaught browser errors').toEqual([]);
 });
