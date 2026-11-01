@@ -103,6 +103,40 @@ describe('procedural character rig motion presets', () => {
     }
   });
 
+  it('animates lower-leg bones as knee bends only when knee pivots are defined', () => {
+    const candidate = rig();
+    candidate.bones.push(
+      { id: 'lowerLegL', parentId: 'leftLeg', pivotX: 0.42, pivotY: 0.61 },
+      { id: 'shin_r', parentId: 'rightLeg', pivotX: 0.58, pivotY: 0.61 }
+    );
+    candidate.parts.push(
+      { id: 'shin-left-part', boneId: 'lowerLegL', imageUrl: 'https://assets.example/shin-left.png' },
+      { id: 'shin-right-part', boneId: 'shin_r', imageUrl: 'https://assets.example/shin-right.png' }
+    );
+
+    const walk = createCharacterRigMotionPreset(candidate, 'walk');
+    assert.equal(walk.status, 'ready');
+    const walkPose = sampleCharacterRigTimeline(walk.timeline, 0.25).Foxy;
+    assert.ok(walkPose.lowerLegL.rotation > 0);
+    assert.equal(walkPose.shin_r, undefined);
+    const rightSwingPose = sampleCharacterRigTimeline(walk.timeline, 0.75).Foxy;
+    assert.ok(rightSwingPose.shin_r.rotation > 0);
+    assert.ok(!walk.warnings.some(message => message.includes('knee pivots are defined')));
+
+    const run = createCharacterRigMotionPreset(candidate, 'run');
+    const runPose = sampleCharacterRigTimeline(run.timeline, 0.25).Foxy;
+    assert.ok(runPose.lowerLegL.rotation > walkPose.lowerLegL.rotation);
+
+    const legacy = rig();
+    legacy.bones.push({ id: 'leftShin', parentId: 'leftLeg' });
+    legacy.parts.push({ id: 'shin-part', boneId: 'leftShin', imageUrl: 'https://assets.example/shin.png' });
+    const legacyWalk = createCharacterRigMotionPreset(legacy, 'walk');
+    assert.equal(legacyWalk.status, 'ready');
+    const legacyPose = sampleCharacterRigTimeline(legacyWalk.timeline, 0.25).Foxy;
+    assert.equal(legacyPose.leftShin, undefined);
+    assert.ok(legacyWalk.warnings.some(message => message.includes('knee pivots are defined')));
+  });
+
   it('creates different run and walk amplitudes', () => {
     const walk = createCharacterRigMotionPreset(rig(), 'walk');
     const run = createCharacterRigMotionPreset(rig(), 'run');
