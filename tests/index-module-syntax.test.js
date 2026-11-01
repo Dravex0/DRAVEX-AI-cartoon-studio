@@ -63,10 +63,12 @@ test('WebM export derives built-in character mouth movement from scheduled local
   assert.match(html, /buildAudioMouthEnvelope, sampleAudioMouthEnvelope/);
   assert.match(html, /getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)/);
   assert.match(html, /decodeContext\.decodeAudioData\(await track\.blob\.arrayBuffer\(\)\)/);
-  assert.match(html, /exportMouthTracks\.push\(\{sceneIndex:track\.sceneIndex,startMs:track\.startMs,envelope,visemes\}\)/);
+  assert.match(html, /exportMouthTracks\.push\(\{sceneIndex:track\.sceneIndex,characterId:track\.characterId,characterName:track\.characterName,startMs:track\.startMs,envelope,visemes\}\)/);
   assert.match(html, /performance\.now\(\)-exportMouthOriginTimeMs/);
   assert.match(html, /exportElapsedMs>=track\.startMs/);
   assert.match(html, /sampleAudioMouthEnvelope\(activeMouthTrack\.envelope,mouthTrackTimeMs\)/);
+  assert.match(html, /sampleCharacterFacialLipSync\(exportMouthTracks,sceneIndex,exportElapsedMs\)/);
+  assert.match(html, /facialVisemes:facialLipSync\.facialVisemes,facialMouthOpenness:facialLipSync\.facialMouthOpenness/);
   assert.match(html, /recorder\.start\(250\);\s*exportMouthOriginTimeMs=performance\.now\(\);\s*if\(audioScheduledStartAtMs!==null\)\{[\s\S]*?getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)[\s\S]*?\}/);
   assert.match(html, /voiceTracks\.filter\(track=>track\.characterName\.trim\(\)\.toLowerCase\(\)===mainCharacterKey\)/);
   assert.match(html, /lipSyncSkippedTracks\+\+/);
