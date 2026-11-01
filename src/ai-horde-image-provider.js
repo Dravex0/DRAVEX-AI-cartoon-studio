@@ -58,8 +58,10 @@ export async function generateImageWithHorde({
   const positive = clean(prompt, 10000);
   const negative = clean(negativePrompt, 2000);
   if (!positive) throw new Error('Add an image prompt before generating.');
-  const safeWidth = Math.max(256, Math.min(768, Math.round(Number(width) / 64) * 64 || 512));
-  const safeHeight = Math.max(256, Math.min(768, Math.round(Number(height) / 64) * 64 || 512));
+  // Keep the app's advertised 1024px quality profiles intact while staying within
+  // the conservative 1024px per-side range supported by common AI Horde models.
+  const safeWidth = Math.max(256, Math.min(1024, Math.round(Number(width) / 64) * 64 || 512));
+  const safeHeight = Math.max(256, Math.min(1024, Math.round(Number(height) / 64) * 64 || 512));
   const safeSteps = Math.max(10, Math.min(30, Math.round(Number(steps) || 20)));
   const headers = {
     'Content-Type': 'application/json',

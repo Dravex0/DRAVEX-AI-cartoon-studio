@@ -56,6 +56,38 @@ test('passes selected image dimensions and step count to the provider request', 
   assert.equal(submittedBody.params.steps, 30);
 });
 
+test('preserves the advertised 1024px landscape and portrait quality dimensions', async () => {
+  const submitted = [];
+  const fetchImpl = async (url, options) => {
+    if (url.endsWith('/generate/async')) {
+      submitted.push(JSON.parse(options.body).params);
+      return response({ id: `resolution-${submitted.length}` }, 202);
+    }
+    if (url.includes('/generate/check/')) return response({ done: true, finished: 1 });
+    return response({ generations: [{ img: 'https://cdn.example.test/resolution.webp' }] });
+  };
+  await generateImageWithHorde({ prompt: 'Landscape frame.', width: 1024, height: 576, fetchImpl, pollIntervalMs: 0 });
+  await generateImageWithHorde({ prompt: 'Portrait frame.', width: 576, height: 1024, fetchImpl, pollIntervalMs: 0 });
+  assert.deepEqual(submitted.map(({ width, height }) => [width, height]), [[1024, 576], [576, 1024]]);
+});
+
+test('still bounds oversized dimensions and rounds them to 64px increments', async () => {
+  let submitted = null;
+  const fetchImpl = async (url, options) => {
+    if (url.endsWith('/generate/async')) {
+      submitted = JSON.parse(options.body).params;
+      return response({ id: 'bounded-resolution' }, 202);
+    }
+    if (url.endsWith('/generate/check/bounded-resolution')) return response({ done: true, finished: 1 });
+    return response({ generations: [{ img: 'https://cdn.example.test/bounded.webp' }] });
+  };
+  await generateImageWithHorde({ prompt: 'Bounded frame.', width: 4096, height: 1280, fetchImpl, pollIntervalMs: 0 });
+  assert.equal(submitted.width, 1024);
+  assert.equal(submitted.height, 1024);
+  assert.equal(submitted.width % 64, 0);
+  assert.equal(submitted.height % 64, 0);
+});
+
 test('rejects an empty prompt without making a network request', async () => {
   let called = false;
   await assert.rejects(() => generateImageWithHorde({ prompt: ' ', fetchImpl: async () => { called = true; } }), /Add an image prompt/);
