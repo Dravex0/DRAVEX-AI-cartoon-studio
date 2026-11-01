@@ -1,10 +1,11 @@
 import { validateCharacterRig } from './character-rig.js';
 import { validateCharacterRigTimeline } from './character-rig-timeline.js';
+import { solveCharacterRigLimbPose } from './character-rig-ik.js';
 
 const PRESETS = Object.freeze({
   idle: { label: 'Idle / Ожидание', frames: 4 },
-  walk: { label: 'Walk / Ходьба', frames: 5 },
-  run: { label: 'Run / Бег', frames: 5 },
+  walk: { label: 'Walk / Ходьба', frames: 9 },
+  run: { label: 'Run / Бег', frames: 9 },
   jump: { label: 'Jump / Прыжок', frames: 5 },
   wave: { label: 'Wave / Приветствие', frames: 5 }
 });
@@ -31,6 +32,80 @@ const roleOf = boneId => {
   return 'other';
 };
 const round = value => Math.round(value * 10000) / 10000;
+
+function limbChainFor(rig, side) {
+  const byRole = role => rig.bones.find(bone => roleOf(bone.id) === role);
+  const upper = byRole(side === 'left' ? 'leftLeg' : 'rightLeg');
+  const lower = byRole(side === 'left' ? 'leftLowerLeg' : 'rightLowerLeg');
+  const foot = byRole(side === 'left' ? 'leftFoot' : 'rightFoot');
+  const root = rig.bones.find(bone => roleOf(bone.id) === 'root');
+  if (!root || !upper || !lower || !foot
+    || ![root, upper, lower, foot].every(bone => bone.pivotEnabled)
+    || lower.parentId?.toLowerCase() !== upper.id.toLowerCase()
+    || foot.parentId?.toLowerCase() !== lower.id.toLowerCase()) return null;
+  let ancestor = upper;
+  const visited = new Set();
+  while (ancestor?.parentId && !visited.has(ancestor.id.toLowerCase())) {
+    visited.add(ancestor.id.toLowerCase());
+    ancestor = rig.bones.find(bone => bone.id.toLowerCase() === ancestor.parentId.toLowerCase());
+  }
+  if (ancestor?.id.toLowerCase() !== root.id.toLowerCase()) return null;
+  const upperLength = Math.hypot(lower.pivotX - upper.pivotX, lower.pivotY - upper.pivotY);
+  const lowerLength = Math.hypot(foot.pivotX - lower.pivotX, foot.pivotY - lower.pivotY);
+  if (!upperLength || !lowerLength || upperLength > 2 || lowerLength > 2) return null;
+  const cross = (lower.pivotX - upper.pivotX) * (foot.pivotY - upper.pivotY)
+    - (lower.pivotY - upper.pivotY) * (foot.pivotX - upper.pivotX);
+  return { root, upper, lower, foot, upperLength, lowerLength, bendDirection: cross >= 0 ? 1 : -1 };
+}
+
+function plantedGaitChains(rig) {
+  const left = limbChainFor(rig, 'left');
+  const right = limbChainFor(rig, 'right');
+  return left && right && left.root.id === right.root.id ? { left, right } : null;
+}
+
+function applyPlantedGaitPose(rig, pose, phase, preset, rootBob, chains) {
+  if (!chains) return false;
+  const strideScale = preset === 'run' ? 0.48 : 0.34;
+  const stride = clamp(Math.min(
+    chains.left.upperLength + chains.left.lowerLength,
+    chains.right.upperLength + chains.right.lowerLength
+  ) * strideScale, 0.035, preset === 'run' ? 0.16 : 0.12);
+  const liftHeight = clamp(Math.min(
+    chains.left.upperLength + chains.left.lowerLength,
+    chains.right.upperLength + chains.right.lowerLength
+  ) * (preset === 'run' ? 0.22 : 0.14), 0.02, preset === 'run' ? 0.11 : 0.075);
+  const rootX = phase * stride;
+  const rootPose = pose[chains.left.root.id] || {};
+  pose[chains.left.root.id] = { ...rootPose, x: round(rootX), y: round(rootBob) };
+
+  for (const [side, chain] of [['left', chains.left], ['right', chains.right]]) {
+    const isLeft = side === 'left';
+    const stance = isLeft ? phase <= 0.5 : phase >= 0.5;
+    const swingProgress = isLeft ? (phase - 0.5) * 2 : phase * 2;
+    const progress = clamp(swingProgress, 0, 1);
+    const smoothProgress = progress * progress * (3 - 2 * progress);
+    const desiredWorldX = isLeft
+      ? chain.foot.pivotX + (stance ? 0 : stride * smoothProgress)
+      : chain.foot.pivotX + (stance ? 0 : -stride * (1 - smoothProgress));
+    const swingLift = stance ? 0 : Math.sin(Math.PI * progress) * liftHeight;
+    const target = {
+      x: desiredWorldX - rootX,
+      y: chain.foot.pivotY - swingLift - rootBob
+    };
+    const solved = solveCharacterRigLimbPose(rig, {
+      upperBoneId: chain.upper.id,
+      lowerBoneId: chain.lower.id,
+      endBoneId: chain.foot.id,
+      target,
+      bendDirection: chain.bendDirection
+    });
+    if (solved.status !== 'solved') return false;
+    pose[chain.upper.id] = { ...(pose[chain.upper.id] || {}), rotation: round(solved.pose[chain.upper.id].rotation) };
+    pose[chain.lower.id] = { ...(pose[chain.lower.id] || {}), rotation: round(solved.pose[chain.lower.id].rotation) };
+  }
+  return true;
+}
 
 function poseFor(rig, preset, phase) {
   const pose = {};
@@ -79,7 +154,7 @@ function poseFor(rig, preset, phase) {
     }
     // Counter the root's vertical bounce at foot bones so the planted foot
     // does not inherit that extra body motion. This is not full inverse kinematics.
-    if (role === 'leftFoot' || role === 'rightFoot' || role === 'foot') y = -rootBob;
+    if (!gaitChains && (role === 'leftFoot' || role === 'rightFoot' || role === 'foot')) y = -rootBob;
     if (x || y || rotation) pose[bone.id] = { x: round(clamp(x, -0.5, 0.5)), y: round(clamp(y, -0.5, 0.5)), rotation: round(clamp(rotation, -1.5, 1.5)) };
   }
   return pose;
@@ -97,7 +172,7 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
   if (presetName === 'walk' || presetName === 'run') {
     if (![...roles].some(role => role === 'leftLeg' || role === 'rightLeg' || role === 'leg')) warnings.push('No leg-like bone IDs found; this preset will animate only recognized upper-body/root bones.');
     if (![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) warnings.push('No arm-like bone IDs found; arm swing will be omitted.');
-    if (![...roles].some(role => role === 'foot' || role === 'leftFoot' || role === 'rightFoot')) warnings.push('No foot-like bone IDs found; root bounce cannot be compensated at the feet, so planted-foot contact is not represented.');
+    if (![...roles].some(role => role === 'foot' || role === 'leftFoot' || role === 'rightFoot')) warnings.push('No foot-like bone IDs found; root bounce cannot be compensated at the feet, so planted-foot contact is not represented.');\n    else if (!plantedGaitChains(rig)) warnings.push('Foot-planting IK is disabled: walk/run requires complete left and right hip-knee-ankle chains with enabled pivots. The legacy motion preset is retained.');
   }
   const lowerLegBones = rig.bones.filter(bone => ['leftLowerLeg', 'rightLowerLeg'].includes(roleOf(bone.id)));
   if (['walk', 'run', 'jump'].includes(presetName) && lowerLegBones.some(bone => !bone.pivotEnabled)) {
