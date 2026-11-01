@@ -67,3 +67,16 @@ The 14B Wan2.2 I2V workflow is a higher-compute alternative, not the default sta
 ## Privacy and cost
 
 Local inference is intended to keep scene prompts and source images on the user's configured local/private ComfyUI server. Network traffic to that server is still sent over the user's LAN or loopback connection. No remote fallback is performed. Model licences, VRAM/RAM requirements and custom-node dependencies must be checked for the exact workflow before use.
+
+
+## Free Hugging Face ZeroGPU adapter
+
+src/huggingface-zerogpu-video-provider.js integrates the public zerogpu-aoti/wan2-2-fp8da-aoti-faster Gradio Space using the official Gradio JavaScript client. It performs image-to-video generation with Wan 2.2 14B Fast and downloads the returned MP4 as a Blob for DRAVEX preview/storage/export.
+
+- The app loads the pinned Gradio client from jsDelivr only when the user connects the provider.
+- The user supplies their own Hugging Face read token in a password field. DRAVEX does not persist it to localStorage or the saved draft; it stays in the active page session.
+- A separate explicit consent checkbox is required before scene images and motion prompts are sent to the public Space.
+- The Space uses a 4-step fast profile, 16 FPS and supports up to 5 seconds per clip at its model-defined dimensions. Output quality and runtime depend on the public GPU queue.
+- Hugging Face documents a free-account ZeroGPU quota of 5 GPU minutes per day and 2 minutes for unauthenticated users. This is a daily quota, not a guarantee that a six-scene film will always complete in one session. Completed scene clips are retained locally so the user can resume after quota reset.
+- The adapter is a remote community/public service, not local inference. Do not upload private or sensitive material. The user can instead choose the existing local ComfyUI provider.
+- The public Space and its API may change or become unavailable; the connection check verifies that the expected /generate_video endpoint is present before enabling the batch action.
