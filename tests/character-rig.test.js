@@ -52,9 +52,9 @@ describe('character rig foundation', () => {
       root: { x: 0.05, rotation: 0.1 },
       arm: { x: 0.15, y: -0.1, rotation: 0.25 }
     });
-    assert.equal(moved[0].x, 0.3);
-    assert.equal(moved[0].y, 0.1);
-    assert.equal(moved[0].rotation, 0.35);
+    assert.ok(Math.abs(moved[0].x - 0.3) < 1e-9);
+    assert.ok(Math.abs(moved[0].y - 0.1) < 1e-9);
+    assert.ok(Math.abs(moved[0].rotation - 0.35) < 1e-9);
   });
 
   it('normalizes bounded per-scene rig poses and preserves them through scene normalization', () => {
