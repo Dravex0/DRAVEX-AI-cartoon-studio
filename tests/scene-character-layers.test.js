@@ -210,3 +210,27 @@ test('can composite ready rig parts alongside legacy character layers when expli
   assert.deepEqual(result.rigReadyCharacterIds, ['Foxy']);
   assert.deepEqual(calls, [spriteImage, rigImage]);
 });
+
+test('prefers complete rig parts and suppresses the matching whole sprite without counting it skipped', () => {
+  const calls = [];
+  const context = {
+    globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
+    drawImage(image) { calls.push(image); }
+  };
+  const rigImage = { naturalWidth: 20, naturalHeight: 20 };
+  const spriteImage = { naturalWidth: 100, naturalHeight: 100 };
+  const rig = {
+    schemaVersion: 1, characterId: 'Foxy',
+    bones: [{ id: 'root', parentId: null }],
+    parts: [{ id: 'body', boneId: 'root', imageUrl: 'blob:part', x: 0.5, y: 0.5, width: 0.2, height: 0.4 }]
+  };
+  const result = drawCharacterLayers(context, [
+    { characterId: 'Foxy', imageUrl: 'blob:sprite' }
+  ], key => key === 'blob:part' ? rigImage : spriteImage, 500, 500, {
+    drawRigParts: true, preferRigParts: true, characterRigs: [rig]
+  });
+  assert.equal(result.drawn, 1);
+  assert.equal(result.skipped, 0);
+  assert.equal(result.rigDrawn, 1);
+  assert.deepEqual(calls, [rigImage]);
+});
