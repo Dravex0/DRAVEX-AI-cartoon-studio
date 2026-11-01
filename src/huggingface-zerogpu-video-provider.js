@@ -111,11 +111,29 @@ export function createHuggingFaceZeroGPUVideoProvider({
         throw new Error("Hugging Face returned a non-video file.");
       }
 
+      // Preserve a provider's actual video MIME type. Only infer a type for
+      // generic/empty responses when the download URL has a known extension.
+      let normalizedVideo = video;
+      if (!mimeType || mimeType === "application/octet-stream") {
+        const pathname = new URL(fileUrl).pathname.toLowerCase();
+        const extension = pathname.match(/\.(mp4|webm|mov|m4v)$/)?.[1];
+        const inferredMimeType = ({
+          mp4: "video/mp4",
+          webm: "video/webm",
+          mov: "video/quicktime",
+          m4v: "video/mp4"
+        })[extension];
+        if (!inferredMimeType) {
+          throw new Error("Hugging Face returned a video with an unknown format; refusing to label it as MP4.");
+        }
+        normalizedVideo = new Blob([video], { type: inferredMimeType });
+      }
+
       context.onProgress?.({ stage: "completed", queuePosition: null, etaSeconds: 0, progress: [] });
       return {
         status: "completed",
         taskId: String(submission.event_id || ""),
-        video: mimeType === "video/mp4" ? video : new Blob([video], { type: "video/mp4" })
+        video: normalizedVideo
       };
     }
   });
