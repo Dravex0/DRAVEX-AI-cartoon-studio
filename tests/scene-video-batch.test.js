@@ -67,3 +67,19 @@ test("stops before starting work when the signal is aborted", async () => {
   assert.equal(calls, 0);
   assert.equal(report.cancelled, true);
 });
+
+
+test("normalizes provider progress fractions and percentages without inventing progress", async () => {
+  const { normalizeVideoProgressPercent, readVideoProgressPercent } =
+    await import("../src/scene-video-batch.js");
+
+  assert.equal(normalizeVideoProgressPercent(0.5), 50);
+  assert.equal(normalizeVideoProgressPercent(42), 42);
+  assert.equal(normalizeVideoProgressPercent(-2), 0);
+  assert.equal(normalizeVideoProgressPercent(140), 100);
+  assert.equal(normalizeVideoProgressPercent(Number.NaN), null);
+  assert.equal(readVideoProgressPercent({ stage: "queued", queuePosition: 3 }), null);
+  assert.equal(readVideoProgressPercent({ progress_data: [{ progress: 0.5 }] }), 50);
+  assert.equal(readVideoProgressPercent({ progressPercent: 73 }), 73);
+  assert.equal(readVideoProgressPercent({ progress: [{ progress: 0.25 }] }), 25);
+});

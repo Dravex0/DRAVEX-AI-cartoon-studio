@@ -1,3 +1,44 @@
+/**
+ * Normalize provider progress values to a 0–100 percentage.
+ * Gradio commonly reports fractions (0–1); other providers may report 0–100.
+ */
+export function normalizeVideoProgressPercent(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const percent = value >= 0 && value <= 1 ? value * 100 : value;
+  return Math.round(Math.max(0, Math.min(100, percent)));
+}
+
+/**
+ * Read progress only when a provider actually reports a numeric value.
+ * Queue position and elapsed time are deliberately not treated as percentages.
+ */
+export function readVideoProgressPercent(update) {
+  if (!update || typeof update !== "object") return null;
+
+  const directKeys = ["progressPercent", "percentage", "percent", "progress"];
+  for (const key of directKeys) {
+    const value = normalizeVideoProgressPercent(update[key]);
+    if (value !== null) return value;
+  }
+
+  const progressEntries = [
+    ...(Array.isArray(update.progress_data) ? update.progress_data : []),
+    ...(Array.isArray(update.progressData) ? update.progressData : []),
+    ...(Array.isArray(update.progress) ? update.progress : [])
+  ];
+
+  for (let index = progressEntries.length - 1; index >= 0; index -= 1) {
+    const entry = progressEntries[index];
+    if (!entry || typeof entry !== "object") continue;
+    for (const key of ["progress", "percentage", "percent"]) {
+      const value = normalizeVideoProgressPercent(entry[key]);
+      if (value !== null) return value;
+    }
+  }
+
+  return null;
+}
+
 const abortError = () => {
   const error = new Error("Storyboard video generation was cancelled.");
   error.name = "AbortError";
