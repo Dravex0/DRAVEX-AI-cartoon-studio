@@ -357,3 +357,45 @@ test('does not guess when entity IDs collide after normalization', () => {
   ]);
   assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
 });
+
+
+test('accepts documented canonical character clothing and pose changes', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'character-change-a', duration: 3, prompt: 'Aster waits beside the gate.',
+      endStateData: { characters: { Aster: { clothing: 'blue coat', pose: 'standing' } } }
+    },
+    {
+      id: 'character-change-b', duration: 3, prompt: 'Aster changes clothes and kneels.',
+      startStateData: { characters: { Aster: { clothing: 'red coat', pose: 'kneeling' } } },
+      structuredStateChanges: [
+        { entity: 'Aster', property: 'clothing', previousValue: 'blue coat', value: 'red coat', evidence: 'Aster changes into a red coat.' },
+        { entity: 'Aster', property: 'pose', previousValue: 'standing', value: 'kneeling', evidence: 'Aster kneels beside the gate.' }
+      ]
+    }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+test('does not guess canonical location change type when an ID is both character and object', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'ambiguous-kind-a', duration: 3, prompt: 'Aster waits.',
+      endStateData: {
+        characters: { Aster: { location: 'north hall' } },
+        objects: { Aster: { location: 'north hall' } }
+      }
+    },
+    {
+      id: 'ambiguous-kind-b', duration: 3, prompt: 'Aster moves.',
+      startStateData: {
+        characters: { Aster: { location: 'south hall' } },
+        objects: { Aster: { location: 'south hall' } }
+      },
+      structuredStateChanges: [
+        { entity: 'Aster', property: 'location', previousValue: 'north hall', value: 'south hall', evidence: 'Aster moves south.' }
+      ]
+    }
+  ]);
+  assert.ok(result.issues.some(entry => entry.code === 'continuity-state-mismatch'));
+});
