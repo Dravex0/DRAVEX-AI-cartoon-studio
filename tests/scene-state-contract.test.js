@@ -39,7 +39,10 @@ test("rejects non-record character and object states", () => {
 
 test("normalizes object state", () => {
   assert.deepEqual(normalizeObjectState({ location: "Alice", owner: "Alice", state: "held", extra: 1 }), {
-    location: "Alice", owner: "Alice", state: "held"
+    location: "Alice", owner: "Alice", holder: null, state: "held"
+  });
+  assert.deepEqual(normalizeObjectState({ holder: "Alice" }), {
+    location: null, owner: null, holder: "Alice", state: null
   });
 });
 
