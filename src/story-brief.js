@@ -103,7 +103,9 @@ export function parseStoryBrief(input) {
       continue;
     }
 
-    if (readingCharacterProfiles) {
+    const leadingLabel = line.match(/^\s*([^:：]{2,60})\s*[:：]/u);
+    const leadingDirectiveKey = leadingLabel ? ALIASES.get(normalizeLabel(leadingLabel[1])) : null;
+    if (readingCharacterProfiles && !leadingDirectiveKey) {
       const profile = parseCharacterLine(line);
       if (profile) {
         characterProfiles.push(profile);
@@ -159,7 +161,12 @@ export function parseStoryBrief(input) {
       inCharacterSection = true;
       continue;
     }
-    if (sceneHeading(line) || /^\s*[^:：]{2,60}\s*[:：]/u.test(line)) {
+    if (sceneHeading(line)) {
+      inCharacterSection = false;
+      continue;
+    }
+    const labeledAttribute = /^(?:clothing|outfit|одежда|одяг|colou?rs?|цвета|кольори|distinctive features|особые приметы|особливі ознаки)\s*[:：]/iu.test(line);
+    if (/^\s*[^:：]{2,60}\s*[:：]/u.test(line) && !labeledAttribute) {
       inCharacterSection = false;
       continue;
     }
