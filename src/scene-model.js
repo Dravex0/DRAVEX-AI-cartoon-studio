@@ -95,10 +95,10 @@ export function normalizeScene(input = {}, index = 0) {
           entity: text(change.entity ?? change.entityId, 120),
           property: text(change.property, 40),
           previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
-          value: change.value == null ? null : text(change.value, 160),
+          value: change.value === null ? null : (change.value === undefined ? undefined : text(change.value, 160)),
           actorId: text(change.actorId, 120) || null,
           evidence: text(change.evidence, 1_200) || null
-        })).filter(change => change.entity && change.property && change.value !== null)
+        })).filter(change => change.entity && change.property && change.value !== undefined)
       : [],
     interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
       type: text(item.type, 40), actorId: text(item.actorId, 120), targetId: text(item.targetId, 120),
