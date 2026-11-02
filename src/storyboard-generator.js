@@ -169,6 +169,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
     return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
   };
+  let carriedState = emptyState();
   scenes.forEach((scene, index) => {
     scene.causalLink = causalLinks[index];
     scene.stateChanges = toStructuredStateChanges(stateChanges[index]);
@@ -223,11 +224,32 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
       : null;
     scene.durationSeconds = brief.requestedDurationSeconds ?? 3;
     scene.negativePrompt = brief.directives.avoid || '';
-    // Seed only verified identity facts from the character bible. Story location,
-    // pose, object ownership and other unknown state remain null until explicitly authored.
+    // Carry only explicit, source-grounded state across scene boundaries.
+    // Character-bible facts seed identity; unknown location/pose/ownership stay null.
     const knownState = buildKnownCharacterSnapshot(scene.characters, brief.characterProfiles);
-    scene.startStateData = knownState;
-    scene.endStateData = JSON.parse(JSON.stringify(knownState));
+    const startState = JSON.parse(JSON.stringify(carriedState));
+    for (const [characterId, characterState] of Object.entries(knownState.characters)) {
+      startState.characters[characterId] = {
+        ...(startState.characters[characterId] || {}),
+        ...characterState
+      };
+    }
+    const endState = JSON.parse(JSON.stringify(startState));
+    for (const change of scene.stateChanges) {
+      if (!change || typeof change.entity !== 'string' || !change.entity) continue;
+      if (change.property === 'location' && Object.hasOwn(endState.characters, change.entity)) {
+        endState.characters[change.entity].location = change.value;
+      } else if (['holder', 'state'].includes(change.property)) {
+        const current = endState.objects[change.entity] || {
+          location: null, owner: null, holder: null, state: null
+        };
+        current[change.property] = change.value;
+        endState.objects[change.entity] = current;
+      }
+    }
+    scene.startStateData = startState;
+    scene.endStateData = endState;
+    carriedState = endState;
   });
   const productionScenes = scenes.map((scene, index) => buildProductionScene(scene, brief.characterProfiles, { index }));
   const eventChain = buildStoryEventChain(productionScenes);
