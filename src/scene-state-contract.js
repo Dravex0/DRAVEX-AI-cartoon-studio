@@ -260,6 +260,27 @@ function buildKindContext(scenes) {
       for (const id of Object.keys(normalizedState.characters)) characterIds.add(id);
       for (const id of Object.keys(normalizedState.objects)) objectIds.add(id);
     }
+
+    // State-change properties provide a safe kind hint for entities not yet
+    // materialized in the start/end snapshots. Character location is resolved
+    // only when the entity is already in the cast; object-only properties are
+    // unambiguous and register the entity as an object.
+    const changesRead = safeRead(scene, "stateChanges");
+    if (!changesRead.ok) return { ok: false };
+    if (changesRead.value != null) {
+      if (!Array.isArray(changesRead.value)) return { ok: false };
+      for (let changeIndex = 0; changeIndex < changesRead.value.length; changeIndex += 1) {
+        const changeRead = safeRead(changesRead.value, changeIndex);
+        if (!changeRead.ok || !isRecord(changeRead.value)) return { ok: false };
+        const entityRead = safeRead(changeRead.value, "entity");
+        const propertyRead = safeRead(changeRead.value, "property");
+        if (!entityRead.ok || !propertyRead.ok) return { ok: false };
+        const entity = asStringOrNull(entityRead.value, 120);
+        const property = asStringOrNull(propertyRead.value, 40);
+        if (!entity || !property) return { ok: false };
+        if (property === "holder" || property === "owner" || property === "state") objectIds.add(entity);
+      }
+    }
   }
 
   const conflictingIds = new Set();
