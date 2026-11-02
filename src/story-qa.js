@@ -62,11 +62,27 @@ function continuityBoundaryIssues(previous, current) {
     // can mean a release/clear, but it must be documented by this scene.
     if (!hasStateText(oldValue)) return;
     if (hasStateText(newValue) && comparableState(oldValue) === comparableState(newValue)) return;
+    const structuredChangeType = change => {
+      if (['holder', 'owner', 'state'].includes(change.property)) return 'object';
+      if (change.entity === 'scene' && ['location', 'time', 'weather'].includes(change.property)) return 'scene';
+      if (!['location', 'position', 'pose', 'clothing'].includes(change.property)) return undefined;
+      const inCharacters = Boolean(
+        matchingStateRecord(current.startStateData?.characters, change.entity) ||
+        matchingStateRecord(current.endStateData?.characters, change.entity)
+      );
+      const inObjects = Boolean(
+        matchingStateRecord(current.startStateData?.objects, change.entity) ||
+        matchingStateRecord(current.endStateData?.objects, change.entity)
+      );
+      if (inCharacters === inObjects) return undefined;
+      if (change.property !== 'location' && !inCharacters) return undefined;
+      return inCharacters ? 'character' : 'object';
+    };
     const documentedChanges = [
       ...current.stateChanges.map(change => ({ ...change, entity: change.entityId, type: change.entityType })),
       ...current.structuredStateChanges.map(change => ({
         ...change,
-        type: ['holder', 'owner', 'state'].includes(change.property) ? 'object' : undefined
+        type: structuredChangeType(change)
       }))
     ];
     const documented = documentedChanges.some(change =>
