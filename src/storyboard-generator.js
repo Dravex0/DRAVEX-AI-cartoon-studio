@@ -238,8 +238,14 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
       const carriedCharacter = startState.characters[characterId] || {};
       startState.characters[characterId] = { ...carriedCharacter };
       for (const [field, value] of Object.entries(characterState)) {
-        if (value !== null && value !== undefined) startState.characters[characterId][field] = value;
-        else if (!(field in startState.characters[characterId])) startState.characters[characterId][field] = null;
+        // Character-bible facts seed unknown fields, but must never overwrite
+        // a state change already carried forward from an earlier scene.
+        if (value !== null && value !== undefined &&
+            (carriedCharacter[field] === null || carriedCharacter[field] === undefined)) {
+          startState.characters[characterId][field] = value;
+        } else if (!(field in startState.characters[characterId])) {
+          startState.characters[characterId][field] = null;
+        }
       }
     }
     const endState = JSON.parse(JSON.stringify(startState));
