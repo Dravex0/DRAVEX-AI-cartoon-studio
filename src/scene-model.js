@@ -33,7 +33,7 @@ function normalizeStructuredSceneState(input) {
     time: scalar(input.time),
     weather: scalar(input.weather),
     characters: normalizeEntities(input.characters, ['location', 'position', 'pose', 'clothing']),
-    objects: normalizeEntities(input.objects, ['location', 'owner', 'state'])
+    objects: normalizeEntities(input.objects, ['location', 'owner', 'holder', 'state'])
   };
 }
 
