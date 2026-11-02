@@ -67,3 +67,35 @@ test('keeps location evidence inside the sentence that names the moving characte
   assert.equal(changes[0][0].value, 'inside:stone castle');
   assert.equal(changes[0][0].evidence, 'Mira enters the stone castle.');
 });
+
+
+test('tracks only explicitly named character pose changes and carries the previous pose', () => {
+  const changes = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy sits on the stone.', characters: ['Foxy'] },
+    { storyDetail: 'Foxy stands up.', characters: ['Foxy'] },
+    { storyDetail: 'Foxy kneels before the gate.', characters: ['Foxy'] },
+    { storyDetail: 'Foxy lies down.', characters: ['Foxy'] }
+  ], 'en');
+  assert.deepEqual(changes.map(scene => scene.map(change => [change.property, change.previousValue, change.value])), [
+    [['pose', null, 'sitting']],
+    [['pose', 'sitting', 'standing']],
+    [['pose', 'standing', 'kneeling']],
+    [['pose', 'kneeling', 'lying']]
+  ]);
+});
+
+test('recognizes explicit Russian and Ukrainian pose changes without guessing pronouns', () => {
+  const ru = inferStoryboardStateChanges([
+    { storyDetail: 'Лисёнок садится на камень.', characters: ['Лисёнок'] },
+    { storyDetail: 'Лисёнок встаёт.', characters: ['Лисёнок'] }
+  ], 'ru');
+  const uk = inferStoryboardStateChanges([
+    { storyDetail: 'Лисеня сідає на камінь.', characters: ['Лисеня'] },
+    { storyDetail: 'Лисеня стає на коліна.', characters: ['Лисеня'] }
+  ], 'uk');
+  assert.deepEqual(ru.map(scene => scene[0]?.value), ['sitting', 'standing']);
+  assert.deepEqual(uk.map(scene => scene[0]?.value), ['sitting', 'kneeling']);
+  assert.deepEqual(inferStoryboardStateChanges([
+    { storyDetail: 'He sits on the stone.', characters: ['Foxy'] }
+  ], 'en'), [[]]);
+});
