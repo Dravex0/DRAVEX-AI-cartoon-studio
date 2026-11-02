@@ -372,3 +372,19 @@ test('production scene retains legacy state-change entity type and identifier', 
   assert.equal(Object.hasOwn(prepared.stateChanges[0], 'entity'), false);
   assert.equal(prepared.stateChanges[0].entityId, 'silver key');
 });
+
+
+test('production scene preserves explicit null when an object is released', () => {
+  const prepared = buildProductionScene({
+    id: 'scene_release_key',
+    title: 'Foxy drops the key',
+    visibleAction: 'Foxy drops the silver key.',
+    stateChanges: [{
+      entity: 'silver key', property: 'holder',
+      previousValue: 'Foxy', value: null, actorId: 'Foxy',
+      evidence: 'Foxy drops the silver key.'
+    }]
+  });
+  assert.equal(prepared.structuredStateChanges[0].previousValue, 'Foxy');
+  assert.equal(prepared.structuredStateChanges[0].value, null);
+});
