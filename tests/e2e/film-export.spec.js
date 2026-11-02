@@ -29,10 +29,36 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
     if (!response.ok) throw new Error('The exported WebM URL could not be read.');
     const blob = await response.blob();
     const signature = Array.from(new Uint8Array(await blob.slice(0, 4).arrayBuffer()));
+
+    await new Promise((resolve, reject) => {
+      if (video.readyState >= HTMLMediaElement.HAVE_METADATA) return resolve();
+      const timeout = setTimeout(() => reject(new Error('Exported WebM metadata did not load.')), 10_000);
+      video.addEventListener('loadedmetadata', () => { clearTimeout(timeout); resolve(); }, { once: true });
+      video.addEventListener('error', () => { clearTimeout(timeout); reject(new Error(video.error?.message || 'Exported WebM could not be decoded.')); }, { once: true });
+    });
+
+    video.muted = true;
+    await video.play();
+    let decodedFrame = false;
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Exported WebM produced no decoded video frame.')), 5_000);
+        video.requestVideoFrameCallback(() => { decodedFrame = true; clearTimeout(timeout); resolve(); });
+      });
+    } else {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      decodedFrame = video.videoWidth > 0 && video.videoHeight > 0;
+    }
+    video.pause();
+
     return {
       size: blob.size,
       type: blob.type,
       signature,
+      duration: video.duration,
+      width: video.videoWidth,
+      height: video.videoHeight,
+      decodedFrame,
       mediaError: video.error?.message || null
     };
   });
