@@ -42,7 +42,7 @@ function issue(severity, code, sceneId, message, otherSceneId) {
 
 function hasStateText(value) { return typeof value === 'string' && value.trim().length > 0; }
 function comparableState(value) {
-  return String(value ?? '').normalize('NFKC').trim().replace(/\\s+/gu, ' ').toLocaleLowerCase();
+  return String(value ?? '').normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase();
 }
 
 function continuityBoundaryIssues(previous, current) {
