@@ -222,3 +222,29 @@ test('semantic reveal creates a source-grounded action instead of a passive idle
   assert.equal(scene.actionTimeline.phases[0].actorId, 'Nox');
   assert.match(scene.motionGenerationPrompt, /reveal/);
 });
+
+
+test('populates structured scene snapshots only with explicit character-bible facts', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\\nFoxy — small orange fox wearing a blue scarf.\\nSnowball — white rabbit.\\n\\nScene 1: Meeting\\nFoxy meets Snowball.\\n\\nScene 2: Departure\\nSnowball leaves the forest.',
+    'en',
+    'Foxy'
+  );
+  const first = result.scenes[0];
+  assert.equal(first.startStateData.characters.Foxy.clothing, 'blue scarf');
+  assert.equal(first.endStateData.characters.Foxy.clothing, 'blue scarf');
+  assert.equal(first.startStateData.characters.Foxy.pose, null);
+  assert.equal(first.startStateData.characters.Foxy.location, null);
+  assert.equal(first.startStateData.characters.Snowball.clothing, null);
+  assert.deepEqual(first.startStateData.objects, {});
+  assert.deepEqual(result.scenes[1].startStateData.characters, {
+    Snowball: { location: null, position: null, pose: null, clothing: null }
+  });
+});
+
+test('does not fabricate structured character state when no matching character profile exists', () => {
+  const result = buildStoryboardFromText('A fox runs through the forest.', 'en', 'Foxy');
+  assert.deepEqual(result.scenes[0].startStateData.characters, {});
+  assert.deepEqual(result.scenes[0].endStateData.characters, {});
+  assert.equal(result.scenes[0].startStateData.location, null);
+});
