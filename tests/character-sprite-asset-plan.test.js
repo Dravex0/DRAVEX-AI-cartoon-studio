@@ -80,3 +80,27 @@ test('deduplicates IDs case-insensitively and enforces the scene cast limit', ()
 test('returns an empty plan for scenes without a cast', () => {
   assert.deepEqual(buildCharacterSpriteAssetPlan({ characters: [] }, bible), []);
 });
+
+
+test('keeps a stable identity seed across scenes while preserving scene-specific sprite IDs', () => {
+  const first = buildCharacterSpriteAssetPlan({
+    id: 'scene-1', characters: ['Foxy'], visibleAction: 'Foxy waves.'
+  }, bible)[0];
+  const second = buildCharacterSpriteAssetPlan({
+    id: 'scene-9', characters: ['foxy'], visibleAction: 'Foxy runs through the forest.'
+  }, bible)[0];
+  assert.equal(first.identitySeed, second.identitySeed);
+  assert.notEqual(first.assetId, second.assetId);
+  assert.ok(Number.isInteger(first.identitySeed));
+  assert.ok(first.identitySeed >= 0 && first.identitySeed <= 0xffffffff);
+});
+
+test('changes the identity seed when the canonical appearance changes', () => {
+  const original = buildCharacterSpriteAssetPlan({
+    id: 'scene-1', characters: ['Foxy'], visibleAction: 'Foxy waves.'
+  }, bible)[0];
+  const redesigned = buildCharacterSpriteAssetPlan({
+    id: 'scene-1', characters: ['Foxy'], visibleAction: 'Foxy waves.'
+  }, [{ ...bible[0], clothing: 'Green coat' }])[0];
+  assert.notEqual(original.identitySeed, redesigned.identitySeed);
+});
