@@ -271,7 +271,7 @@ test('carries explicit full outfit replacements across scenes and off-screen gap
     '',
     'Scene 3: Return',
     'Foxy waves at the gate.'
-  ].join('\\n'), 'en', 'Foxy');
+  ].join('\n'), 'en', 'Foxy');
   const scenes = result.scenes;
   const change = scenes.find(scene => /changes into a red winter outfit/i.test(scene.storyDetail));
   const returnScene = scenes.find(scene => /Foxy waves at the gate/i.test(scene.storyDetail));
