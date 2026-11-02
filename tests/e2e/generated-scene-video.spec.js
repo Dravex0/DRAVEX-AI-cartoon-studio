@@ -26,6 +26,7 @@ test('persists a real generated WebM clip and draws its decoded frame', async ({
     const stopped = new Promise(resolve => { recorder.onstop = resolve; });
     sourceContext.fillStyle = '#f02020';
     sourceContext.fillRect(0, 0, 64, 64);
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     recorder.start();
     await new Promise(resolve => setTimeout(resolve, 700));
     recorder.stop();
@@ -63,6 +64,9 @@ test('persists a real generated WebM clip and draws its decoded frame', async ({
         video.load();
       });
 
+      await video.play();
+      await new Promise(resolve => setTimeout(resolve, 180));
+      video.pause();
       const selected = getDrawableSceneVideo(new Map([[sceneId, { video }]]), sceneId);
       if (selected !== video) throw new Error('The renderer did not select the decoded generated clip.');
       const outputCanvas = document.createElement('canvas');
