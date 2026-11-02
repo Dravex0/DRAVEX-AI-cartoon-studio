@@ -48,6 +48,28 @@ test('moves toward an explicitly named character target without inventing a dire
   assert.ok(result.timeline.phases[0].motion.to.x > 0.25);
 });
 
+test('plans a directional dodge as a sidestep and recovery for a flat sprite', () => {
+  const result = planCharacterMotionFromActionTimeline(makeScene('dodges left from the incoming strike'), layers);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 2);
+  const [evade, recover] = result.timeline.phases;
+  assert.equal(evade.start, 0.2);
+  assert.equal(evade.end, 0.5);
+  assert.equal(evade.motion.to.x, 0.09);
+  assert.equal(recover.start, 0.5);
+  assert.equal(recover.end, 0.8);
+  assert.equal(recover.motion.from.x, 0.09);
+  assert.equal(recover.motion.to.x, 0.25);
+  assert.equal(evade.easing, 'ease-out');
+  assert.equal(recover.easing, 'ease-in');
+});
+
+test('does not guess a direction for an ambiguous dodge', () => {
+  const result = planCharacterMotionFromActionTimeline(makeScene('dodges the incoming strike'), layers);
+  assert.equal(result.status, 'no-unambiguous-motion');
+  assert.equal(result.timeline, null);
+});
+
 test('does not guess a direction for an unspecified walk', () => {
   const result = planCharacterMotionFromActionTimeline(makeScene('walks across the room'), layers);
   assert.equal(result.status, 'no-unambiguous-motion');
