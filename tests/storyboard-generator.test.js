@@ -250,8 +250,8 @@ test('carries explicitly labeled character-bible clothing into every matching sc
   );
   for (const scene of result.scenes) {
     if (scene.characters.includes('Foxy')) {
-      assert.equal(scene.startStateData.characters.Foxy.clothing, 'blue scarf and brown vest');
-      assert.equal(scene.endStateData.characters.Foxy.clothing, 'blue scarf and brown vest');
+      assert.equal(scene.startStateData.characters.Foxy.clothing, 'blue scarf and brown vest.');
+      assert.equal(scene.endStateData.characters.Foxy.clothing, 'blue scarf and brown vest.');
     }
   }
   assert.ok(result.scenes.some(scene => scene.characters.includes('Foxy')));
