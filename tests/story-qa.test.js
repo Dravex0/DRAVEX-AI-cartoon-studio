@@ -184,3 +184,63 @@ test('does not confuse an idle scene with an active action because of shared wor
   ]);
   assert.equal(result.issues.some((entry) => entry.code === 'adjacent-repeat'), false);
 });
+
+
+test('warns when known character and object states conflict across adjacent scenes', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'continuity-a', duration: 3, prompt: 'Aster stands beside the old gate.',
+      startStateData: {
+        location: 'old gate', characters: { Aster: { clothing: 'blue coat', pose: 'standing' } },
+        objects: { key: { owner: 'Aster', state: 'held' } }
+      },
+      endStateData: {
+        location: 'old gate', characters: { Aster: { clothing: 'blue coat', pose: 'standing' } },
+        objects: { key: { owner: 'Aster', state: 'held' } }
+      }
+    },
+    {
+      id: 'continuity-b', duration: 3, prompt: 'Aster approaches the gate.',
+      startStateData: {
+        location: 'old gate', characters: { Aster: { clothing: 'red coat', pose: 'kneeling' } },
+        objects: { key: { owner: 'Mira', state: 'missing' } }
+      }
+    }
+  ]);
+  const mismatches = result.issues.filter(entry => entry.code === 'continuity-state-mismatch');
+  assert.equal(mismatches.length, 4);
+  assert.ok(mismatches.every(entry => entry.severity === 'warning' && entry.otherSceneId === 'continuity-a'));
+});
+
+test('allows documented state changes supported by current-scene evidence', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'handoff-a', duration: 3, prompt: 'Aster holds the key.',
+      endStateData: { characters: { Aster: { clothing: 'blue coat' } }, objects: { key: { owner: 'Aster', state: 'held' } } }
+    },
+    {
+      id: 'handoff-b', duration: 3, prompt: 'Aster gives the key to Mira.',
+      startStateData: { characters: { Aster: { clothing: 'blue coat' } }, objects: { key: { owner: 'Mira', state: 'held' } } },
+      stateChanges: [
+        { entityType: 'object', entityId: 'key', property: 'owner', previousValue: 'Aster', value: 'Mira', evidence: 'Aster hands the key to Mira on screen.' }
+      ]
+    }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+test('ignores unknown or missing snapshots instead of inventing continuity facts', () => {
+  const result = validateStoryScenes([
+    { id: 'unknown-a', duration: 3, prompt: 'Aster enters the room.', endStateData: null },
+    { id: 'unknown-b', duration: 3, prompt: 'Aster sits down.', startStateData: { characters: { Aster: { clothing: null, pose: 'sitting' } } } }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+test('does not flag entities that appear for the first time in the next scene', () => {
+  const result = validateStoryScenes([
+    { id: 'arrival-a', duration: 3, prompt: 'Aster waits by the gate.', endStateData: { characters: { Aster: { clothing: 'blue coat' } } } },
+    { id: 'arrival-b', duration: 3, prompt: 'Mira arrives.', startStateData: { characters: { Aster: { clothing: 'blue coat' }, Mira: { clothing: 'green scarf' } } } }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});

@@ -29,10 +29,36 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
     if (!response.ok) throw new Error('The exported WebM URL could not be read.');
     const blob = await response.blob();
     const signature = Array.from(new Uint8Array(await blob.slice(0, 4).arrayBuffer()));
+    if (video.readyState < 2 || video.videoWidth <= 0 || video.videoHeight <= 0) {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Exported WebM did not decode a playable video frame.')), 15000);
+        const ready = () => {
+          if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+            clearTimeout(timeout);
+            video.removeEventListener('loadeddata', ready);
+            video.removeEventListener('canplay', ready);
+            resolve();
+          }
+        };
+        video.addEventListener('loadeddata', ready);
+        video.addEventListener('canplay', ready);
+        ready();
+      });
+    }
+    // MediaRecorder WebM files may omit duration metadata. Prove playback by
+    // advancing the decoded media clock instead of requiring video.duration.
+    video.muted = true;
+    await video.play();
+    await new Promise(resolve => setTimeout(resolve, 350));
+    video.pause();
     return {
       size: blob.size,
       type: blob.type,
       signature,
+      currentTime: video.currentTime,
+      width: video.videoWidth,
+      height: video.videoHeight,
+      readyState: video.readyState,
       mediaError: video.error?.message || null
     };
   });
@@ -42,5 +68,9 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
   // WebM is an EBML container and starts with the four-byte EBML signature.
   expect(film.signature).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
   expect(film.mediaError).toBeNull();
+  expect(film.currentTime).toBeGreaterThan(0);
+  expect(film.width).toBeGreaterThan(0);
+  expect(film.height).toBeGreaterThan(0);
+  expect(film.readyState).toBeGreaterThanOrEqual(2);
   expect(pageErrors, 'export should not throw uncaught browser errors').toEqual([]);
 });
