@@ -1270,7 +1270,17 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const key=sceneVideoKey(index,motionScene);
   const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
   const filename='dravex-scene-'+(index+1)+extension;
-  attachSceneVideo(index,motionScene,result.video,filename);
+  const attached=attachSceneVideo(index,motionScene,result.video,filename);
+  try{
+   await waitForSceneVideoReady(attached.video,{timeoutMs:20000});
+   attached.video.pause();
+   try{attached.video.currentTime=0;}catch{}
+  }catch(error){
+   disposeSceneVideoEntry(attached);
+   if(sceneVideoCache.get(key)===attached)sceneVideoCache.delete(key);
+   const mediaError=attached.video.error;
+   throw new Error('Сцена '+(index+1)+' вернула файл, который браузер не смог декодировать. readyState='+attached.video.readyState+', networkState='+attached.video.networkState+', videoError='+(mediaError?.code??'none')+'. '+(error?.message||'Проверь формат и кодек видео.'));
+  }
   let persistenceNote='';
   try{await sceneVideoStorage.put(key,result.video,filename);}
   catch(storageError){console.warn('Scene video remains available only until this tab is closed:',storageError);persistenceNote=uiLang==='ru'?' Не удалось сохранить видео в памяти браузера; скачай его отдельно.':' Browser storage was unavailable; download the video before closing this tab.';}
