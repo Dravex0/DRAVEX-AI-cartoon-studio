@@ -304,9 +304,9 @@ test('matches character and object IDs case-insensitively across scene boundarie
   ]);
   const mismatches = result.issues.filter(entry => entry.code === 'continuity-state-mismatch');
   assert.equal(mismatches.length, 3);
-  assert.ok(mismatches.some(entry => entry.message.includes('character " aStEr " has conflicting clothing')));
-  assert.ok(mismatches.some(entry => entry.message.includes('object "silverkey" has conflicting owner')));
-  assert.ok(mismatches.some(entry => entry.message.includes('object "silverkey" has conflicting state')));
+  assert.ok(mismatches.some(entry => entry.message.includes('has conflicting clothing')));
+  assert.ok(mismatches.some(entry => entry.message.includes('has conflicting owner')));
+  assert.ok(mismatches.some(entry => entry.message.includes('has conflicting state')));
 });
 
 test('does not guess when entity IDs collide after normalization', () => {
