@@ -1120,7 +1120,7 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
   for(const plan of ready){
    status.textContent=uiLang==='ru'?'Генерация '+(completed+failed+1)+' из '+ready.length+': '+plan.characterId+'…':'Generating '+(completed+failed+1)+' of '+ready.length+': '+plan.characterId+'…';
    try{
-    const asset=await generateCharacterSpriteAsset({plan,consentAccepted:true,onProgress:progress=>{
+    const asset=await generateCharacterSpriteAsset({plan,consentAccepted:$('spriteHordeConsent').checked===true,onProgress:progress=>{
      const pos=progress.queuePosition===null?'?':progress.queuePosition;
      status.textContent=(uiLang==='ru'?'AI Horde · ':'AI Horde · ')+plan.characterId+' · очередь: '+pos;
     }});
