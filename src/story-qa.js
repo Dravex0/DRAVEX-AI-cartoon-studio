@@ -62,8 +62,15 @@ function continuityBoundaryIssues(previous, current) {
     // can mean a release/clear, but it must be documented by this scene.
     if (!hasStateText(oldValue)) return;
     if (hasStateText(newValue) && comparableState(oldValue) === comparableState(newValue)) return;
-    const documented = current.stateChanges.some(change =>
-      change.entityType === entityType && comparableState(change.entityId) === comparableState(entityId) &&
+    const documentedChanges = [
+      ...current.stateChanges.map(change => ({ ...change, entity: change.entityId, type: change.entityType })),
+      ...current.structuredStateChanges.map(change => ({
+        ...change,
+        type: ['holder', 'owner', 'state'].includes(change.property) ? 'object' : undefined
+      }))
+    ];
+    const documented = documentedChanges.some(change =>
+      change.type === entityType && comparableState(change.entity) === comparableState(entityId) &&
       change.property === property && comparableState(change.previousValue) === comparableState(oldValue) &&
       comparableState(change.value) === comparableState(newValue) && hasStateText(change.evidence)
     );
