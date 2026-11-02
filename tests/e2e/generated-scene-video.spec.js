@@ -64,8 +64,8 @@ test('persists a real generated WebM clip and draws its decoded frame', async ({
         video.load();
       });
 
-      await video.play();
-      await new Promise(resolve => setTimeout(resolve, 180));
+      // loadeddata guarantees a decoded first frame; avoid play() because a short
+      // fixture may reach its end before the browser resolves the play promise.
       video.pause();
       const selected = getDrawableSceneVideo(new Map([[sceneId, { video }]]), sceneId);
       if (selected !== video) throw new Error('The renderer did not select the decoded generated clip.');
