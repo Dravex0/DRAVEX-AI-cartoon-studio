@@ -57,3 +57,22 @@ test('extracts character profiles from bullet and comma-separated character desc
   assert.deepEqual(brief.characterProfiles.map(profile => profile.characterId), ['Arin', 'Elira', 'Nox']);
   assert.deepEqual(brief.characters.slice(0, 3), ['Arin', 'Elira', 'Nox']);
 });
+
+test('extracts only explicitly labeled character-bible attributes and preserves original description', () => {
+  const brief = parseStoryBrief([
+    'Characters:',
+    'Foxy — small orange fox; Clothing: blue scarf and brown vest; Colors: orange and white; Distinctive features: white tail tip.',
+    'Snowball — white rabbit with long ears.',
+    'Scene 1: Meeting',
+    'Foxy meets Snowball.'
+  ].join('\\n'));
+  const foxy = brief.characterProfiles.find(profile => profile.characterId === 'Foxy');
+  const snowball = brief.characterProfiles.find(profile => profile.characterId === 'Snowball');
+  assert.equal(foxy.visualDescription, 'small orange fox; Clothing: blue scarf and brown vest; Colors: orange and white; Distinctive features: white tail tip.');
+  assert.equal(foxy.clothing, 'blue scarf and brown vest');
+  assert.equal(foxy.colors, 'orange and white');
+  assert.equal(foxy.distinctiveFeatures, 'white tail tip.');
+  assert.equal(snowball.clothing, '');
+  assert.equal(snowball.colors, '');
+  assert.equal(snowball.distinctiveFeatures, '');
+});
