@@ -285,6 +285,41 @@ test('still reports meaningful continuity changes after normalization', () => {
 });
 
 
+
+test('flags undocumented object holder changes across scene boundaries', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'holder-a', duration: 3, prompt: 'Aster holds the silver key.',
+      endStateData: { objects: { 'silver key': { holder: 'Aster' } } }
+    },
+    {
+      id: 'holder-b', duration: 3, prompt: 'Aster looks at the gate.',
+      startStateData: { objects: { 'silver key': { holder: 'Mira' } } }
+    }
+  ]);
+  assert.ok(result.issues.some(entry =>
+    entry.code === 'continuity-state-mismatch' && entry.message.includes('conflicting holder')
+  ));
+});
+
+test('accepts an explicitly documented object release to null holder', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'release-a', duration: 3, prompt: 'Aster holds the silver key.',
+      endStateData: { objects: { 'silver key': { holder: 'Aster' } } }
+    },
+    {
+      id: 'release-b', duration: 3, prompt: 'Aster drops the silver key.',
+      startStateData: { objects: { 'silver key': { holder: null } } },
+      structuredStateChanges: [{
+        entity: 'silver key', property: 'holder', previousValue: 'Aster',
+        value: null, actorId: 'Aster', evidence: 'Aster drops the silver key.'
+      }]
+    }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
 test('matches character and object IDs case-insensitively across scene boundaries', () => {
   const result = validateStoryScenes([
     {
