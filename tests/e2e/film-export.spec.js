@@ -45,11 +45,17 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
         ready();
       });
     }
+    // MediaRecorder WebM files may omit duration metadata. Prove playback by
+    // advancing the decoded media clock instead of requiring video.duration.
+    video.muted = true;
+    await video.play();
+    await new Promise(resolve => setTimeout(resolve, 350));
+    video.pause();
     return {
       size: blob.size,
       type: blob.type,
       signature,
-      duration: video.duration,
+      currentTime: video.currentTime,
       width: video.videoWidth,
       height: video.videoHeight,
       readyState: video.readyState,
@@ -62,8 +68,7 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
   // WebM is an EBML container and starts with the four-byte EBML signature.
   expect(film.signature).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
   expect(film.mediaError).toBeNull();
-  expect(Number.isFinite(film.duration)).toBe(true);
-  expect(film.duration).toBeGreaterThan(0);
+  expect(film.currentTime).toBeGreaterThan(0);
   expect(film.width).toBeGreaterThan(0);
   expect(film.height).toBeGreaterThan(0);
   expect(film.readyState).toBeGreaterThanOrEqual(2);
