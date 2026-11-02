@@ -55,15 +55,7 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
     sampleCanvas.height = 18;
     const sampleContext = sampleCanvas.getContext('2d', { willReadFrequently: true });
     if (!sampleContext) throw new Error('Could not create a canvas for exported-frame inspection.');
-    for (const fraction of [0.1, 0.5, 0.9]) {
-      const targetTime = Math.min(video.duration - 0.05, Math.max(0, video.duration * fraction));
-      if (Math.abs(video.currentTime - targetTime) > 0.02) {
-        await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Timed out seeking to an exported scene frame.')), 5_000);
-          video.addEventListener('seeked', () => { clearTimeout(timeout); resolve(); }, { once: true });
-          video.currentTime = targetTime;
-        });
-      }
+    const sampleCurrentFrame = time => {
       sampleContext.drawImage(video, 0, 0, sampleCanvas.width, sampleCanvas.height);
       const pixels = sampleContext.getImageData(0, 0, sampleCanvas.width, sampleCanvas.height).data;
       const colors = new Set();
@@ -83,12 +75,36 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
         }
         differenceFromPrevious = changed / signatureBytes.length;
       }
-      sampledFrames.push({
-        time: targetTime,
-        uniqueColors: colors.size,
-        differenceFromPrevious,
-        signatureBytes
-      });
+      sampledFrames.push({ time, uniqueColors: colors.size, differenceFromPrevious, signatureBytes });
+    };
+    const finiteDuration = Number.isFinite(video.duration) && video.duration > 0
+      ? video.duration
+      : (video.seekable.length ? video.seekable.end(video.seekable.length - 1) : null);
+    if (Number.isFinite(finiteDuration) && finiteDuration > 0) {
+      for (const fraction of [0.1, 0.5, 0.9]) {
+        const targetTime = Math.min(finiteDuration - 0.05, Math.max(0, finiteDuration * fraction));
+        if (Math.abs(video.currentTime - targetTime) > 0.02) {
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Timed out seeking to an exported scene frame.')), 5_000);
+            video.addEventListener('seeked', () => { clearTimeout(timeout); resolve(); }, { once: true });
+            video.currentTime = targetTime;
+          });
+        }
+        sampleCurrentFrame(targetTime);
+      }
+    } else {
+      // Some MediaRecorder WebM files expose an infinite duration. Sample
+      // successive decoded frames during playback instead of seeking to Infinity.
+      for (let index = 0; index < 3; index++) {
+        const time = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Timed out waiting for another decoded export frame.')), 5_000);
+          video.requestVideoFrameCallback((_now, metadata) => {
+            clearTimeout(timeout);
+            resolve(metadata.mediaTime);
+          });
+        });
+        sampleCurrentFrame(time);
+      }
     }
     const frameInspection = sampledFrames.map(({ time, uniqueColors, differenceFromPrevious }) => ({
       time, uniqueColors, differenceFromPrevious
