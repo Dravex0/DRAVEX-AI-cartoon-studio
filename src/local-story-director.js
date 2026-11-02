@@ -182,6 +182,9 @@ export async function directStoryboardWithLocalAI({
       motionPrompt: clean(scene.motionPrompt, 3_000),
       startState: clean(scene.startState, 1_000),
       endState: clean(scene.endState, 1_000),
+      // Retain structured continuity snapshots after they have passed validation.
+      startStateData: scene.startStateData ?? null,
+      endStateData: scene.endStateData ?? null,
       actionTimeline: scene.actionTimeline ?? null
     };
   }));
