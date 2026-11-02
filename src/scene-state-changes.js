@@ -76,6 +76,13 @@ const POSE_VERBS = {
   ]
 };
 
+const CLOTHING_VERBS = {
+  en: [{ re: /(?:changes clothes into|changes into|changes outfit to|changes outfits to)/iu }],
+  ru: [{ re: /(?:переодевается в|меняет одежду на|сменяет наряд на)/iu }],
+  uk: [{ re: /(?:переодягається в|змінює одяг на|змінює вбрання на)/iu }],
+  es: [{ re: /(?:se cambia de ropa y se pone|se cambia a|cambia su atuendo por)/iu }]
+};
+
 const clean = (value, max = 160) => String(value ?? '').trim()
   .replace(/^[\s"'«»“”‘’]+|[\s"'«»“”‘’]+$/gu, '').slice(0, max);
 const escapeRegExp = value => [...String(value)].map(char => '.*+?^$|{}()[]'.includes(char) || char === String.fromCharCode(92) ? String.fromCharCode(92) + char : char).join('');
@@ -152,6 +159,26 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
             previousValue, value, actorId, evidence: clean(sentence, 1_200)
           });
           knownStates.set(key, value);
+        }
+
+        // A clothing update is accepted only when the story explicitly says
+        // the named character changes into a replacement outfit. Partial actions
+        // such as putting on or removing one item are deliberately not guessed.
+        for (const verb of CLOTHING_VERBS[locale]) {
+          const verbMatch = verb.re.exec(afterActor);
+          if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) continue;
+          const outfit = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
+          if (!outfit || outfit.length > 100) continue;
+          const value = outfit;
+          const key = 'character:' + actorId.toLocaleLowerCase() + ':clothing';
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          if (previousValue === value) continue;
+          changes.push({
+            entityType: 'character', entityId: actorId, property: 'clothing',
+            previousValue, value, actorId, evidence: clean(sentence, 1_200)
+          });
+          knownStates.set(key, value);
+          break;
         }
 
         for (const verb of POSE_VERBS[locale]) {
