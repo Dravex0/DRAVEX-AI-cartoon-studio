@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyCharacterActionTimelineToLayers } from '../src/character-action-runtime.js';
 import { drawCharacterLayers } from '../src/scene-character-layers.js';
+import { planCharacterMotionFromActionTimeline } from '../src/character-motion-planner.js';
 
 const layers = [
   { characterId: 'Foxy', imageUrl: 'fox', x: 0.2, y: 0.7, scale: 1, opacity: 1 },
@@ -130,4 +131,48 @@ test('unknown easing safely falls back to linear runtime interpolation', () => {
     ] }, 0.25
   );
   assert.ok(Math.abs(result[0].x - 0.35) < 1e-9);
+});
+
+
+test('story-planned directional dodge reaches the rendered sprite and returns to its base position', () => {
+  const scene = {
+    characters: ['Foxy'],
+    characterCastProvided: true,
+    storyDetail: 'Foxy dodges left from the incoming strike.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action',
+        start: 0.2,
+        end: 0.8,
+        actorId: 'Foxy',
+        targetId: null,
+        description: 'Foxy dodges left from the incoming strike.',
+        evidence: 'Foxy dodges left from the incoming strike.'
+      }]
+    }
+  };
+  const sprite = [{ characterId: 'Foxy', imageUrl: 'fox', x: 0.2, y: 0.7, width: 0.25, height: 0.4 }];
+  const planned = planCharacterMotionFromActionTimeline(scene, sprite);
+  assert.equal(planned.status, 'generated');
+  assert.equal(planned.generatedCount, 2);
+
+  const renderX = progress => {
+    const translations = [];
+    const context = {
+      globalAlpha: 1,
+      save() {}, restore() {}, rotate() {}, scale() {},
+      translate(x, y) { translations.push([x, y]); },
+      drawImage() {}
+    };
+    drawCharacterLayers(context, sprite, () => ({ naturalWidth: 10, naturalHeight: 10 }), 100, 100, {
+      motionTimeline: planned.timeline,
+      progress
+    });
+    return translations[0]?.[0];
+  };
+
+  assert.equal(renderX(0.5), 5, 'the sprite should sidestep left during the dodge');
+  assert.equal(renderX(0.8), 20, 'the sprite should recover to its original x position');
+  assert.equal(sprite[0].x, 0.2, 'render-time animation must not mutate the saved sprite layer');
 });
