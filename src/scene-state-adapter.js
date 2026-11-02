@@ -11,7 +11,7 @@ export function toStructuredStateChanges(changes = []) {
     const evidence = typeof change.evidence === 'string' ? change.evidence.trim() : '';
     const property = change.property === 'holder' ? 'holder'
       : change.property === 'openState' ? 'state'
-      : change.property === 'location' && change.entityType === 'character' ? 'location'
+      : ['location', 'pose'].includes(change.property) && change.entityType === 'character' ? change.property
       : null;
     if (!entity || !property || (change.value !== null && typeof change.value !== 'string')) return [];
     return [{
