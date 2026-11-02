@@ -13,7 +13,7 @@ export function toStructuredStateChanges(changes = []) {
       : change.property === 'openState' ? 'state'
       : change.property === 'location' && change.entityType === 'character' ? 'location'
       : null;
-    if (!entity || !property || typeof change.value !== 'string') return [];
+    if (!entity || !property || (change.value !== null && typeof change.value !== 'string')) return [];
     return [{
       entity,
       property,
