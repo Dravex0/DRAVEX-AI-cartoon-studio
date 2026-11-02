@@ -228,11 +228,19 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     // Character-bible facts seed identity; unknown location/pose/ownership stay null.
     const knownState = buildKnownCharacterSnapshot(scene.characters, brief.characterProfiles);
     const startState = JSON.parse(JSON.stringify(carriedState));
+    // Scene snapshots expose only the current cast, while the carried ledger
+    // retains off-screen characters so their state survives later re-entry.
+    const sceneCast = new Set(scene.characters.map(name => String(name).toLocaleLowerCase()));
+    for (const characterId of Object.keys(startState.characters)) {
+      if (!sceneCast.has(characterId.toLocaleLowerCase())) delete startState.characters[characterId];
+    }
     for (const [characterId, characterState] of Object.entries(knownState.characters)) {
-      startState.characters[characterId] = {
-        ...(startState.characters[characterId] || {}),
-        ...characterState
-      };
+      const carriedCharacter = startState.characters[characterId] || {};
+      startState.characters[characterId] = { ...carriedCharacter };
+      for (const [field, value] of Object.entries(characterState)) {
+        if (value !== null && value !== undefined) startState.characters[characterId][field] = value;
+        else if (!(field in startState.characters[characterId])) startState.characters[characterId][field] = null;
+      }
     }
     const endState = JSON.parse(JSON.stringify(startState));
     for (const change of scene.stateChanges) {
@@ -249,7 +257,14 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     }
     scene.startStateData = startState;
     scene.endStateData = endState;
-    carriedState = endState;
+    // Merge the visible scene result back into the full ledger without dropping
+    // characters who are temporarily absent from the current cast.
+    carriedState = JSON.parse(JSON.stringify(carriedState));
+    carriedState.location = endState.location ?? carriedState.location;
+    carriedState.time = endState.time ?? carriedState.time;
+    carriedState.weather = endState.weather ?? carriedState.weather;
+    Object.assign(carriedState.characters, endState.characters);
+    Object.assign(carriedState.objects, endState.objects);
   });
   const productionScenes = scenes.map((scene, index) => buildProductionScene(scene, brief.characterProfiles, { index }));
   const eventChain = buildStoryEventChain(productionScenes);
