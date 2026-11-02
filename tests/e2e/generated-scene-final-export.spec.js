@@ -41,6 +41,8 @@ test('includes a persisted generated scene clip in the final exported WebM', asy
     recorder.ondataavailable = event => {
       if (event.data?.size) chunks.push(event.data);
     };
+    // Let the captured canvas deliver real painted frames before recording.
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const stopped = new Promise(resolve => { recorder.onstop = resolve; });
     recorder.start();
     await new Promise(resolve => setTimeout(resolve, 1200));
