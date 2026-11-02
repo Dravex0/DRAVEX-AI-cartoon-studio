@@ -77,10 +77,13 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
       }
       sampledFrames.push({ time, uniqueColors: colors.size, differenceFromPrevious, signatureBytes });
     };
+    // Some Chromium mobile builds expose Infinity for MediaRecorder WebM
+    // duration while reporting only a short seekable range. That range is not
+    // the full film, so do not mistake it for the timeline length.
     const finiteDuration = Number.isFinite(video.duration) && video.duration > 0
       ? video.duration
-      : (video.seekable.length ? video.seekable.end(video.seekable.length - 1) : null);
-    if (Number.isFinite(finiteDuration) && finiteDuration > 0) {
+      : null;
+    if (finiteDuration !== null) {
       for (const fraction of [0.1, 0.5, 0.9]) {
         const targetTime = Math.min(finiteDuration - 0.05, Math.max(0, finiteDuration * fraction));
         if (Math.abs(video.currentTime - targetTime) > 0.02) {
@@ -93,16 +96,25 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
         sampleCurrentFrame(targetTime);
       }
     } else {
-      // Some MediaRecorder WebM files expose an infinite duration. Sample
-      // successive decoded frames during playback instead of seeking to Infinity.
+      // Sample decoded frames at meaningful intervals during playback. Adjacent
+      // frames can be nearly identical even when the animation is working.
+      let previousTime = -Infinity;
       for (let index = 0; index < 3; index++) {
         const time = await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Timed out waiting for another decoded export frame.')), 5_000);
-          video.requestVideoFrameCallback((_now, metadata) => {
-            clearTimeout(timeout);
-            resolve(metadata.mediaTime);
-          });
+          const requestNext = () => {
+            video.requestVideoFrameCallback((_now, metadata) => {
+              if (metadata.mediaTime >= previousTime + 0.75 || previousTime < 0) {
+                clearTimeout(timeout);
+                resolve(metadata.mediaTime);
+              } else {
+                requestNext();
+              }
+            });
+          };
+          requestNext();
         });
+        previousTime = time;
         sampleCurrentFrame(time);
       }
     }
@@ -134,7 +146,7 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
   expect(film.decodedFrame).toBe(true);
   expect(film.frameInspection).toHaveLength(3);
   expect(film.frameInspection.every(frame => frame.uniqueColors > 8)).toBe(true);
-  expect(film.frameInspection.slice(1).every(frame => frame.differenceFromPrevious > 0.02)).toBe(true);
+  expect(film.frameInspection.slice(1).every(frame => frame.differenceFromPrevious > 0.02), JSON.stringify(film.frameInspection)).toBe(true);
   expect(film.mediaError).toBeNull();
   expect(pageErrors, 'export should not throw uncaught browser errors').toEqual([]);
 });
