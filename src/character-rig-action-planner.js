@@ -5,7 +5,7 @@ import { sampleCharacterRigTimeline, validateCharacterRigTimeline } from './char
 
 const clean = value => String(value ?? '').trim();
 const key = value => clean(value).toLocaleLowerCase();
-const PRESET_BY_ACTION = Object.freeze({ walk: 'walk', run: 'run', jump: 'jump' });
+const PRESET_BY_ACTION = Object.freeze({ walk: 'walk', run: 'run', jump: 'jump', wave: 'wave' });
 
 function presetForDescription(description) {
   const intent = inferSceneActionIntent(description);
