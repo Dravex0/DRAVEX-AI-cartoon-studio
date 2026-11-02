@@ -103,6 +103,15 @@ export function parseStoryBrief(input) {
       continue;
     }
 
+    if (readingCharacterProfiles) {
+      const profile = parseCharacterLine(line);
+      if (profile) {
+        characterProfiles.push(profile);
+        appendDirective(directives, 'characters', profile.characterId);
+        continue;
+      }
+    }
+
     const parts = line.split(/\s+[·•]\s+/u);
     const remaining = [];
     let foundDirective = false;
