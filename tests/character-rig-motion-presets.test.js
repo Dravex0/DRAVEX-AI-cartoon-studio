@@ -27,7 +27,7 @@ const rig = () => ({
 
 describe('procedural character rig motion presets', () => {
   it('exposes the supported starter movement library', () => {
-    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'wave']);
+    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'wave']);
   });
 
   it('creates a validated walk cycle with explicit start and end frames', () => {
@@ -144,6 +144,27 @@ describe('procedural character rig motion presets', () => {
     const walkMid = sampleCharacterRigTimeline(walk.timeline, 0.25).Foxy.leftLeg.rotation;
     const runMid = sampleCharacterRigTimeline(run.timeline, 0.25).Foxy.leftLeg.rotation;
     assert.ok(Math.abs(runMid) > Math.abs(walkMid));
+  });
+
+  it('creates an articulated dodge pose across arms, legs, torso and head', () => {
+    const result = createCharacterRigMotionPreset(rig(), 'dodge');
+    assert.equal(result.status, 'ready');
+    assert.equal(result.timeline.keyframes.length, 5);
+    const start = sampleCharacterRigTimeline(result.timeline, 0).Foxy;
+    const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+    const end = sampleCharacterRigTimeline(result.timeline, 1).Foxy;
+    assert.ok(Math.abs(middle.leftArm.rotation) > 0.5);
+    assert.ok(Math.abs(middle.rightArm.rotation) > 0.5);
+    assert.ok(Math.abs(middle.leftLeg.rotation) > 0.2);
+    assert.ok(Math.abs(middle.rightLeg.rotation) > 0.2);
+    assert.ok(middle.root.y > 0);
+    assert.ok(Math.abs(middle.root.rotation) > 0);
+    assert.ok(Math.abs(middle.head.rotation) > 0);
+    assert.ok(Math.abs(start?.leftArm?.rotation || 0) < 1e-9);
+    assert.ok(Math.abs(end?.leftArm?.rotation || 0) < 1e-9);
+    assert.ok(result.animatedBoneIds.includes('leftArm'));
+    assert.ok(result.animatedBoneIds.includes('rightLeg'));
+    assert.deepEqual(result.warnings, []);
   });
 
   it('creates a jump with vertical root movement and a greeting with arm motion', () => {
