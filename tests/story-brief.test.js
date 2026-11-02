@@ -65,7 +65,7 @@ test('extracts only explicitly labeled character-bible attributes and preserves 
     'Snowball — white rabbit with long ears.',
     'Scene 1: Meeting',
     'Foxy meets Snowball.'
-  ].join('\\n'));
+  ].join('\n'));
   const foxy = brief.characterProfiles.find(profile => profile.characterId === 'Foxy');
   const snowball = brief.characterProfiles.find(profile => profile.characterId === 'Snowball');
   assert.equal(foxy.visualDescription, 'small orange fox; Clothing: blue scarf and brown vest; Colors: orange and white; Distinctive features: white tail tip.');
