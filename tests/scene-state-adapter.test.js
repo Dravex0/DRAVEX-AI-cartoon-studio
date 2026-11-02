@@ -25,6 +25,19 @@ test('maps open/closed state and character location into contract properties', (
   ]);
 });
 
+
+test('maps explicit character outfit replacement to the clothing contract field', () => {
+  const [change] = toStructuredStateChanges([{
+    entityType: 'character', entityId: 'Foxy', property: 'clothing',
+    previousValue: 'travel coat', value: 'red winter outfit',
+    actorId: 'Foxy', evidence: 'Foxy changes into a red winter outfit.'
+  }]);
+  assert.deepEqual([change.entity, change.property, change.previousValue, change.value], [
+    'Foxy', 'clothing', 'travel coat', 'red winter outfit'
+  ]);
+  assert.equal(normalizeStateChanges([change], { kindResolver: () => 'character' }).ok, true);
+});
+
 test('preserves explicit possession release while dropping unsupported or incomplete changes', () => {
   assert.deepEqual(toStructuredStateChanges([
     { entityType: 'prop', entityId: 'key', property: 'owner', value: 'Foxy' },
