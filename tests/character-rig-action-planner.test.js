@@ -98,8 +98,8 @@ test('combines grounded actions for multiple characters on one scene clock', () 
 });
 
 test('reports supported story actions whose actor has no attached rig', () => {
-  const result = createCharacterRigTimelineFromActionTimeline(makeScene('jumps over the stone'), []);
-  assert.equal(result.status, 'blocked');
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('jumps over the stone'), [rig('Bunny')]);
+  assert.equal(result.status, 'no-supported-actions');
   assert.equal(result.timeline, null);
-  assert.match(result.reason, /No segmented character rigs/);
+  assert.equal(result.skipped[0].reason, 'actor-rig-missing');
 });
