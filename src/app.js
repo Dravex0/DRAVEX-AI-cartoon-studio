@@ -1506,9 +1506,17 @@ $('export').onclick=async()=>{
       const key=String(meta.id||('scene-index-'+segment.sceneIndex));
       const entry=sceneVideoCache.get(key);
       if(entry?.video){
-        readinessTasks.push(waitForSceneVideoReady(entry.video,{timeoutMs:12000}).then(()=>{
+        readinessTasks.push((async()=>{
+          // A restored <video> may have metadata but no decoded frame yet.
+          // Start muted playback before waiting; waiting alone cannot decode a
+          // frame when the browser has not begun fetching/decoding the stream.
+          if(entry.video.paused){
+            await entry.video.play();
+          }
+          await waitForSceneVideoReady(entry.video,{timeoutMs:12000});
+          entry.video.pause();
           try{entry.video.currentTime=0;}catch{}
-        }));
+        })());
       }
       const imageUrl=String(meta.generatedImageUrl||'').trim();
       if(imageUrl&&!entry?.video){
@@ -1652,7 +1660,7 @@ $('export').onclick=async()=>{
   }catch(error){
     console.error('DRAVEX export failed:',error);
     cleanup();
-    $('status').textContent=tr('exportFailed');
+    $('status').textContent=tr('exportFailed')+' '+(error.message||'');
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка подготовки WebM','WebM preparation failed'),error.message||tr('exportFailed'));filmProgressTracking=false;}
   }
 };
