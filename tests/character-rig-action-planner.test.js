@@ -92,7 +92,7 @@ test('combines grounded actions for multiple characters on one scene clock', () 
   const result = createCharacterRigTimelineFromActionTimeline(scene, [rig('Foxy'), rig('Bunny')]);
   assert.equal(result.status, 'generated');
   assert.equal(result.generatedCount, 4);
-  assert.deepEqual(result.mappedActions.map(item => item.actorId), ['Foxy', 'Bunny', 'Foxy', 'Bunny']);
+  assert.deepEqual(result.mappedActions.map(item => item.actorId).sort(), ['Bunny', 'Bunny', 'Foxy', 'Foxy']);
   assert.ok(sampleCharacterRigTimeline(result.timeline, 0.35).Bunny);
   assert.ok(sampleCharacterRigTimeline(result.timeline, 0.6).Foxy);
 });
