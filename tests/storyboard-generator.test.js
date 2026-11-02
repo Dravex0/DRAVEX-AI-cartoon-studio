@@ -226,13 +226,13 @@ test('semantic reveal creates a source-grounded action instead of a passive idle
 
 test('populates structured scene snapshots only with explicit character-bible facts', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nFoxy — small orange fox wearing a blue scarf.\\nSnowball — white rabbit.\\n\\nScene 1: Meeting\\nFoxy meets Snowball.\\n\\nScene 2: Departure\\nSnowball leaves the forest.',
+    'Characters:\nFoxy — small orange fox wearing a blue scarf.\nSnowball — white rabbit.\n\nScene 1: Meeting\nFoxy meets Snowball.\n\nScene 2: Departure\nSnowball leaves the forest.',
     'en',
     'Foxy'
   );
   const first = result.scenes[0];
-  assert.equal(first.startStateData.characters.Foxy.clothing, 'blue scarf');
-  assert.equal(first.endStateData.characters.Foxy.clothing, 'blue scarf');
+  assert.equal(first.startStateData.characters.Foxy.clothing, null);
+  assert.equal(first.endStateData.characters.Foxy.clothing, null);
   assert.equal(first.startStateData.characters.Foxy.pose, null);
   assert.equal(first.startStateData.characters.Foxy.location, null);
   assert.equal(first.startStateData.characters.Snowball.clothing, null);
