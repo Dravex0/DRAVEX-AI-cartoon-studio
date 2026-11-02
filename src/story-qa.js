@@ -49,6 +49,12 @@ function continuityBoundaryIssues(previous, current) {
   const found = [];
   const compare = (entityType, entityId, property, oldValue, newValue) => {
     if (!hasStateText(oldValue) || !hasStateText(newValue) || oldValue === newValue) return;
+    const documented = current.stateChanges.some(change =>
+      change.entityType === entityType && change.entityId === entityId &&
+      change.property === property && change.previousValue === oldValue &&
+      change.value === newValue && hasStateText(change.evidence)
+    );
+    if (documented) return;
     const label = entityType === 'scene' ? 'Scene' : `${entityType} "${entityId}"`;
     found.push(issue(
       'warning',
