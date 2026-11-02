@@ -70,6 +70,7 @@ export function validateStoryScenes(rawScenes) {
     }
     if (index > 0) {
       const previous = scenes[index - 1];
+      issues.push(...continuityBoundaryIssues(previous, scene));
       const promptScore = similarity(scene.prompt, previous.prompt);
       const actionScore = actionSimilarity(scene.visibleAction, previous.visibleAction);
       const fallbackScore = actionSimilarity(scene.prompt || scene.visibleAction, previous.prompt || previous.visibleAction);
