@@ -263,3 +263,25 @@ test('does not fabricate structured character state when no matching character p
   assert.deepEqual(result.scenes[0].endStateData.characters, {});
   assert.equal(result.scenes[0].startStateData.location, null);
 });
+
+
+test('carries explicit object possession and release between adjacent scenes', () => {
+  const result = buildStoryboardFromText([
+    'Characters:',
+    'Foxy — small orange fox.',
+    '',
+    'Scene 1: Finding the key',
+    'Foxy picks up the silver key.',
+    '',
+    'Scene 2: Dropping the key',
+    'Foxy drops the silver key.'
+  ].join('\\n'), 'en', 'Foxy');
+
+  const pickup = result.scenes.find(scene => /picks up the silver key/i.test(scene.storyDetail));
+  const release = result.scenes.find(scene => /drops the silver key/i.test(scene.storyDetail));
+  assert.ok(pickup);
+  assert.ok(release);
+  assert.equal(pickup.endStateData.objects['silver key'].holder, 'Foxy');
+  assert.equal(release.startStateData.objects['silver key'].holder, 'Foxy');
+  assert.equal(release.endStateData.objects['silver key'].holder, null);
+});
