@@ -88,7 +88,7 @@ test('assigns ease-out and ease-in profiles to jump rise and landing', () => {
 
 
 test('plans an explicit sidestep as an out-and-back dodge', () => {
-  const result = planCharacterMotionFromActionTimeline(makeScene('sidesteps quickly to the left'));
+  const result = planCharacterMotionFromActionTimeline(makeScene('sidesteps quickly to the left'), layers);
   assert.equal(result.status, 'generated');
   assert.equal(result.generatedCount, 2);
   const [out, recover] = result.timeline.phases;
@@ -99,7 +99,7 @@ test('plans an explicit sidestep as an out-and-back dodge', () => {
 });
 
 test('does not guess a dodge direction when the action is underspecified', () => {
-  const result = planCharacterMotionFromActionTimeline(makeScene('ducks to avoid the falling branch'));
+  const result = planCharacterMotionFromActionTimeline(makeScene('ducks to avoid the falling branch'), layers);
   assert.equal(result.status, 'no-unambiguous-motion');
   assert.equal(result.timeline, null);
 });
