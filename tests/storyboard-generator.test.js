@@ -242,6 +242,21 @@ test('populates structured scene snapshots only with explicit character-bible fa
   });
 });
 
+test('carries explicitly labeled character-bible clothing into every matching scene', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — small orange fox; Clothing: blue scarf and brown vest.\nSnowball — white rabbit.\n\nScene 1: Meeting\nFoxy meets Snowball.\n\nScene 2: Departure\nFoxy waves as Snowball leaves.',
+    'en',
+    'Foxy'
+  );
+  for (const scene of result.scenes) {
+    if (scene.characters.includes('Foxy')) {
+      assert.equal(scene.startStateData.characters.Foxy.clothing, 'blue scarf and brown vest');
+      assert.equal(scene.endStateData.characters.Foxy.clothing, 'blue scarf and brown vest');
+    }
+  }
+  assert.ok(result.scenes.some(scene => scene.characters.includes('Foxy')));
+});
+
 test('does not fabricate structured character state when no matching character profile exists', () => {
   const result = buildStoryboardFromText('A fox runs through the forest.', 'en', 'Foxy');
   assert.deepEqual(result.scenes[0].startStateData.characters, {});
