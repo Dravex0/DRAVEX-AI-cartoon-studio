@@ -314,3 +314,71 @@ test('accepts decoded dialogue audio within the measured-duration tolerance', as
   });
   await session.cleanup();
 });
+
+test('mixes local music and timed dialogue into the same recording stream', async () => {
+  const h = createHarness();
+  const scheduled = [];
+  class MixedAudioContext extends h.FakeAudioContext {
+    currentTime = 5;
+    async decodeAudioData(bytes) {
+      assert.ok(bytes instanceof ArrayBuffer);
+      return { duration: 0.5 };
+    }
+    createBufferSource() {
+      return {
+        buffer: null,
+        connect() { h.events.push('dialogue-connect'); },
+        start(when) { scheduled.push(when); },
+        stop() { h.events.push('dialogue-stop'); }
+      };
+    }
+  }
+
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioElement: h.audioElement,
+    volume: 0.35,
+    voiceVolume: 0.85,
+    voiceTracks: [{
+      cueId: 'scene-2:line-1',
+      blob: new Blob(['valid-audio-fixture']),
+      startMs: 1750,
+      durationMs: 500
+    }],
+    AudioContextClass: MixedAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  assert.deepEqual(session.stream.getTracks().map(track => track.kind), ['video', 'audio']);
+  await session.start();
+  assert.deepEqual(scheduled, [6.83]);
+  assert.ok(h.events.includes('source-connect'));
+  assert.ok(h.events.includes('dialogue-connect'));
+  assert.ok(h.events.includes('play'));
+  await session.cleanup();
+  assert.ok(h.events.includes('dialogue-stop'));
+  assert.equal(h.audioTrack.stopped, true);
+});
+
+test('closes audio resources when a dialogue Blob cannot be decoded', async () => {
+  const h = createHarness();
+  class InvalidAudioContext extends h.FakeAudioContext {
+    async decodeAudioData() {
+      throw new Error('unsupported dialogue codec');
+    }
+  }
+
+  await assert.rejects(() => createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    voiceTracks: [{
+      cueId: 'scene-1:line-1',
+      blob: new Blob(['not-audio']),
+      startMs: 0
+    }],
+    AudioContextClass: InvalidAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  }), /unsupported dialogue codec/);
+
+  assert.ok(h.events.includes('close'));
+});
+
