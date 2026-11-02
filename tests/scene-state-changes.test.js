@@ -84,6 +84,29 @@ test('tracks only explicitly named character pose changes and carries the previo
   ]);
 });
 
+
+test('tracks only explicit complete outfit replacements in supported languages', () => {
+  const en = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy changes into a red winter outfit.', characters: ['Foxy'] },
+    { storyDetail: 'Foxy puts on a blue scarf.', characters: ['Foxy'] },
+    { storyDetail: 'Foxy changes clothes into a green travel suit.', characters: ['Foxy'] }
+  ], 'en');
+  assert.deepEqual(en.map(scene => scene.map(change => [change.property, change.previousValue, change.value])), [
+    [['clothing', null, 'red winter outfit']],
+    [],
+    [['clothing', 'red winter outfit', 'green travel suit']]
+  ]);
+
+  const ru = inferStoryboardStateChanges([
+    { storyDetail: 'Лисёнок переодевается в красный зимний костюм.', characters: ['Лисёнок'] }
+  ], 'ru');
+  const uk = inferStoryboardStateChanges([
+    { storyDetail: 'Лисеня змінює одяг на синій дорожній костюм.', characters: ['Лисеня'] }
+  ], 'uk');
+  assert.equal(ru[0][0].value, 'красный зимний костюм');
+  assert.equal(uk[0][0].value, 'синій дорожній костюм');
+});
+
 test('recognizes explicit Russian and Ukrainian pose changes without guessing pronouns', () => {
   const ru = inferStoryboardStateChanges([
     { storyDetail: 'Лисёнок садится на камень.', characters: ['Лисёнок'] },
