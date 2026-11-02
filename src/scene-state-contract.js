@@ -152,8 +152,10 @@ export function normalizeStateChange(raw, options = {}) {
 
   const entity = asStringOrNull(entityRead.value, 120);
   const property = asStringOrNull(propertyRead.value, 40);
-  const value = asStringOrNull(valueRead.value, 500);
-  if (!entity || !property || value === null) return { ok: false };
+  const value = valueRead.value === null ? null : asStringOrNull(valueRead.value, 500);
+  // Explicit null clears a known state (for example, releasing a held object).
+  // Missing or malformed values remain invalid.
+  if (!entity || !property || (valueRead.value !== null && value === null)) return { ok: false };
 
   const resolverRead = safeRead(options, "kindResolver");
   if (!resolverRead.ok) return { ok: false };
