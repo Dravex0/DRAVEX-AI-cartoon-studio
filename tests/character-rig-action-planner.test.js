@@ -120,3 +120,11 @@ test('maps an explicit Russian hand wave to the articulated wave preset', () => 
   const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
   assert.ok(Math.abs(middle.rightArm.rotation) > 0.5);
 });
+
+test('maps an explicit Spanish hand wave to the articulated wave preset', () => {
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('saluda con la mano al viajero'), [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.mappedActions[0].preset, 'wave');
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+  assert.ok(Math.abs(middle.rightArm.rotation) > 0.5);
+});
