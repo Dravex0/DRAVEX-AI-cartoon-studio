@@ -10,6 +10,7 @@ import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
 import { emptyState } from './scene-state-contract.js';
+import { toStructuredStateChanges } from './scene-state-adapter.js';
 import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
@@ -170,7 +171,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   };
   scenes.forEach((scene, index) => {
     scene.causalLink = causalLinks[index];
-    scene.stateChanges = stateChanges[index];
+    scene.stateChanges = toStructuredStateChanges(stateChanges[index]);
     scene.characters = knownCharacters.filter(name => scene.storyDetail
       ? characterMention(name, scene.storyDetail)
       : name.toLocaleLowerCase() === subject.toLocaleLowerCase());
