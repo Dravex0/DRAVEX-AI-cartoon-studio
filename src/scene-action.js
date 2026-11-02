@@ -17,12 +17,42 @@ function matches(text, pattern) {
   try { return pattern.test(text); } catch { return false; }
 }
 
+// Ignore an action only when a nearby negation governs that exact match.
+// Contrast words start a new clause: "does not walk, but runs" still detects run.
+function isNegatedMatch(text, matchIndex) {
+  const prefix = text.slice(0, matchIndex);
+  const clauseStart = Math.max(
+    prefix.lastIndexOf(';'),
+    prefix.lastIndexOf('.'),
+    prefix.lastIndexOf(','),
+    prefix.lastIndexOf(' but '),
+    prefix.lastIndexOf(' but, '),
+    prefix.lastIndexOf(' но '),
+    prefix.lastIndexOf(' а '),
+    prefix.lastIndexOf(' але '),
+    prefix.lastIndexOf(' проте '),
+    prefix.lastIndexOf(' pero ')
+  );
+  const clause = prefix.slice(clauseStart + 1).trimEnd();
+  if (/\bnot\s+only\s*$/i.test(clause)) return false;
+  return /(?:\b(?:doesn't|don't|didn't|isn't|aren't|wasn't|weren't|can't|cannot|won't|shouldn't|not|never|without|no|nunca|sin)\b|\b(?:does|do|did|is|are|was|were|can|will|should)\s+not\b|(?:^|\s)(?:не|ні|без))\s*$/i.test(clause);
+}
+
+function hasPositiveMatch(text, pattern) {
+  try {
+    const match = pattern.exec(text);
+    return Boolean(match && !isNegatedMatch(text, match.index));
+  } catch {
+    return false;
+  }
+}
+
 /** Detect the strongest explicit scene action across Russian, Ukrainian, English and Spanish. */
 export function detectSceneAction(input) {
   const text = String(input ?? '').normalize('NFKC').toLocaleLowerCase();
   if (!text.trim()) return 'idle';
   for (const entry of ACTION_PATTERNS) {
-    if (entry.patterns.some(pattern => matches(text, pattern))) return entry.action;
+    if (entry.patterns.some(pattern => hasPositiveMatch(text, pattern))) return entry.action;
   }
   return 'idle';
 }
@@ -88,7 +118,7 @@ export function inferSceneActionIntent(input) {
   const text = String(input ?? '').normalize('NFKC').trim();
   if (!text) return { intent: 'unknown', motionCue: 'idle', confidence: 0, evidence: '' };
   for (const entry of SEMANTIC_ACTIONS) {
-    const matched = entry.patterns.find(pattern => matches(text, pattern));
+    const matched = entry.patterns.find(pattern => hasPositiveMatch(text, pattern));
     if (matched) return {
       intent: entry.intent,
       motionCue: entry.motionCue,
