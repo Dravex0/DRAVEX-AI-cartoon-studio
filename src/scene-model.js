@@ -12,6 +12,31 @@ import { normalizeCharacterFacialRig, normalizeCharacterFacialExpressions } from
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
 
+/**
+ * Normalize optional structured continuity snapshots without inventing unknown facts.
+ * Only known schema fields are retained; null remains null and arbitrary model output
+ * is never copied into the canonical scene record.
+ */
+function normalizeStructuredSceneState(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const scalar = value => value == null ? null : text(value, 500) || null;
+  const normalizeEntities = (value, fields) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value).slice(0, 100).flatMap(([id, record]) => {
+      const key = text(id, 120);
+      if (!key || !record || typeof record !== 'object' || Array.isArray(record)) return [];
+      return [[key, Object.fromEntries(fields.map(field => [field, scalar(record[field])]))]];
+    }));
+  };
+  return {
+    location: scalar(input.location),
+    time: scalar(input.time),
+    weather: scalar(input.weather),
+    characters: normalizeEntities(input.characters, ['location', 'position', 'pose', 'clothing']),
+    objects: normalizeEntities(input.objects, ['location', 'owner', 'state'])
+  };
+}
+
 /** Normalize both current and legacy prototype scene shapes without dropping production prompts. */
 export function normalizeScene(input = {}, index = 0) {
   const scene = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
@@ -94,6 +119,10 @@ export function normalizeScene(input = {}, index = 0) {
     camera: text(scene.camera, 1_000),
     startState: text(scene.startState, 1_000),
     endState: text(scene.endState, 1_000),
+    // Structured snapshots are preserved for downstream continuity checks and renderers.
+    // Missing snapshots remain null; they are never synthesized from prose.
+    startStateData: normalizeStructuredSceneState(scene.startStateData),
+    endStateData: normalizeStructuredSceneState(scene.endStateData),
     dialogue: dialogueSource.map(line => typeof line === 'string'
       ? { characterId: '', text: text(line, 2_000), language: 'en' }
       : { characterId: text(line?.characterId, 120), text: text(line?.text, 2_000), language: text(line?.language, 12) || 'en' })
