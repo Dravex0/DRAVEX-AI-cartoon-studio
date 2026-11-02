@@ -43,7 +43,28 @@ function parseCharacterLine(line) {
   const match = normalized.match(/^([^—–,:-]{1,80}?)\s*(?:[—–-]|,\s*|:\s*)(.{3,})$/u);
   if (!match) return null;
   const characterId = clean(match[1], 80).replace(/[.:]+$/u, '');
-  return characterId ? { characterId, visualDescription: clean(match[2], 1200), clothing: '', colors: '', distinctiveFeatures: '' } : null;
+  if (!characterId) return null;
+
+  const visualDescription = clean(match[2], 1200);
+  const fields = {
+    clothing: /^(?:clothing|outfit|одежда|одяг)\s*[:：]\s*/iu,
+    colors: /^(?:colors?|цвета|кольори)\s*[:：]\s*/iu,
+    distinctiveFeatures: /^(?:distinctive features|особые приметы|особливі ознаки)\s*[:：]\s*/iu
+  };
+  const labels = /(?:^|[;|])\s*(clothing|outfit|одежда|одяг|colou?rs?|цвета|кольори|distinctive features|особые приметы|особливі ознаки)\s*[:：]\s*/giu;
+  const matches = [...visualDescription.matchAll(labels)];
+  const extracted = { clothing: '', colors: '', distinctiveFeatures: '' };
+  for (let index = 0; index < matches.length; index += 1) {
+    const current = matches[index];
+    const next = matches[index + 1];
+    const rawLabel = current[1].toLocaleLowerCase();
+    const start = current.index + current[0].length;
+    const value = visualDescription.slice(start, next ? next.index : visualDescription.length).replace(/[;|\s]+$/u, '').trim();
+    const key = fields.clothing.test(rawLabel) ? 'clothing'
+      : fields.colors.test(rawLabel) ? 'colors' : 'distinctiveFeatures';
+    if (value) extracted[key] = clean(value, 500);
+  }
+  return { characterId, visualDescription, ...extracted };
 }
 
 /**
