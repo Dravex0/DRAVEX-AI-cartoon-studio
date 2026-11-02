@@ -245,7 +245,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     const endState = JSON.parse(JSON.stringify(startState));
     for (const change of scene.stateChanges) {
       if (!change || typeof change.entity !== 'string' || !change.entity) continue;
-      if (['location', 'pose'].includes(change.property) && Object.hasOwn(endState.characters, change.entity)) {
+      if (['location', 'pose', 'clothing'].includes(change.property) && Object.hasOwn(endState.characters, change.entity)) {
         endState.characters[change.entity][change.property] = change.value;
       } else if (['holder', 'state'].includes(change.property)) {
         const current = endState.objects[change.entity] || {
