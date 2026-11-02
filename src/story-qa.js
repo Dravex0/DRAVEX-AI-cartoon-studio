@@ -72,8 +72,10 @@ export function validateStoryScenes(rawScenes) {
       const previous = scenes[index - 1];
       const promptScore = similarity(scene.prompt, previous.prompt);
       const actionScore = actionSimilarity(scene.visibleAction, previous.visibleAction);
-      const fallbackScore = actionSimilarity(scene.prompt || scene.visibleAction, previous.prompt || previous.visibleAction);
-      const score = Math.max(promptScore, actionScore, fallbackScore);
+      // Compare like fields only: a prompt is not interchangeable with an action.
+      // Cross-field fallback can report a repeat when one scene's prompt merely
+      // resembles the previous scene's action, even though their actual actions differ.
+      const score = Math.max(promptScore, actionScore);
       if (score >= 0.78) issues.push(issue('warning', 'adjacent-repeat', scene.id, `This scene is very similar to the previous scene (${Math.round(score * 100)}% token overlap).`, previous.id));
       const currentShot = cameraShotType(scene.camera);
       const previousShot = cameraShotType(previous.camera);
@@ -86,8 +88,8 @@ export function validateStoryScenes(rawScenes) {
       // Check prompt and action separately so changed prose cannot hide a reused action.
       const promptScore = similarity(scene.prompt, prior.prompt);
       const actionScore = actionSimilarity(scene.visibleAction, prior.visibleAction);
-      const fallbackScore = actionSimilarity(scene.prompt || scene.visibleAction, prior.prompt || prior.visibleAction);
-      const score = Math.max(promptScore, actionScore, fallbackScore);
+      // Keep non-adjacent comparisons field-aligned for the same reason as above.
+      const score = Math.max(promptScore, actionScore);
       if (score >= 0.9) {
         issues.push(issue('info', 'repeated-content', scene.id, `Similar content also appears in scene ${earlier + 1}.`, prior.id));
         break;
