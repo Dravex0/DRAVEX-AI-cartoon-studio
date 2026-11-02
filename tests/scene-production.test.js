@@ -319,3 +319,21 @@ test('production scene does not fabricate a background plan from character-aware
   assert.equal(prepared.sceneBackgroundPlan.prompt, '');
   assert.equal(prepared.sceneBackgroundPlan.compositionStatus, 'unverified');
 });
+
+test('production scene preserves object holder in structured continuity snapshots', () => {
+  const prepared = buildProductionScene({
+    id: 'scene_holder', title: 'The key is picked up',
+    visibleAction: 'Foxy picks up the silver key.', camera: 'Medium shot',
+    startStateData: {
+      characters: { Foxy: { clothing: 'blue scarf' } },
+      objects: { 'silver key': { location: 'table', owner: null, holder: null, state: 'resting' } }
+    },
+    endStateData: {
+      characters: { Foxy: { clothing: 'blue scarf' } },
+      objects: { 'silver key': { location: 'Foxy', owner: null, holder: 'Foxy', state: 'held' } }
+    }
+  });
+  assert.equal(prepared.startStateData.objects['silver key'].holder, null);
+  assert.equal(prepared.endStateData.objects['silver key'].holder, 'Foxy');
+  assert.equal(prepared.endStateData.objects['silver key'].owner, null);
+});
