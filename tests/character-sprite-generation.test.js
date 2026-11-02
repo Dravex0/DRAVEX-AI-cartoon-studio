@@ -62,3 +62,19 @@ test('rejects non-HTTPS provider results rather than storing unsafe image refere
     generateImage: async () => ({ imageUrl: 'http://cdn.example.test/foxy.png' })
   }), /unsupported image URL/);
 });
+
+
+test('passes the stable identity seed to the image provider and records it separately', async () => {
+  const received = [];
+  const seededPlan = { ...plan, identitySeed: 123456789 };
+  const asset = await generateCharacterSpriteAsset({
+    plan: seededPlan, consentAccepted: true,
+    generateImage: async options => {
+      received.push(options);
+      return { imageUrl: 'https://cdn.example.test/foxy-seeded.png', seed: '123456789' };
+    }
+  });
+  assert.equal(received[0].seed, 123456789);
+  assert.equal(asset.identitySeed, 123456789);
+  assert.equal(asset.seed, '123456789');
+});
