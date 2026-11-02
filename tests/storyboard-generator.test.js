@@ -275,7 +275,7 @@ test('carries explicit object possession and release between adjacent scenes', (
     '',
     'Scene 2: Dropping the key',
     'Foxy drops the silver key.'
-  ].join('\\n'), 'en', 'Foxy');
+  ].join('\n'), 'en', 'Foxy');
 
   const pickup = result.scenes.find(scene => /picks up the silver key/i.test(scene.storyDetail));
   const release = result.scenes.find(scene => /drops the silver key/i.test(scene.storyDetail));
