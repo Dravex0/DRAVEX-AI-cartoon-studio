@@ -160,8 +160,8 @@ describe('procedural character rig motion presets', () => {
     assert.ok(middle.root.y > 0);
     assert.ok(Math.abs(middle.root.rotation) > 0);
     assert.ok(Math.abs(middle.head.rotation) > 0);
-    assert.equal(start?.leftArm, undefined);
-    assert.equal(end?.leftArm, undefined);
+    assert.equal(start?.leftArm?.rotation, 0);
+    assert.equal(end?.leftArm?.rotation, 0);
     assert.ok(result.animatedBoneIds.includes('leftArm'));
     assert.ok(result.animatedBoneIds.includes('rightLeg'));
     assert.deepEqual(result.warnings, []);
