@@ -1606,7 +1606,7 @@ $('export').onclick=async()=>{
         $('finalFilmPlayer').src=url;$('finalFilmPlayer').hidden=false;$('finalFilmResult').hidden=false;$('finalFilmDownload').href=url;
         const anchor=document.createElement('a');
         anchor.href=url;
-        anchor.download='dravex-cartoon-storyboard.webm';
+        anchor.download='dravex-cartoon-film.webm';
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
