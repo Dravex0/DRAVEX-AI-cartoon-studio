@@ -41,13 +41,21 @@ test('includes a persisted generated scene clip in the final exported WebM', asy
     recorder.ondataavailable = event => {
       if (event.data?.size) chunks.push(event.data);
     };
-    // Let the captured canvas deliver real painted frames before recording.
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    // Canvas capture emits frames when its pixels change. Keep a tiny marker
+    // moving while recording so the fixture contains decodable video frames;
+    // the sampled center of the exported frame remains solid red.
     const stopped = new Promise(resolve => { recorder.onstop = resolve; });
+    let markerFrame = 0;
+    let markerTimer;
     recorder.start();
+    markerTimer = setInterval(() => {
+      context.fillStyle = markerFrame++ % 2 ? '#ed2020' : '#d91d1d';
+      context.fillRect(0, 0, 2, 2);
+    }, 80);
     await new Promise(resolve => setTimeout(resolve, 1200));
     recorder.stop();
     await stopped;
+    clearInterval(markerTimer);
     stream.getTracks().forEach(track => track.stop());
 
     const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
