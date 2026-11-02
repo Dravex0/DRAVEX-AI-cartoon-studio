@@ -79,21 +79,27 @@ export function normalizeScene(input = {}, index = 0) {
           evidence: text(scene.causalLink.evidence, 1_200)
         }
       : null,
-    // Keep both vocabularies during migration: canonical entity and legacy entityId/entityType.
-    // This lets structured-state consumers read new records without breaking older UI consumers.
-    stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => {
-      const entity = text(change.entity ?? change.entityId, 120);
-      return {
-        entity,
-        entityType: text(change.entityType, 20),
-        entityId: text(change.entityId ?? change.entity, 120),
-        property: text(change.property, 40),
-        previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
-        value: change.value == null ? null : text(change.value, 160),
-        actorId: text(change.actorId, 120),
-        evidence: text(change.evidence, 1_200)
-      };
-    }) : [],
+    // Preserve the legacy stateChanges shape exactly for existing consumers.
+    stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => ({
+      entityType: text(change.entityType, 20),
+      entityId: text(change.entityId ?? change.entity, 120),
+      property: text(change.property, 40),
+      previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
+      value: change.value == null ? null : text(change.value, 160),
+      actorId: text(change.actorId, 120),
+      evidence: text(change.evidence, 1_200)
+    })) : [],
+    // New canonical records live separately so legacy deep-equality consumers do not break.
+    structuredStateChanges: Array.isArray(scene.structuredStateChanges ?? scene.stateChanges)
+      ? (scene.structuredStateChanges ?? scene.stateChanges).filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => ({
+          entity: text(change.entity ?? change.entityId, 120),
+          property: text(change.property, 40),
+          previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
+          value: change.value == null ? null : text(change.value, 160),
+          actorId: text(change.actorId, 120) || null,
+          evidence: text(change.evidence, 1_200) || null
+        })).filter(change => change.entity && change.property && change.value !== null)
+      : [],
     interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
       type: text(item.type, 40), actorId: text(item.actorId, 120), targetId: text(item.targetId, 120),
       evidence: text(item.evidence, 500),
