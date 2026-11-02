@@ -45,6 +45,13 @@ function comparableState(value) {
   return String(value ?? '').normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase();
 }
 
+
+ // Resolve IDs with value normalization; ambiguous collisions are deliberately ignored.
+function matchingStateRecord(records, id) {
+  const matches = Object.entries(records ?? {}).filter(([key]) => comparableState(key) === comparableState(id));
+  return matches.length === 1 ? matches[0][1] : null;
+}
+
 function continuityBoundaryIssues(previous, current) {
   const before = previous.endStateData;
   const after = current.startStateData;
@@ -71,14 +78,14 @@ function continuityBoundaryIssues(previous, current) {
     compare('scene', 'scene', property, before[property], after[property]);
   }
   for (const [id, next] of Object.entries(after.characters ?? {})) {
-    const prior = before.characters?.[id];
+    const prior = matchingStateRecord(before.characters, id);
     if (!prior) continue;
     for (const property of ['location', 'position', 'pose', 'clothing']) {
       compare('character', id, property, prior[property], next[property]);
     }
   }
   for (const [id, next] of Object.entries(after.objects ?? {})) {
-    const prior = before.objects?.[id];
+    const prior = matchingStateRecord(before.objects, id);
     if (!prior) continue;
     for (const property of ['location', 'owner', 'state']) {
       compare('object', id, property, prior[property], next[property]);
