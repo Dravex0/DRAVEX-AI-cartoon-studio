@@ -123,7 +123,7 @@ function attachSceneVideo(index,meta,blob,filename){
  disposeSceneVideoEntry(sceneVideoCache.get(key));
  const url=URL.createObjectURL(blob);
  const video=document.createElement("video");
- video.muted=true;video.loop=true;video.playsInline=true;video.preload="auto";video.src=url;
+ video.muted=true;video.loop=true;video.playsInline=true;video.preload="auto";video.src=url;video.load();
  video.addEventListener("loadeddata",()=>{if(sceneIndex===index)draw()},{once:true});
  const entry={video,url,filename};
  sceneVideoCache.set(key,entry);
