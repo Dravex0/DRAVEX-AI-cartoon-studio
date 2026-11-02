@@ -184,3 +184,44 @@ test('does not confuse an idle scene with an active action because of shared wor
   ]);
   assert.equal(result.issues.some((entry) => entry.code === 'adjacent-repeat'), false);
 });
+
+
+test('does not compare a scene prompt with the previous scene action', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'walk-action',
+      duration: 3,
+      visibleAction: 'Aster walks slowly through the ruined cathedral toward the old silver door.'
+    },
+    {
+      id: 'jump-action',
+      duration: 3,
+      prompt: 'Aster walks slowly through the ruined cathedral toward the old silver door.',
+      visibleAction: 'Aster jumps over a broken stone barrier in the courtyard.'
+    }
+  ]);
+  assert.equal(result.issues.some((entry) => entry.code === 'adjacent-repeat'), false);
+});
+
+test('does not compare a later scene prompt with an earlier scene action', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'walk-action',
+      duration: 3,
+      visibleAction: 'Aster walks slowly through the ruined cathedral toward the old silver door.'
+    },
+    {
+      id: 'middle-action',
+      duration: 3,
+      prompt: 'A silver key falls onto a stone table.',
+      visibleAction: 'The key spins once and stops.'
+    },
+    {
+      id: 'different-action',
+      duration: 3,
+      prompt: 'Aster walks slowly through the ruined cathedral toward the old silver door.',
+      visibleAction: 'Aster jumps over a broken stone barrier in the courtyard.'
+    }
+  ]);
+  assert.equal(result.issues.some((entry) => entry.code === 'repeated-content'), false);
+});
