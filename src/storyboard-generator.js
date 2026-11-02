@@ -226,7 +226,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     // pose, object ownership and other unknown state remain null until explicitly authored.
     const knownState = buildKnownCharacterSnapshot(scene.characters, brief.characterProfiles);
     scene.startStateData = knownState;
-    scene.endStateData = structuredClone(knownState);
+    scene.endStateData = JSON.parse(JSON.stringify(knownState));
   });
   const productionScenes = scenes.map((scene, index) => buildProductionScene(scene, brief.characterProfiles, { index }));
   const eventChain = buildStoryEventChain(productionScenes);
