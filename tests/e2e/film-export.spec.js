@@ -67,6 +67,10 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
   expect(film.type).toContain('video/webm');
   // WebM is an EBML container and starts with the four-byte EBML signature.
   expect(film.signature).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
+  expect(film.duration).toBeGreaterThan(0);
+  expect(film.width).toBeGreaterThan(0);
+  expect(film.height).toBeGreaterThan(0);
+  expect(film.decodedFrame).toBe(true);
   expect(film.mediaError).toBeNull();
   expect(pageErrors, 'export should not throw uncaught browser errors').toEqual([]);
 });
