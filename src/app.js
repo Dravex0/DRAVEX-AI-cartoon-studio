@@ -12,6 +12,7 @@ import { drawImageCover } from "./image-frame.js";
 import { drawCharacterLayers } from "./scene-character-layers.js";
 import { validateCharacterRigTimeline, sampleCharacterRigTimeline } from "./character-rig-timeline.js";
 import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from "./character-rig-motion-presets.js";
+import { createCharacterRigTimelineFromActionTimeline } from "./character-rig-action-planner.js";
 import { validateCharacterRig, normalizeCharacterRigPoses, characterRigPosesFor } from "./character-rig.js";
 import { upsertCharacterMotionPhase } from "./character-motion-editor.js";
 import { planCharacterMotionFromActionTimeline } from "./character-motion-planner.js";
@@ -460,6 +461,31 @@ $('generateCharacterRigPreset').addEventListener('click',()=>{
  $('characterRigScrubber').value='0';
  $('characterRigScrubberValue').textContent='0%';
  $('characterRigStatus').textContent=result.label+' generated for '+actorId+'. Animated bones: '+(result.animatedBoneIds.join(', ')||'none')+'. '+(result.warnings.join(' ')||'No rig mapping warnings.');
+ sceneMotionSceneIndex=-1;
+ if(!playing)draw();
+});
+
+$('generateCharacterRigFromStory').addEventListener('click',()=>{
+ const meta=sceneMetadata[sceneIndex]||{};
+ const result=createCharacterRigTimelineFromActionTimeline(meta,meta.characterRigs||[]);
+ if(!result.timeline){
+  const skippedCount=(result.skipped||[]).length;
+  $('characterRigStatus').textContent=(result.reason||'No articulated character animation could be generated from this scene.')+
+   (skippedCount?' Skipped items: '+skippedCount+'.':'');
+  return;
+ }
+ sceneMetadata[sceneIndex]={...meta,characterRigTimeline:result.timeline};
+ $('characterRigTimelineJson').value=JSON.stringify(result.timeline,null,2);
+ $('characterRigScrubber').disabled=false;
+ $('resetCharacterRigScrubber').disabled=false;
+ rigPreviewProgress=0;
+ $('characterRigScrubber').value='0';
+ $('characterRigScrubberValue').textContent='0%';
+ const mapped=(result.mappedActions||[]).map(item=>item.actorId+': '+item.preset).join(', ');
+ const skippedCount=(result.skipped||[]).length;
+ $('characterRigStatus').textContent='Story-driven bone animation generated: '+result.generatedCount+' action(s). '+mapped+
+  (skippedCount?'. Skipped unsupported, missing-rig or overlapping actions: '+skippedCount+'.':'. No actions skipped.')+
+  ' Preview and canvas export sample this same rig timeline.';
  sceneMotionSceneIndex=-1;
  if(!playing)draw();
 });
