@@ -258,3 +258,13 @@ test("emptyState returns a complete fresh structure", () => {
   assert.notEqual(first, second);
   assert.notEqual(first.characters, second.characters);
 });
+
+test("resolves object entities declared only by structured state changes", () => {
+  const scene = makeScene("object-change", {
+    stateChanges: [{ entity: "silver key", property: "holder", previousValue: null, value: "Alice", actorId: "Alice", evidence: "Alice picks up the silver key." }]
+  });
+  const normalized = normalizeScenes([scene]);
+  assert.ok(normalized);
+  assert.equal(normalized[0].stateChanges[0].entity, "silver key");
+  assert.equal(normalized[0].stateChanges[0].property, "holder");
+});
