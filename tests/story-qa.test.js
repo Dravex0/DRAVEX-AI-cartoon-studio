@@ -244,3 +244,42 @@ test('does not flag entities that appear for the first time in the next scene', 
   ]);
   assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
 });
+
+
+test('does not report continuity mismatches for case or whitespace-only differences', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'normalized-a', duration: 3, prompt: 'Aster waits by the gate.',
+      endStateData: {
+        location: 'Old Gate',
+        characters: { Aster: { clothing: 'Blue  Coat', pose: 'Standing' } },
+        objects: { key: { owner: 'Aster', state: 'Held' } }
+      }
+    },
+    {
+      id: 'normalized-b', duration: 3, prompt: 'Aster notices the lantern.',
+      startStateData: {
+        location: 'old   gate',
+        characters: { Aster: { clothing: 'blue coat', pose: 'standing' } },
+        objects: { key: { owner: 'aster', state: 'held' } }
+      }
+    }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+test('still reports meaningful continuity changes after normalization', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'meaningful-a', duration: 3, prompt: 'Aster waits by the gate.',
+      endStateData: { characters: { Aster: { clothing: 'blue coat' } } }
+    },
+    {
+      id: 'meaningful-b', duration: 3, prompt: 'Aster enters the gate.',
+      startStateData: { characters: { Aster: { clothing: 'red coat' } } }
+    }
+  ]);
+  const mismatch = result.issues.find(entry => entry.code === 'continuity-state-mismatch');
+  assert.ok(mismatch);
+  assert.equal(mismatch.sceneId, 'meaningful-b');
+});
