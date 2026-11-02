@@ -49,6 +49,33 @@ const LOCATION_VERBS = {
   ]
 };
 
+const POSE_VERBS = {
+  en: [
+    { re: /(?:stands? up|gets? up|is standing|stands?)/iu, value: 'standing' },
+    { re: /(?:sits? down|sits?)/iu, value: 'sitting' },
+    { re: /(?:kneels? down|kneels?)/iu, value: 'kneeling' },
+    { re: /(?:lies? down|lies?)/iu, value: 'lying' }
+  ],
+  ru: [
+    { re: /(?:вста[её]т|поднимается на ноги|стоит)/iu, value: 'standing' },
+    { re: /(?:садится|присаживается|сидит)/iu, value: 'sitting' },
+    { re: /(?:становится на колени|опускается на колени|стоит на коленях)/iu, value: 'kneeling' },
+    { re: /(?:ложится|лежит)/iu, value: 'lying' }
+  ],
+  uk: [
+    { re: /(?:вста[єе]|підводиться|стоїть)/iu, value: 'standing' },
+    { re: /(?:сідає|присідає|сидить)/iu, value: 'sitting' },
+    { re: /(?:стає на коліна|опускається на коліна|стоїть на колінах)/iu, value: 'kneeling' },
+    { re: /(?:лягає|лежить)/iu, value: 'lying' }
+  ],
+  es: [
+    { re: /(?:se pone de pie|se levanta|está de pie)/iu, value: 'standing' },
+    { re: /(?:se sienta|está sentado|está sentada)/iu, value: 'sitting' },
+    { re: /(?:se arrodilla|está de rodillas)/iu, value: 'kneeling' },
+    { re: /(?:se acuesta|está tumbado|está tumbada)/iu, value: 'lying' }
+  ]
+};
+
 const clean = (value, max = 160) => String(value ?? '').trim()
   .replace(/^[\s"'«»“”‘’]+|[\s"'«»“”‘’]+$/gu, '').slice(0, max);
 const escapeRegExp = value => [...String(value)].map(char => '.*+?^$|{}()[]'.includes(char) || char === String.fromCharCode(92) ? String.fromCharCode(92) + char : char).join('');
@@ -125,6 +152,21 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
             previousValue, value, actorId, evidence: clean(sentence, 1_200)
           });
           knownStates.set(key, value);
+        }
+
+        for (const verb of POSE_VERBS[locale]) {
+          const verbMatch = verb.re.exec(afterActor);
+          if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) continue;
+          const value = verb.value;
+          const key = 'character:' + actorId.toLocaleLowerCase() + ':pose';
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          if (previousValue === value) continue;
+          changes.push({
+            entityType: 'character', entityId: actorId, property: 'pose',
+            previousValue, value, actorId, evidence: clean(sentence, 1_200)
+          });
+          knownStates.set(key, value);
+          break;
         }
       }
     }
