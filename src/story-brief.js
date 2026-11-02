@@ -47,9 +47,9 @@ function parseCharacterLine(line) {
 
   const visualDescription = clean(match[2], 1200);
   const fields = {
-    clothing: /^(?:clothing|outfit|одежда|одяг)\s*[:：]\s*/iu,
-    colors: /^(?:colors?|цвета|кольори)\s*[:：]\s*/iu,
-    distinctiveFeatures: /^(?:distinctive features|особые приметы|особливі ознаки)\s*[:：]\s*/iu
+    clothing: /^(?:clothing|outfit|одежда|одяг)$/iu,
+    colors: /^(?:colors?|цвета|кольори)$/iu,
+    distinctiveFeatures: /^(?:distinctive features|особые приметы|особливі ознаки)$/iu
   };
   const labels = /(?:^|[;|])\s*(clothing|outfit|одежда|одяг|colou?rs?|цвета|кольори|distinctive features|особые приметы|особливі ознаки)\s*[:：]\s*/giu;
   const matches = [...visualDescription.matchAll(labels)];
