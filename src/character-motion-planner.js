@@ -1,5 +1,5 @@
 import { validateCharacterActionTimeline } from './character-action-timeline.js';
-import { detectSceneAction } from './scene-action.js';
+import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const clean = value => String(value ?? '').trim();
@@ -66,7 +66,13 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
       continue;
     }
     const description = clean(source.description);
-    const action = detectSceneAction(description);
+    const detectedAction = detectSceneAction(description);
+    const semanticIntent = inferSceneActionIntent(description);
+    // Use semantic intent only for the specific evasive action that the basic
+    // motion vocabulary does not classify. Direction must still be explicit.
+    const action = detectedAction !== 'idle'
+      ? detectedAction
+      : semanticIntent.intent === 'dodge' ? 'dodge' : 'idle';
     const direction = directionOf(description);
     const from = { ...(poses.get(actorKey) || basePose(actorLayer)) };
     let to = { ...from };
@@ -90,6 +96,15 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
       if (direction === 'up') to.y = clamp(from.y - distance, 0.05, 0.95);
       if (direction === 'down') to.y = clamp(from.y + distance, 0.05, 0.95);
       plan = [phase(actorId, source.start, source.end, from, to, source, ' (move in the explicitly stated direction)')];
+    } else if (action === 'dodge' && (direction === 'left' || direction === 'right')) {
+      const midpoint = (source.start + source.end) / 2;
+      const offset = direction === 'left' ? -0.16 : 0.16;
+      const sidestep = { ...from, x: clamp(from.x + offset, 0.05, 0.95) };
+      plan = [
+        phase(actorId, source.start, midpoint, from, sidestep, source, ' (dodge: sidestep)', 'ease-out'),
+        phase(actorId, midpoint, source.end, sidestep, from, source, ' (dodge: recover)', 'ease-in')
+      ];
+      to = from;
     } else if (action === 'jump') {
       const apex = { ...from, y: clamp(from.y - 0.14, 0.05, 0.95), scale: clamp(from.scale * 1.04, 0.05, 4) };
       const midpoint = (source.start + source.end) / 2;
