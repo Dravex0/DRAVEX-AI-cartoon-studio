@@ -283,3 +283,42 @@ test('still reports meaningful continuity changes after normalization', () => {
   assert.ok(mismatch);
   assert.equal(mismatch.sceneId, 'meaningful-b');
 });
+
+
+test('matches character and object IDs case-insensitively across scene boundaries', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'id-normalization-a', duration: 3, prompt: 'Aster waits beside the gate.',
+      endStateData: {
+        characters: { Aster: { clothing: 'blue coat' } },
+        objects: { SilverKey: { owner: 'Aster', state: 'held' } }
+      }
+    },
+    {
+      id: 'id-normalization-b', duration: 3, prompt: 'Aster approaches the gate.',
+      startStateData: {
+        characters: { ' aStEr ': { clothing: 'red coat' } },
+        objects: { silverkey: { owner: 'Mira', state: 'missing' } }
+      }
+    }
+  ]);
+  const mismatches = result.issues.filter(entry => entry.code === 'continuity-state-mismatch');
+  assert.equal(mismatches.length, 3);
+  assert.ok(mismatches.some(entry => entry.message.includes('character " aStEr " has conflicting clothing')));
+  assert.ok(mismatches.some(entry => entry.message.includes('object "silverkey" has conflicting owner')));
+  assert.ok(mismatches.some(entry => entry.message.includes('object "silverkey" has conflicting state')));
+});
+
+test('does not guess when entity IDs collide after normalization', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'ambiguous-a', duration: 3, prompt: 'Aster waits.',
+      endStateData: { characters: { Aster: { clothing: 'blue coat' }, aster: { clothing: 'green coat' } } }
+    },
+    {
+      id: 'ambiguous-b', duration: 3, prompt: 'Aster moves.',
+      startStateData: { characters: { ' ASTER ': { clothing: 'red coat' } } }
+    }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
