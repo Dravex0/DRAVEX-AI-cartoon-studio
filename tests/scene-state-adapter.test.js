@@ -25,10 +25,12 @@ test('maps open/closed state and character location into contract properties', (
   ]);
 });
 
-test('drops unsupported or incomplete inferred changes instead of inventing fields', () => {
+test('preserves explicit possession release while dropping unsupported or incomplete changes', () => {
   assert.deepEqual(toStructuredStateChanges([
     { entityType: 'prop', entityId: 'key', property: 'owner', value: 'Foxy' },
     { entityType: 'prop', entityId: '', property: 'holder', value: 'Foxy' },
-    { entityType: 'prop', entityId: 'key', property: 'holder', value: null }
-  ]), []);
+    { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: 'Foxy', value: null, actorId: 'Foxy', evidence: 'Foxy drops the key.' }
+  ]).map(change => [change.entity, change.property, change.value]), [
+    ['key', 'holder', null]
+  ]);
 });
