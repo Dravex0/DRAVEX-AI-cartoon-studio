@@ -122,3 +122,37 @@ test('keeps semantic labels separate from supported renderer movement cues', asy
   const result = inferSceneActionIntent('Arin and Elira combine their powers.');
   assert.ok(['idle', 'walk', 'run', 'jump', 'turn', 'float', 'vanish', 'magic', 'talk', 'surprised', 'sad', 'happy', 'dance'].includes(result.motionCue));
 });
+
+
+test('ignores explicitly negated actions in English, Russian, Ukrainian and Spanish', () => {
+  const examples = [
+    ['The fox does not run through the forest.', 'idle'],
+    ["The fox isn't running.", 'idle'],
+    ['Лисёнок не бежит по лесу.', 'idle'],
+    ['Лисеня не стрибає через струмок.', 'idle'],
+    ['El zorro no corre por el bosque.', 'idle']
+  ];
+  for (const [description, expected] of examples) {
+    assert.equal(detectSceneAction(description), expected, description);
+  }
+});
+
+test('preserves positive actions after contrastive negation', () => {
+  assert.equal(detectSceneAction('The fox does not walk, but runs toward the gate.'), 'run');
+  assert.equal(detectSceneAction('Лис не бежит, а идёт к воротам.'), 'walk');
+});
+
+test('does not mistake "not only" for a negated action', () => {
+  assert.equal(detectSceneAction('The fox not only runs but also jumps.'), 'jump');
+});
+
+test('continues scanning when an earlier occurrence is negated but a later one is positive', () => {
+  assert.equal(detectSceneAction('The fox does not run; later it runs toward the gate.'), 'run');
+});
+
+test('does not infer negated semantic events as positive intent', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  assert.notEqual(inferSceneActionIntent('Arin does not attack Nox.').intent, 'attack');
+  assert.notEqual(inferSceneActionIntent('Арин не атакует Нокса.').intent, 'attack');
+  assert.equal(inferSceneActionIntent('Arin does not defend; he attacks instead.').intent, 'attack');
+});
