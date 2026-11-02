@@ -54,6 +54,7 @@ export async function generateCharacterSpriteAsset({
     provider: 'ai-horde',
     requestId: clean(result?.requestId, 80),
     seed: clean(result?.seed, 80),
+    identitySeed: Number.isInteger(plan.identitySeed) ? plan.identitySeed : null,
     model: clean(result?.model, 120),
     generationStatus: 'generated',
     verificationStatus: 'not_verified',
