@@ -28,7 +28,7 @@ import { generateStoryboardVideos, readVideoProgressPercent } from "./scene-vide
 import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./huggingface-zerogpu-video-provider.js";
 import { syncSceneVideoPlayback } from "./scene-video-transport.js";
 import { getDrawableSceneVideo } from "./scene-video-render-source.js";
-import { waitForSceneVideoReady, waitForSceneImageReady } from "./scene-video-readiness.js";
+import { waitForSceneVideoReady, validateSceneVideoPlayback, waitForSceneImageReady } from "./scene-video-readiness.js";
 import { createAnimationClock } from "./animation-clock.js";
 import { getPromptCameraTransform } from "./prompt-camera-motion.js";
 import { detectSceneActionForScene } from "./scene-action.js";
@@ -1272,7 +1272,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const filename='dravex-scene-'+(index+1)+extension;
   const attached=attachSceneVideo(index,motionScene,result.video,filename);
   try{
-   await waitForSceneVideoReady(attached.video,{timeoutMs:20000});
+   await validateSceneVideoPlayback(attached.video,{timeoutMs:20000});
    attached.video.pause();
    try{attached.video.currentTime=0;}catch{}
   }catch(error){
@@ -1428,7 +1428,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const filename='dravex-scene-'+(index+1)+extension;
     const attached=attachSceneVideo(index,meta,result.video,filename);
     try{
-     await waitForSceneVideoReady(attached.video,{timeoutMs:20000,signal});
+     await validateSceneVideoPlayback(attached.video,{timeoutMs:20000,signal});
      attached.video.pause();
      try{attached.video.currentTime=0;}catch{}
     }catch(error){
