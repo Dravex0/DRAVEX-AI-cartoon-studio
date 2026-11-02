@@ -103,3 +103,20 @@ test('reports supported story actions whose actor has no attached rig', () => {
   assert.equal(result.timeline, null);
   assert.equal(result.skipped[0].reason, 'actor-rig-missing');
 });
+
+
+test('maps an explicit English greeting wave to the articulated wave preset', () => {
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('waves hello to the traveler'), [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.mappedActions[0].preset, 'wave');
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+  assert.ok(Math.abs(middle.rightArm.rotation) > 0.5);
+});
+
+test('maps an explicit Russian hand wave to the articulated wave preset', () => {
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('машет рукой путнику'), [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.mappedActions[0].preset, 'wave');
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+  assert.ok(Math.abs(middle.rightArm.rotation) > 0.5);
+});
