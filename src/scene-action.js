@@ -34,8 +34,8 @@ function isNegatedMatch(text, matchIndex) {
     prefix.lastIndexOf(' pero ')
   );
   const clause = prefix.slice(clauseStart + 1).trimEnd();
-  if (/\\bnot\\s+only\\s*$/i.test(clause)) return false;
-  return /(?:\\b(?:doesn't|don't|didn't|isn't|aren't|wasn't|weren't|can't|cannot|won't|shouldn't|not|never|without|no|nunca|sin)\\b|\\b(?:does|do|did|is|are|was|were|can|will|should)\\s+not\\b|(?:^|\\s)(?:не|ні|без))\\s*$/i.test(clause);
+  if (/\bnot\s+only\s*$/i.test(clause)) return false;
+  return /(?:\b(?:doesn't|don't|didn't|isn't|aren't|wasn't|weren't|can't|cannot|won't|shouldn't|not|never|without|no|nunca|sin)\b|\b(?:does|do|did|is|are|was|were|can|will|should)\s+not\b|(?:^|\s)(?:не|ні|без))\s*$/i.test(clause);
 }
 
 function hasPositiveMatch(text, pattern) {
