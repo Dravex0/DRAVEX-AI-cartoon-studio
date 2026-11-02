@@ -58,7 +58,10 @@ function continuityBoundaryIssues(previous, current) {
   if (!before || !after) return [];
   const found = [];
   const compare = (entityType, entityId, property, oldValue, newValue) => {
-    if (!hasStateText(oldValue) || !hasStateText(newValue) || comparableState(oldValue) === comparableState(newValue)) return;
+    // A known value disappearing is also a continuity change: explicit null
+    // can mean a release/clear, but it must be documented by this scene.
+    if (!hasStateText(oldValue)) return;
+    if (hasStateText(newValue) && comparableState(oldValue) === comparableState(newValue)) return;
     const documented = current.stateChanges.some(change =>
       change.entityType === entityType && comparableState(change.entityId) === comparableState(entityId) &&
       change.property === property && comparableState(change.previousValue) === comparableState(oldValue) &&
@@ -87,7 +90,7 @@ function continuityBoundaryIssues(previous, current) {
   for (const [id, next] of Object.entries(after.objects ?? {})) {
     const prior = matchingStateRecord(before.objects, id);
     if (!prior) continue;
-    for (const property of ['location', 'owner', 'state']) {
+    for (const property of ['location', 'owner', 'holder', 'state']) {
       compare('object', id, property, prior[property], next[property]);
     }
   }
