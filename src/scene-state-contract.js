@@ -7,7 +7,7 @@
  */
 
 const CHARACTER_FIELDS = Object.freeze(["location", "position", "pose", "clothing"]);
-const OBJECT_FIELDS = Object.freeze(["location", "owner", "state"]);
+const OBJECT_FIELDS = Object.freeze(["location", "owner", "holder", "state"]);
 const ALLOWED = Object.freeze({
   scene: new Set(["location", "time", "weather"]),
   character: new Set(CHARACTER_FIELDS),
