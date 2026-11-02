@@ -337,3 +337,36 @@ test('production scene preserves object holder in structured continuity snapshot
   assert.equal(prepared.endStateData.objects['silver key'].holder, 'Foxy');
   assert.equal(prepared.endStateData.objects['silver key'].owner, null);
 });
+
+
+test('production scene preserves canonical structured state changes and legacy fields', () => {
+  const prepared = buildProductionScene({
+    id: 'scene_state_change',
+    title: 'Foxy picks up the key',
+    visibleAction: 'Foxy picks up the silver key.',
+    stateChanges: [{
+      entity: 'silver key', property: 'holder',
+      previousValue: null, value: 'Foxy', actorId: 'Foxy',
+      evidence: 'Foxy picks up the silver key.'
+    }]
+  });
+  assert.equal(prepared.stateChanges[0].entity, 'silver key');
+  assert.equal(prepared.stateChanges[0].entityId, 'silver key');
+  assert.equal(prepared.stateChanges[0].property, 'holder');
+  assert.equal(prepared.stateChanges[0].value, 'Foxy');
+});
+
+test('production scene retains legacy state-change entity type and identifier', () => {
+  const prepared = buildProductionScene({
+    id: 'scene_legacy_state_change',
+    title: 'Legacy state record',
+    stateChanges: [{
+      entityType: 'prop', entityId: 'silver key', property: 'holder',
+      previousValue: null, value: 'Foxy', actorId: 'Foxy',
+      evidence: 'Foxy picks up the silver key.'
+    }]
+  });
+  assert.equal(prepared.stateChanges[0].entity, 'silver key');
+  assert.equal(prepared.stateChanges[0].entityType, 'prop');
+  assert.equal(prepared.stateChanges[0].entityId, 'silver key');
+});
