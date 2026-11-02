@@ -55,22 +55,18 @@ export function normalizeScene(input = {}, index = 0) {
     order: Number.isInteger(orderRaw) && orderRaw > 0 ? orderRaw : index + 1,
     title: text(scene.title, 200) || `Scene ${index + 1}`,
     purpose: text(scene.purpose ?? scene.emotion, 500),
-    // Preserve source-story attribution so evaluators and later learning stages can verify fidelity.
     storyDetail: text(scene.storyDetail, 2_000),
     storyEventType: text(scene.storyEventType, 80),
     sourceStoryText: text(scene.sourceStoryText, 10_000),
     sourceEvents: uniqueStrings(scene.sourceEvents),
     characters: uniqueStrings(scene.characters ?? (scene.characterId ? [scene.characterId] : [])),
-    // Preserve whether an empty cast was explicitly supplied before normalization.
     characterCastProvided: typeof scene.characterCastProvided === 'boolean'
       ? scene.characterCastProvided
       : Array.isArray(scene.characters) || Boolean(scene.characterId),
     characterLayers: normalizeCharacterLayers(scene.characterLayers),
-    // Rig metadata is separate from whole-character sprites until segmented assets are supplied.
     characterRigs: Array.isArray(scene.characterRigs) ? scene.characterRigs.slice(0, 20).map(normalizeCharacterRig) : [],
     characterRigPoses: normalizeCharacterRigPoses(scene.characterRigPoses),
     characterRigTimeline: normalizeCharacterRigTimeline(scene.characterRigTimeline),
-    // Facial assets and expression controls remain explicit metadata until renderer integration.
     characterFacialRigs: Array.isArray(scene.characterFacialRigs) ? scene.characterFacialRigs.slice(0, 20).map(normalizeCharacterFacialRig) : [],
     characterFacialExpressions: normalizeCharacterFacialExpressions(scene.characterFacialExpressions),
     causalLink: scene.causalLink && typeof scene.causalLink === 'object' && !Array.isArray(scene.causalLink)
@@ -83,15 +79,21 @@ export function normalizeScene(input = {}, index = 0) {
           evidence: text(scene.causalLink.evidence, 1_200)
         }
       : null,
-    stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => ({
-      entityType: text(change.entityType, 20),
-      entityId: text(change.entityId, 120),
-      property: text(change.property, 40),
-      previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
-      value: change.value == null ? null : text(change.value, 160),
-      actorId: text(change.actorId, 120),
-      evidence: text(change.evidence, 1_200)
-    })) : [],
+    // Keep both vocabularies during migration: canonical entity and legacy entityId/entityType.
+    // This lets structured-state consumers read new records without breaking older UI consumers.
+    stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => {
+      const entity = text(change.entity ?? change.entityId, 120);
+      return {
+        entity,
+        entityType: text(change.entityType, 20),
+        entityId: text(change.entityId ?? change.entity, 120),
+        property: text(change.property, 40),
+        previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
+        value: change.value == null ? null : text(change.value, 160),
+        actorId: text(change.actorId, 120),
+        evidence: text(change.evidence, 1_200)
+      };
+    }) : [],
     interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
       type: text(item.type, 40), actorId: text(item.actorId, 120), targetId: text(item.targetId, 120),
       evidence: text(item.evidence, 500),
@@ -114,13 +116,10 @@ export function normalizeScene(input = {}, index = 0) {
     timeOfDay: text(scene.timeOfDay, 120),
     visibleAction,
     actionTimeline: normalizeCharacterActionTimeline(scene.actionTimeline),
-    // Editor-authored sprite transforms stay separate from semantically validated story actions.
     characterMotionTimeline: normalizeCharacterActionTimeline(scene.characterMotionTimeline),
     camera: text(scene.camera, 1_000),
     startState: text(scene.startState, 1_000),
     endState: text(scene.endState, 1_000),
-    // Structured snapshots are preserved for downstream continuity checks and renderers.
-    // Missing snapshots remain null; they are never synthesized from prose.
     startStateData: normalizeStructuredSceneState(scene.startStateData),
     endStateData: normalizeStructuredSceneState(scene.endStateData),
     dialogue: dialogueSource.map(line => typeof line === 'string'
@@ -135,7 +134,6 @@ export function normalizeScene(input = {}, index = 0) {
     motionPrompt: text(scene.motionPrompt, 3_000),
     negativePrompt: text(scene.negativePrompt, 2_000),
     continuityLock: text(scene.continuityLock, 2_000),
-    // Temporary compatibility fields retained during gradual migration.
     emotion: text(scene.emotion, 500),
     effects: text(scene.effects, 1_000),
     directorHeuristicScore: Number.isFinite(scoreRaw) ? Math.max(0, Math.min(100, scoreRaw)) : null
