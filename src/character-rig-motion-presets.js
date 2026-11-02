@@ -7,6 +7,7 @@ const PRESETS = Object.freeze({
   walk: { label: 'Walk / Ходьба', frames: 9 },
   run: { label: 'Run / Бег', frames: 9 },
   jump: { label: 'Jump / Прыжок', frames: 5 },
+  dodge: { label: 'Dodge / Уклонение', frames: 5 },
   wave: { label: 'Wave / Приветствие', frames: 5 }
 });
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -171,6 +172,18 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightLeg') rotation = 0.35 * lift;
       if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = 0.24 * lift;
       if (role === 'rightLowerLeg' && bone.pivotEnabled) rotation = 0.24 * lift;
+    } else if (preset === 'dodge') {
+      // A compact protective crouch: the sprite-level planner handles lateral
+      // displacement; this preset articulates the segmented body around it.
+      const tuck = Math.sin(Math.PI * phase);
+      if (role === 'root') { y = 0.045 * tuck; rotation = -0.10 * tuck; }
+      if (role === 'head') rotation = -0.08 * tuck;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.72 * tuck;
+      if (role === 'rightArm') rotation = 0.72 * tuck;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.28 * tuck;
+      if (role === 'rightLeg') rotation = 0.28 * tuck;
+      if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = 0.34 * tuck;
+      if (role === 'rightLowerLeg' && bone.pivotEnabled) rotation = 0.34 * tuck;
     } else if (preset === 'wave') {
       if (role === 'rightArm' || role === 'arm') rotation = -0.8 + 0.22 * Math.sin(phase * Math.PI * 2);
       if (role === 'leftArm') rotation = -0.12;
@@ -207,6 +220,10 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
   const lowerLegBones = rig.bones.filter(bone => ['leftLowerLeg', 'rightLowerLeg'].includes(roleOf(bone.id)));
   if (['walk', 'run', 'jump'].includes(presetName) && lowerLegBones.some(bone => !bone.pivotEnabled)) {
     warnings.push('One or more lower-leg bones have no knee pivots defined; knee bending is omitted for those bones to avoid rotating around an unknown joint.');
+  }
+  if (presetName === 'dodge') {
+    if (![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) warnings.push('No arm-like bone IDs found; the protective arm pose will be omitted.');
+    if (![...roles].some(role => role === 'leftLeg' || role === 'rightLeg' || role === 'leg')) warnings.push('No leg-like bone IDs found; the crouch pose will be omitted.');
   }
   if (presetName === 'wave' && ![...roles].some(role => role === 'rightArm' || role === 'arm')) {
     warnings.push('No right-arm or generic arm bone found; the greeting gesture cannot be represented by this rig.');
