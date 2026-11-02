@@ -350,10 +350,11 @@ test('production scene preserves canonical structured state changes and legacy f
       evidence: 'Foxy picks up the silver key.'
     }]
   });
-  assert.equal(prepared.stateChanges[0].entity, 'silver key');
+  assert.equal(prepared.structuredStateChanges[0].entity, 'silver key');
+  assert.equal(prepared.structuredStateChanges[0].property, 'holder');
+  assert.equal(prepared.structuredStateChanges[0].value, 'Foxy');
   assert.equal(prepared.stateChanges[0].entityId, 'silver key');
-  assert.equal(prepared.stateChanges[0].property, 'holder');
-  assert.equal(prepared.stateChanges[0].value, 'Foxy');
+  assert.equal(Object.hasOwn(prepared.stateChanges[0], 'entity'), false);
 });
 
 test('production scene retains legacy state-change entity type and identifier', () => {
@@ -366,7 +367,8 @@ test('production scene retains legacy state-change entity type and identifier', 
       evidence: 'Foxy picks up the silver key.'
     }]
   });
-  assert.equal(prepared.stateChanges[0].entity, 'silver key');
+  assert.equal(prepared.structuredStateChanges[0].entity, 'silver key');
   assert.equal(prepared.stateChanges[0].entityType, 'prop');
+  assert.equal(Object.hasOwn(prepared.stateChanges[0], 'entity'), false);
   assert.equal(prepared.stateChanges[0].entityId, 'silver key');
 });
