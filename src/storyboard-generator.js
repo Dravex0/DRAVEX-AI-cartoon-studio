@@ -9,6 +9,7 @@ import { inferSceneCausalLinks } from './scene-causality.js';
 import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
+import { emptyState } from './scene-state-contract.js';
 import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
@@ -82,6 +83,26 @@ function selectBeats(locale, requestedCount) {
 const CHARACTER_LABEL = { ru: 'Главный персонаж', uk: 'Головний персонаж', en: 'Main character', es: 'Personaje principal' };
 const STORY_LABEL = { ru: 'Деталь исходной истории', uk: 'Деталь початкової історії', en: 'Story detail to preserve', es: 'Detalle que conservar de la historia' };
 const FALLBACK = { ru: 'Начинается новое приключение.', uk: 'Починається нова пригода.', en: 'A new adventure begins.', es: 'Comienza una nueva aventura.' };
+
+function buildKnownCharacterSnapshot(sceneCharacters, characterProfiles) {
+  const snapshot = emptyState();
+  const cast = new Set((Array.isArray(sceneCharacters) ? sceneCharacters : [])
+    .map(value => String(value ?? '').trim().toLocaleLowerCase()).filter(Boolean));
+  for (const profile of Array.isArray(characterProfiles) ? characterProfiles : []) {
+    const characterId = String(profile?.characterId ?? '').trim().slice(0, 120);
+    if (!characterId || !cast.has(characterId.toLocaleLowerCase())) continue;
+    snapshot.characters[characterId] = {
+      location: null,
+      position: null,
+      pose: null,
+      // Clothing is carried only when the character bible explicitly defines it.
+      clothing: typeof profile.clothing === 'string' && profile.clothing.trim()
+        ? profile.clothing.trim().slice(0, 500)
+        : null
+    };
+  }
+  return snapshot;
+}
 
 function distributeStoryDetails(sentences, beatCount) {
   const buckets = Array.from({ length: beatCount }, () => []);
@@ -201,6 +222,11 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
       : null;
     scene.durationSeconds = brief.requestedDurationSeconds ?? 3;
     scene.negativePrompt = brief.directives.avoid || '';
+    // Seed only verified identity facts from the character bible. Story location,
+    // pose, object ownership and other unknown state remain null until explicitly authored.
+    const knownState = buildKnownCharacterSnapshot(scene.characters, brief.characterProfiles);
+    scene.startStateData = knownState;
+    scene.endStateData = structuredClone(knownState);
   });
   const productionScenes = scenes.map((scene, index) => buildProductionScene(scene, brief.characterProfiles, { index }));
   const eventChain = buildStoryEventChain(productionScenes);
