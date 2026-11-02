@@ -285,3 +285,28 @@ test('carries explicit object possession and release between adjacent scenes', (
   assert.equal(release.startStateData.objects['silver key'].holder, 'Foxy');
   assert.equal(release.endStateData.objects['silver key'].holder, null);
 });
+
+
+test('carries explicit pose changes across scenes and preserves pose while a character is off-screen', () => {
+  const result = buildStoryboardFromText([
+    'Characters:',
+    'Foxy — small orange fox.',
+    '',
+    'Scene 1: Rest',
+    'Foxy sits on the stone.',
+    '',
+    'Scene 2: Alone',
+    'The forest becomes quiet.',
+    '',
+    'Scene 3: Return',
+    'Foxy stands up.'
+  ].join('\\n'), 'en', 'Foxy');
+  const scenes = result.scenes;
+  const sitting = scenes.find(scene => /Foxy sits on the stone/i.test(scene.storyDetail));
+  const standing = scenes.find(scene => /Foxy stands up/i.test(scene.storyDetail));
+  assert.ok(sitting);
+  assert.ok(standing);
+  assert.equal(sitting.endStateData.characters.Foxy.pose, 'sitting');
+  assert.equal(standing.startStateData.characters.Foxy.pose, 'sitting');
+  assert.equal(standing.endStateData.characters.Foxy.pose, 'standing');
+});
