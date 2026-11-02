@@ -1513,7 +1513,26 @@ $('export').onclick=async()=>{
           if(entry.video.paused){
             await entry.video.play();
           }
-          await waitForSceneVideoReady(entry.video,{timeoutMs:12000});
+          try{
+            await waitForSceneVideoReady(entry.video,{timeoutMs:12000});
+          }catch(error){
+            const video=entry.video;
+            const mediaError=video.error;
+            const details={
+              readyState:video.readyState,
+              networkState:video.networkState,
+              videoWidth:video.videoWidth,
+              videoHeight:video.videoHeight,
+              currentTime:Number.isFinite(video.currentTime)?video.currentTime:null,
+              duration:Number.isFinite(video.duration)?video.duration:null,
+              paused:video.paused,
+              ended:video.ended,
+              source:video.currentSrc?'blob-url-present':'missing-source',
+              errorCode:mediaError?.code??null,
+              errorMessage:mediaError?.message||null
+            };
+            throw new Error((error?.message||'Scene video is not ready.')+' Media diagnostics: '+JSON.stringify(details));
+          }
           entry.video.pause();
           try{entry.video.currentTime=0;}catch{}
         })());
