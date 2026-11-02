@@ -83,13 +83,13 @@ test('extracts labeled character-bible attributes in Russian and Ukrainian', () 
     'Лисёнок — маленькая рыжая лиса; Одежда: синий шарф; Цвета: рыжий и белый; Особые приметы: белый кончик хвоста.',
     'Сцена 1: Встреча',
     'Лисёнок встречает зайца.'
-  ].join('\\n'));
+  ].join('\n'));
   const ukrainian = parseStoryBrief([
     'Персонажі:',
     'Лисеня — маленька руда лисиця; Одяг: синя хустка; Кольори: рудий і білий; Особливі ознаки: білий кінчик хвоста.',
     'Сцена 1: Зустріч',
     'Лисеня зустрічає зайця.'
-  ].join('\\n'));
+  ].join('\n'));
 
   assert.equal(russian.characterProfiles[0].clothing, 'синий шарф');
   assert.equal(russian.characterProfiles[0].colors, 'рыжий и белый');
