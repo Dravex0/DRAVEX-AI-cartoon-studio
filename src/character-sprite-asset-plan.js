@@ -12,6 +12,16 @@ function profileAppearance(profile = {}) {
   ].map(value => clean(value, 700)).filter(Boolean).join(' — ');
 }
 
+function characterIdentitySeed(characterId, appearance) {
+  const source = key(characterId) + '|' + key(appearance);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < source.length; index++) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
 function characterAction(scene, characterId, castSize) {
   if (scene.actionTimeline != null) {
     const report = validateCharacterActionTimeline(scene);
@@ -53,6 +63,7 @@ export function buildCharacterSpriteAssetPlan(scene = {}, characterBible = []) {
     const profile = profiles.get(key(characterId));
     const appearance = profile ? profileAppearance(profile) : '';
     const action = characterAction(scene, characterId, cast.length);
+    const identitySeed = appearance ? characterIdentitySeed(characterId, appearance) : null;
     const issues = [];
     if (!profile) issues.push({ code: 'missing-character-reference', characterId });
     else if (!appearance) issues.push({ code: 'empty-character-appearance', characterId });
@@ -77,6 +88,7 @@ export function buildCharacterSpriteAssetPlan(scene = {}, characterBible = []) {
       assetRole: 'character-sprite',
       transparentBackground: true,
       appearanceReference: appearance,
+      identitySeed,
       action,
       prompt,
       negativePrompt: 'background, scenery, extra characters, cropped body, missing feet, text, logo, watermark, costume change, different colors, duplicate limbs',
