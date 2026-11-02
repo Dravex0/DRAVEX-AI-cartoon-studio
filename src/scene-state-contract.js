@@ -265,8 +265,11 @@ function buildKindContext(scenes) {
     // materialized in the start/end snapshots. Character location is resolved
     // only when the entity is already in the cast; object-only properties are
     // unambiguous and register the entity as an object.
-    const changesRead = safeRead(scene, "stateChanges");
-    if (!changesRead.ok) return { ok: false };
+    const structuredChangesRead = safeRead(scene, "structuredStateChanges");
+    const changesRead = structuredChangesRead.ok && structuredChangesRead.value != null
+      ? structuredChangesRead
+      : safeRead(scene, "stateChanges");
+    if (!structuredChangesRead.ok || !changesRead.ok) return { ok: false };
     if (changesRead.value != null) {
       if (!Array.isArray(changesRead.value)) return { ok: false };
       for (let changeIndex = 0; changeIndex < changesRead.value.length; changeIndex += 1) {
@@ -423,8 +426,11 @@ export function normalizeScene(raw, options = {}) {
       kindResolver = context.kindResolver;
     }
 
-    const stateChangesRead = safeRead(raw, "stateChanges");
-    if (!stateChangesRead.ok) return null;
+    const structuredChangesRead = safeRead(raw, "structuredStateChanges");
+    const stateChangesRead = structuredChangesRead.ok && structuredChangesRead.value != null
+      ? structuredChangesRead
+      : safeRead(raw, "stateChanges");
+    if (!structuredChangesRead.ok || !stateChangesRead.ok) return null;
     const stateChanges = normalizeStateChanges(stateChangesRead.value, { kindResolver });
     if (!stateChanges.ok) return null;
 
