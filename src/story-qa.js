@@ -39,6 +39,45 @@ function issue(severity, code, sceneId, message, otherSceneId) {
   return { severity, code, sceneId, ...(otherSceneId ? { otherSceneId } : {}), message };
 }
 
+
+function hasStateText(value) { return typeof value === 'string' && value.trim().length > 0; }
+
+function continuityBoundaryIssues(previous, current) {
+  const before = previous.endStateData;
+  const after = current.startStateData;
+  if (!before || !after) return [];
+  const found = [];
+  const compare = (entityType, entityId, property, oldValue, newValue) => {
+    if (!hasStateText(oldValue) || !hasStateText(newValue) || oldValue === newValue) return;
+    const label = entityType === 'scene' ? 'Scene' : `${entityType} "${entityId}"`;
+    found.push(issue(
+      'warning',
+      'continuity-state-mismatch',
+      current.id,
+      `${label} has conflicting ${property}: previous scene ends with "${oldValue}", but this scene starts with "${newValue}". Add a supported transition or align the state.`,
+      previous.id
+    ));
+  };
+  for (const property of ['location', 'time', 'weather']) {
+    compare('scene', 'scene', property, before[property], after[property]);
+  }
+  for (const [id, next] of Object.entries(after.characters ?? {})) {
+    const prior = before.characters?.[id];
+    if (!prior) continue;
+    for (const property of ['location', 'position', 'pose', 'clothing']) {
+      compare('character', id, property, prior[property], next[property]);
+    }
+  }
+  for (const [id, next] of Object.entries(after.objects ?? {})) {
+    const prior = before.objects?.[id];
+    if (!prior) continue;
+    for (const property of ['location', 'owner', 'state']) {
+      compare('object', id, property, prior[property], next[property]);
+    }
+  }
+  return found;
+}
+
 /** Deterministic text checks only; this does not analyze frames or call a model. */
 export function validateStoryScenes(rawScenes) {
   const scenes = normalizeScenes(rawScenes);
