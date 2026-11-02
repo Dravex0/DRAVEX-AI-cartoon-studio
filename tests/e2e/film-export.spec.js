@@ -49,6 +49,50 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
       await new Promise(resolve => setTimeout(resolve, 300));
       decodedFrame = video.videoWidth > 0 && video.videoHeight > 0;
     }
+    const sampledFrames = [];
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = 32;
+    sampleCanvas.height = 18;
+    const sampleContext = sampleCanvas.getContext('2d', { willReadFrequently: true });
+    if (!sampleContext) throw new Error('Could not create a canvas for exported-frame inspection.');
+    for (const fraction of [0.1, 0.5, 0.9]) {
+      const targetTime = Math.min(video.duration - 0.05, Math.max(0, video.duration * fraction));
+      if (Math.abs(video.currentTime - targetTime) > 0.02) {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Timed out seeking to an exported scene frame.')), 5_000);
+          video.addEventListener('seeked', () => { clearTimeout(timeout); resolve(); }, { once: true });
+          video.currentTime = targetTime;
+        });
+      }
+      sampleContext.drawImage(video, 0, 0, sampleCanvas.width, sampleCanvas.height);
+      const pixels = sampleContext.getImageData(0, 0, sampleCanvas.width, sampleCanvas.height).data;
+      const colors = new Set();
+      const signatureBytes = [];
+      for (let i = 0; i < pixels.length; i += 4) {
+        const color = [pixels[i], pixels[i + 1], pixels[i + 2]]
+          .map(channel => Math.round(channel / 16)).join(',');
+        colors.add(color);
+        signatureBytes.push(Math.round(pixels[i] / 16), Math.round(pixels[i + 1] / 16), Math.round(pixels[i + 2] / 16));
+      }
+      let differenceFromPrevious = null;
+      if (sampledFrames.length) {
+        const previous = sampledFrames[sampledFrames.length - 1].signatureBytes;
+        let changed = 0;
+        for (let i = 0; i < signatureBytes.length; i++) {
+          if (signatureBytes[i] !== previous[i]) changed++;
+        }
+        differenceFromPrevious = changed / signatureBytes.length;
+      }
+      sampledFrames.push({
+        time: targetTime,
+        uniqueColors: colors.size,
+        differenceFromPrevious,
+        signatureBytes
+      });
+    }
+    const frameInspection = sampledFrames.map(({ time, uniqueColors, differenceFromPrevious }) => ({
+      time, uniqueColors, differenceFromPrevious
+    }));
     video.pause();
 
     return {
@@ -59,6 +103,7 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
       width: video.videoWidth,
       height: video.videoHeight,
       decodedFrame,
+      frameInspection,
       mediaError: video.error?.message || null
     };
   });
@@ -71,6 +116,9 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
   expect(film.width).toBeGreaterThan(0);
   expect(film.height).toBeGreaterThan(0);
   expect(film.decodedFrame).toBe(true);
+  expect(film.frameInspection).toHaveLength(3);
+  expect(film.frameInspection.every(frame => frame.uniqueColors > 8)).toBe(true);
+  expect(film.frameInspection.slice(1).every(frame => frame.differenceFromPrevious > 0.02)).toBe(true);
   expect(film.mediaError).toBeNull();
   expect(pageErrors, 'export should not throw uncaught browser errors').toEqual([]);
 });
