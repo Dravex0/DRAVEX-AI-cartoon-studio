@@ -41,6 +41,9 @@ function issue(severity, code, sceneId, message, otherSceneId) {
 
 
 function hasStateText(value) { return typeof value === 'string' && value.trim().length > 0; }
+function comparableState(value) {
+  return String(value ?? '').normalize('NFKC').trim().replace(/\\s+/gu, ' ').toLocaleLowerCase();
+}
 
 function continuityBoundaryIssues(previous, current) {
   const before = previous.endStateData;
@@ -48,11 +51,11 @@ function continuityBoundaryIssues(previous, current) {
   if (!before || !after) return [];
   const found = [];
   const compare = (entityType, entityId, property, oldValue, newValue) => {
-    if (!hasStateText(oldValue) || !hasStateText(newValue) || oldValue === newValue) return;
+    if (!hasStateText(oldValue) || !hasStateText(newValue) || comparableState(oldValue) === comparableState(newValue)) return;
     const documented = current.stateChanges.some(change =>
-      change.entityType === entityType && change.entityId === entityId &&
-      change.property === property && change.previousValue === oldValue &&
-      change.value === newValue && hasStateText(change.evidence)
+      change.entityType === entityType && comparableState(change.entityId) === comparableState(entityId) &&
+      change.property === property && comparableState(change.previousValue) === comparableState(oldValue) &&
+      comparableState(change.value) === comparableState(newValue) && hasStateText(change.evidence)
     );
     if (documented) return;
     const label = entityType === 'scene' ? 'Scene' : `${entityType} "${entityId}"`;
