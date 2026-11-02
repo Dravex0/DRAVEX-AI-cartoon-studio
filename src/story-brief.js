@@ -43,7 +43,28 @@ function parseCharacterLine(line) {
   const match = normalized.match(/^([^—–,:-]{1,80}?)\s*(?:[—–-]|,\s*|:\s*)(.{3,})$/u);
   if (!match) return null;
   const characterId = clean(match[1], 80).replace(/[.:]+$/u, '');
-  return characterId ? { characterId, visualDescription: clean(match[2], 1200), clothing: '', colors: '', distinctiveFeatures: '' } : null;
+  if (!characterId) return null;
+
+  const visualDescription = clean(match[2], 1200);
+  const fields = {
+    clothing: /^(?:clothing|outfit|одежда|одяг)$/iu,
+    colors: /^(?:colors?|цвета|кольори)$/iu,
+    distinctiveFeatures: /^(?:distinctive features|особые приметы|особливі ознаки)$/iu
+  };
+  const labels = /(?:^|[;|])\s*(clothing|outfit|одежда|одяг|colou?rs?|цвета|кольори|distinctive features|особые приметы|особливі ознаки)\s*[:：]\s*/giu;
+  const matches = [...visualDescription.matchAll(labels)];
+  const extracted = { clothing: '', colors: '', distinctiveFeatures: '' };
+  for (let index = 0; index < matches.length; index += 1) {
+    const current = matches[index];
+    const next = matches[index + 1];
+    const rawLabel = current[1].toLocaleLowerCase();
+    const start = current.index + current[0].length;
+    const value = visualDescription.slice(start, next ? next.index : visualDescription.length).replace(/[;|\s]+$/u, '').trim();
+    const key = fields.clothing.test(rawLabel) ? 'clothing'
+      : fields.colors.test(rawLabel) ? 'colors' : 'distinctiveFeatures';
+    if (value) extracted[key] = clean(value, 500);
+  }
+  return { characterId, visualDescription, ...extracted };
 }
 
 /**
@@ -80,6 +101,17 @@ export function parseStoryBrief(input) {
       sceneBlocks.push(activeScene);
       readingCharacterProfiles = false;
       continue;
+    }
+
+    const leadingLabel = line.match(/^\s*([^:：]{2,60})\s*[:：]/u);
+    const leadingDirectiveKey = leadingLabel ? ALIASES.get(normalizeLabel(leadingLabel[1])) : null;
+    if (readingCharacterProfiles && !leadingDirectiveKey) {
+      const profile = parseCharacterLine(line);
+      if (profile) {
+        characterProfiles.push(profile);
+        appendDirective(directives, 'characters', profile.characterId);
+        continue;
+      }
     }
 
     const parts = line.split(/\s+[·•]\s+/u);
@@ -129,7 +161,12 @@ export function parseStoryBrief(input) {
       inCharacterSection = true;
       continue;
     }
-    if (sceneHeading(line) || /^\s*[^:：]{2,60}\s*[:：]/u.test(line)) {
+    if (sceneHeading(line)) {
+      inCharacterSection = false;
+      continue;
+    }
+    const labeledAttribute = /^(?:clothing|outfit|одежда|одяг|colou?rs?|цвета|кольори|distinctive features|особые приметы|особливі ознаки)\s*[:：]/iu.test(line);
+    if (/^\s*[^:：]{2,60}\s*[:：]/u.test(line) && !labeledAttribute) {
       inCharacterSection = false;
       continue;
     }

@@ -319,3 +319,72 @@ test('production scene does not fabricate a background plan from character-aware
   assert.equal(prepared.sceneBackgroundPlan.prompt, '');
   assert.equal(prepared.sceneBackgroundPlan.compositionStatus, 'unverified');
 });
+
+test('production scene preserves object holder in structured continuity snapshots', () => {
+  const prepared = buildProductionScene({
+    id: 'scene_holder', title: 'The key is picked up',
+    visibleAction: 'Foxy picks up the silver key.', camera: 'Medium shot',
+    startStateData: {
+      characters: { Foxy: { clothing: 'blue scarf' } },
+      objects: { 'silver key': { location: 'table', owner: null, holder: null, state: 'resting' } }
+    },
+    endStateData: {
+      characters: { Foxy: { clothing: 'blue scarf' } },
+      objects: { 'silver key': { location: 'Foxy', owner: null, holder: 'Foxy', state: 'held' } }
+    }
+  });
+  assert.equal(prepared.startStateData.objects['silver key'].holder, null);
+  assert.equal(prepared.endStateData.objects['silver key'].holder, 'Foxy');
+  assert.equal(prepared.endStateData.objects['silver key'].owner, null);
+});
+
+
+test('production scene preserves canonical structured state changes and legacy fields', () => {
+  const prepared = buildProductionScene({
+    id: 'scene_state_change',
+    title: 'Foxy picks up the key',
+    visibleAction: 'Foxy picks up the silver key.',
+    stateChanges: [{
+      entity: 'silver key', property: 'holder',
+      previousValue: null, value: 'Foxy', actorId: 'Foxy',
+      evidence: 'Foxy picks up the silver key.'
+    }]
+  });
+  assert.equal(prepared.structuredStateChanges[0].entity, 'silver key');
+  assert.equal(prepared.structuredStateChanges[0].property, 'holder');
+  assert.equal(prepared.structuredStateChanges[0].value, 'Foxy');
+  assert.equal(prepared.stateChanges[0].entityId, 'silver key');
+  assert.equal(Object.hasOwn(prepared.stateChanges[0], 'entity'), false);
+});
+
+test('production scene retains legacy state-change entity type and identifier', () => {
+  const prepared = buildProductionScene({
+    id: 'scene_legacy_state_change',
+    title: 'Legacy state record',
+    stateChanges: [{
+      entityType: 'prop', entityId: 'silver key', property: 'holder',
+      previousValue: null, value: 'Foxy', actorId: 'Foxy',
+      evidence: 'Foxy picks up the silver key.'
+    }]
+  });
+  assert.equal(prepared.structuredStateChanges[0].entity, 'silver key');
+  assert.equal(prepared.stateChanges[0].entityType, 'prop');
+  assert.equal(Object.hasOwn(prepared.stateChanges[0], 'entity'), false);
+  assert.equal(prepared.stateChanges[0].entityId, 'silver key');
+});
+
+
+test('production scene preserves explicit null when an object is released', () => {
+  const prepared = buildProductionScene({
+    id: 'scene_release_key',
+    title: 'Foxy drops the key',
+    visibleAction: 'Foxy drops the silver key.',
+    stateChanges: [{
+      entity: 'silver key', property: 'holder',
+      previousValue: 'Foxy', value: null, actorId: 'Foxy',
+      evidence: 'Foxy drops the silver key.'
+    }]
+  });
+  assert.equal(prepared.structuredStateChanges[0].previousValue, 'Foxy');
+  assert.equal(prepared.structuredStateChanges[0].value, null);
+});

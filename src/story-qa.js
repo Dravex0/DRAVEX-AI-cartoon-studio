@@ -39,6 +39,87 @@ function issue(severity, code, sceneId, message, otherSceneId) {
   return { severity, code, sceneId, ...(otherSceneId ? { otherSceneId } : {}), message };
 }
 
+
+function hasStateText(value) { return typeof value === 'string' && value.trim().length > 0; }
+function comparableState(value) {
+  return String(value ?? '').normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase();
+}
+
+
+ // Resolve IDs with value normalization; ambiguous collisions are deliberately ignored.
+function matchingStateRecord(records, id) {
+  const matches = Object.entries(records ?? {}).filter(([key]) => comparableState(key) === comparableState(id));
+  return matches.length === 1 ? matches[0][1] : null;
+}
+
+function continuityBoundaryIssues(previous, current) {
+  const before = previous.endStateData;
+  const after = current.startStateData;
+  if (!before || !after) return [];
+  const found = [];
+  const compare = (entityType, entityId, property, oldValue, newValue) => {
+    // A known value disappearing is also a continuity change: explicit null
+    // can mean a release/clear, but it must be documented by this scene.
+    if (!hasStateText(oldValue)) return;
+    if (hasStateText(newValue) && comparableState(oldValue) === comparableState(newValue)) return;
+    const structuredChangeType = change => {
+      if (['holder', 'owner', 'state'].includes(change.property)) return 'object';
+      if (change.entity === 'scene' && ['location', 'time', 'weather'].includes(change.property)) return 'scene';
+      if (!['location', 'position', 'pose', 'clothing'].includes(change.property)) return undefined;
+      const inCharacters = Boolean(
+        matchingStateRecord(current.startStateData?.characters, change.entity) ||
+        matchingStateRecord(current.endStateData?.characters, change.entity)
+      );
+      const inObjects = Boolean(
+        matchingStateRecord(current.startStateData?.objects, change.entity) ||
+        matchingStateRecord(current.endStateData?.objects, change.entity)
+      );
+      if (inCharacters === inObjects) return undefined;
+      if (change.property !== 'location' && !inCharacters) return undefined;
+      return inCharacters ? 'character' : 'object';
+    };
+    const documentedChanges = [
+      ...current.stateChanges.map(change => ({ ...change, entity: change.entityId, type: change.entityType })),
+      ...current.structuredStateChanges.map(change => ({
+        ...change,
+        type: structuredChangeType(change)
+      }))
+    ];
+    const documented = documentedChanges.some(change =>
+      change.type === entityType && comparableState(change.entity) === comparableState(entityId) &&
+      change.property === property && comparableState(change.previousValue) === comparableState(oldValue) &&
+      comparableState(change.value) === comparableState(newValue) && hasStateText(change.evidence)
+    );
+    if (documented) return;
+    const label = entityType === 'scene' ? 'Scene' : `${entityType} "${entityId}"`;
+    found.push(issue(
+      'warning',
+      'continuity-state-mismatch',
+      current.id,
+      `${label} has conflicting ${property}: previous scene ends with "${oldValue}", but this scene starts with "${newValue}". Add a supported transition or align the state.`,
+      previous.id
+    ));
+  };
+  for (const property of ['location', 'time', 'weather']) {
+    compare('scene', 'scene', property, before[property], after[property]);
+  }
+  for (const [id, next] of Object.entries(after.characters ?? {})) {
+    const prior = matchingStateRecord(before.characters, id);
+    if (!prior) continue;
+    for (const property of ['location', 'position', 'pose', 'clothing']) {
+      compare('character', id, property, prior[property], next[property]);
+    }
+  }
+  for (const [id, next] of Object.entries(after.objects ?? {})) {
+    const prior = matchingStateRecord(before.objects, id);
+    if (!prior) continue;
+    for (const property of ['location', 'owner', 'holder', 'state']) {
+      compare('object', id, property, prior[property], next[property]);
+    }
+  }
+  return found;
+}
+
 /** Deterministic text checks only; this does not analyze frames or call a model. */
 export function validateStoryScenes(rawScenes) {
   const scenes = normalizeScenes(rawScenes);
@@ -70,6 +151,7 @@ export function validateStoryScenes(rawScenes) {
     }
     if (index > 0) {
       const previous = scenes[index - 1];
+      issues.push(...continuityBoundaryIssues(previous, scene));
       const promptScore = similarity(scene.prompt, previous.prompt);
       const actionScore = actionSimilarity(scene.visibleAction, previous.visibleAction);
       const fallbackScore = actionSimilarity(scene.prompt || scene.visibleAction, previous.prompt || previous.visibleAction);

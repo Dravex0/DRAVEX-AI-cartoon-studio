@@ -7,7 +7,7 @@
  */
 
 const CHARACTER_FIELDS = Object.freeze(["location", "position", "pose", "clothing"]);
-const OBJECT_FIELDS = Object.freeze(["location", "owner", "state"]);
+const OBJECT_FIELDS = Object.freeze(["location", "owner", "holder", "state"]);
 const ALLOWED = Object.freeze({
   scene: new Set(["location", "time", "weather"]),
   character: new Set(CHARACTER_FIELDS),
@@ -152,8 +152,10 @@ export function normalizeStateChange(raw, options = {}) {
 
   const entity = asStringOrNull(entityRead.value, 120);
   const property = asStringOrNull(propertyRead.value, 40);
-  const value = asStringOrNull(valueRead.value, 500);
-  if (!entity || !property || value === null) return { ok: false };
+  const value = valueRead.value === null ? null : asStringOrNull(valueRead.value, 500);
+  // Explicit null clears a known state (for example, releasing a held object).
+  // Missing or malformed values remain invalid.
+  if (!entity || !property || (valueRead.value !== null && value === null)) return { ok: false };
 
   const resolverRead = safeRead(options, "kindResolver");
   if (!resolverRead.ok) return { ok: false };
@@ -259,6 +261,30 @@ function buildKindContext(scenes) {
       if (!normalizedState) return { ok: false };
       for (const id of Object.keys(normalizedState.characters)) characterIds.add(id);
       for (const id of Object.keys(normalizedState.objects)) objectIds.add(id);
+    }
+
+    // State-change properties provide a safe kind hint for entities not yet
+    // materialized in the start/end snapshots. Character location is resolved
+    // only when the entity is already in the cast; object-only properties are
+    // unambiguous and register the entity as an object.
+    const structuredChangesRead = safeRead(scene, "structuredStateChanges");
+    const changesRead = structuredChangesRead.ok && structuredChangesRead.value != null
+      ? structuredChangesRead
+      : safeRead(scene, "stateChanges");
+    if (!structuredChangesRead.ok || !changesRead.ok) return { ok: false };
+    if (changesRead.value != null) {
+      if (!Array.isArray(changesRead.value)) return { ok: false };
+      for (let changeIndex = 0; changeIndex < changesRead.value.length; changeIndex += 1) {
+        const changeRead = safeRead(changesRead.value, changeIndex);
+        if (!changeRead.ok || !isRecord(changeRead.value)) return { ok: false };
+        const entityRead = safeRead(changeRead.value, "entity");
+        const propertyRead = safeRead(changeRead.value, "property");
+        if (!entityRead.ok || !propertyRead.ok) return { ok: false };
+        const entity = asStringOrNull(entityRead.value, 120);
+        const property = asStringOrNull(propertyRead.value, 40);
+        if (!entity || !property) return { ok: false };
+        if (property === "holder" || property === "owner" || property === "state") objectIds.add(entity);
+      }
     }
   }
 
@@ -402,8 +428,11 @@ export function normalizeScene(raw, options = {}) {
       kindResolver = context.kindResolver;
     }
 
-    const stateChangesRead = safeRead(raw, "stateChanges");
-    if (!stateChangesRead.ok) return null;
+    const structuredChangesRead = safeRead(raw, "structuredStateChanges");
+    const stateChangesRead = structuredChangesRead.ok && structuredChangesRead.value != null
+      ? structuredChangesRead
+      : safeRead(raw, "stateChanges");
+    if (!structuredChangesRead.ok || !stateChangesRead.ok) return null;
     const stateChanges = normalizeStateChanges(stateChangesRead.value, { kindResolver });
     if (!stateChanges.ok) return null;
 

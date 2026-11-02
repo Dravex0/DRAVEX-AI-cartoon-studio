@@ -57,3 +57,44 @@ test('extracts character profiles from bullet and comma-separated character desc
   assert.deepEqual(brief.characterProfiles.map(profile => profile.characterId), ['Arin', 'Elira', 'Nox']);
   assert.deepEqual(brief.characters.slice(0, 3), ['Arin', 'Elira', 'Nox']);
 });
+
+test('extracts only explicitly labeled character-bible attributes and preserves original description', () => {
+  const brief = parseStoryBrief([
+    'Characters:',
+    'Foxy — small orange fox; Clothing: blue scarf and brown vest; Colors: orange and white; Distinctive features: white tail tip.',
+    'Snowball — white rabbit with long ears.',
+    'Scene 1: Meeting',
+    'Foxy meets Snowball.'
+  ].join('\n'));
+  const foxy = brief.characterProfiles.find(profile => profile.characterId === 'Foxy');
+  const snowball = brief.characterProfiles.find(profile => profile.characterId === 'Snowball');
+  assert.equal(foxy.visualDescription, 'small orange fox; Clothing: blue scarf and brown vest; Colors: orange and white; Distinctive features: white tail tip.');
+  assert.equal(foxy.clothing, 'blue scarf and brown vest');
+  assert.equal(foxy.colors, 'orange and white');
+  assert.equal(foxy.distinctiveFeatures, 'white tail tip.');
+  assert.equal(snowball.clothing, '');
+  assert.equal(snowball.colors, '');
+  assert.equal(snowball.distinctiveFeatures, '');
+});
+
+test('extracts labeled character-bible attributes in Russian and Ukrainian', () => {
+  const russian = parseStoryBrief([
+    'Персонажи:',
+    'Лисёнок — маленькая рыжая лиса; Одежда: синий шарф; Цвета: рыжий и белый; Особые приметы: белый кончик хвоста.',
+    'Сцена 1: Встреча',
+    'Лисёнок встречает зайца.'
+  ].join('\n'));
+  const ukrainian = parseStoryBrief([
+    'Персонажі:',
+    'Лисеня — маленька руда лисиця; Одяг: синя хустка; Кольори: рудий і білий; Особливі ознаки: білий кінчик хвоста.',
+    'Сцена 1: Зустріч',
+    'Лисеня зустрічає зайця.'
+  ].join('\n'));
+
+  assert.equal(russian.characterProfiles[0].clothing, 'синий шарф');
+  assert.equal(russian.characterProfiles[0].colors, 'рыжий и белый');
+  assert.equal(russian.characterProfiles[0].distinctiveFeatures, 'белый кончик хвоста.');
+  assert.equal(ukrainian.characterProfiles[0].clothing, 'синя хустка');
+  assert.equal(ukrainian.characterProfiles[0].colors, 'рудий і білий');
+  assert.equal(ukrainian.characterProfiles[0].distinctiveFeatures, 'білий кінчик хвоста.');
+});

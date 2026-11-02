@@ -184,3 +184,218 @@ test('does not confuse an idle scene with an active action because of shared wor
   ]);
   assert.equal(result.issues.some((entry) => entry.code === 'adjacent-repeat'), false);
 });
+
+
+test('warns when known character and object states conflict across adjacent scenes', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'continuity-a', duration: 3, prompt: 'Aster stands beside the old gate.',
+      startStateData: {
+        location: 'old gate', characters: { Aster: { clothing: 'blue coat', pose: 'standing' } },
+        objects: { key: { owner: 'Aster', state: 'held' } }
+      },
+      endStateData: {
+        location: 'old gate', characters: { Aster: { clothing: 'blue coat', pose: 'standing' } },
+        objects: { key: { owner: 'Aster', state: 'held' } }
+      }
+    },
+    {
+      id: 'continuity-b', duration: 3, prompt: 'Aster approaches the gate.',
+      startStateData: {
+        location: 'old gate', characters: { Aster: { clothing: 'red coat', pose: 'kneeling' } },
+        objects: { key: { owner: 'Mira', state: 'missing' } }
+      }
+    }
+  ]);
+  const mismatches = result.issues.filter(entry => entry.code === 'continuity-state-mismatch');
+  assert.equal(mismatches.length, 4);
+  assert.ok(mismatches.every(entry => entry.severity === 'warning' && entry.otherSceneId === 'continuity-a'));
+});
+
+test('allows documented state changes supported by current-scene evidence', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'handoff-a', duration: 3, prompt: 'Aster holds the key.',
+      endStateData: { characters: { Aster: { clothing: 'blue coat' } }, objects: { key: { owner: 'Aster', state: 'held' } } }
+    },
+    {
+      id: 'handoff-b', duration: 3, prompt: 'Aster gives the key to Mira.',
+      startStateData: { characters: { Aster: { clothing: 'blue coat' } }, objects: { key: { owner: 'Mira', state: 'held' } } },
+      stateChanges: [
+        { entityType: 'object', entityId: 'key', property: 'owner', previousValue: 'Aster', value: 'Mira', evidence: 'Aster hands the key to Mira on screen.' }
+      ]
+    }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+test('ignores unknown or missing snapshots instead of inventing continuity facts', () => {
+  const result = validateStoryScenes([
+    { id: 'unknown-a', duration: 3, prompt: 'Aster enters the room.', endStateData: null },
+    { id: 'unknown-b', duration: 3, prompt: 'Aster sits down.', startStateData: { characters: { Aster: { clothing: null, pose: 'sitting' } } } }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+test('does not flag entities that appear for the first time in the next scene', () => {
+  const result = validateStoryScenes([
+    { id: 'arrival-a', duration: 3, prompt: 'Aster waits by the gate.', endStateData: { characters: { Aster: { clothing: 'blue coat' } } } },
+    { id: 'arrival-b', duration: 3, prompt: 'Mira arrives.', startStateData: { characters: { Aster: { clothing: 'blue coat' }, Mira: { clothing: 'green scarf' } } } }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+
+test('does not report continuity mismatches for case or whitespace-only differences', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'normalized-a', duration: 3, prompt: 'Aster waits by the gate.',
+      endStateData: {
+        location: 'Old Gate',
+        characters: { Aster: { clothing: 'Blue  Coat', pose: 'Standing' } },
+        objects: { key: { owner: 'Aster', state: 'Held' } }
+      }
+    },
+    {
+      id: 'normalized-b', duration: 3, prompt: 'Aster notices the lantern.',
+      startStateData: {
+        location: 'old   gate',
+        characters: { Aster: { clothing: 'blue coat', pose: 'standing' } },
+        objects: { key: { owner: 'aster', state: 'held' } }
+      }
+    }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+test('still reports meaningful continuity changes after normalization', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'meaningful-a', duration: 3, prompt: 'Aster waits by the gate.',
+      endStateData: { characters: { Aster: { clothing: 'blue coat' } } }
+    },
+    {
+      id: 'meaningful-b', duration: 3, prompt: 'Aster enters the gate.',
+      startStateData: { characters: { Aster: { clothing: 'red coat' } } }
+    }
+  ]);
+  const mismatch = result.issues.find(entry => entry.code === 'continuity-state-mismatch');
+  assert.ok(mismatch);
+  assert.equal(mismatch.sceneId, 'meaningful-b');
+});
+
+
+
+test('flags undocumented object holder changes across scene boundaries', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'holder-a', duration: 3, prompt: 'Aster holds the silver key.',
+      endStateData: { objects: { 'silver key': { holder: 'Aster' } } }
+    },
+    {
+      id: 'holder-b', duration: 3, prompt: 'Aster looks at the gate.',
+      startStateData: { objects: { 'silver key': { holder: 'Mira' } } }
+    }
+  ]);
+  assert.ok(result.issues.some(entry =>
+    entry.code === 'continuity-state-mismatch' && entry.message.includes('conflicting holder')
+  ));
+});
+
+test('accepts an explicitly documented object release to null holder', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'release-a', duration: 3, prompt: 'Aster holds the silver key.',
+      endStateData: { objects: { 'silver key': { holder: 'Aster' } } }
+    },
+    {
+      id: 'release-b', duration: 3, prompt: 'Aster drops the silver key.',
+      startStateData: { objects: { 'silver key': { holder: null } } },
+      structuredStateChanges: [{
+        entity: 'silver key', property: 'holder', previousValue: 'Aster',
+        value: null, actorId: 'Aster', evidence: 'Aster drops the silver key.'
+      }]
+    }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+test('matches character and object IDs case-insensitively across scene boundaries', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'id-normalization-a', duration: 3, prompt: 'Aster waits beside the gate.',
+      endStateData: {
+        characters: { Aster: { clothing: 'blue coat' } },
+        objects: { SilverKey: { owner: 'Aster', state: 'held' } }
+      }
+    },
+    {
+      id: 'id-normalization-b', duration: 3, prompt: 'Aster approaches the gate.',
+      startStateData: {
+        characters: { ' aStEr ': { clothing: 'red coat' } },
+        objects: { silverkey: { owner: 'Mira', state: 'missing' } }
+      }
+    }
+  ]);
+  const mismatches = result.issues.filter(entry => entry.code === 'continuity-state-mismatch');
+  assert.equal(mismatches.length, 3);
+  assert.ok(mismatches.some(entry => entry.message.includes('has conflicting clothing')));
+  assert.ok(mismatches.some(entry => entry.message.includes('has conflicting owner')));
+  assert.ok(mismatches.some(entry => entry.message.includes('has conflicting state')));
+});
+
+test('does not guess when entity IDs collide after normalization', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'ambiguous-a', duration: 3, prompt: 'Aster waits.',
+      endStateData: { characters: { Aster: { clothing: 'blue coat' }, aster: { clothing: 'green coat' } } }
+    },
+    {
+      id: 'ambiguous-b', duration: 3, prompt: 'Aster moves.',
+      startStateData: { characters: { ' ASTER ': { clothing: 'red coat' } } }
+    }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+
+test('accepts documented canonical character clothing and pose changes', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'character-change-a', duration: 3, prompt: 'Aster waits beside the gate.',
+      endStateData: { characters: { Aster: { clothing: 'blue coat', pose: 'standing' } } }
+    },
+    {
+      id: 'character-change-b', duration: 3, prompt: 'Aster changes clothes and kneels.',
+      startStateData: { characters: { Aster: { clothing: 'red coat', pose: 'kneeling' } } },
+      structuredStateChanges: [
+        { entity: 'Aster', property: 'clothing', previousValue: 'blue coat', value: 'red coat', evidence: 'Aster changes into a red coat.' },
+        { entity: 'Aster', property: 'pose', previousValue: 'standing', value: 'kneeling', evidence: 'Aster kneels beside the gate.' }
+      ]
+    }
+  ]);
+  assert.equal(result.issues.some(entry => entry.code === 'continuity-state-mismatch'), false);
+});
+
+test('does not guess canonical location change type when an ID is both character and object', () => {
+  const result = validateStoryScenes([
+    {
+      id: 'ambiguous-kind-a', duration: 3, prompt: 'Aster waits.',
+      endStateData: {
+        characters: { Aster: { location: 'north hall' } },
+        objects: { Aster: { location: 'north hall' } }
+      }
+    },
+    {
+      id: 'ambiguous-kind-b', duration: 3, prompt: 'Aster moves.',
+      startStateData: {
+        characters: { Aster: { location: 'south hall' } },
+        objects: { Aster: { location: 'south hall' } }
+      },
+      structuredStateChanges: [
+        { entity: 'Aster', property: 'location', previousValue: 'north hall', value: 'south hall', evidence: 'Aster moves south.' }
+      ]
+    }
+  ]);
+  assert.ok(result.issues.some(entry => entry.code === 'continuity-state-mismatch'));
+});

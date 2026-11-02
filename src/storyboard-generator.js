@@ -9,6 +9,8 @@ import { inferSceneCausalLinks } from './scene-causality.js';
 import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
+import { emptyState } from './scene-state-contract.js';
+import { toStructuredStateChanges } from './scene-state-adapter.js';
 import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
@@ -83,6 +85,26 @@ const CHARACTER_LABEL = { ru: 'Главный персонаж', uk: 'Голов
 const STORY_LABEL = { ru: 'Деталь исходной истории', uk: 'Деталь початкової історії', en: 'Story detail to preserve', es: 'Detalle que conservar de la historia' };
 const FALLBACK = { ru: 'Начинается новое приключение.', uk: 'Починається нова пригода.', en: 'A new adventure begins.', es: 'Comienza una nueva aventura.' };
 
+function buildKnownCharacterSnapshot(sceneCharacters, characterProfiles) {
+  const snapshot = emptyState();
+  const cast = new Set((Array.isArray(sceneCharacters) ? sceneCharacters : [])
+    .map(value => String(value ?? '').trim().toLocaleLowerCase()).filter(Boolean));
+  for (const profile of Array.isArray(characterProfiles) ? characterProfiles : []) {
+    const characterId = String(profile?.characterId ?? '').trim().slice(0, 120);
+    if (!characterId || !cast.has(characterId.toLocaleLowerCase())) continue;
+    snapshot.characters[characterId] = {
+      location: null,
+      position: null,
+      pose: null,
+      // Clothing is carried only when the character bible explicitly defines it.
+      clothing: typeof profile.clothing === 'string' && profile.clothing.trim()
+        ? profile.clothing.trim().slice(0, 500)
+        : null
+    };
+  }
+  return snapshot;
+}
+
 function distributeStoryDetails(sentences, beatCount) {
   const buckets = Array.from({ length: beatCount }, () => []);
   sentences.forEach((sentence, index) => {
@@ -147,9 +169,10 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
     return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
   };
+  let carriedState = emptyState();
   scenes.forEach((scene, index) => {
     scene.causalLink = causalLinks[index];
-    scene.stateChanges = stateChanges[index];
+    scene.stateChanges = toStructuredStateChanges(stateChanges[index]);
     scene.characters = knownCharacters.filter(name => scene.storyDetail
       ? characterMention(name, scene.storyDetail)
       : name.toLocaleLowerCase() === subject.toLocaleLowerCase());
@@ -201,6 +224,53 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
       : null;
     scene.durationSeconds = brief.requestedDurationSeconds ?? 3;
     scene.negativePrompt = brief.directives.avoid || '';
+    // Carry only explicit, source-grounded state across scene boundaries.
+    // Character-bible facts seed identity; unknown location/pose/ownership stay null.
+    const knownState = buildKnownCharacterSnapshot(scene.characters, brief.characterProfiles);
+    const startState = JSON.parse(JSON.stringify(carriedState));
+    // Scene snapshots expose only the current cast, while the carried ledger
+    // retains off-screen characters so their state survives later re-entry.
+    const sceneCast = new Set(scene.characters.map(name => String(name).toLocaleLowerCase()));
+    for (const characterId of Object.keys(startState.characters)) {
+      if (!sceneCast.has(characterId.toLocaleLowerCase())) delete startState.characters[characterId];
+    }
+    for (const [characterId, characterState] of Object.entries(knownState.characters)) {
+      const carriedCharacter = startState.characters[characterId] || {};
+      startState.characters[characterId] = { ...carriedCharacter };
+      for (const [field, value] of Object.entries(characterState)) {
+        // Character-bible facts seed unknown fields, but must never overwrite
+        // a state change already carried forward from an earlier scene.
+        if (value !== null && value !== undefined &&
+            (carriedCharacter[field] === null || carriedCharacter[field] === undefined)) {
+          startState.characters[characterId][field] = value;
+        } else if (!(field in startState.characters[characterId])) {
+          startState.characters[characterId][field] = null;
+        }
+      }
+    }
+    const endState = JSON.parse(JSON.stringify(startState));
+    for (const change of scene.stateChanges) {
+      if (!change || typeof change.entity !== 'string' || !change.entity) continue;
+      if (['location', 'pose', 'clothing'].includes(change.property) && Object.hasOwn(endState.characters, change.entity)) {
+        endState.characters[change.entity][change.property] = change.value;
+      } else if (['holder', 'state'].includes(change.property)) {
+        const current = endState.objects[change.entity] || {
+          location: null, owner: null, holder: null, state: null
+        };
+        current[change.property] = change.value;
+        endState.objects[change.entity] = current;
+      }
+    }
+    scene.startStateData = startState;
+    scene.endStateData = endState;
+    // Merge the visible scene result back into the full ledger without dropping
+    // characters who are temporarily absent from the current cast.
+    carriedState = JSON.parse(JSON.stringify(carriedState));
+    carriedState.location = endState.location ?? carriedState.location;
+    carriedState.time = endState.time ?? carriedState.time;
+    carriedState.weather = endState.weather ?? carriedState.weather;
+    Object.assign(carriedState.characters, endState.characters);
+    Object.assign(carriedState.objects, endState.objects);
   });
   const productionScenes = scenes.map((scene, index) => buildProductionScene(scene, brief.characterProfiles, { index }));
   const eventChain = buildStoryEventChain(productionScenes);

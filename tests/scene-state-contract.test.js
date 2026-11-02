@@ -39,7 +39,10 @@ test("rejects non-record character and object states", () => {
 
 test("normalizes object state", () => {
   assert.deepEqual(normalizeObjectState({ location: "Alice", owner: "Alice", state: "held", extra: 1 }), {
-    location: "Alice", owner: "Alice", state: "held"
+    location: "Alice", owner: "Alice", holder: null, state: "held"
+  });
+  assert.deepEqual(normalizeObjectState({ holder: "Alice" }), {
+    location: null, owner: null, holder: "Alice", state: null
   });
 });
 
@@ -102,6 +105,22 @@ test("normalizes state changes with the entity/property contract", () => {
   });
   assert.equal(result.ok, true);
   assert.equal(result.value.value, "roof");
+});
+
+test("accepts explicit null to clear a known state but rejects missing or malformed values", () => {
+  const release = normalizeStateChange({
+    entity: "key", property: "holder", previousValue: "Foxy",
+    value: null, actorId: "Foxy", evidence: "Foxy drops the key."
+  }, { kindResolver: () => "object" });
+  assert.equal(release.ok, true);
+  assert.equal(release.value.value, null);
+  assert.equal(normalizeStateChange({
+    entity: "key", property: "holder", previousValue: "Foxy",
+    actorId: "Foxy"
+  }, { kindResolver: () => "object" }).ok, false);
+  assert.equal(normalizeStateChange({
+    entity: "key", property: "holder", value: undefined
+  }, { kindResolver: () => "object" }).ok, false);
 });
 
 test("validates properties against the resolved entity kind", () => {
@@ -257,4 +276,14 @@ test("emptyState returns a complete fresh structure", () => {
   });
   assert.notEqual(first, second);
   assert.notEqual(first.characters, second.characters);
+});
+
+test("resolves object entities declared only by structured state changes", () => {
+  const scene = makeScene("object-change", {
+    stateChanges: [{ entity: "silver key", property: "holder", previousValue: null, value: "Alice", actorId: "Alice", evidence: "Alice picks up the silver key." }]
+  });
+  const normalized = normalizeScenes([scene]);
+  assert.ok(normalized);
+  assert.equal(normalized[0].stateChanges[0].entity, "silver key");
+  assert.equal(normalized[0].stateChanges[0].property, "holder");
 });

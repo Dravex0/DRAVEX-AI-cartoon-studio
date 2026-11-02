@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createSceneVideoStorage } from "../src/scene-video-storage.js";
+import { createVideoProviderRegistry, generateVideoWithProvider } from "../src/video-provider-contract.js";
+import { getDrawableSceneVideo } from "../src/scene-video-render-source.js";
 
 function createMemoryIndexedDB() {
   const records = new Map();
@@ -87,4 +89,48 @@ test("closes stale connections and reopens after an IndexedDB version change", a
   assert.equal(closed, 1);
   await storage.get("scene-1");
   assert.equal(indexedDBRef.openCount, 2);
+});
+
+test("routes a fake provider clip through persistent storage to the drawable export source", async () => {
+  const storage = createSceneVideoStorage({ indexedDBRef: createMemoryIndexedDB() });
+  const expectedBytes = "generated-scene-motion";
+  const providerBlob = new Blob([expectedBytes], { type: "video/webm" });
+  const registry = createVideoProviderRegistry();
+  registry.register({
+    id: "deterministic-test-provider",
+    name: "Deterministic test provider",
+    taskTypes: ["image-to-video"],
+    generate: async () => ({ status: "completed", video: providerBlob })
+  });
+
+  const generated = await generateVideoWithProvider(registry, "deterministic-test-provider", {
+    taskType: "image-to-video",
+    prompt: "A fox turns toward a glowing star.",
+    durationSeconds: 2,
+    fps: 16,
+    image: new Blob(["source-image"], { type: "image/png" })
+  });
+  assert.equal(generated.status, "completed");
+  assert.equal(generated.video, providerBlob);
+
+  await storage.put("stable-scene-fox-01", generated.video, "fox-motion.webm");
+  const restored = await storage.get("stable-scene-fox-01");
+  assert.equal(await restored.blob.text(), expectedBytes);
+  assert.equal(restored.filename, "fox-motion.webm");
+
+  const decodedVideo = {
+    readyState: 2,
+    videoWidth: 640,
+    videoHeight: 360,
+    sourceBlob: restored.blob
+  };
+  const renderCache = new Map([
+    ["stable-scene-fox-01", { video: decodedVideo, blob: restored.blob }]
+  ]);
+
+  assert.equal(getDrawableSceneVideo(renderCache, "stable-scene-fox-01"), decodedVideo);
+  assert.equal(getDrawableSceneVideo(renderCache, "missing-scene"), null);
+  assert.equal(getDrawableSceneVideo(new Map([
+    ["not-decoded", { video: { readyState: 1, videoWidth: 0, videoHeight: 0 } }]
+  ]), "not-decoded"), null);
 });

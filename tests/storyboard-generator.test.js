@@ -222,3 +222,117 @@ test('semantic reveal creates a source-grounded action instead of a passive idle
   assert.equal(scene.actionTimeline.phases[0].actorId, 'Nox');
   assert.match(scene.motionGenerationPrompt, /reveal/);
 });
+
+
+test('populates structured scene snapshots only with explicit character-bible facts', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — small orange fox wearing a blue scarf.\nSnowball — white rabbit.\n\nScene 1: Meeting\nFoxy meets Snowball.\n\nScene 2: Departure\nSnowball leaves the forest.',
+    'en',
+    'Foxy'
+  );
+  const first = result.scenes[0];
+  assert.equal(first.startStateData.characters.Foxy.clothing, null);
+  assert.equal(first.endStateData.characters.Foxy.clothing, null);
+  assert.equal(first.startStateData.characters.Foxy.pose, null);
+  assert.equal(first.startStateData.characters.Foxy.location, null);
+  assert.equal(first.startStateData.characters.Snowball.clothing, null);
+  assert.deepEqual(first.startStateData.objects, {});
+  assert.deepEqual(result.scenes[1].startStateData.characters, {
+    Snowball: { location: null, position: null, pose: null, clothing: null }
+  });
+});
+
+test('carries explicitly labeled character-bible clothing into every matching scene', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — small orange fox; Clothing: blue scarf and brown vest.\nSnowball — white rabbit.\n\nScene 1: Meeting\nFoxy meets Snowball.\n\nScene 2: Departure\nFoxy waves as Snowball leaves.',
+    'en',
+    'Foxy'
+  );
+  for (const scene of result.scenes) {
+    if (scene.characters.includes('Foxy')) {
+      assert.equal(scene.startStateData.characters.Foxy.clothing, 'blue scarf and brown vest.');
+      assert.equal(scene.endStateData.characters.Foxy.clothing, 'blue scarf and brown vest.');
+    }
+  }
+  assert.ok(result.scenes.some(scene => scene.characters.includes('Foxy')));
+});
+
+
+test('carries explicit full outfit replacements across scenes and off-screen gaps', () => {
+  const result = buildStoryboardFromText([
+    'Characters:',
+    'Foxy — small orange fox; Clothing: blue scarf and brown vest.',
+    '',
+    'Scene 1: Departure',
+    'Foxy changes into a red winter outfit.',
+    '',
+    'Scene 2: Forest',
+    'The forest becomes quiet.',
+    '',
+    'Scene 3: Return',
+    'Foxy waves at the gate.'
+  ].join('\n'), 'en', 'Foxy');
+  const scenes = result.scenes;
+  const change = scenes.find(scene => /changes into a red winter outfit/i.test(scene.storyDetail));
+  const returnScene = scenes.find(scene => /Foxy waves at the gate/i.test(scene.storyDetail));
+  assert.ok(change);
+  assert.ok(returnScene);
+  assert.equal(change.startStateData.characters.Foxy.clothing, 'blue scarf and brown vest.');
+  assert.equal(change.endStateData.characters.Foxy.clothing, 'red winter outfit');
+  assert.equal(returnScene.startStateData.characters.Foxy.clothing, 'red winter outfit');
+  assert.equal(returnScene.endStateData.characters.Foxy.clothing, 'red winter outfit');
+});
+
+test('does not fabricate structured character state when no matching character profile exists', () => {
+  const result = buildStoryboardFromText('A fox runs through the forest.', 'en', 'Foxy');
+  assert.deepEqual(result.scenes[0].startStateData.characters, {});
+  assert.deepEqual(result.scenes[0].endStateData.characters, {});
+  assert.equal(result.scenes[0].startStateData.location, null);
+});
+
+
+test('carries explicit object possession and release between adjacent scenes', () => {
+  const result = buildStoryboardFromText([
+    'Characters:',
+    'Foxy — small orange fox.',
+    '',
+    'Scene 1: Finding the key',
+    'Foxy picks up the silver key.',
+    '',
+    'Scene 2: Dropping the key',
+    'Foxy drops the silver key.'
+  ].join('\n'), 'en', 'Foxy');
+
+  const pickup = result.scenes.find(scene => /picks up the silver key/i.test(scene.storyDetail));
+  const release = result.scenes.find(scene => /drops the silver key/i.test(scene.storyDetail));
+  assert.ok(pickup);
+  assert.ok(release);
+  assert.equal(pickup.endStateData.objects['silver key'].holder, 'Foxy');
+  assert.equal(release.startStateData.objects['silver key'].holder, 'Foxy');
+  assert.equal(release.endStateData.objects['silver key'].holder, null);
+});
+
+
+test('carries explicit pose changes across scenes and preserves pose while a character is off-screen', () => {
+  const result = buildStoryboardFromText([
+    'Characters:',
+    'Foxy — small orange fox.',
+    '',
+    'Scene 1: Rest',
+    'Foxy sits on the stone.',
+    '',
+    'Scene 2: Alone',
+    'The forest becomes quiet.',
+    '',
+    'Scene 3: Return',
+    'Foxy stands up.'
+  ].join('\n'), 'en', 'Foxy');
+  const scenes = result.scenes;
+  const sitting = scenes.find(scene => /Foxy sits on the stone/i.test(scene.storyDetail));
+  const standing = scenes.find(scene => /Foxy stands up/i.test(scene.storyDetail));
+  assert.ok(sitting);
+  assert.ok(standing);
+  assert.equal(sitting.endStateData.characters.Foxy.pose, 'sitting');
+  assert.equal(standing.startStateData.characters.Foxy.pose, 'sitting');
+  assert.equal(standing.endStateData.characters.Foxy.pose, 'standing');
+});
