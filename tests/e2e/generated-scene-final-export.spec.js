@@ -63,9 +63,14 @@ test('includes a persisted generated scene clip in the final exported WebM', asy
   await expect(page.locator('#export')).toBeEnabled();
   await page.locator('#export').click();
 
-  await expect.poll(async () => page.locator('#finalFilmResult').evaluate(node => !node.hidden), {
-    timeout: 90_000
-  }).toBe(true);
+  await expect.poll(async () => {
+    const resultVisible = await page.locator('#finalFilmResult').evaluate(node => !node.hidden);
+    const statusText = await page.locator('#status').innerText();
+    return { resultVisible, statusText };
+  }, {
+    timeout: 90_000,
+    message: 'Final export did not complete. Inspect the application status below.'
+  }).toMatchObject({ resultVisible: true });
 
   const exportedFrame = await page.locator('#finalFilmPlayer').evaluate(async video => {
     if (!video.currentSrc.startsWith('blob:')) {
