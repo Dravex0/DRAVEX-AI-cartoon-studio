@@ -257,6 +257,32 @@ test('carries explicitly labeled character-bible clothing into every matching sc
   assert.ok(result.scenes.some(scene => scene.characters.includes('Foxy')));
 });
 
+
+test('carries explicit full outfit replacements across scenes and off-screen gaps', () => {
+  const result = buildStoryboardFromText([
+    'Characters:',
+    'Foxy — small orange fox; Clothing: blue scarf and brown vest.',
+    '',
+    'Scene 1: Departure',
+    'Foxy changes into a red winter outfit.',
+    '',
+    'Scene 2: Forest',
+    'The forest becomes quiet.',
+    '',
+    'Scene 3: Return',
+    'Foxy waves at the gate.'
+  ].join('\\n'), 'en', 'Foxy');
+  const scenes = result.scenes;
+  const change = scenes.find(scene => /changes into a red winter outfit/i.test(scene.storyDetail));
+  const returnScene = scenes.find(scene => /Foxy waves at the gate/i.test(scene.storyDetail));
+  assert.ok(change);
+  assert.ok(returnScene);
+  assert.equal(change.startStateData.characters.Foxy.clothing, 'blue scarf and brown vest.');
+  assert.equal(change.endStateData.characters.Foxy.clothing, 'red winter outfit');
+  assert.equal(returnScene.startStateData.characters.Foxy.clothing, 'red winter outfit');
+  assert.equal(returnScene.endStateData.characters.Foxy.clothing, 'red winter outfit');
+});
+
 test('does not fabricate structured character state when no matching character profile exists', () => {
   const result = buildStoryboardFromText('A fox runs through the forest.', 'en', 'Foxy');
   assert.deepEqual(result.scenes[0].startStateData.characters, {});
