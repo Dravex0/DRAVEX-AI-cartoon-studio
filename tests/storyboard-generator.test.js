@@ -300,7 +300,7 @@ test('carries explicit pose changes across scenes and preserves pose while a cha
     '',
     'Scene 3: Return',
     'Foxy stands up.'
-  ].join('\\n'), 'en', 'Foxy');
+  ].join('\n'), 'en', 'Foxy');
   const scenes = result.scenes;
   const sitting = scenes.find(scene => /Foxy sits on the stone/i.test(scene.storyDetail));
   const standing = scenes.find(scene => /Foxy stands up/i.test(scene.storyDetail));
