@@ -107,6 +107,22 @@ test("normalizes state changes with the entity/property contract", () => {
   assert.equal(result.value.value, "roof");
 });
 
+test("accepts explicit null to clear a known state but rejects missing or malformed values", () => {
+  const release = normalizeStateChange({
+    entity: "key", property: "holder", previousValue: "Foxy",
+    value: null, actorId: "Foxy", evidence: "Foxy drops the key."
+  }, { kindResolver: () => "object" });
+  assert.equal(release.ok, true);
+  assert.equal(release.value.value, null);
+  assert.equal(normalizeStateChange({
+    entity: "key", property: "holder", previousValue: "Foxy",
+    actorId: "Foxy"
+  }, { kindResolver: () => "object" }).ok, false);
+  assert.equal(normalizeStateChange({
+    entity: "key", property: "holder", value: undefined
+  }, { kindResolver: () => "object" }).ok, false);
+});
+
 test("validates properties against the resolved entity kind", () => {
   assert.equal(normalizeStateChange({
     entity: "Alice", property: "owner", value: "Bob"
