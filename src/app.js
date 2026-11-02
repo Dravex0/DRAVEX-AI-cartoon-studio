@@ -1416,7 +1416,17 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const key=sceneVideoKey(index,meta);
     const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
     const filename='dravex-scene-'+(index+1)+extension;
-    attachSceneVideo(index,meta,result.video,filename);
+    const attached=attachSceneVideo(index,meta,result.video,filename);
+    try{
+     await waitForSceneVideoReady(attached.video,{timeoutMs:20000,signal});
+     attached.video.pause();
+     try{attached.video.currentTime=0;}catch{}
+    }catch(error){
+     disposeSceneVideoEntry(attached);
+     if(sceneVideoCache.get(key)===attached)sceneVideoCache.delete(key);
+     const mediaError=attached.video.error;
+     throw new Error('Сцена '+(index+1)+' вернула файл, который браузер не смог декодировать. readyState='+attached.video.readyState+', networkState='+attached.video.networkState+', videoError='+(mediaError?.code??'none')+'. '+(error?.message||'Проверь формат и кодек видео.'));
+    }
     await sceneVideoStorage.put(key,result.video,filename);
     if(sceneIndex===index)renderComfySceneVideo();
     if(!playing)draw();
