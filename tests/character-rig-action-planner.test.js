@@ -72,3 +72,34 @@ test('blocks invalid action timelines before generating rig poses', () => {
   assert.equal(result.status, 'blocked');
   assert.equal(result.timeline, null);
 });
+
+
+test('combines grounded actions for multiple characters on one scene clock', () => {
+  const scene = {
+    characters: ['Foxy', 'Bunny'],
+    characterCastProvided: true,
+    storyDetail: 'Foxy walks to the gate. Bunny jumps over the stone. Foxy runs away. Bunny walks to Foxy.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [
+        { phase: 'preparation', start: 0.05, end: 0.2, actorId: 'Foxy', targetId: null, description: 'Foxy walks to the gate', evidence: 'Foxy walks to the gate.' },
+        { phase: 'action', start: 0.25, end: 0.5, actorId: 'Bunny', targetId: null, description: 'Bunny jumps over the stone', evidence: 'Bunny jumps over the stone.' },
+        { phase: 'reaction', start: 0.55, end: 0.7, actorId: 'Foxy', targetId: null, description: 'Foxy runs away', evidence: 'Foxy runs away.' },
+        { phase: 'result', start: 0.75, end: 0.9, actorId: 'Bunny', targetId: null, description: 'Bunny walks to Foxy', evidence: 'Bunny walks to Foxy.' }
+      ]
+    }
+  };
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig('Foxy'), rig('Bunny')]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 4);
+  assert.deepEqual(result.mappedActions.map(item => item.actorId), ['Foxy', 'Bunny', 'Foxy', 'Bunny']);
+  assert.ok(sampleCharacterRigTimeline(result.timeline, 0.35).Bunny);
+  assert.ok(sampleCharacterRigTimeline(result.timeline, 0.6).Foxy);
+});
+
+test('reports supported story actions whose actor has no attached rig', () => {
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('jumps over the stone'), []);
+  assert.equal(result.status, 'blocked');
+  assert.equal(result.timeline, null);
+  assert.match(result.reason, /No segmented character rigs/);
+});
