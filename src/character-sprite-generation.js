@@ -36,6 +36,7 @@ export async function generateCharacterSpriteAsset({
     width,
     height,
     steps,
+    seed: Number.isInteger(plan.identitySeed) && plan.identitySeed >= 0 && plan.identitySeed <= 0xffffffff ? plan.identitySeed : undefined,
     signal,
     onProgress
   });
