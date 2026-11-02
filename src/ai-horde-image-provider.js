@@ -49,6 +49,7 @@ export async function generateImageWithHorde({
   width = 512,
   height = 512,
   steps = 20,
+  seed,
   fetchImpl = fetch,
   signal,
   onProgress = () => {},
@@ -68,9 +69,11 @@ export async function generateImageWithHorde({
     'Client-Agent': CLIENT_AGENT,
     apikey: ANONYMOUS_KEY
   };
+  const params = { width: safeWidth, height: safeHeight, steps: safeSteps, n: 1, cfg_scale: 7.5 };
+  if (Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff) params.seed = seed;
   const body = {
     prompt: negative ? `${positive}###${negative}` : positive,
-    params: { width: safeWidth, height: safeHeight, steps: safeSteps, n: 1, cfg_scale: 7.5 },
+    params,
     nsfw: false,
     censor_nsfw: true,
     trusted_workers: true,

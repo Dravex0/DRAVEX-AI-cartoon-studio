@@ -64,7 +64,10 @@ function actionTimelineInstructions(scene = {}) {
   if (scene.actionTimeline == null) return '';
   const report = validateCharacterActionTimeline(scene);
   if (!report.passed) return '';
-  const duration = Number.isFinite(Number(scene.durationSeconds)) ? Number(scene.durationSeconds) : 3;
+  const requestedDuration = Number(scene.durationSeconds ?? scene.duration);
+  const duration = Number.isFinite(requestedDuration) && requestedDuration >= 0.25 && requestedDuration <= 30
+    ? requestedDuration
+    : 3;
   const phases = scene.actionTimeline.phases.map(phase => {
     const startSeconds = (Number(phase.start) * duration).toFixed(2);
     const endSeconds = (Number(phase.end) * duration).toFixed(2);

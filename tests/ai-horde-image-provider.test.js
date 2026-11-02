@@ -141,3 +141,42 @@ test('honors cancellation before submitting a job', async () => {
   }), { name: 'AbortError' });
   assert.equal(called, false);
 });
+
+
+test('includes a bounded deterministic seed when requested', async () => {
+  let submittedBody = null;
+  const fetchImpl = async (url, options) => {
+    if (url.endsWith('/generate/async')) {
+      submittedBody = JSON.parse(options.body);
+      return response({ id: 'seeded-request' }, 202);
+    }
+    if (url.endsWith('/generate/check/seeded-request')) return response({ done: true, finished: 1 });
+    return response({ generations: [{ img: 'https://cdn.example.test/seeded.webp', seed: 123456789 }] });
+  };
+  await generateImageWithHorde({
+    prompt: 'A consistent orange fox character.',
+    seed: 123456789,
+    fetchImpl,
+    pollIntervalMs: 0
+  });
+  assert.equal(submittedBody.params.seed, 123456789);
+});
+
+test('ignores invalid deterministic seeds instead of sending unsafe values', async () => {
+  let submittedBody = null;
+  const fetchImpl = async (url, options) => {
+    if (url.endsWith('/generate/async')) {
+      submittedBody = JSON.parse(options.body);
+      return response({ id: 'invalid-seed-request' }, 202);
+    }
+    if (url.endsWith('/generate/check/invalid-seed-request')) return response({ done: true, finished: 1 });
+    return response({ generations: [{ img: 'https://cdn.example.test/seedless.webp' }] });
+  };
+  await generateImageWithHorde({
+    prompt: 'A character.',
+    seed: -1,
+    fetchImpl,
+    pollIntervalMs: 0
+  });
+  assert.equal(Object.hasOwn(submittedBody.params, 'seed'), false);
+});

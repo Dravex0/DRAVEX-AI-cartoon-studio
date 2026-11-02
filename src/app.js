@@ -12,6 +12,7 @@ import { drawImageCover } from "./image-frame.js";
 import { drawCharacterLayers } from "./scene-character-layers.js";
 import { validateCharacterRigTimeline, sampleCharacterRigTimeline } from "./character-rig-timeline.js";
 import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from "./character-rig-motion-presets.js";
+import { createCharacterRigTimelineFromActionTimeline } from "./character-rig-action-planner.js";
 import { validateCharacterRig, normalizeCharacterRigPoses, characterRigPosesFor } from "./character-rig.js";
 import { upsertCharacterMotionPhase } from "./character-motion-editor.js";
 import { planCharacterMotionFromActionTimeline } from "./character-motion-planner.js";
@@ -299,6 +300,7 @@ $('spritePlanPreviewLabel').textContent=uiLang==='ru'?'План спрайтов
 $('spritePlanPreview').textContent=spritePlan.length?spritePlan.map(asset=>[
   asset.characterId+' · '+asset.status.toUpperCase(),
   asset.appearanceReference?'Appearance: '+asset.appearanceReference:'Appearance reference: missing',
+  Number.isInteger(asset.identitySeed)?'Identity seed: '+asset.identitySeed+' · stable for this character profile across scenes':'Identity seed: unavailable',
   asset.action?'Action: '+asset.action:'Action: not safely assigned',
   asset.issues.length?'Blocked: '+asset.issues.map(issue=>issue.code).join(', '):'Prompt: '+asset.prompt
 ].join('\n')).join('\n\n'):(uiLang==='ru'?'В сцене пока нет отдельных персонажей.':'No individual characters are assigned to this scene.');
@@ -329,7 +331,7 @@ function renderCharacterSpriteAssets(){
   const title=document.createElement('strong');title.textContent=String(asset.characterId||'Character');
   const note=document.createElement('small');
   const initialTransparency=asset.transparencyStatus||'unverified';
-  note.textContent=uiLang==='ru'?'Прозрачность: '+initialTransparency+' · сходство персонажа не проверено':'Transparency: '+initialTransparency+' · character identity not verified';
+  note.textContent=uiLang==='ru'?'Прозрачность: '+initialTransparency+' · сходство не проверено · общий seed помогает повторяемости, но не гарантирует одинаковый образ':'Transparency: '+initialTransparency+' · identity not verified · shared seed helps repeatability but does not guarantee an identical design';
   const sceneId=String(sceneMetadata[sceneIndex]?.id||'');
   const assetId=String(asset.assetId||'');
   const updateTransparency=(status,check=null)=>{
@@ -460,6 +462,31 @@ $('generateCharacterRigPreset').addEventListener('click',()=>{
  $('characterRigScrubber').value='0';
  $('characterRigScrubberValue').textContent='0%';
  $('characterRigStatus').textContent=result.label+' generated for '+actorId+'. Animated bones: '+(result.animatedBoneIds.join(', ')||'none')+'. '+(result.warnings.join(' ')||'No rig mapping warnings.');
+ sceneMotionSceneIndex=-1;
+ if(!playing)draw();
+});
+
+$('generateCharacterRigFromStory').addEventListener('click',()=>{
+ const meta=sceneMetadata[sceneIndex]||{};
+ const result=createCharacterRigTimelineFromActionTimeline(meta,meta.characterRigs||[]);
+ if(!result.timeline){
+  const skippedCount=(result.skipped||[]).length;
+  $('characterRigStatus').textContent=(result.reason||'No articulated character animation could be generated from this scene.')+
+   (skippedCount?' Skipped items: '+skippedCount+'.':'');
+  return;
+ }
+ sceneMetadata[sceneIndex]={...meta,characterRigTimeline:result.timeline};
+ $('characterRigTimelineJson').value=JSON.stringify(result.timeline,null,2);
+ $('characterRigScrubber').disabled=false;
+ $('resetCharacterRigScrubber').disabled=false;
+ rigPreviewProgress=0;
+ $('characterRigScrubber').value='0';
+ $('characterRigScrubberValue').textContent='0%';
+ const mapped=(result.mappedActions||[]).map(item=>item.actorId+': '+item.preset).join(', ');
+ const skippedCount=(result.skipped||[]).length;
+ $('characterRigStatus').textContent='Story-driven bone animation generated: '+result.generatedCount+' action(s). '+mapped+
+  (skippedCount?'. Skipped unsupported, missing-rig or overlapping actions: '+skippedCount+'.':'. No actions skipped.')+
+  ' Preview and canvas export sample this same rig timeline.';
  sceneMotionSceneIndex=-1;
  if(!playing)draw();
 });
@@ -1093,7 +1120,7 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
   for(const plan of ready){
    status.textContent=uiLang==='ru'?'Генерация '+(completed+failed+1)+' из '+ready.length+': '+plan.characterId+'…':'Generating '+(completed+failed+1)+' of '+ready.length+': '+plan.characterId+'…';
    try{
-    const asset=await generateCharacterSpriteAsset({plan,consentAccepted:true,onProgress:progress=>{
+    const asset=await generateCharacterSpriteAsset({plan,consentAccepted:$('spriteHordeConsent').checked===true,onProgress:progress=>{
      const pos=progress.queuePosition===null?'?':progress.queuePosition;
      status.textContent=(uiLang==='ru'?'AI Horde · ':'AI Horde · ')+plan.characterId+' · очередь: '+pos;
     }});

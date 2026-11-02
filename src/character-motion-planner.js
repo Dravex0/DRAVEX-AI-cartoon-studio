@@ -1,5 +1,5 @@
 import { validateCharacterActionTimeline } from './character-action-timeline.js';
-import { detectSceneAction } from './scene-action.js';
+import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const clean = value => String(value ?? '').trim();
@@ -67,12 +67,27 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
     }
     const description = clean(source.description);
     const action = detectSceneAction(description);
+    const intent = inferSceneActionIntent(description);
     const direction = directionOf(description);
     const from = { ...(poses.get(actorKey) || basePose(actorLayer)) };
     let to = { ...from };
     let plan = null;
 
-    if ((action === 'walk' || action === 'run') && source.targetId && layerById.has(key(source.targetId))) {
+    if (intent.intent === 'dodge' && (direction === 'left' || direction === 'right')) {
+      const midpoint = (source.start + source.end) / 2;
+      const offset = direction === 'left' ? -0.16 : 0.16;
+      const evade = {
+        ...from,
+        x: clamp(from.x + offset, 0.05, 0.95),
+        rotation: clamp(from.rotation + (direction === 'left' ? -0.12 : 0.12), -Math.PI * 2, Math.PI * 2),
+        scale: clamp(from.scale * 0.96, 0.05, 4)
+      };
+      plan = [
+        phase(actorId, source.start, midpoint, from, evade, source, ' (sidestep dodge)', 'ease-out'),
+        phase(actorId, midpoint, source.end, evade, from, source, ' (recover to the starting position)', 'ease-in')
+      ];
+      to = from;
+    } else if ((action === 'walk' || action === 'run') && source.targetId && layerById.has(key(source.targetId))) {
       const target = poses.get(key(source.targetId)) || basePose(layerById.get(key(source.targetId)));
       const dx = target.x - from.x, dy = target.y - from.y;
       const distance = Math.hypot(dx, dy);

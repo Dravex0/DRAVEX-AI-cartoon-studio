@@ -319,3 +319,24 @@ test('production scene does not fabricate a background plan from character-aware
   assert.equal(prepared.sceneBackgroundPlan.prompt, '');
   assert.equal(prepared.sceneBackgroundPlan.compositionStatus, 'unverified');
 });
+
+
+test('motion prompt timing respects the legacy duration field used by scene export', () => {
+  const timelineScene = {
+    ...scene,
+    storyDetail: 'Foxy notices the key, turns the key, and the gate opens.',
+    duration: 8,
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [
+        { phase: 'preparation', start: 0, end: 0.2, actorId: 'foxy', description: 'Foxy notices the key.', evidence: 'Foxy notices the key' },
+        { phase: 'action', start: 0.2, end: 0.65, actorId: 'foxy', description: 'Foxy turns the key.', evidence: 'turns the key' },
+        { phase: 'reaction', start: 0.65, end: 0.82, actorId: 'foxy', description: 'Foxy watches the gate.', evidence: 'the gate opens' },
+        { phase: 'result', start: 0.82, end: 1, actorId: 'foxy', description: 'The gate remains open.', evidence: 'the gate opens' }
+      ]
+    }
+  };
+  const prompt = buildMotionGenerationPrompt(timelineScene);
+  assert.match(prompt, /preparation \(0%-20%; 0\.00-1\.60s\)/);
+  assert.match(prompt, /action \(20%-65%; 1\.60-5\.20s\)/);
+});
