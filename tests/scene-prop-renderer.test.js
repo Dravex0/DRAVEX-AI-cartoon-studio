@@ -121,3 +121,20 @@ test('interpolates prop orientation during pickup and restores ground orientatio
   const released = buildScenePropRenderPlan(drop, layers, 1, runtime)[0];
   assert.equal(released.rotation, 0);
 });
+
+
+test('uses an explicitly authored grip point transformed by the posed hand rotation', () => {
+  const rig = {
+    schemaVersion: 1, characterId: 'Fox',
+    bones: [{ id: 'root', parentId: null }, { id: 'rightHand', parentId: 'root' }],
+    parts: [{
+      id: 'rightHand', boneId: 'rightHand', imageUrl: 'https://assets.example/hand.png',
+      x: 0.5, y: 0.5, width: 0.1, height: 0.1, rotation: Math.PI / 2,
+      gripOffsetX: 0.04, gripOffsetY: 0
+    }]
+  };
+  const plan = buildScenePropRenderPlan(scene, layers, 1, { characterRigs: [rig] })[0];
+  assert.ok(Math.abs(plan.x - 0.5) < 1e-9);
+  assert.ok(Math.abs(plan.y - 0.54) < 1e-9);
+  assert.ok(Math.abs(plan.rotation - Math.PI / 2) < 1e-9);
+});
