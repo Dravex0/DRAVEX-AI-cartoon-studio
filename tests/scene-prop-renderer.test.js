@@ -86,8 +86,8 @@ test('anchors held props to the explicitly named hand after applying the sampled
     rigPoses: { Fox: { leftHand: { x: -0.04, y: 0.03 } } }
   })[0];
   assert.equal(plan.held, true);
-  assert.equal(plan.x, 0.47);
-  assert.equal(plan.y, 0.61);
+  assert.ok(Math.abs(plan.x - 0.47) < 1e-9);
+  assert.ok(Math.abs(plan.y - 0.61) < 1e-9);
 });
 
 test('uses the safe legacy hand estimate when the rig has no explicit hand or paw anchor', () => {
