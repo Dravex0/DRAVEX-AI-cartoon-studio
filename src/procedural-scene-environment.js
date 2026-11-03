@@ -1,9 +1,9 @@
 const ENVIRONMENTS = [
-  { type: 'forest', pattern: /\\bforest\\b|\\bwoods?\\b|\\btrees?\\b|лес|лесу|дерев|ліс|дерев/i },
-  { type: 'castle', pattern: /\\bcastle\\b|\\bkingdom\\b|\\bpalace\\b|замок|дворец|палац|фортец/i },
-  { type: 'cave', pattern: /\\bcave\\b|\\btunnel\\b|\\bunderground\\b|пещер|туннел|печер|підзем/i },
-  { type: 'beach', pattern: /\\bbeach\\b|\\bocean\\b|\\bsea\\b|\\bshore\\b|пляж|океан|море|узбереж/i },
-  { type: 'city', pattern: /\\bcity\\b|\\bstreet\\b|\\btown\\b|\\bbuildings?\\b|город|улиц|міст|вулиц|будин/i }
+  { type: 'forest', pattern: /\bforest\b|\bwoods?\b|\btrees?\b|лес|лесу|дерев|ліс|дерев/i },
+  { type: 'castle', pattern: /\bcastle\b|\bkingdom\b|\bpalace\b|замок|дворец|палац|фортец/i },
+  { type: 'cave', pattern: /\bcave\b|\btunnel\b|\bunderground\b|пещер|туннел|печер|підзем/i },
+  { type: 'beach', pattern: /\bbeach\b|\bocean\b|\bsea\b|\bshore\b|пляж|океан|море|узбереж/i },
+  { type: 'city', pattern: /\bcity\b|\bstreet\b|\btown\b|\bbuildings?\b|город|улиц|міст|вулиц|будин/i }
 ];
 
 /** Infer a small, deterministic environment vocabulary from grounded scene text. */
