@@ -88,3 +88,14 @@ test('legacy character profiles receive empty defaults for new identity anchors'
     assert.equal(result[field], '');
   }
 });
+
+
+test('preserves a local reference image asset ID without embedding image data', () => {
+  const result = normalizeCharacterReference({
+    characterId: 'Foxy',
+    referenceImageAssetId: 'refimg_12345678',
+    referenceImage: new Blob(['should-not-be-stored'])
+  });
+  assert.equal(result.referenceImageAssetId, 'refimg_12345678');
+  assert.equal(Object.hasOwn(result, 'referenceImage'), false);
+});
