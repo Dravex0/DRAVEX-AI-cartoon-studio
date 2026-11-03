@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { createCharacterRigTimelineFromActionTimeline } from '../src/character-rig-action-planner.js';
 import { sampleCharacterRigTimeline } from '../src/character-rig-timeline.js';
 import { drawCharacterLayers } from '../src/scene-character-layers.js';
+import { buildCharacterRigAssetPlan } from '../src/character-rig-asset-plan.js';
+import { createCharacterRigMotionPreset } from '../src/character-rig-motion-presets.js';
 
 const rig = {
   schemaVersion: 1,
@@ -113,4 +115,61 @@ test('story-generated rig timeline renders neutral parts before the action inter
   assert.equal(result.rigDrawn, rig.parts.length);
   assert.ok(spy.calls.rotations.every(rotation => Math.abs(rotation) < 1e-9),
     'the character should remain neutral outside the story action interval');
+});
+
+
+test('generated ten-part rig walk timeline reaches all ten rendered sprite layers', () => {
+  const plan = buildCharacterRigAssetPlan({
+    characterId: 'Foxy',
+    appearanceReference: 'Orange fox, cream muzzle, green scarf'
+  });
+  assert.equal(plan.status, 'ready_for_generation');
+  const generatedRig = {
+    ...plan.rig,
+    parts: plan.rig.parts.map(part => ({
+      ...part,
+      imageUrl: 'https://assets.example/' + part.id + '.png'
+    }))
+  };
+  const motion = createCharacterRigMotionPreset(generatedRig, 'walk');
+  assert.equal(motion.status, 'ready');
+
+  const renderAt = progress => {
+    const sampledPoses = sampleCharacterRigTimeline(motion.timeline, progress).Foxy;
+    const rotations = [];
+    const spy = {
+      save() {},
+      restore() {},
+      translate() {},
+      rotate(value) { rotations.push(value); },
+      drawImage() { rotations.push('draw'); }
+    };
+    const result = drawCharacterLayers(
+      spy,
+      [{ characterId: 'Foxy', imageUrl: 'https://assets.example/legacy-foxy.png' }],
+      url => ({ width: 64, height: 64, src: url }),
+      640,
+      360,
+      {
+        drawRigParts: true,
+        preferRigParts: true,
+        characterRigs: [generatedRig],
+        rigPoses: { Foxy: sampledPoses }
+      }
+    );
+    return { result, rotations };
+  };
+
+  const leftStride = renderAt(0.25);
+  const rightStride = renderAt(0.75);
+  for (const rendered of [leftStride, rightStride]) {
+    assert.equal(rendered.result.rigDrawn, 10);
+    assert.equal(rendered.result.rigSkipped, 0);
+    assert.deepEqual(rendered.result.rigReadyCharacterIds, ['Foxy']);
+    assert.equal(rendered.rotations.filter(value => value === 'draw').length, 10);
+    assert.ok(rendered.rotations.some(value => typeof value === 'number' && Math.abs(value) > 0.05),
+      'animated bone rotations must reach the canvas renderer');
+  }
+  assert.notDeepEqual(leftStride.rotations, rightStride.rotations,
+    'opposite walk phases must render different limb transforms');
 });
