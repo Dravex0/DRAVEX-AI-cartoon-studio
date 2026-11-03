@@ -39,7 +39,7 @@ test('draws planned props through the canvas API', () => {
   const calls = [];
   const context = new Proxy({}, { get(target, property) {
     if (property === 'save' || property === 'restore' || property === 'beginPath' || property === 'closePath' || property === 'stroke' || property === 'fill') return () => calls.push(property);
-    if (property === 'translate' || property === 'moveTo' || property === 'lineTo' || property === 'fillRect' || property === 'strokeRect' || property === 'arc' || property === 'ellipse' || property === 'roundRect') return (...args) => calls.push([property, ...args]);
+    if (property === 'translate' || property === 'rotate' || property === 'moveTo' || property === 'lineTo' || property === 'fillRect' || property === 'strokeRect' || property === 'arc' || property === 'ellipse' || property === 'roundRect') return (...args) => calls.push([property, ...args]);
     return undefined;
   }, set(target, property, value) { target[property] = value; return true; } });
   const result = drawSceneProps(context, scene, layers, 1, 640, 360, 0.5);
