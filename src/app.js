@@ -48,6 +48,7 @@ import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-vi
 import { createVideoProviderRegistry, generateVideoWithProvider } from "./video-provider-contract.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./scene-production.js";
 import { buildCharacterSpriteAssetPlan } from "./character-sprite-asset-plan.js";
+import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { generateCharacterSpriteAsset } from "./character-sprite-generation.js";
 import { verifySpriteTransparency } from "./character-sprite-verification.js";
 import { upsertCharacterReference, mergeCharacterReferences } from "./character-reference.js";
@@ -1156,6 +1157,88 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
   status.textContent=uiLang==='ru'?'Готово: '+completed+' · ошибок: '+failed+'. Сохрани черновик, чтобы сохранить ссылки.':'Finished: '+completed+' generated · '+failed+' failed. Save the draft to keep the links.';
  }finally{
   button.disabled=!$('spriteHordeConsent').checked;
+ }
+});
+
+
+function renderCharacterRigPartSets(){
+ const host=$('characterRigPartResults');
+ if(!host)return;
+ host.replaceChildren();
+ const sets=sceneMetadata[sceneIndex]?.characterRigPartSets||{};
+ const entries=Object.entries(sets);
+ if(!entries.length){
+  const note=document.createElement('small');note.className='muted';
+  note.textContent=uiLang==='ru'?'Пока нет частей скелета.':'No rig-part sets generated yet.';
+  host.appendChild(note);return;
+ }
+ entries.forEach(([characterId,set])=>{
+  const heading=document.createElement('strong');heading.textContent=characterId+' · '+(set.status||'unverified');
+  host.appendChild(heading);
+  const grid=document.createElement('div');grid.className='sprite-results';
+  (Array.isArray(set.assets)?set.assets:[]).forEach(asset=>{
+   if(!asset||!/^https:\/\//i.test(String(asset.imageUrl||'')))return;
+   const card=document.createElement('div');card.className='sprite-result';
+   const image=document.createElement('img');image.src=asset.imageUrl;image.alt=characterId+' · '+String(asset.partId||'rig part');image.loading='lazy';image.referrerPolicy='no-referrer';
+   const title=document.createElement('strong');title.textContent=String(asset.partId||'Part');
+   const note=document.createElement('small');note.textContent=uiLang==='ru'?'Не проверено · прозрачность, сходство и стыки требуют проверки':'Unverified · alpha, identity and joints need review';
+   card.append(image,title,note);grid.appendChild(card);
+  });
+  host.appendChild(grid);
+  if(Array.isArray(set.failures)&&set.failures.length){
+   const failures=document.createElement('small');failures.textContent=(uiLang==='ru'?'Ошибки: ':'Failures: ')+set.failures.map(item=>item.partId).join(', ');
+   host.appendChild(failures);
+  }
+ });
+}
+$('rigPartsConsent').addEventListener('change',()=>{$('generateCharacterRigParts').disabled=!$('rigPartsConsent').checked});
+$('generateCharacterRigParts').addEventListener('click',async()=>{
+ const button=$('generateCharacterRigParts'),status=$('characterRigPartsStatus');
+ if(!$('rigPartsConsent').checked){status.textContent=uiLang==='ru'?'Сначала подтверди отдельное согласие на отправку частей персонажа в AI Horde.':'First confirm separate consent to send character-part prompts to AI Horde.';return}
+ if(button.disabled)return;
+ const characterId=String($('bibleCharacterId').value||'').trim();
+ const profile=characterBible.find(item=>String(item.characterId||'').trim().toLowerCase()===characterId.toLowerCase())||{};
+ const appearanceReference=[
+  $('bibleVisualDescription').value.trim()||profile.visualDescription,
+  $('bibleClothing').value.trim()||profile.clothing,
+  $('bibleColors').value.trim()||profile.colors,
+  $('bibleDistinctiveFeatures').value.trim()||profile.distinctiveFeatures
+ ].filter(Boolean).join('; ');
+ if(!characterId||!appearanceReference){
+  status.textContent=uiLang==='ru'?'Сначала укажи имя и описание внешности персонажа в справочнике, затем сохрани образ.':'Add the character name and appearance details in the character reference first.';
+  return;
+ }
+ const targetIndex=sceneIndex;
+ const targetId=String(sceneMetadata[targetIndex]?.id||('scene_'+(targetIndex+1)));
+ button.disabled=true;
+ status.textContent=uiLang==='ru'?'Подготовка 10 отдельных частей персонажа…':'Preparing 10 separate character parts…';
+ try{
+  const result=await generateCharacterRigParts({
+   characterId,
+   appearanceReference,
+   consentAccepted:$('rigPartsConsent').checked===true,
+   onProgress:progress=>{
+    if(progress.phase==='generating')status.textContent=(uiLang==='ru'?'Создаём часть ':'Generating part ')+progress.index+' / '+progress.total+' · '+progress.partId;
+    else if(progress.phase==='queue')status.textContent='AI Horde · '+progress.partId+' · '+(uiLang==='ru'?'запрос в очереди':'queue request');
+    else if(progress.phase==='part-complete')status.textContent=(uiLang==='ru'?'Готово ':'Completed ')+progress.completed+' / '+progress.total+' · '+(uiLang==='ru'?'ошибок ':'failed ')+progress.failed;
+   }
+  });
+  const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===targetId);
+  if(resolvedIndex>=0){
+   const meta=sceneMetadata[resolvedIndex];
+   const sets={...(meta.characterRigPartSets||{})};
+   sets[characterId]={status:result.status,identitySeed:result.identitySeed,assets:result.assets,failures:result.failures,verificationRequired:result.verificationRequired,readyForAnimation:false,generatedAt:new Date().toISOString()};
+   sceneMetadata[resolvedIndex]={...meta,characterRigPartSets:sets};
+   if(sceneIndex===resolvedIndex)renderCharacterRigPartSets();
+   const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
+   status.textContent=(uiLang==='ru'?'Результат: ':'Result: ')+result.assets.length+'/10 · '+(uiLang==='ru'?'ошибок ':'failed ')+result.failures.length+' · '+(saved?(uiLang==='ru'?'сохранено в черновике':'saved to draft'):(uiLang==='ru'?'не удалось сохранить черновик':'draft save failed'))+'. '+(uiLang==='ru'?'Все части пока не проверены и не подключены к анимации.':'All parts remain unverified and are not attached to animation.');
+  }else{
+   status.textContent=uiLang==='ru'?'Сцена изменилась во время генерации. Результат не привязан к другой сцене.':'The scene changed during generation. Results were not attached to another scene.';
+  }
+ }catch(error){
+  status.textContent=(uiLang==='ru'?'Ошибка генерации частей: ':'Rig-part generation failed: ')+(error?.message||'Unknown error');
+ }finally{
+  button.disabled=!$('rigPartsConsent').checked;
  }
 });
 
