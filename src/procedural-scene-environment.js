@@ -8,7 +8,8 @@ const ENVIRONMENTS = [
 
 /** Infer a small, deterministic environment vocabulary from grounded scene text. */
 export function inferProceduralEnvironment(scene = {}) {
-  const source = [scene.location, scene.environmentDescription, scene.prompt, scene.storyDetail, scene.title]
+  const data = scene && typeof scene === 'object' ? scene : {};
+  const source = [data.location, data.environmentDescription, data.prompt, data.storyDetail, data.title]
     .filter(value => typeof value === 'string').join(' ').slice(0, 8_000);
   return ENVIRONMENTS.find(environment => environment.pattern.test(source))?.type || 'hills';
 }
