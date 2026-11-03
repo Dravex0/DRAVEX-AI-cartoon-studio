@@ -401,7 +401,7 @@ describe('attack and defense motion presets', () => {
 
     assert.ok(anticipation.rightArm.rotation > 0.2, 'arm should visibly wind back before the strike');
     assert.ok(impact.rightArm.rotation < -0.9, 'arm should extend at impact');
-    assert.ok(recoil.rightArm.rotation > -0.2 && recoil.rightArm.rotation < 0, 'arm should recoil after impact');
+    assert.ok(recoil.rightArm.rotation > 0 && recoil.rightArm.rotation < 0.2, 'arm should recoil back toward neutral after impact');
     assert.equal(recovery.root?.x || 0, 0, 'root should return to its neutral horizontal offset');
     assert.equal(recovery.rightArm?.rotation || 0, 0, 'arm should return to its neutral rotation');
   });
