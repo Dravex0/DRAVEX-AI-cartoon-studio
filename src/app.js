@@ -141,15 +141,35 @@ function releaseSceneVideo(meta,index){
  void sceneVideoStorage.delete(key).catch(error=>console.warn("Could not delete persisted scene video:",error));
 }
 async function restorePersistedSceneVideos(){
- let restored=0;
+ let restored=0,discarded=0;
  for(let index=0;index<sceneMetadata.length;index++){
   const meta=sceneMetadata[index];
   try{
    const record=await sceneVideoStorage.get(meta.id);
-   if(record?.blob instanceof Blob){attachSceneVideo(index,meta,record.blob,record.filename||("dravex-scene-"+(index+1)+".webm"));restored++;}
+   if(!record)continue;
+   if(!(record.blob instanceof Blob)||record.blob.size===0){
+    await sceneVideoStorage.delete(meta.id);discarded++;continue;
+   }
+   const entry=attachSceneVideo(index,meta,record.blob,record.filename||("dravex-scene-"+(index+1)+".webm"));
+   try{
+    await waitForSceneVideoReady(entry.video,{timeoutMs:20000});
+    restored++;
+   }catch(decodeError){
+    if(sceneVideoCache.get(sceneVideoKey(index,meta))===entry)sceneVideoCache.delete(sceneVideoKey(index,meta));
+    disposeSceneVideoEntry(entry);
+    await sceneVideoStorage.delete(meta.id);
+    discarded++;
+    console.warn("Discarded persisted scene video that cannot be decoded:",decodeError);
+   }
   }catch(error){console.warn("Could not restore scene video:",error);}
  }
- if(restored){renderComfySceneVideo();if(!playing)draw();$('status').textContent=uiLang==='ru'?'Восстановлено видео сцен: '+restored+'.':'Restored scene videos: '+restored+'.';}
+ if(restored){renderComfySceneVideo();if(!playing)draw();}
+ if(restored||discarded){
+  const message=uiLang==='ru'
+   ?'Восстановлено видео сцен: '+restored+'.'+(discarded?' Удалено повреждённых файлов: '+discarded+'.':'')
+   :'Restored scene videos: '+restored+'.'+(discarded?' Removed invalid files: '+discarded+'.':'');
+  $('status').textContent=message;
+ }
 }
 function getLoadedSceneImage(url){
 const key=String(url||'').trim();
