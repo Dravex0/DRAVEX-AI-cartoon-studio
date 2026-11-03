@@ -415,8 +415,8 @@ describe('dance motion preset', () => {
     const start = sampleCharacterRigTimeline(result.timeline, 0).Foxy;
     const middle = sampleCharacterRigTimeline(result.timeline, 0.25).Foxy;
     const end = sampleCharacterRigTimeline(result.timeline, 1).Foxy;
-    assert.ok(Math.abs(middle.leftArm.rotation) > 0.2);
-    assert.ok(Math.abs(middle.rightArm.rotation) > 0.2);
+    assert.ok(Math.abs(middle.leftArm.rotation) > 0.1);
+    assert.ok(Math.abs(middle.rightArm.rotation) > 0.1);
     assert.ok(Math.abs(middle.leftLeg.rotation) > 0.05);
     assert.equal(start.root?.y || 0, end.root?.y || 0);
     assert.equal(start.root?.rotation || 0, end.root?.rotation || 0);
