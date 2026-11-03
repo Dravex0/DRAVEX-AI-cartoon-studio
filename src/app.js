@@ -1175,6 +1175,7 @@ function renderCharacterRigPartSets(){
   host.appendChild(note);return;
  }
  entries.forEach(([characterId,set])=>{
+  const targetSceneId=String(sceneMetadata[sceneIndex]?.id||('scene_'+(sceneIndex+1)));
   const heading=document.createElement('strong');heading.textContent=characterId+' · '+(set.status||'unverified');
   host.appendChild(heading);
   const grid=document.createElement('div');grid.className='sprite-results';
@@ -1218,15 +1219,17 @@ function renderCharacterRigPartSets(){
      context.drawImage(loaded,0,0);
      const pixels=context.getImageData(0,0,canvas.width,canvas.height);
      const review=reviewCharacterRigPart(asset,pixels,canvas.width,canvas.height,decisions);
-     const current=sceneMetadata[sceneIndex]||{};
+     const targetIndex=sceneMetadata.findIndex(item=>String(item?.id||'')===targetSceneId);
+     if(targetIndex<0)throw new Error('The original scene no longer exists; review was not attached elsewhere.');
+     const current=sceneMetadata[targetIndex]||{};
      const currentSets={...(current.characterRigPartSets||{})};
      const currentSet={...(currentSets[characterId]||set)};
      currentSet.reviews={...(currentSet.reviews||{}),[asset.partId]:review};
      currentSets[characterId]=currentSet;
-     sceneMetadata[sceneIndex]={...current,characterRigPartSets:currentSets};
+     sceneMetadata[targetIndex]={...current,characterRigPartSets:currentSets};
      const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
      note.textContent=(review.approved?(uiLang==='ru'?'Часть одобрена. ':'Part approved. '):(uiLang==='ru'?'Не одобрено: ':'Not approved: '))+review.issues.join(', ')+(saved?' · '+(uiLang==='ru'?'сохранено':'saved'):' · '+(uiLang==='ru'?'не сохранено':'not saved'));
-     renderCharacterRigPartSets();
+     if(sceneMetadata[sceneIndex]?.id===targetSceneId)renderCharacterRigPartSets();
     }catch(error){
      note.textContent=(uiLang==='ru'?'Не удалось проверить пиксели: ':'Pixel review failed: ')+(error?.message||'Unknown error')+(uiLang==='ru'?'. Провайдер должен разрешать CORS.':' Provider must allow CORS.');
     }finally{reviewButton.disabled=false}
@@ -1253,10 +1256,12 @@ function renderCharacterRigPartSets(){
     reviewSummary.textContent=(uiLang==='ru'?'Сборка заблокирована: ':'Assembly blocked: ')+result.issues.join(', ');
     return;
    }
-   const meta=sceneMetadata[sceneIndex]||{};
+   const targetIndex=sceneMetadata.findIndex(item=>String(item?.id||'')===targetSceneId);
+   if(targetIndex<0){reviewSummary.textContent=uiLang==='ru'?'Исходная сцена больше не существует.':'Original scene no longer exists.';return}
+   const meta=sceneMetadata[targetIndex]||{};
    const rigs=(meta.characterRigs||[]).filter(item=>String(item.characterId||'').toLowerCase()!==characterId.toLowerCase());
    rigs.push(result.rig);
-   sceneMetadata[sceneIndex]={...meta,characterRigs:rigs};
+   sceneMetadata[targetIndex]={...meta,characterRigs:rigs};
    const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
    if($('sceneMotionActor')&&[...$('sceneMotionActor').options].some(option=>option.value.toLowerCase()===characterId.toLowerCase())){
     $('sceneMotionActor').value=characterId;syncCharacterRigEditor();
