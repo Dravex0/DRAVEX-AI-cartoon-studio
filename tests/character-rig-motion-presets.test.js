@@ -353,20 +353,22 @@ describe('foot-planted walk and run IK integration', () => {
   });
 });
 
-test('creates distinct attack and defense gestures with recovery at both ends', () => {
-  const attack = createCharacterRigMotionPreset(rig(), 'attack');
-  const defend = createCharacterRigMotionPreset(rig(), 'defend');
-  assert.equal(attack.status, 'ready');
-  assert.equal(defend.status, 'ready');
-  const attackStart = sampleCharacterRigTimeline(attack.timeline, 0).Foxy;
-  const attackMiddle = sampleCharacterRigTimeline(attack.timeline, 0.5).Foxy;
-  const attackEnd = sampleCharacterRigTimeline(attack.timeline, 1).Foxy;
-  assert.ok(attackMiddle.root.x > 0);
-  assert.ok(Math.abs(attackMiddle.rightArm.rotation) > 0.8);
-  assert.equal(attackStart.root?.x || 0, 0);
-  assert.equal(attackEnd.root?.x || 0, 0);
-  const defendMiddle = sampleCharacterRigTimeline(defend.timeline, 0.5).Foxy;
-  assert.ok(defendMiddle.root.y > 0);
-  assert.ok(Math.abs(defendMiddle.leftArm.rotation) > 0.4);
-  assert.ok(Math.abs(defendMiddle.rightArm.rotation) > 0.4);
+describe('attack and defense motion presets', () => {
+  it('creates distinct attack and defense gestures with recovery at both ends', () => {
+    const attack = createCharacterRigMotionPreset(rig(), 'attack');
+    const defend = createCharacterRigMotionPreset(rig(), 'defend');
+    assert.equal(attack.status, 'ready');
+    assert.equal(defend.status, 'ready');
+    const attackStart = sampleCharacterRigTimeline(attack.timeline, 0).Foxy;
+    const attackMiddle = sampleCharacterRigTimeline(attack.timeline, 0.5).Foxy;
+    const attackEnd = sampleCharacterRigTimeline(attack.timeline, 1).Foxy;
+    assert.ok(attackMiddle.root.x > 0);
+    assert.ok(Math.abs(attackMiddle.rightArm.rotation) > 0.8);
+    assert.equal(attackStart.root?.x || 0, 0);
+    assert.equal(attackEnd.root?.x || 0, 0);
+    const defendMiddle = sampleCharacterRigTimeline(defend.timeline, 0.5).Foxy;
+    assert.ok(defendMiddle.root.y > 0);
+    assert.ok(Math.abs(defendMiddle.leftArm.rotation) > 0.4);
+    assert.ok(Math.abs(defendMiddle.rightArm.rotation) > 0.4);
+  });
 });
