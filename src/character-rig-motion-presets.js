@@ -9,7 +9,7 @@ const PRESETS = Object.freeze({
   jump: { label: 'Jump / Прыжок', frames: 5 },
   dodge: { label: 'Dodge / Уклонение', frames: 5 },
   wave: { label: 'Wave / Приветствие', frames: 5 },
-  attack: { label: 'Attack / Атака', frames: 5 },
+  attack: { label: 'Attack / Атака', frames: 7 },
   defend: { label: 'Defend / Защита', frames: 5 }
 });
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -203,14 +203,28 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightLowerArm') rotation = -0.28 + 0.1 * Math.sin(phase * Math.PI * 2);
       if (role === 'head') rotation = 0.06 * Math.sin(phase * Math.PI * 2);
     } else if (preset === 'attack') {
-      const strike = Math.sin(Math.PI * phase);
-      if (role === 'root') { x = 0.055 * strike; rotation = -0.035 * strike; }
-      if (role === 'rightArm' || role === 'arm') rotation = -1.05 * strike;
-      if (role === 'leftArm') rotation = 0.22 * strike;
-      if (role === 'rightLowerArm') rotation = 0.32 * strike;
-      if (role === 'head') rotation = -0.08 * strike;
-      if (role === 'leftLeg') rotation = -0.12 * strike;
-      if (role === 'rightLeg') rotation = 0.12 * strike;
+      // Six distinct phases: neutral, anticipation, release, impact,
+      // recoil, and recovery. Keep the strike readable instead of using
+      // one symmetric sine pulse that has no wind-up or follow-through.
+      const windUp = phase <= 1 / 6
+        ? phase * 6
+        : phase <= 2 / 6 ? (2 / 6 - phase) * 3 : 0;
+      const strike = phase >= 2 / 6 && phase <= 4 / 6
+        ? Math.sin(((phase - 2 / 6) / (2 / 6)) * Math.PI)
+        : 0;
+      const recoil = phase >= 4 / 6 && phase <= 5 / 6
+        ? 0.35 * (1 - (phase - 4 / 6) * 6)
+        : 0;
+      if (role === 'root') {
+        x = -0.02 * windUp + 0.055 * strike + 0.018 * recoil;
+        rotation = 0.045 * windUp - 0.035 * strike + 0.02 * recoil;
+      }
+      if (role === 'rightArm' || role === 'arm') rotation = 0.32 * windUp - 1.05 * strike + 0.2 * recoil;
+      if (role === 'leftArm') rotation = -0.12 * windUp + 0.22 * strike;
+      if (role === 'rightLowerArm') rotation = -0.12 * windUp + 0.32 * strike - 0.08 * recoil;
+      if (role === 'head') rotation = 0.035 * windUp - 0.08 * strike + 0.025 * recoil;
+      if (role === 'leftLeg') rotation = 0.06 * windUp - 0.12 * strike;
+      if (role === 'rightLeg') rotation = -0.06 * windUp + 0.12 * strike;
     } else if (preset === 'defend') {
       const brace = Math.sin(Math.PI * phase);
       if (role === 'root') { y = 0.035 * brace; rotation = -0.08 * brace; }

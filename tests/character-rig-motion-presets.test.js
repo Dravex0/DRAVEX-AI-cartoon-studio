@@ -388,6 +388,24 @@ describe('foot-planted walk and run IK integration', () => {
 });
 
 describe('attack and defense motion presets', () => {
+
+  it('gives attack a visible anticipation, impact, recoil, and neutral recovery', () => {
+    const result = createCharacterRigMotionPreset(rig(), 'attack');
+    assert.equal(result.status, 'ready');
+    assert.equal(result.timeline.keyframes.length, 7);
+    const poseAt = progress => sampleCharacterRigTimeline(result.timeline, progress).Foxy || {};
+    const anticipation = poseAt(1 / 6);
+    const impact = poseAt(0.5);
+    const recoil = poseAt(4 / 6);
+    const recovery = poseAt(1);
+
+    assert.ok(anticipation.rightArm.rotation > 0.2, 'arm should visibly wind back before the strike');
+    assert.ok(impact.rightArm.rotation < -0.9, 'arm should extend at impact');
+    assert.ok(recoil.rightArm.rotation > 0 && recoil.rightArm.rotation < 0.2, 'arm should recoil back toward neutral after impact');
+    assert.equal(recovery.root?.x || 0, 0, 'root should return to its neutral horizontal offset');
+    assert.equal(recovery.rightArm?.rotation || 0, 0, 'arm should return to its neutral rotation');
+  });
+
   it('creates distinct attack and defense gestures with recovery at both ends', () => {
     const attack = createCharacterRigMotionPreset(rig(), 'attack');
     const defend = createCharacterRigMotionPreset(rig(), 'defend');
