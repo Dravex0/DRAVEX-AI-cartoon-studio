@@ -107,3 +107,23 @@ test('assigns ease-out and ease-in profiles to jump rise and landing', () => {
   assert.equal(result.timeline.phases[0].easing, 'ease-out');
   assert.equal(result.timeline.phases[1].easing, 'ease-in');
 });
+
+
+test('plans a semantic sidestep as an out-and-back dodge with rotation and compression', () => {
+  const result = planCharacterMotionFromActionTimeline(makeScene('sidesteps quickly to the left'), layers);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 2);
+  const [evade, recover] = result.timeline.phases;
+  assert.equal(evade.easing, 'ease-out');
+  assert.equal(recover.easing, 'ease-in');
+  assert.ok(evade.motion.to.x < evade.motion.from.x);
+  assert.ok(evade.motion.to.rotation < evade.motion.from.rotation);
+  assert.ok(evade.motion.to.scale < evade.motion.from.scale);
+  assert.deepEqual(recover.motion.to, evade.motion.from);
+});
+
+test('does not animate an ambiguous duck when no dodge direction is stated', () => {
+  const result = planCharacterMotionFromActionTimeline(makeScene('ducks to avoid the falling branch'), layers);
+  assert.equal(result.status, 'no-unambiguous-motion');
+  assert.equal(result.timeline, null);
+});
