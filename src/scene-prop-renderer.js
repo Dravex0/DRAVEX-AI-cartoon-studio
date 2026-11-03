@@ -1,3 +1,5 @@
+import { applyCharacterRigPose, validateCharacterRig } from './character-rig.js';
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const clean = value => String(value ?? '').trim();
 const key = value => clean(value).toLocaleLowerCase();
@@ -13,11 +15,34 @@ function propKind(name) {
 }
 
 /**
+ * Resolve an explicitly named hand/paw anchor from the same posed rig used by the renderer.
+ * Returns null rather than guessing when the rig has no unambiguous contact part.
+ */
+export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}) {
+  const actorKey = key(characterId);
+  if (!actorKey || !Array.isArray(rigs)) return null;
+  const input = rigs.find(candidate => key(candidate?.characterId) === actorKey);
+  if (!input) return null;
+  const report = validateCharacterRig(input);
+  if (!report.passed) return null;
+  const pose = Object.entries(rigPoses && typeof rigPoses === 'object' ? rigPoses : {})
+    .find(([id]) => key(id) === actorKey)?.[1] || {};
+  const posedParts = applyCharacterRigPose(report.rig.parts, report.rig, pose);
+  const anchors = posedParts.filter(part => /hand|paw|wrist| кист|лап/i.test(part.id)
+    || /hand|paw|wrist|кисть|лап/i.test(part.boneId));
+  if (anchors.length !== 1) return null;
+  const anchor = anchors[0];
+  if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)
+    || anchor.x < 0 || anchor.x > 1 || anchor.y < 0 || anchor.y > 1) return null;
+  return { x: anchor.x, y: anchor.y, partId: anchor.id };
+}
+
+/**
  * Builds a deterministic visual plan from explicit, source-grounded prop holder changes.
  * Uses the authored action phase when available; older scenes use a deterministic
  * latter-half fallback because state changes do not carry their own event timestamps.
  */
-export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progress = 1) {
+export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progress = 1, runtime = {}) {
   const changes = Array.isArray(scene?.stateChanges) ? scene.stateChanges : [];
   const layers = Array.isArray(characterLayers) ? characterLayers : [];
   const p = clamp(Number.isFinite(progress) ? progress : 1, 0, 1);
@@ -46,7 +71,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     const heldByActor = change.value != null && key(change.value) === key(actorId);
     const wasHeldByActor = change.previousValue != null && key(change.previousValue) === key(actorId);
     const ground = { x: 0.68, y: 0.79 };
-    const hand = { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96), y: clamp(actorY - 0.08, 0.08, 0.9) };
+    const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
+    const hand = rigAnchor ? { x: rigAnchor.x, y: rigAnchor.y } : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96), y: clamp(actorY - 0.08, 0.08, 0.9) };
     const from = wasHeldByActor ? hand : ground;
     const to = heldByActor ? hand : ground;
     const x = from.x + (to.x - from.x) * eased;
@@ -110,11 +136,11 @@ function drawProp(context, prop, x, y, time) {
 }
 
 /** Draws explicit story props in the shared Canvas preview/export path. */
-export function drawSceneProps(context, scene, characterLayers, progress, width, height, time = 0) {
+export function drawSceneProps(context, scene, characterLayers, progress, width, height, time = 0, runtime = {}) {
   if (!context || typeof context.save !== 'function' || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return { drawn: 0, skipped: 0 };
   }
-  const plan = buildScenePropRenderPlan(scene, characterLayers, progress);
+  const plan = buildScenePropRenderPlan(scene, characterLayers, progress, runtime);
   for (const prop of plan) drawProp(context, prop, prop.x * width, prop.y * height, Number.isFinite(time) ? time : 0);
   return { drawn: plan.length, skipped: 0, props: plan };
 }
