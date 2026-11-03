@@ -521,7 +521,720 @@ $('generateCharacterRigFromStory').addEventListener('click',()=>{
   $('characterRigStatus').textContent='Story animation generated for '+generatedScenes+' scene(s), '+generatedActions+' action(s). '+scenesWithoutRig+' scene(s) have no attached segmented rig; '+scenesWithoutActions+' scene(s) have no supported validated actions; '+preservedTimelines+' existing timeline(s) preserved.'+(summaries.length?' Details: '+summaries.join(' · '):'')+' Preview and canvas export sample the same rig timelines.';
   sceneMotionSceneIndex=-1;
   if(!playing)draw();
+});
+
+function rigJsonTemplate(characterId){
+ return JSON.stringify({
+  schemaVersion:1,characterId,
+  bones:[{id:'root',parentId:null,pivotX:0.5,pivotY:0.5}],
+  parts:[{id:'body',boneId:'root',imageUrl:'https://example.com/replace-with-body.png',x:0.5,y:0.5,width:0.3,height:0.5,rotation:0,zIndex:0}]
+ },null,2);
+}
+function syncCharacterRigEditor(){
+ const meta=sceneMetadata[sceneIndex]||{};
+ const actorId=$('sceneMotionActor').value;
+ const rig=(meta.characterRigs||[]).find(item=>String(item.characterId||'').toLowerCase()===String(actorId||'').toLowerCase());
+ $('characterRigJson').value=rig?JSON.stringify(rig,null,2):(actorId?rigJsonTemplate(actorId):'');
+ const poses=characterRigPosesFor(actorId,meta.characterRigPoses);
+ $('characterRigPoseJson').value=JSON.stringify(poses,null,2);
+ const rigBones=rig?.bones||[];
+ const neutralPose={};
+ rigBones.forEach(bone=>{neutralPose[bone.id]={x:0,y:0,rotation:0}});
+ const exampleTimeline={schemaVersion:1,keyframes:[
+  {time:0,easing:'linear',poses:{[actorId||'Character']:neutralPose}},
+  {time:1,easing:'ease-in-out',poses:{[actorId||'Character']:Object.fromEntries(rigBones.map(bone=>[bone.id,{x:0,y:0,rotation:bone.id.toLowerCase().includes('arm')?0.25:0}]))}}
+ ]};
+ $('characterRigTimelineJson').value=meta.characterRigTimeline
+  ?JSON.stringify(meta.characterRigTimeline,null,2)
+  :JSON.stringify(exampleTimeline,null,2);
+ $('characterRigJson').disabled=!actorId;
+ $('characterRigPoseJson').disabled=!actorId||!rig;
+ $('applyCharacterRig').disabled=!actorId;
+ $('applyCharacterRigPose').disabled=!actorId||!rig;
+ $('characterRigTimelineJson').disabled=!actorId||!rig;
+ $('applyCharacterRigTimeline').disabled=!actorId||!rig;
+ $('characterRigScrubber').disabled=!actorId||!rig||!meta.characterRigTimeline?.keyframes?.length;
+ $('resetCharacterRigScrubber').disabled=!actorId||!rig||!meta.characterRigTimeline?.keyframes?.length;
+ $('characterRigMotionPreset').disabled=!actorId||!rig;
+ $('generateCharacterRigPreset').disabled=!actorId||!rig;
+ $('characterRigStatus').textContent=rig
+  ? 'Rig loaded for '+actorId+'. '+rig.bones.length+' bones · '+rig.parts.length+' image parts.'
+  : 'Choose a character sprite first. Replace the example URL with transparent images for separate body parts.';
+}
+$('applyCharacterRig').addEventListener('click',()=>{
+ const actorId=$('sceneMotionActor').value;
+ if(!actorId){$('characterRigStatus').textContent='Add a character sprite to this scene first.';return}
+ try{
+  const parsed=JSON.parse($('characterRigJson').value);
+  const report=validateCharacterRig(parsed);
+  if(!report.passed){
+   $('characterRigStatus').textContent='Rig rejected: '+report.issues.map(issue=>issue.message).join(' ');
+   return;
+  }
+  if(report.rig.characterId.toLowerCase()!==actorId.toLowerCase()){
+   $('characterRigStatus').textContent='Rig characterId must match selected sprite: '+actorId+'.';
+   return;
+  }
+  const meta=sceneMetadata[sceneIndex]||{};
+  const rigs=(meta.characterRigs||[]).filter(item=>String(item.characterId||'').toLowerCase()!==actorId.toLowerCase());
+  rigs.push(report.rig);
+  sceneMetadata[sceneIndex]={...meta,characterRigs:rigs};
+  syncCharacterRigEditor();
+  if(!playing)draw();
+  $('characterRigStatus').textContent='Rig validated and attached: '+report.rig.bones.length+' bones, '+report.rig.parts.length+' parts. Preview uses rig parts when every image loads.';
+ }catch(error){$('characterRigStatus').textContent='Invalid JSON: '+error.message}
+});
+$('applyCharacterRigTimeline').addEventListener('click',()=>{
+ const meta=sceneMetadata[sceneIndex]||{};
+ const rigs=Array.isArray(meta.characterRigs)?meta.characterRigs:[];
+ if(!rigs.length){$('characterRigStatus').textContent='Attach at least one valid rig before adding bone animation.';return}
+ try{
+  const parsed=JSON.parse($('characterRigTimelineJson').value);
+  const report=validateCharacterRigTimeline(parsed);
+  if(!report.passed){
+   $('characterRigStatus').textContent='Animation rejected: '+report.issues.map(issue=>issue.message).join(' ');
+   return;
+  }
+  const rigMap=new Map(rigs.map(rig=>[String(rig.characterId||'').toLowerCase(),new Set((rig.bones||[]).map(bone=>String(bone.id||'').toLowerCase()))]));
+  const unknown=[];
+  report.timeline.keyframes.forEach((keyframe,index)=>{
+   Object.entries(keyframe.poses).forEach(([characterId,bones])=>{
+    const allowed=rigMap.get(characterId.toLowerCase());
+    if(!allowed){unknown.push('keyframe '+index+': '+characterId+' has no attached rig');return}
+    Object.keys(bones).forEach(boneId=>{if(!allowed.has(boneId.toLowerCase()))unknown.push('keyframe '+index+': '+characterId+'.'+boneId+' is not in its rig')});
+   });
+  });
+  if(unknown.length){$('characterRigStatus').textContent='Animation references invalid rigs/bones: '+unknown.join('; ');return}
+  sceneMetadata[sceneIndex]={...meta,characterRigTimeline:report.timeline};
+  $('characterRigScrubber').disabled=false;
+  $('resetCharacterRigScrubber').disabled=false;
+  rigPreviewProgress=0;
+  $('characterRigScrubber').value='0';
+  $('characterRigScrubberValue').textContent='0%';
+  $('characterRigStatus').textContent='Bone animation validated: '+report.timeline.keyframes.length+' keyframes. Preview and canvas export sample the same timeline.';
+  sceneMotionSceneIndex=-1;
+  if(!playing)draw();
+ }catch(error){$('characterRigStatus').textContent='Invalid animation JSON: '+error.message}
+});
+$('applyCharacterRigPose').addEventListener('click',()=>{
+ const actorId=$('sceneMotionActor').value;
+ const meta=sceneMetadata[sceneIndex]||{};
+ const rig=(meta.characterRigs||[]).find(item=>String(item.characterId||'').toLowerCase()===String(actorId||'').toLowerCase());
+ if(!rig){$('characterRigStatus').textContent='Attach a valid rig first.';return}
+ try{
+  const parsed=JSON.parse($('characterRigPoseJson').value);
+  const normalized=normalizeCharacterRigPoses({[actorId]:parsed})[actorId]||{};
+  const validBoneIds=new Set(rig.bones.map(bone=>bone.id.toLowerCase()));
+  const unknown=Object.keys(normalized).filter(id=>!validBoneIds.has(id.toLowerCase()));
+  if(unknown.length){$('characterRigStatus').textContent='Unknown bone IDs: '+unknown.join(', ');return}
+  sceneMetadata[sceneIndex]={...meta,characterRigPoses:{...(meta.characterRigPoses||{}),[actorId]:normalized}};
+  $('characterRigStatus').textContent='Bone pose saved for '+actorId+'. Preview and canvas export use the same scene compositor.';
+  if(!playing)draw();
+ }catch(error){$('characterRigStatus').textContent='Invalid pose JSON: '+error.message}
+});
+
+$('applyCharacterMotion').addEventListener('click',()=>{
+ const meta=sceneMetadata[sceneIndex]||{};
+ const actorId=$('sceneMotionActor').value;
+ const layer=(meta.characterLayers||[]).find(item=>String(item.characterId||'')===actorId);
+ if(!layer){$('characterMotionStatus').textContent='Add a character sprite to this scene first.';return}
+ const number=id=>Number($(id).value);
+ try{
+   const timeline=upsertCharacterMotionPhase(meta.characterMotionTimeline,{
+     actorId,
+     start:number('sceneMotionStart'),
+     end:number('sceneMotionEnd'),
+     easing:$('sceneMotionEasing').value,
+     from:{x:Number(layer.x),y:Number(layer.y),scale:Number(layer.scale),rotation:Number(layer.rotation),opacity:Number(layer.opacity)},
+     to:{x:number('sceneMotionX'),y:number('sceneMotionY'),scale:number('sceneMotionScale'),rotation:number('sceneMotionRotation')*Math.PI/180,opacity:number('sceneMotionOpacity')}
+   });
+   sceneMetadata[sceneIndex]={...meta,characterMotionTimeline:timeline};
+   sceneMotionSceneIndex=-1;
+   $('characterMotionStatus').textContent='Motion saved for '+actorId+'. Play the scene or export to see the movement.';
+   if(!playing)draw();
+ }catch(error){$('characterMotionStatus').textContent=error.message||'Invalid motion settings.'}
+});
+$('generateCharacterMotion').addEventListener('click',()=>{
+ const meta=sceneMetadata[sceneIndex]||{};
+ const result=planCharacterMotionFromActionTimeline(meta,meta.characterLayers||[]);
+ if(!result.timeline){
+   $('characterMotionStatus').textContent=result.reason||'No safe motion plan could be generated.';
+   return;
+ }
+ sceneMetadata[sceneIndex]={...meta,characterMotionTimeline:result.timeline};
+ sceneMotionSceneIndex=-1;
+ const skipped=result.skipped?.length||0;
+ $('characterMotionStatus').textContent='Generated '+result.generatedCount+' motion keyframe phases from grounded story actions.'+(skipped?' Skipped '+skipped+' ambiguous or unavailable action(s).':'')+' Preview and canvas export use this motion timeline.';
+ syncCharacterMotionEditor();
+ if(!playing)draw();
+});
+function syncFacialRigEditor(){
+ const meta=sceneMetadata[sceneIndex]||{};
+ const rigs=Array.isArray(meta.characterFacialRigs)?meta.characterFacialRigs:[];
+ const characterId=String($("facialCharacterId")?.value||"").trim()||rigs[0]?.characterId||meta.characters?.[0]||$("character").value||"";
+ const rig=rigs.find(item=>String(item?.characterId||"").toLowerCase()===String(characterId).toLowerCase())||null;
+ $("facialCharacterId").value=characterId;
+ $("facialHeadBoneId").value=rig?.headBoneId||$("facialHeadBoneId").value||"head";
+ const select=$("facialPartSelect"),previous=select.value;
+ select.replaceChildren(new Option("New part / Новая часть",""));
+ for(const part of rig?.parts||[])select.add(new Option(String(part.id)+" · "+String(part.role),String(part.id)));
+ select.value=(rig?.parts||[]).some(part=>String(part.id)===previous)?previous:"";
+ const part=(rig?.parts||[]).find(item=>String(item.id)===select.value)||null;
+ $("facialPartId").value=part?.id||"";$("facialPartRole").value=part?.role||"eye-left";$("facialPartImageUrl").value=part?.imageUrl||"";
+ $("facialPartX").value=String(part?.x??0.5);$("facialPartY").value=String(part?.y??0.5);$("facialPartWidth").value=String(part?.width??0.1);$("facialPartHeight").value=String(part?.height??0.1);
+ $("facialPartRotation").value=String((Number(part?.rotation)||0)*180/Math.PI);$("facialPartZIndex").value=String(part?.zIndex??10);
+ const expression=meta.characterFacialExpressions?.[characterId]||{};
+ $("facialExpressionPreset").value=expression.name||"neutral";$("facialEyeOpen").value=String(expression.eyeOpen??1);$("facialMouthOpen").value=String(expression.mouthOpen??0);$("facialBrowY").value=String(expression.browY??0);$("facialMouthWidth").value=String(expression.mouthWidth??1);
+ $("removeFacialPart").disabled=!part;
+}
+function syncSceneEditor(){
+const meta=sceneMetadata[sceneIndex]||{};
+$('sceneTitle').value=titles[sceneIndex]||'';
+$('sceneDescription').value=descriptions[sceneIndex]||'';
+$('sceneCharacters').value=(Array.isArray(meta.characters)?meta.characters:[]).join(', ');
+$('sceneDialogue').value=formatDialogueLines(meta.dialogue);
+$('sceneCamera').value=meta.camera||'';
+$('sceneImagePrompt').value=meta.imagePrompt||meta.prompt||descriptions[sceneIndex]||'';
+$('sceneMotionPrompt').value=meta.motionPrompt||meta.visibleAction||descriptions[sceneIndex]||'';
+$('sceneStartState').value=meta.startState||'';
+$('sceneEndState').value=meta.endState||'';
+$('sceneNegativePrompt').value=meta.negativePrompt||'No extra characters, no character redesign, no duplicate body parts, no text or watermark.';
+$('sceneContinuityLock').value=meta.continuityLock||'';
+updateProductionPreview();
+renderCharacterBible();
+renderGeneratedSceneImage();
+renderCharacterSpriteAssets();
+syncCharacterMotionEditor();
+syncCharacterRigEditor();
+renderComfySceneVideo();
+renderSceneVoiceAudio();
+refreshSceneVoiceControls();
+syncFacialRigEditor();
+}
+['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock','sceneCharacters'].forEach(id=>$(id).addEventListener('input',updateProductionPreview));
+$("facialPartSelect").addEventListener("change",syncFacialRigEditor);
+$("facialPartImageFile").addEventListener("change",async event=>{
+const file=event.target.files?.[0];if(!file)return;const status=$("facialAssetUploadStatus");
+try{
+const randomId=globalThis.crypto?.randomUUID?.().replace(/-/g,"")||Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+const assetId="faceasset_"+randomId;await facialAssetStorage.put(assetId,file,file.name);
+$("facialPartImageUrl").value="dravex-facial-asset://"+assetId;
+status.textContent=uiLang==="ru"?"Изображение сохранено только на этом устройстве.":"Image saved on this device only.";
+const saved=writeLocalStorage("dravex-cartoon-draft",JSON.stringify({idea:$("idea").value,character:$("character").value,style:$("style").value,canvasFormat:activeCanvasFormat,imageQuality:$("imageQuality").value,duration:$("duration").value,language:$("language").value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
+if(!saved)status.textContent+=" Draft storage is full; save the project manually.";
+}catch(error){status.textContent=error.message||"Could not save facial image.";event.target.value="";}
+});
+$("saveFacialPart").addEventListener("click",()=>{
+ const result=upsertCharacterFacialPart(sceneMetadata[sceneIndex]||{},{characterId:$("facialCharacterId").value,headBoneId:$("facialHeadBoneId").value,partId:$("facialPartId").value,role:$("facialPartRole").value,imageUrl:$("facialPartImageUrl").value,x:Number($("facialPartX").value),y:Number($("facialPartY").value),width:Number($("facialPartWidth").value),height:Number($("facialPartHeight").value),rotation:Number($("facialPartRotation").value)*Math.PI/180,zIndex:Number($("facialPartZIndex").value)});
+ if(result.status==="invalid"){$("facialEditorStatus").textContent=result.issues.map(issue=>issue.message).join(" ");return;}
+ sceneMetadata[sceneIndex]=result.scene;
+ const draftSaved=writeLocalStorage("dravex-cartoon-draft",JSON.stringify({idea:$("idea").value,character:$("character").value,style:$("style").value,canvasFormat:activeCanvasFormat,imageQuality:$("imageQuality").value,duration:$("duration").value,language:$("language").value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
+ if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
+ syncFacialRigEditor();if(!playing)draw();
+ $("facialEditorStatus").textContent=(result.status==="updated"?"Facial part updated. / Часть лица обновлена.":"Facial part added. / Часть лица добавлена.")+(draftSaved?" Draft saved.":" Draft could not be saved; use Save project.");
+});
+$("removeFacialPart").addEventListener("click",()=>{
+ const characterId=String($("facialCharacterId").value||"").trim(),partId=$("facialPartSelect").value;
+ if(!characterId||!partId)return;
+ const meta=sceneMetadata[sceneIndex]||{},rigs=Array.isArray(meta.characterFacialRigs)?meta.characterFacialRigs:[];
+ const next=rigs.map(rig=>String(rig.characterId).toLowerCase()===characterId.toLowerCase()?{...rig,parts:(rig.parts||[]).filter(part=>String(part.id)!==partId)}:rig).filter(rig=>rig.parts?.length);
+ sceneMetadata[sceneIndex]={...meta,characterFacialRigs:next};syncFacialRigEditor();if(!playing)draw();
+ $("facialEditorStatus").textContent="Facial part removed. / Часть лица удалена.";
+});
+$("applyFacialExpression").addEventListener("click",()=>{
+ const result=applyCharacterFacialExpressionToScene(sceneMetadata[sceneIndex]||{},$("facialCharacterId").value,$("facialExpressionPreset").value,{eyeOpen:Number($("facialEyeOpen").value),mouthOpen:Number($("facialMouthOpen").value),browY:Number($("facialBrowY").value),mouthWidth:Number($("facialMouthWidth").value)});
+ if(result.status!=="ready"){$("facialEditorStatus").textContent=result.issues.map(issue=>issue.message).join(" ");return;}
+ sceneMetadata[sceneIndex]=result.scene;if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
+ if(!playing)draw();$("facialEditorStatus").textContent="Expression applied to preview. / Эмоция применена к предпросмотру.";
+});
+function updateStoryQA(){
+  const safeText=value=>{
+    if(value===null||value===undefined)return '';
+    if(typeof value==='string'||typeof value==='number')return String(value).trim();
+    return '';
+  };
+  const sourceTitles=Array.isArray(titles)?titles:[];
+  const sourceDescriptions=Array.isArray(descriptions)?descriptions:[];
+  const rawDuration=Number($('duration')?.value);
+  const duration=Number.isFinite(rawDuration)&&rawDuration>=0.25&&rawDuration<=30?rawDuration:3;
+  const scenes=sourceTitles.map((title,index)=>{const metadata=sceneMetadata[index]||{};const description=safeText(sourceDescriptions[index]);return {
+    id:safeText(metadata.id)||'scene_'+(index+1),order:index+1,title:safeText(title),
+    prompt:safeText(metadata.prompt)||description,visibleAction:safeText(metadata.visibleAction)||description,
+    camera:safeText(metadata.camera),duration
+  }});
+  let qa;
+  try{qa=validateStoryScenes(scenes)}
+  catch(error){
+    console.error('Storyboard QA failed:',error);
+    qa={ok:false,errorCount:1,warningCount:0,totalDurationSeconds:0,issues:[{severity:'error',message:'Could not validate the storyboard.'}]};
+  }
+  const issues=Array.isArray(qa.issues)?qa.issues:[];
+  const report=$('qaReport');
+  const errors=Number.isFinite(qa.errorCount)?qa.errorCount:1;
+  const warnings=Number.isFinite(qa.warningCount)?qa.warningCount:0;
+  const statusClass=errors>0?'qa-report--error':warnings>0?'qa-report--warning':'qa-report--ok';
+  const visibleIssues=issues.filter(issue=>issue&&safeText(issue.message));
+  if(report){
+    report.replaceChildren();
+    report.classList.add('qa-report');
+    report.classList.remove('qa-report--ok','qa-report--warning','qa-report--error');
+    report.classList.add(statusClass);
+    const heading=document.createElement('p');
+    heading.className='qa-report__summary';
+    heading.textContent=(uiLang==='ru'?'Проверка раскадровки: ':'Storyboard QA: ')+
+      (errors===0?(uiLang==='ru'?'критических ошибок нет':'no critical errors'):(uiLang==='ru'?'ошибок: ':'errors: ')+errors)+
+      ' · '+(uiLang==='ru'?'предупреждений: ':'warnings: ')+warnings+
+      ' · '+(uiLang==='ru'?'сцен: ':'scenes: ')+scenes.length;
+    report.appendChild(heading);
+    if(visibleIssues.length){
+      const list=document.createElement('ul');
+      list.className='qa-report__list';
+      visibleIssues.slice(0,5).forEach(issue=>{
+        const item=document.createElement('li');
+        const severity=issue.severity==='error'?'error':issue.severity==='warning'?'warning':'info';
+        item.className='qa-report__item'+(severity==='error'?' qa-report__item--error':severity==='warning'?' qa-report__item--warning':'');
+        const badge=document.createElement('span');
+        badge.className='qa-badge';
+        badge.textContent=severity==='error'?(uiLang==='ru'?'Ошибка':'Error'):severity==='warning'?(uiLang==='ru'?'Внимание':'Warning'):(uiLang==='ru'?'Совет':'Info');
+        item.appendChild(badge);
+        item.appendChild(document.createTextNode(safeText(issue.message)));
+        list.appendChild(item);
+      });
+      if(visibleIssues.length>5){
+        const more=document.createElement('li');
+        more.className='qa-report__item qa-report__item--more';
+        more.textContent=uiLang==='ru'?'И ещё замечаний: '+(visibleIssues.length-5):'And '+(visibleIssues.length-5)+' more issue(s).';
+        list.appendChild(more);
+      }
+      report.appendChild(list);
+    }
+    report.dataset.errorCount=String(errors);
+    report.dataset.warningCount=String(warnings);
+    report.setAttribute('aria-live','polite');
+  }
+  return {...qa,issues,scenes,canContinue:errors===0};
+}
+$('applyScene').onclick=()=>{
+const title=$('sceneTitle').value.trim(),description=$('sceneDescription').value.trim();
+if(!title||!description){$('status').textContent=uiLang==='ru'?'Заполни название и описание сцены.':'Please enter both a scene title and description.';return}
+const imagePrompt=$('sceneImagePrompt').value.trim()||description;
+const motionPrompt=$('sceneMotionPrompt').value.trim()||description;
+const characters=normalizeSceneCast($('sceneCharacters').value,sceneMetadata[sceneIndex]?.characters);
+titles[sceneIndex]=title;descriptions[sceneIndex]=description;
+const previousDialogue=formatDialogueLines(sceneMetadata[sceneIndex]?.dialogue);const nextDialogue=$('sceneDialogue').value.trim();const dialogueChanged=previousDialogue!==nextDialogue;sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),title,description,characters,dialogue:parseDialogueLines($('sceneDialogue').value,storyLanguage()),voiceCues:dialogueChanged?[]:(sceneMetadata[sceneIndex]?.voiceCues||[]),voiceTimeline:dialogueChanged?null:(sceneMetadata[sceneIndex]?.voiceTimeline||null),prompt:imagePrompt,imagePrompt,visibleAction:motionPrompt,motionPrompt,camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim()};if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
+$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+title;
+renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=(sceneEditorLabels[uiLang]||sceneEditorLabels.en).updated
+};
+$('addScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length>=12){$('status').textContent=t.limit;return}titles.push(uiLang==='ru'?'Новая сцена':'New scene');descriptions.push(uiLang==='ru'?'Добавь описание этой сцены.':'Add a description for this scene.');sceneMetadata.push({id:createSceneId(),title:titles[titles.length-1],description:descriptions[descriptions.length-1],prompt:descriptions[descriptions.length-1],visibleAction:descriptions[descriptions.length-1],camera:''});if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};sceneIndex=titles.length-1;$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();$('status').textContent=t.added};
+$('deleteScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length<=1){$('status').textContent=t.minimum;return}const removedScene=sceneMetadata[sceneIndex]||{};releaseSceneVideo(removedScene,sceneIndex);titles.splice(sceneIndex,1);descriptions.splice(sceneIndex,1);sceneMetadata.splice(sceneIndex,1);if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};sceneIndex=Math.min(sceneIndex,titles.length-1);$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=t.deleted};
+
+function renderScenes(){
+  const box=$('scenes');
+  box.replaceChildren();
+  titles.forEach((title,i)=>{
+    const button=document.createElement('button');
+    button.type='button';
+    button.className='scene';
+    button.style.textAlign='left';
+    button.style.color='var(--text)';
+    button.style.width='100%';
+    button.style.background=i===sceneIndex?'#28243f':'#11131e';
+
+    const content=document.createElement('span');
+    const heading=document.createElement('strong');
+    heading.textContent=tr('sceneLabel')+' '+(i+1)+' · '+String(title??'');
+    const description=document.createElement('small');
+    description.textContent=String(descriptions[i]??'');
+    const actionLabel=document.createElement('small');
+    const actionNames={en:{idle:'Action: still moment',run:'Action: running / chase',walk:'Action: walking',jump:'Action: jump',dance:'Action: dancing',turn:'Action: turning',talk:'Action: talking',surprised:'Mood: surprised',float:'Action: floating',vanish:'Action: disappear',magic:'Action: magic effect',sad:'Mood: sad / afraid',happy:'Mood: happy'},ru:{idle:'Действие: спокойный момент',run:'Действие: бег / погоня',walk:'Действие: ходьба',jump:'Действие: прыжок',dance:'Действие: танец',turn:'Действие: поворот',talk:'Действие: разговор',surprised:'Эмоция: удивление',float:'Действие: парение',vanish:'Действие: исчезновение',magic:'Действие: магический эффект',sad:'Эмоция: грусть / страх',happy:'Эмоция: радость'},uk:{idle:'Дія: спокійний момент',run:'Дія: біг / погоня',walk:'Дія: ходьба',jump:'Дія: стрибок',dance:'Дія: танець',turn:'Дія: поворот',talk:'Дія: розмова',surprised:'Емоція: здивування',float:'Дія: ширяння',vanish:'Дія: зникнення',magic:'Дія: магічний ефект',sad:'Емоція: сум / страх',happy:'Емоція: радість'},es:{idle:'Acción: momento tranquilo',run:'Acción: correr / perseguir',walk:'Acción: caminar',jump:'Acción: saltar',dance:'Acción: bailar',turn:'Acción: girar',talk:'Acción: hablar',surprised:'Emoción: sorpresa',float:'Acción: flotar',vanish:'Acción: desaparecer',magic:'Acción: efecto mágico',sad:'Emoción: tristeza / miedo',happy:'Emoción: alegría'}};
+    const actionLanguage=actionNames[storyLanguage()]||actionNames.en;
+    actionLabel.textContent=actionLanguage[getSceneAction(i)]||actionLanguage.idle;
+    actionLabel.style.opacity='.78';
+    const cameraLabel=document.createElement('small');
+    const cameraPlan=String(sceneMetadata[i]?.camera||'').trim();
+    cameraLabel.textContent=cameraPlan?((storyLanguage()==='ru'?'Камера: ':storyLanguage()==='uk'?'Камера: ':storyLanguage()==='es'?'Cámara: ':'Camera: ')+cameraPlan):'';
+    cameraLabel.style.opacity='.72';
+    content.append(heading,description,actionLabel,cameraLabel);
+
+    const arrow=document.createElement('span');
+    arrow.setAttribute('aria-hidden','true');
+    arrow.textContent='›';
+    button.append(content,arrow);
+
+    button.setAttribute('aria-pressed',String(i===sceneIndex));
+    button.onclick=()=>{
+      sceneIndex=i;
+      if(playing)void startSceneVoicePreview(i);else void stopSceneVoicePreview();
+      $('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(i+1)+' · '+String(titles[i]??'');
+      renderScenes();
+      syncSceneEditor();
+      if(!playing)draw();
+    };
+    box.appendChild(button);
+  });
+}
+let sceneVoiceStorage=null;
+let sceneVoiceEngine=null;
+let sceneVoiceRenderToken=0;
+let sceneVoiceObjectUrls=[];
+function getSceneVoiceEngine(){
+ if(!window.indexedDB)throw new Error(uiLang==='ru'?'В этом браузере недоступно локальное хранилище аудио.':'IndexedDB local audio storage is unavailable in this browser.');
+ if(!window.crypto?.subtle)throw new Error(uiLang==='ru'?'Недоступна Web Crypto для проверки аудиофайлов.':'Web Crypto is unavailable for audio verification.');
+ if(!sceneVoiceStorage)sceneVoiceStorage=createVoiceAudioStorage();
+ const timestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
+ const currentTimestamped=sceneVoiceEngine?.status.engine==='headtts-timestamped-kokoro';
+ if(sceneVoiceEngine&&timestamped!==currentTimestamped){
+  sceneVoiceEngine.dispose?.();
+  sceneVoiceEngine=null;
+ }
+ if(!sceneVoiceEngine){
+  sceneVoiceEngine=timestamped
+   ?createTimestampedKokoroEngine({storage:sceneVoiceStorage})
+   :createBrowserLocalTtsEngine({storage:sceneVoiceStorage});
+ }
+ return sceneVoiceEngine;
+}
+function voiceText(ru,en){return uiLang==='ru'?ru:en}
+function refreshSceneVoiceControls(){
+ const locale=storyLanguage();
+ const timestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
+ const restricted=locale!=='en'&&!timestamped;
+ $('voiceConsentRow').hidden=!restricted;
+ $('voiceConsentLabel').textContent=voiceText('Подтверждаю некоммерческое использование этой модели (обязательно для русского, украинского и испанского).','I confirm non-commercial use of this model (required for Russian, Ukrainian and Spanish).');
+ $('loadSceneVoiceModel').textContent=voiceText('Загрузить локальную модель голоса','Load local voice model');
+ $('generateSceneVoices').textContent=voiceText('Озвучить эту сцену','Generate voices for this scene');
+ const expectedEngine=timestamped?'headtts-timestamped-kokoro':null;
+ const loaded=Boolean(sceneVoiceEngine?.status.loaded&&sceneVoiceEngine.status.locale===locale
+  &&(timestamped?sceneVoiceEngine.status.engine===expectedEngine:sceneVoiceEngine.status.engine!== 'headtts-timestamped-kokoro'));
+ $('loadSceneVoiceModel').disabled=Boolean($('loadSceneVoiceModel').dataset.busy==='true')
+  ||(timestamped&&locale!=='en')||(restricted&&!$('voiceNonCommercialConsent').checked);
+ $('generateSceneVoices').disabled=!loaded||$('generateSceneVoices').dataset.busy==='true';
+ if(timestamped&&locale!=='en'){
+  $('sceneVoiceStatus').textContent=voiceText('Экспериментальный timestamped Kokoro поддерживает только английский. Выбери стандартный движок для этого языка.','Experimental timestamped Kokoro currently supports English only. Choose the standard engine for this language.');
+ }else if(!loaded&&!sceneVoiceEngine?.status.loaded&&!$('sceneVoiceStatus').dataset.touched){
+  $('sceneVoiceStatus').textContent=voiceText('Модель не загружена. Загрузка начнётся только после нажатия кнопки.','No voice model loaded. Download starts only after you press Load.');
+ }else if(!loaded&&sceneVoiceEngine?.status.loaded){
+  $('sceneVoiceStatus').textContent=voiceText('Загружен другой движок или язык. Нажми Load, чтобы переключить модель.','A different engine or language is loaded. Press Load to switch.');
+ }
+}
+async function renderSceneVoiceAudio(){
+ const host=$('sceneVoiceResults');
+ if(!host)return;
+ const token=++sceneVoiceRenderToken;
+ for(const url of sceneVoiceObjectUrls)URL.revokeObjectURL(url);
+ sceneVoiceObjectUrls=[];
+ host.replaceChildren();
+ const cues=Array.isArray(sceneMetadata[sceneIndex]?.voiceCues)?sceneMetadata[sceneIndex].voiceCues:[];
+ if(!cues.length){
+  const note=document.createElement('small');
+  note.className='muted';
+  note.textContent=voiceText('У этой сцены пока нет сгенерированных голосовых дорожек.','This scene has no generated voice tracks yet.');
+  host.appendChild(note);
+  return;
+ }
+ try{
+  const storage=sceneVoiceStorage||(sceneVoiceEngine?sceneVoiceStorage:null)||createVoiceAudioStorage();
+  for(let index=0;index<cues.length;index++){
+   const cue=cues[index];
+   const record=await storage.get(cue.audioHash);
+   if(token!==sceneVoiceRenderToken)return;
+   if(!record?.blob)continue;
+   const wrap=document.createElement('div');wrap.className='voice-result';
+   const heading=document.createElement('strong');
+   heading.textContent=(cue.characterId||cue.characterName||'Narrator')+' · '+(index+1);
+   const spoken=document.createElement('small');spoken.textContent=String(cue.text||'');
+   const audio=document.createElement('audio');audio.controls=true;audio.preload='none';
+   const url=URL.createObjectURL(record.blob);sceneVoiceObjectUrls.push(url);audio.src=url;
+   wrap.append(heading,spoken,audio);host.appendChild(wrap);
+  }
+  if(!host.childElementCount){
+   const note=document.createElement('small');note.className='muted';
+   note.textContent=voiceText('Аудиофайлы не найдены в локальном хранилище. Сгенерируй реплики заново.','Audio files are missing from local storage. Generate the dialogue again.');
+   host.appendChild(note);
+  }
+ }catch(error){
+  if(token===sceneVoiceRenderToken)$('sceneVoiceStatus').textContent=(error?.message||'Could not restore local voice audio.');
+ }
+}
+$('loadSceneVoiceModel').addEventListener('click',async()=>{
+ const button=$('loadSceneVoiceModel');
+ if(button.dataset.busy==='true')return;
+ const locale=storyLanguage();
+ const timestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
+ const allowNonCommercial=$('voiceNonCommercialConsent').checked;
+ if(timestamped&&locale!=='en'){
+  $('sceneVoiceStatus').textContent=voiceText('Timestamped Kokoro доступен только для английского.','Timestamped Kokoro is available for English only.');
+  return;
+ }
+ if(!timestamped&&locale!=='en'&&!allowNonCommercial){
+  $('sceneVoiceStatus').textContent=voiceText('Для этой модели требуется явное подтверждение некоммерческого использования.','This model requires explicit non-commercial-use consent.');
+  return;
+ }
+ button.dataset.busy='true';button.disabled=true;$('sceneVoiceStatus').dataset.touched='true';
+ $('sceneVoiceStatus').textContent=voiceText('Загружаем локальную модель речи…','Loading the local speech model…');
+ try{
+  const engine=getSceneVoiceEngine();
+  await engine.load({
+   locale,
+   allowNonCommercial,
+   backend:'wasm',
+   onProgress:info=>{
+    const percent=Number.isFinite(info.progress)?' '+Math.round(info.progress*100)+'%':'';
+    $('sceneVoiceStatus').textContent=voiceText('Загрузка модели: '+info.status+percent,'Model download: '+info.status+percent);
+   }
+  });
+  const count=engine.availableVoices.length;
+  $('sceneVoiceStatus').textContent=timestamped
+   ?voiceText('Timestamped Kokoro готов. Временные метки viseme берутся из длительностей токенов модели.','Timestamped Kokoro ready. Viseme timings come from model token durations.')
+   :locale==='en'
+    ?voiceText('Английская локальная модель готова. Доступно голосов: '+count+'.','English local model ready. Available voices: '+count+'.')
+    :voiceText('Локальная модель готова. Эта языковая модель использует один голос.','Local model ready. This language model uses a single speaker voice.');
+ }catch(error){
+  $('sceneVoiceStatus').textContent=(error?.message||'Voice model loading failed.');
+ }finally{
+  button.dataset.busy='false';button.disabled=false;refreshSceneVoiceControls();
+ }
+});
+$('generateSceneVoices').addEventListener('click',async()=>{
+ const button=$('generateSceneVoices');
+ if(button.dataset.busy==='true')return;
+ const locale=storyLanguage();
+ let dialogue=parseDialogueLines($('sceneDialogue').value,locale);
+ if(!dialogue.length){
+  $('sceneVoiceStatus').textContent=voiceText('Сначала добавь реплики в формате «Персонаж: текст».','Add dialogue lines first using “Character: text”.');
+  return;
+ }
+ let engine;
+ try{engine=getSceneVoiceEngine()}catch(error){$('sceneVoiceStatus').textContent=error.message;return}
+ if(!engine.status.loaded||engine.status.locale!==locale){
+  $('sceneVoiceStatus').textContent=voiceText('Сначала загрузи модель для выбранного языка.','Load the model for the selected language first.');
+  refreshSceneVoiceControls();return;
+ }
+ button.dataset.busy='true';button.disabled=true;$('sceneVoiceStatus').dataset.touched='true';
+ try{
+  let savedMap={};
+  try{const parsed=JSON.parse(readLocalStorage('dravex-character-voice-map')||'{}');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))savedMap=parsed}catch{}
+
+  const assignments=assignCharacterVoices({
+   speakers:dialogue.map(line=>line.characterId),
+   availableVoices:engine.availableVoices,
+   existingAssignments:savedMap,
+   fallbackVoiceId:engine.availableVoices[0]||null
+  });
+  writeLocalStorage('dravex-character-voice-map',JSON.stringify(assignments));
+  const artifacts=[];
+  for(let index=0;index<dialogue.length;index++){
+   const line=dialogue[index];
+   const voiceId=assignments[normalizeSpeakerKey(line.characterId)]||undefined;
+   $('sceneVoiceStatus').textContent=voiceText('Создаём голос '+(index+1)+' из '+dialogue.length+'…','Generating voice '+(index+1)+' of '+dialogue.length+'…');
+   const result=await engine.synthesize({
+    text:line.text,
+    voiceId,
+    filename:'scene-'+String(sceneMetadata[sceneIndex]?.id||sceneIndex+1)+'-line-'+(index+1)+'.wav'
+   });
+   artifacts.push({...result,voiceId:voiceId||null});
+  }
+  const meta=sceneMetadata[sceneIndex]||{};
+  const scheduled=buildSceneVoiceTimeline({
+   sceneId:meta.id||('scene-'+(sceneIndex+1)),
+   dialogue,
+   artifacts,
+   fps:24,
+   gapMs:120
+  });
+  meta.dialogue=dialogue;
+  meta.voiceCues=scheduled.cues;
+  meta.voiceTimeline=scheduled.timeline;
+  sceneMetadata[sceneIndex]=meta;
+  const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
+   idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
+   language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
+  }));
+  await renderSceneVoiceAudio();
+  $('sceneVoiceStatus').textContent=voiceText(
+   'Готово: '+scheduled.cues.length+' реплик · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' сек. '+(saved?'Черновик сохранён.':'Не удалось сохранить черновик.'),
+   'Done: '+scheduled.cues.length+' lines · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' sec. '+(saved?'Draft saved.':'Draft could not be saved.')
+  );
+ }catch(error){
+  console.error('DRAVEX local voice generation failed:',error);
+  $('sceneVoiceStatus').textContent=(error?.message||'Voice generation failed.');
+ }finally{
+  button.dataset.busy='false';refreshSceneVoiceControls();
+ }
+});
+$('sceneVoiceEngineChoice').addEventListener('change',()=>{
+ if(sceneVoiceEngine){sceneVoiceEngine.dispose?.();sceneVoiceEngine=null;}
+ $('sceneVoiceStatus').dataset.touched='false';
+ $('sceneVoiceStatus').textContent=voiceText('Выбран другой движок. Загрузи его отдельно.','Engine selection changed. Load the selected engine.');
+ refreshSceneVoiceControls();
+});
+$('language').addEventListener('change',()=>{
+ if(storyLanguage()!=='en'&&$('sceneVoiceEngineChoice').value==='timestamped'){
+  $('sceneVoiceEngineChoice').value='standard';
+  if(sceneVoiceEngine){sceneVoiceEngine.dispose?.();sceneVoiceEngine=null;}
+ }
+ refreshSceneVoiceControls();
+ $('sceneVoiceStatus').textContent=voiceText('Язык истории изменён. При необходимости загрузи соответствующую модель.','Story language changed. Load the matching voice model if needed.');
+});
+$('voiceNonCommercialConsent').addEventListener('change',refreshSceneVoiceControls);
+$('make').addEventListener('click',()=>createStoryboard(false));
+function createStoryboard(){const status=$('status');const idea=$('idea').value.trim();if(!idea){status.textContent=tr('emptyIdea');$('idea').focus();return}const lang=storyLanguage();const requestedCharacter=$('character').value.trim();const character=resolveStoryProtagonist(idea,requestedCharacter,lang);const proceduralDemoCharacter=!requestedCharacter&&['Главный герой','Головний герой','Main character','Personaje principal'].includes(character);$('character').value=character;try{status.textContent=uiLang==='ru'?'Создаём раскадровку локальным движком DRAVEX…':'Creating a storyboard with the local DRAVEX engine…';const plan=buildStoryboardFromText(idea,lang,character);const storyContext=prepareStoryCharacterContext(plan,characterBible,character,lang);characterBible=storyContext.characterBible;const preparedScenes=storyContext.scenes;const stateChanges=inferStoryboardStateChanges(preparedScenes,lang,character);sceneMetadata=ensureSceneIds(preparedScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]})));currentStoryboardPlan={...plan,eventChain:buildStoryEventChain(sceneMetadata),sourceText:idea,sourceLanguage:lang,sourceCharacter:character,proceduralDemoCharacter,scenes:sceneMetadata};titles=plan.titles;descriptions=plan.descriptions;sceneIndex=0;$('bibleCharacterId').value=character;$('bibleCharacterId').dataset.loaded='';$('sceneLabel').textContent=(storyLabels[lang]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();updateStoryQA();status.textContent=uiLang==='ru'?'Раскадровка создана локальным движком DRAVEX.':'Storyboard created by the local DRAVEX engine.';status.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(error){console.error('DRAVEX storyboard error:',error);status.textContent=(uiLang==='ru'?'Не удалось создать раскадровку: ':'Storyboard creation failed: ')+(error?.message||'Unknown error');}}
+$('checkLocalAI').addEventListener('click',async()=>{
+const button=$('checkLocalAI'),status=$('localAIStatus'),ru=uiLang==='ru';
+if(button.disabled)return;button.disabled=true;status.textContent=ru?'Проверяем возможности браузера и устройства…':'Checking browser and device capabilities…';
+try{
+const result=await detectDeviceCapabilities();
+const yesNo=value=>value?(ru?'да':'yes'):(ru?'нет':'no');
+const memory=result.deviceMemoryGB===null?(ru?'неизвестно':'unknown'):result.deviceMemoryGB+' GB';
+const cores=result.hardwareConcurrency===null?(ru?'неизвестно':'unknown'):String(result.hardwareConcurrency);
+const storage=result.storage.availableBytes===null?(ru?'неизвестно':'unknown'):(result.storage.availableBytes/1024/1024/1024).toFixed(2)+' GB';
+const lines=ru
+?['HTTPS: '+yesNo(result.secureContext),'WebGPU API: '+yesNo(result.webgpuApiAvailable),'GPU-адаптер: '+yesNo(result.adapterAvailable),'Оценка памяти браузера: '+memory,'Потоки CPU: '+cores,'WASM: '+yesNo(result.wasmAvailable),'Потоки WASM: '+yesNo(result.wasmThreadsAvailable),'Свободное хранилище браузера: '+storage,result.recommendation]
+:['Secure HTTPS: '+yesNo(result.secureContext),'WebGPU API: '+yesNo(result.webgpuApiAvailable),'GPU adapter: '+yesNo(result.adapterAvailable),'Browser memory estimate: '+memory,'CPU threads: '+cores,'WASM: '+yesNo(result.wasmAvailable),'Threaded WASM: '+yesNo(result.wasmThreadsAvailable),'Available browser storage: '+storage,result.recommendation];
+status.textContent=lines.join(' · ');
+}catch(error){status.textContent=(ru?'Не удалось проверить устройство: ':'Device check failed: ')+(error?.message||'Unknown error')}
+finally{button.disabled=false}
+});
+$('localModelConsent').addEventListener('change',()=>{$('loadLocalModel').disabled=!$('localModelConsent').checked});
+$('loadLocalModel').addEventListener('click',async()=>{
+const button=$('loadLocalModel'),status=$('localModelStatus'),ru=uiLang==='ru';
+if(!$('localModelConsent').checked){status.textContent=ru?'Сначала подтверди загрузку весов модели с Hugging Face.':'First confirm the model download from Hugging Face.';return}
+if(button.disabled)return;button.disabled=true;$('runLocalModel').disabled=true;
+status.textContent=ru?'Загружаем модель с Hugging Face. Первый запуск требует интернета; генерация будет выполняться на устройстве…':'Downloading model weights from Hugging Face. First load requires internet; generation will run on this device…';
+try{
+const result=await localTextRuntime.load({backend:'auto',onProgress:event=>{
+if(event.total&&event.loaded){const pct=Math.min(100,Math.round(event.loaded/event.total*100));status.textContent=(ru?'Загрузка модели: ':'Downloading model: ')+pct+'%';}
+}});
+status.textContent=(ru?'Локальная модель загружена. Режим: ':'Local model loaded. Backend: ')+result.backend+'. '+(ru?'Текст запросов остаётся на устройстве.':'Prompt text stays on this device.');
+$('runLocalModel').disabled=false;
+}catch(error){status.textContent=(ru?'Не удалось загрузить локальную модель: ':'Local model loading failed: ')+(error?.message||'Unknown error');}
+finally{button.disabled=false;}
+});
+$('runLocalModel').addEventListener('click',async()=>{
+const button=$('runLocalModel'),status=$('localModelStatus'),output=$('localModelOutput'),ru=uiLang==='ru';
+const story=$('idea').value.trim();
+if(!story){status.textContent=ru?'Сначала введи историю.':'Enter a story first.';return}
+if(button.disabled)return;button.disabled=true;status.textContent=ru?'Локальный AI-режиссёр создаёт варианты сцен и проверяет их…':'Local AI director is drafting and evaluating the scenes…';output.hidden=true;
+try{
+const language=storyLanguage(),languageName={ru:'Russian',uk:'Ukrainian',en:'English',es:'Spanish'}[language]||'English';
+const character=resolveStoryProtagonist(story,$('character').value,language);
+const rawBasePlan=currentStoryboardPlan?.sourceText===story&&currentStoryboardPlan?.sourceLanguage===language&&currentStoryboardPlan?.sourceCharacter===character?currentStoryboardPlan:buildStoryboardFromText(story,language,character);
+const storyContext=prepareStoryCharacterContext(rawBasePlan,characterBible,character,language);characterBible=storyContext.characterBible;const castScenes=storyContext.scenes;const stateChanges=inferStoryboardStateChanges(castScenes,language,character);const preparedScenes=castScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]}));const basePlan={...rawBasePlan,scenes:preparedScenes,eventChain:buildStoryEventChain(preparedScenes)};const result=await directStoryboardWithLocalAI({runtime:localTextRuntime,basePlan,storyText:story,language:languageName,character,characterBible});
+if(result.usedLocalModel){
+currentStoryboardPlan={...basePlan,eventChain:result.eventChain||buildStoryEventChain(result.scenes),sourceText:story,sourceLanguage:language,sourceCharacter:character,scenes:result.scenes,titles:result.scenes.map(scene=>scene.title),descriptions:result.scenes.map(scene=>scene.visibleAction)};
+titles=currentStoryboardPlan.titles;descriptions=currentStoryboardPlan.descriptions;sceneMetadata=ensureSceneIds(result.scenes.map(scene=>({...scene,characters:Array.isArray(scene.characters)&&scene.characters.length?scene.characters:[character]})));ensureMainCharacterReference(character);sceneIndex=0;$('bibleCharacterId').value=character;$('bibleCharacterId').dataset.loaded='';$('sceneLabel').textContent=(storyLabels[language]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();updateStoryQA();
+status.textContent=(ru?'Локальный AI улучшил раскадровку. Оценка качества: ':'Local AI director accepted the storyboard. Quality score: ')+result.evaluation.overallScore+'/100 ('+result.backend+').';
+}else{
+currentStoryboardPlan={...basePlan,eventChain:buildStoryEventChain(basePlan.scenes),sourceText:story,sourceLanguage:language,sourceCharacter:character};titles=basePlan.titles||basePlan.scenes.map(scene=>scene.title);descriptions=basePlan.descriptions||basePlan.scenes.map(scene=>scene.visibleAction);sceneMetadata=ensureSceneIds(basePlan.scenes.map(scene=>({...scene,characters:Array.isArray(scene.characters)&&scene.characters.length?scene.characters:[character]})));sceneIndex=0;$('sceneLabel').textContent=(storyLabels[language]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();updateStoryQA();
+status.textContent=(ru?'AI-вариант не прошёл проверку. Оставлена надёжная локальная раскадровка. Причина: ':'AI draft did not pass the quality gate. The deterministic storyboard was kept. Reason: ')+result.fallbackReason;
+}
+output.textContent=JSON.stringify({usedLocalModel:result.usedLocalModel,score:result.evaluation?.overallScore??null,issues:result.evaluation?.issues||[],fallbackReason:result.fallbackReason},null,2);output.hidden=false;
+}catch(error){status.textContent=(ru?'Локальный режиссёр не сработал: ':'Local director failed: ')+(error?.message||'Unknown error');}
+finally{button.disabled=false;}
+});
+
+$('hordeConsent').addEventListener('change',()=>{$('generateSceneImage').disabled=!$('hordeConsent').checked});
+$('spriteHordeConsent').addEventListener('change',()=>{$('generateCharacterSprites').disabled=!$('spriteHordeConsent').checked});
+$('generateCharacterSprites').addEventListener('click',async()=>{
+ const button=$('generateCharacterSprites'),status=$('characterSpriteStatus');
+ if(!$('spriteHordeConsent').checked){status.textContent=uiLang==='ru'?'Сначала подтверди отдельное согласие на отправку промптов персонажей.':'First confirm separate consent to send character prompts.';return}
+ if(button.disabled)return;
+ const targetIndex=sceneIndex,meta=sceneMetadata[targetIndex]||{};
+ const targetId=String(meta.id||('scene_'+(targetIndex+1)));
+ const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
+ const plans=buildCharacterSpriteAssetPlan(scene,characterBible);
+ const ready=plans.filter(plan=>plan.status==='ready');
+ if(!ready.length){status.textContent=uiLang==='ru'?'Нет готовых планов. Проверь состав сцены, справочник внешности и действия персонажей.':'No ready sprite plans. Check the scene cast, character appearance references, and character actions.';return}
+ button.disabled=true;
+ const existing=Array.isArray(meta.characterSpriteAssets)?[...meta.characterSpriteAssets]:[];
+ let completed=0,failed=0;
+ try{
+  for(const plan of ready){
+   status.textContent=uiLang==='ru'?'Генерация '+(completed+failed+1)+' из '+ready.length+': '+plan.characterId+'…':'Generating '+(completed+failed+1)+' of '+ready.length+': '+plan.characterId+'…';
+   try{
+    const asset=await generateCharacterSpriteAsset({plan,consentAccepted:$('spriteHordeConsent').checked===true,onProgress:progress=>{
+     const pos=progress.queuePosition===null?'?':progress.queuePosition;
+     status.textContent=(uiLang==='ru'?'AI Horde · ':'AI Horde · ')+plan.characterId+' · очередь: '+pos;
+    }});
+    const oldIndex=existing.findIndex(item=>item&&item.assetId===asset.assetId);
+    if(oldIndex>=0)existing[oldIndex]=asset;else existing.push(asset);
+    completed++;
+   }catch(error){
+    failed++;
+    console.error('Character sprite generation failed:',plan.characterId,error);
+   }
+   const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id)===targetId);
+   if(resolvedIndex>=0)sceneMetadata[resolvedIndex]={...sceneMetadata[resolvedIndex],characterSpriteAssets:[...existing]};
+   if(sceneIndex===resolvedIndex)renderCharacterSpriteAssets();
+  }
+  status.textContent=uiLang==='ru'?'Готово: '+completed+' · ошибок: '+failed+'. Сохрани черновик, чтобы сохранить ссылки.':'Finished: '+completed+' generated · '+failed+' failed. Save the draft to keep the links.';
+ }finally{
+  button.disabled=!$('spriteHordeConsent').checked;
+ }
+});
+
+$('generateSceneImage').addEventListener('click',async()=>{
+const button=$('generateSceneImage'),status=$('imageGenerationStatus');
+if(!$('hordeConsent').checked){status.textContent=uiLang==='ru'?'Сначала подтверди согласие на отправку текстового промпта.':'First confirm consent to send the text prompt.';return}
+if(button.disabled)return;
+const targetIndex=sceneIndex,meta=sceneMetadata[targetIndex]||{};
+const targetId=String(meta.id||('scene_'+(targetIndex+1)+'_'+Date.now()));
+const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),prompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),location:meta.location,timeOfDay:meta.timeOfDay,characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
+titles[targetIndex]=scene.title;descriptions[targetIndex]=scene.description;
+sceneMetadata[targetIndex]=scene;
+const prompt=buildImageGenerationPrompt(scene,characterBible,{includeNegative:false,visualStyle:$('style').value});
+renderScenes();
+button.disabled=true;status.textContent=uiLang==='ru'?'Отправляем текстовый промпт в бесплатную очередь AI Horde…':'Submitting the text prompt to the free AI Horde queue…';
+try{
+const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);const result=await generateImageWithHorde({prompt,negativePrompt:scene.negativePrompt,...quality,onProgress:progress=>{
+const position=progress.queuePosition===null?'?':progress.queuePosition;
+status.textContent=uiLang==='ru'?'Очередь AI Horde · позиция: '+position+' · ожидают: '+progress.waiting+' · обрабатываются: '+progress.processing:'AI Horde queue · position: '+position+' · waiting: '+progress.waiting+' · processing: '+progress.processing;
+}});
+const resolvedIndex=sceneMetadata.findIndex(item=>item&&item.id===targetId);
+if(resolvedIndex>=0)sceneMetadata[resolvedIndex]={...sceneMetadata[resolvedIndex],generatedImageUrl:result.imageUrl,generatedImageSeed:result.seed,generatedImageModel:result.model,generatedImageWorker:result.workerName};
+if(sceneIndex===resolvedIndex)renderGeneratedSceneImage();
+getLoadedSceneImage(result.imageUrl);
+if(!playing)draw();
+updateStoryQA();
+status.textContent=uiLang==='ru'?'Изображение сцены '+(targetIndex+1)+' создано. Сохрани черновик, чтобы запомнить ссылку.':'Image for scene '+(targetIndex+1)+' generated. Save the draft to keep its result link.';
+}catch(error){
+status.textContent=(uiLang==='ru'?'Не удалось создать изображение: ':'Image generation failed: ')+(error?.message||'Unknown error');
+}finally{button.disabled=!$('hordeConsent').checked}
+});
+
+let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
+let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
+let filmProgressTracking=false;
+let filmProgressSceneStates=[];
+
+function filmProgressText(ru,en){return uiLang==='ru'?ru:en}
+function setFilmProgress(percent,stage,detail=''){
+ const safePercent=Math.max(0,Math.min(100,Math.floor(Number(percent)||0)));
+ $('fullFilmProgress').value=safePercent;
+ $('fullFilmPercent').textContent=safePercent+'%';
+ $('fullFilmStage').textContent=stage;
+ $('fullFilmProgressMeta').textContent=detail;
+}
+function renderFilmSceneProgress(){
+ const root=$('fullFilmSceneList');
+ root.replaceChildren();
+ filmProgressSceneStates.forEach((scene,index)=>{
+  const row=document.createElement('div');
+  row.className='film-progress__scene'+(scene.status==='completed'||scene.status==='skipped'?' film-progress__scene--completed':'')+(scene.status==='failed'?' film-progress__scene--failed':'');
+  const name=document.createElement('span');
+  name.className='film-progress__scene-name';
+  name.textContent=(index+1)+'. '+scene.title;
+  const state=document.createElement('span');
+  state.className='film-progress__scene-state';
+  state.textContent=scene.label;
+  const bar=document.createElement('progress');
+  bar.max=100;
+  if(Number.isFinite(scene.progress))bar.value=scene.progress;
+  else bar.removeAttribute('value');
+  row.append(name,state,bar);
+  root.append(row);
  });
+}
 function updateFilmSceneProgress(index,patch){
  if(!filmProgressSceneStates[index])return;
  filmProgressSceneStates[index]={...filmProgressSceneStates[index],...patch};
