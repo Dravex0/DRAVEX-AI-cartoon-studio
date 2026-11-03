@@ -28,7 +28,7 @@ const rig = () => ({
 
 describe('procedural character rig motion presets', () => {
   it('exposes the supported starter movement library', () => {
-    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'wave', 'attack', 'defend']);
+    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'wave', 'dance', 'attack', 'defend']);
   });
 
   it('creates a validated walk cycle with explicit start and end frames', () => {
@@ -222,7 +222,7 @@ describe('procedural character rig motion presets', () => {
 
   it('rejects an invalid rig and an unknown preset', () => {
     assert.equal(createCharacterRigMotionPreset({}, 'walk').status, 'invalid-rig');
-    assert.equal(createCharacterRigMotionPreset(rig(), 'dance').status, 'unknown-preset');
+    assert.equal(createCharacterRigMotionPreset(rig(), 'moonwalk').status, 'unknown-preset');
   });
   it('warns when only one lower-leg bone has a knee pivot', () => {
     const candidate = rig();
