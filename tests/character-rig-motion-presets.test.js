@@ -364,8 +364,8 @@ describe('attack and defense motion presets', () => {
     const attackEnd = sampleCharacterRigTimeline(attack.timeline, 1).Foxy;
     assert.ok(attackMiddle.root.x > 0);
     assert.ok(Math.abs(attackMiddle.rightArm.rotation) > 0.8);
-    assert.equal(attackStart.root?.x || 0, 0);
-    assert.equal(attackEnd.root?.x || 0, 0);
+    assert.equal(attackStart?.root?.x || 0, 0);
+    assert.equal(attackEnd?.root?.x || 0, 0);
     const defendMiddle = sampleCharacterRigTimeline(defend.timeline, 0.5).Foxy;
     assert.ok(defendMiddle.root.y > 0);
     assert.ok(Math.abs(defendMiddle.leftArm.rotation) > 0.4);
