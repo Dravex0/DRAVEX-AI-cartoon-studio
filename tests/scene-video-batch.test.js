@@ -54,7 +54,7 @@ test("continues after a scene failure and reports it", async () => {
     scenes: [{ id: "bad" }, { id: "good" }],
     generateScene: async scene => {
       if (scene.id === "bad") throw new Error("provider unavailable");
-      return { status: "completed" };
+      return { status: "completed", video: new Blob(["clip"]) };
     }
   });
 
