@@ -1261,7 +1261,9 @@ function renderCharacterRigPartSets(){
    const meta=sceneMetadata[targetIndex]||{};
    const rigs=(meta.characterRigs||[]).filter(item=>String(item.characterId||'').toLowerCase()!==characterId.toLowerCase());
    rigs.push(result.rig);
-   sceneMetadata[targetIndex]={...meta,characterRigs:rigs};
+   const currentSets={...(meta.characterRigPartSets||{})};
+   currentSets[characterId]={...(currentSets[characterId]||set),status:'approved',readyForAnimation:true,assembledAt:new Date().toISOString()};
+   sceneMetadata[targetIndex]={...meta,characterRigs:rigs,characterRigPartSets:currentSets};
    const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
    if($('sceneMotionActor')&&[...$('sceneMotionActor').options].some(option=>option.value.toLowerCase()===characterId.toLowerCase())){
     $('sceneMotionActor').value=characterId;syncCharacterRigEditor();
