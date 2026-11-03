@@ -120,6 +120,53 @@ test('story-generated rig timeline renders neutral parts before the action inter
 });
 
 
+test('story-generated dance poses reach the canvas renderer as visible articulated limb transforms', () => {
+  const evidence = 'Foxy dances to the music';
+  const scene = {
+    characters: ['Foxy'],
+    characterCastProvided: true,
+    storyDetail: evidence,
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action',
+        start: 0.2,
+        end: 0.8,
+        actorId: 'Foxy',
+        targetId: null,
+        description: evidence,
+        evidence
+      }]
+    }
+  };
+  const planned = createCharacterRigTimelineFromActionTimeline(scene, [rig]);
+  assert.equal(planned.status, 'generated');
+  assert.equal(planned.mappedActions[0].preset, 'dance');
+
+  const sampledPoses = sampleCharacterRigTimeline(planned.timeline, 0.5);
+  const spy = createCanvasSpy();
+  const result = drawCharacterLayers(
+    spy.context,
+    [{ characterId: 'Foxy', imageUrl: 'https://assets.example/foxy.png' }],
+    () => ({ width: 64, height: 64 }),
+    640,
+    360,
+    {
+      drawRigParts: true,
+      preferRigParts: true,
+      characterRigs: [rig],
+      rigPoses: sampledPoses
+    }
+  );
+
+  assert.equal(result.rigDrawn, rig.parts.length);
+  assert.equal(result.rigSkipped, 0);
+  assert.deepEqual(result.rigReadyCharacterIds, ['Foxy']);
+  assert.equal(spy.calls.draws, rig.parts.length);
+  assert.ok(spy.calls.rotations.some(rotation => Math.abs(rotation) > 0.2),
+    'dance limb rotations must reach the actual canvas part transforms');
+});
+
 test('generated ten-part rig walk timeline reaches all ten rendered sprite layers', () => {
   const plan = buildCharacterRigAssetPlan({
     characterId: 'Foxy',
