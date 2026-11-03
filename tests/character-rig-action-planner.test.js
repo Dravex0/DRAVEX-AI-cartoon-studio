@@ -53,7 +53,7 @@ test('maps jump action and preserves neutral poses outside its scene-time interv
   const result = createCharacterRigTimelineFromActionTimeline(makeScene('jumps over the stone'), [rig()]);
   assert.equal(result.status, 'generated');
   const before = sampleCharacterRigTimeline(result.timeline, 0.1).Foxy || {};
-  const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.35).Foxy;
   assert.equal(before.root?.y || 0, 0);
   assert.ok(Math.abs(middle.root.y) > 0);
 });
@@ -153,7 +153,7 @@ test('maps grounded English dance action to a looping articulated full-body groo
   assert.equal(result.status, 'generated');
   assert.equal(result.mappedActions[0].preset, 'dance');
   const start = sampleCharacterRigTimeline(result.timeline, 0.2).Foxy || {};
-  const middle = sampleCharacterRigTimeline(result.timeline, 0.35).Foxy;
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
   const end = sampleCharacterRigTimeline(result.timeline, 0.8).Foxy || {};
   assert.ok(Math.abs(middle.leftArm.rotation) > 0.2);
   assert.ok(Math.abs(middle.rightArm.rotation) > 0.2);
