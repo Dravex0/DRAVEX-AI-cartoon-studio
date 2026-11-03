@@ -521,8 +521,7 @@ $('generateCharacterRigFromStory').addEventListener('click',()=>{
   $('characterRigStatus').textContent='Story animation generated for '+generatedScenes+' scene(s), '+generatedActions+' action(s). '+scenesWithoutRig+' scene(s) have no attached segmented rig; '+scenesWithoutActions+' scene(s) have no supported validated actions; '+preservedTimelines+' existing timeline(s) preserved.'+(summaries.length?' Details: '+summaries.join(' · '):'')+' Preview and canvas export sample the same rig timelines.';
   sceneMotionSceneIndex=-1;
   if(!playing)draw();
- });;
-}
+ });
 function updateFilmSceneProgress(index,patch){
  if(!filmProgressSceneStates[index])return;
  filmProgressSceneStates[index]={...filmProgressSceneStates[index],...patch};
