@@ -59,7 +59,7 @@ test('maps jump action and preserves neutral poses outside its scene-time interv
 });
 
 test('does not guess a rig preset for unsupported semantic actions', () => {
-  const result = createCharacterRigTimelineFromActionTimeline(makeScene('raises a shield and protects the village'), [rig()]);
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('opens a mysterious chest'), [rig()]);
   assert.equal(result.status, 'no-supported-actions');
   assert.equal(result.timeline, null);
   assert.equal(result.skipped[0].reason, 'unsupported-or-ambiguous-action');
@@ -127,4 +127,23 @@ test('maps an explicit Spanish hand wave to the articulated wave preset', () => 
   assert.equal(result.mappedActions[0].preset, 'wave');
   const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
   assert.ok(Math.abs(middle.rightArm.rotation) > 0.5);
+});
+
+test('maps grounded attack actions to a visible articulated strike', () => {
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('attacks the stone golem'), [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.mappedActions[0].preset, 'attack');
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+  assert.ok(middle.root.x > 0);
+  assert.ok(Math.abs(middle.rightArm.rotation) > 0.8);
+});
+
+test('maps grounded defense actions to an articulated protective brace', () => {
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('raises a shield and protects the village'), [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.mappedActions[0].preset, 'defend');
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+  assert.ok(middle.root.y > 0);
+  assert.ok(Math.abs(middle.leftArm.rotation) > 0.4);
+  assert.ok(Math.abs(middle.rightArm.rotation) > 0.4);
 });
