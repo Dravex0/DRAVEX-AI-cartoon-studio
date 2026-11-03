@@ -172,21 +172,36 @@ export function createComfyUIVideoProvider({
       if (!request.image || typeof request.image.arrayBuffer !== 'function') {
         throw new ComfyUIAdapterError('The source image must be a browser File or Blob.', 'INVALID_SOURCE_IMAGE');
       }
-      const form = new FormData();
-      const filename = clean(request.image.name, 180).replace(/[^a-z0-9._-]/gi, '_') || 'dravex-scene.png';
-      form.append('image', request.image, filename);
-      form.append('overwrite', 'true');
-      let uploadResponse;
-      try {
-        uploadResponse = await fetchImpl(`${base}/upload/image`, { method: 'POST', body: form, signal: context.signal });
-      } catch (error) {
-        if (context.signal?.aborted) throw error;
-        throw new ComfyUIAdapterError('ComfyUI could not receive the source image. Check server availability and CORS.', 'UPLOAD_FAILED');
+      const uploadImage = async (image, label, fallbackName) => {
+        if (!image || typeof image.arrayBuffer !== 'function') {
+          throw new ComfyUIAdapterError(`The ${label} must be a browser File or Blob.`, 'INVALID_REFERENCE_IMAGE');
+        }
+        const form = new FormData();
+        const filename = clean(image.name, 180).replace(/[^a-z0-9._-]/gi, '_') || fallbackName;
+        form.append('image', image, filename);
+        form.append('overwrite', 'true');
+        let response;
+        try {
+          response = await fetchImpl(`${base}/upload/image`, { method: 'POST', body: form, signal: context.signal });
+        } catch (error) {
+          if (context.signal?.aborted) throw error;
+          throw new ComfyUIAdapterError(`ComfyUI could not receive ${label}. Check server availability and CORS.`, 'UPLOAD_FAILED');
+        }
+        const uploaded = await readJson(response, `${label} upload`);
+        const uploadedName = clean(uploaded?.name, 500);
+        if (!uploadedName) throw new ComfyUIAdapterError(`ComfyUI upload response did not contain the ${label} name.`, 'INVALID_UPLOAD_RESPONSE');
+        return [clean(uploaded.subfolder, 500), uploadedName].filter(Boolean).join('/');
+      };
+      const imagePath = await uploadImage(request.image, 'source image', 'dravex-scene.png');
+      const referenceValues = {};
+      const references = Array.isArray(request.referenceImages) ? request.referenceImages.slice(0, 4) : [];
+      for (let index = 0; index < references.length; index += 1) {
+        const key = `referenceImage${index + 1}`;
+        if (!Object.prototype.hasOwnProperty.call(nodeBindings, key)) continue;
+        const reference = references[index];
+        const blob = reference?.blob || reference?.image || reference;
+        referenceValues[key] = await uploadImage(blob, `character reference ${index + 1}`, `dravex-character-reference-${index + 1}.png`);
       }
-      const uploaded = await readJson(uploadResponse, 'image upload');
-      const uploadedName = clean(uploaded?.name, 500);
-      if (!uploadedName) throw new ComfyUIAdapterError('ComfyUI upload response did not contain an image name.', 'INVALID_UPLOAD_RESPONSE');
-      const imagePath = [clean(uploaded.subfolder, 500), uploadedName].filter(Boolean).join('/');
 
       const graph = cloneWorkflow(template);
       const values = {
@@ -196,7 +211,8 @@ export function createComfyUIVideoProvider({
         durationSeconds: request.durationSeconds,
         fps: request.fps,
         frameCount: frameOffset + Math.max(1, Math.ceil((request.durationSeconds * request.fps - frameOffset) / frameStep)) * frameStep,
-        seed: request.seed ?? 0
+        seed: request.seed ?? 0,
+        ...referenceValues
       };
       for (const [key, binding] of Object.entries(nodeBindings)) {
         if (Object.prototype.hasOwnProperty.call(values, key)) applyBinding(graph, binding, values[key], key);
