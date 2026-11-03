@@ -393,7 +393,7 @@ describe('attack and defense motion presets', () => {
     const result = createCharacterRigMotionPreset(rig(), 'attack');
     assert.equal(result.status, 'ready');
     assert.equal(result.timeline.keyframes.length, 7);
-    const poseAt = progress => sampleCharacterRigTimeline(result.timeline, progress).Foxy;
+    const poseAt = progress => sampleCharacterRigTimeline(result.timeline, progress).Foxy || {};
     const anticipation = poseAt(1 / 6);
     const impact = poseAt(0.5);
     const recoil = poseAt(4 / 6);
