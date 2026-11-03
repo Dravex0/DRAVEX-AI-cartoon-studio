@@ -1365,7 +1365,8 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 }finally{button.disabled=!$('hordeConsent').checked}
 });
 
-let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;\nlet comfyCharacterReferenceFiles=[];
+let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
+let comfyCharacterReferenceFiles=[];
 let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
 let filmProgressTracking=false;
 let filmProgressSceneStates=[];
