@@ -43,6 +43,7 @@ import { getAudioTimelineOffsetMs } from "./audio-clock-alignment.js";
 import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js";
 import { createAudioExportSession } from "./audio-export.js";
 import { waitForExportVideoReady, validateExportTracks } from "./film-export-readiness.js";
+import { buildSceneMediaReport } from "./scene-media-report.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
@@ -189,6 +190,7 @@ async function restorePersistedSceneVideos(){
   }catch(error){console.warn("Could not restore scene video:",error);}
  }
  if(restored){renderComfySceneVideo();if(!playing)draw();}
+ renderScenes();
  if(restored||discarded){
   const message=uiLang==='ru'
    ?'Восстановлено видео сцен: '+restored+'.'+(discarded?' Удалено повреждённых файлов: '+discarded+'.':'')
@@ -900,6 +902,20 @@ renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').
 $('addScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length>=12){$('status').textContent=t.limit;return}titles.push(uiLang==='ru'?'Новая сцена':'New scene');descriptions.push(uiLang==='ru'?'Добавь описание этой сцены.':'Add a description for this scene.');sceneMetadata.push({id:createSceneId(),title:titles[titles.length-1],description:descriptions[descriptions.length-1],prompt:descriptions[descriptions.length-1],visibleAction:descriptions[descriptions.length-1],camera:''});if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};sceneIndex=titles.length-1;$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();$('status').textContent=t.added};
 $('deleteScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length<=1){$('status').textContent=t.minimum;return}const removedScene=sceneMetadata[sceneIndex]||{};releaseSceneVideo(removedScene,sceneIndex);titles.splice(sceneIndex,1);descriptions.splice(sceneIndex,1);sceneMetadata.splice(sceneIndex,1);if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};sceneIndex=Math.min(sceneIndex,titles.length-1);$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=t.deleted};
 
+function renderSceneMediaReport(){
+  const target=$('sceneMediaReport');
+  if(!target)return;
+  const report=buildSceneMediaReport(sceneMetadata,new Set(sceneVideoCache.keys()));
+  const russian=uiLang==='ru';
+  const videoLabel=russian?'Настоящие видеосцены':'Generated video scenes';
+  const stillLabel=russian?'Статичные сцены / холст':'Still-image / canvas scenes';
+  const completeLabel=russian?'Все сцены имеют декодированные видеоклипы.':'Every scene has a decoded video clip.';
+  const partialLabel=russian?'WebM можно экспортировать, но он не означает, что все сцены анимированы.':'WebM can be exported, but this does not mean every scene is animated.';
+  target.textContent=videoLabel+': '+report.videoScenes+'/'+report.totalScenes+' · '+stillLabel+': '+report.stillScenes+'. '+(report.complete?completeLabel:partialLabel);
+  target.dataset.videoScenes=String(report.videoScenes);
+  target.dataset.stillScenes=String(report.stillScenes);
+  target.dataset.totalScenes=String(report.totalScenes);
+}
 function renderScenes(){
   const box=$('scenes');
   box.replaceChildren();
@@ -926,7 +942,13 @@ function renderScenes(){
     const cameraPlan=String(sceneMetadata[i]?.camera||'').trim();
     cameraLabel.textContent=cameraPlan?((storyLanguage()==='ru'?'Камера: ':storyLanguage()==='uk'?'Камера: ':storyLanguage()==='es'?'Cámara: ':'Camera: ')+cameraPlan):'';
     cameraLabel.style.opacity='.72';
-    content.append(heading,description,actionLabel,cameraLabel);
+    const hasDecodedVideo=sceneVideoCache.has(sceneVideoKey(i,sceneMetadata[i]));
+    const mediaLabel=document.createElement('small');
+    mediaLabel.textContent=hasDecodedVideo
+      ?(uiLang==='ru'?'Медиа: готовый видеоклип':'Media: decoded video clip')
+      :(uiLang==='ru'?'Медиа: изображение / холст':'Media: still image / canvas');
+    mediaLabel.style.opacity='.9';
+    content.append(heading,description,actionLabel,cameraLabel,mediaLabel);
 
     const arrow=document.createElement('span');
     arrow.setAttribute('aria-hidden','true');
@@ -944,6 +966,7 @@ function renderScenes(){
     };
     box.appendChild(button);
   });
+  renderSceneMediaReport();
 }
 let sceneVoiceStorage=null;
 let sceneVoiceEngine=null;
@@ -1750,6 +1773,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
     if(!persistence.persisted)console.warn('Generated scene video is kept in memory but could not be saved for reload:',persistence.error);
     if(sceneIndex===index)renderComfySceneVideo();
+    renderScenes();
     if(!playing)draw();
     return persistence.persisted?result:{...result,storageWarning:persistence.error};
    }
