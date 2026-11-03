@@ -45,6 +45,7 @@ import { createAudioExportSession } from "./audio-export.js";
 import { waitForExportVideoReady, validateExportTracks } from "./film-export-readiness.js";
 import { buildSceneMediaReport } from "./scene-media-report.js";
 import { analyzeSceneVideoMotion, captureSceneVideoFrameSamples } from "./scene-motion-analysis.js";
+import { createSceneFrameContactSheet } from "./scene-frame-contact-sheet.js";
 import { summarizeSceneMotionResults } from "./scene-motion-results.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
@@ -1017,6 +1018,39 @@ function renderSceneMediaReport(){
           strip.appendChild(frame);
         }
         row.appendChild(strip);
+        const downloadFrames=document.createElement('button');
+        downloadFrames.type='button';
+        downloadFrames.className='secondary';
+        downloadFrames.style.marginTop='7px';
+        downloadFrames.textContent=russian?'Скачать контрольные кадры':'Download frame sheet';
+        downloadFrames.addEventListener('click',async()=>{
+          if(downloadFrames.disabled)return;
+          downloadFrames.disabled=true;
+          const previousLabel=downloadFrames.textContent;
+          downloadFrames.textContent=russian?'Готовим файл…':'Preparing file…';
+          try{
+            const contactSheet=await createSceneFrameContactSheet(result.frameSamples);
+            const url=URL.createObjectURL(contactSheet);
+            const link=document.createElement('a');
+            link.href=url;
+            link.download='dravex-scene-'+String(item.index+1).padStart(2,'0')+'-frames.jpg';
+            link.hidden=true;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(()=>URL.revokeObjectURL(url),1500);
+            downloadFrames.textContent=russian?'Кадры скачаны':'Frame sheet downloaded';
+          }catch(error){
+            console.warn('Could not create scene frame contact sheet:',error);
+            downloadFrames.textContent=(russian?'Ошибка: ':'Error: ')+String(error?.message||'');
+          }finally{
+            setTimeout(()=>{
+              downloadFrames.disabled=false;
+              downloadFrames.textContent=previousLabel;
+            },1800);
+          }
+        });
+        row.appendChild(downloadFrames);
       }else if(result.frameCaptureMessage){
         const note=document.createElement('small');
         note.textContent=(russian?'Кадры не получены: ':'Frame samples unavailable: ')+result.frameCaptureMessage;
