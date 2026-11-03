@@ -31,8 +31,8 @@ const roleOf = boneId => {
   // receive the same swing rotation as the upper leg.
   if (/left.*(lowerleg|shin|calf)|(lowerleg|shin|calf).*left|l(lowerleg|shin|calf)|(lowerleg|shin|calf)l|legleftlower/.test(id)) return 'leftLowerLeg';
   if (/right.*(lowerleg|shin|calf)|(lowerleg|shin|calf).*right|r(lowerleg|shin|calf)|(lowerleg|shin|calf)r|legrightlower/.test(id)) return 'rightLowerLeg';
-  if (/left.*(leg|thigh)|(leg|thigh).*left|l(leg|thigh)|(leg|thigh)l/.test(id)) return 'leftLeg';
-  if (/right.*(leg|thigh)|(leg|thigh).*right|r(leg|thigh)|(leg|thigh)r/.test(id)) return 'rightLeg';
+  if (/left.*(leg|thigh)|(leg|thigh).*left|l(leg|thigh)|(leg|thigh)l|legleftupper/.test(id)) return 'leftLeg';
+  if (/right.*(leg|thigh)|(leg|thigh).*right|r(leg|thigh)|(leg|thigh)r|legrightupper/.test(id)) return 'rightLeg';
   if (/arm|hand|shoulder/.test(id)) return 'arm';
   if (/leg|thigh/.test(id)) return 'leg';
   return 'other';
