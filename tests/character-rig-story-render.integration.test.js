@@ -1,4 +1,6 @@
 import test from 'node:test';
+import { generateCharacterRigParts } from '../src/character-rig-part-generation.js';
+import { reviewCharacterRigPart, assembleApprovedCharacterRig } from '../src/character-rig-part-review.js';
 import assert from 'node:assert/strict';
 import { createCharacterRigTimelineFromActionTimeline } from '../src/character-rig-action-planner.js';
 import { sampleCharacterRigTimeline } from '../src/character-rig-timeline.js';
@@ -172,4 +174,78 @@ test('generated ten-part rig walk timeline reaches all ten rendered sprite layer
   }
   assert.notDeepEqual(leftStride.rotations, rightStride.rotations,
     'opposite walk phases must render different limb transforms');
+});
+
+
+test('generated, reviewed ten-part assets assemble into an animated rig and reach the renderer', async () => {
+  let generated = 0;
+  const generation = await generateCharacterRigParts({
+    characterId: 'Foxy',
+    appearanceReference: 'Orange fox, cream muzzle, green scarf',
+    consentAccepted: true,
+    generateImage: async ({ seed }) => {
+      generated++;
+      return {
+        imageUrl: 'https://assets.example.test/foxy-part-' + generated + '.png',
+        requestId: 'foxy-' + generated,
+        seed
+      };
+    }
+  });
+
+  assert.equal(generated, 10);
+  assert.equal(generation.readyForAnimation, false);
+  assert.equal(generation.assets.length, 10);
+
+  const rgba = new Uint8ClampedArray(10 * 10 * 4);
+  for (let pixel = 0; pixel < 100; pixel++) {
+    const alpha = pixel < 20 ? 0 : 255;
+    rgba[pixel * 4] = 255;
+    rgba[pixel * 4 + 1] = 120;
+    rgba[pixel * 4 + 2] = 40;
+    rgba[pixel * 4 + 3] = alpha;
+  }
+  const reviews = generation.assets.map(asset => ({
+    partId: asset.partId,
+    review: reviewCharacterRigPart(asset, { data: rgba }, 10, 10, {
+      correctPart: true,
+      characterIdentity: true,
+      jointAlignment: true
+    })
+  }));
+  assert.ok(reviews.every(item => item.review.approved === true));
+
+  const assembled = assembleApprovedCharacterRig({
+    characterId: 'Foxy',
+    rig: generation.rig,
+    assets: generation.assets,
+    reviews
+  });
+  assert.equal(assembled.status, 'approved');
+  assert.equal(assembled.readyForAnimation, true);
+  assert.equal(assembled.approvedPartCount, 10);
+  assert.ok(assembled.rig.parts.every(part => /^https:\\/\\//i.test(part.imageUrl)));
+
+  const motion = createCharacterRigMotionPreset(assembled.rig, 'walk');
+  assert.equal(motion.status, 'ready');
+  const poses = sampleCharacterRigTimeline(motion.timeline, 0.25);
+  const spy = createCanvasSpy();
+  const rendered = drawCharacterLayers(
+    spy.context,
+    [{ characterId: 'Foxy', imageUrl: 'https://assets.example.test/foxy-fallback.png' }],
+    () => ({ width: 64, height: 64 }),
+    640,
+    360,
+    {
+      drawRigParts: true,
+      preferRigParts: true,
+      characterRigs: [assembled.rig],
+      rigPoses: { Foxy: poses.Foxy }
+    }
+  );
+
+  assert.equal(rendered.rigDrawn, 10);
+  assert.equal(rendered.rigSkipped, 0);
+  assert.deepEqual(rendered.rigReadyCharacterIds, ['Foxy']);
+  assert.equal(spy.calls.draws, 10);
 });
