@@ -34,7 +34,14 @@ export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}
   const anchor = anchors[0];
   if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)
     || anchor.x < 0 || anchor.x > 1 || anchor.y < 0 || anchor.y > 1) return null;
-  return { x: anchor.x, y: anchor.y, rotation: Number.isFinite(anchor.rotation) ? anchor.rotation : 0, partId: anchor.id };
+  const rotation = Number.isFinite(anchor.rotation) ? anchor.rotation : 0;
+  const gripX = Number.isFinite(anchor.gripOffsetX) ? anchor.gripOffsetX : 0;
+  const gripY = Number.isFinite(anchor.gripOffsetY) ? anchor.gripOffsetY : 0;
+  const cos = Math.cos(rotation), sin = Math.sin(rotation);
+  const x = anchor.x + cos * gripX - sin * gripY;
+  const y = anchor.y + sin * gripX + cos * gripY;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+  return { x, y, rotation, partId: anchor.id };
 }
 
 /**
