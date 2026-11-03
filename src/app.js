@@ -1365,7 +1365,7 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 }finally{button.disabled=!$('hordeConsent').checked}
 });
 
-let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
+let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;\nlet comfyCharacterReferenceFiles=[];
 let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
 let filmProgressTracking=false;
 let filmProgressSceneStates=[];
@@ -1425,12 +1425,22 @@ function comfyText(id){return $(id).value.trim()}
 function comfyBindings(){
  const binding=(nodeId,input)=>nodeId&&input?{nodeId,input}:null;
  const result={prompt:binding(comfyText('comfyPromptNode'),comfyText('comfyPromptInput')),image:binding(comfyText('comfyImageNode'),comfyText('comfyImageInput'))};
- const optional={negativePrompt:['comfyNegativeNode','comfyNegativeInput'],frameCount:['comfyFramesNode','comfyFramesInput'],fps:['comfyFpsNode','comfyFpsInput']};
+ const optional={negativePrompt:['comfyNegativeNode','comfyNegativeInput'],frameCount:['comfyFramesNode','comfyFramesInput'],fps:['comfyFpsNode','comfyFpsInput'],referenceImage1:['comfyReference1Node','comfyReference1Input'],referenceImage2:['comfyReference2Node','comfyReference2Input']};
  Object.entries(optional).forEach(([key,ids])=>{const value=binding(comfyText(ids[0]),comfyText(ids[1]));if(value)result[key]=value});
  return result;
 }
 function setComfyStatus(message){$('comfyStatus').textContent=message}
 function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow;const mode=$('videoGenerationMode')?.value||'huggingface';const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:comfyConnected&&!!comfyWorkflow;$('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController}
+['comfyCharacterReference1','comfyCharacterReference2'].forEach((id,index)=>{
+ $(id).addEventListener('change',()=>{
+  const file=$(id).files?.[0]||null;
+  comfyCharacterReferenceFiles[index]=file;
+  const count=comfyCharacterReferenceFiles.filter(Boolean).length;
+  setComfyStatus(count
+   ? (uiLang==='ru'?'Выбрано референсов: '+count+'. Они будут отправлены только в локальный ComfyUI при запуске анимации.':'Selected character references: '+count+'. They are sent only to local ComfyUI when animation starts.')
+   : (uiLang==='ru'?'Референсы персонажей не выбраны.':'No character references selected.'));
+ });
+});
 $('comfySourceImageFile').addEventListener('change',()=>{
  const file=$('comfySourceImageFile').files?.[0]||null;
  comfySourceImage=file;
@@ -1483,7 +1493,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
-  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob},{onProgress:progress=>{
+  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages:comfyCharacterReferenceFiles.slice(0,2)},{onProgress:progress=>{
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
    status.textContent=(uiLang==='ru'?'ComfyUI · ':'ComfyUI · ')+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'');
   }});
