@@ -224,7 +224,7 @@ test('generated, reviewed ten-part assets assemble into an animated rig and reac
   assert.equal(assembled.status, 'approved');
   assert.equal(assembled.readyForAnimation, true);
   assert.equal(assembled.approvedPartCount, 10);
-  assert.ok(assembled.rig.parts.every(part => /^https:\\/\\//i.test(part.imageUrl)));
+  assert.ok(assembled.rig.parts.every(part => part.imageUrl.startsWith('https://')));
 
   const motion = createCharacterRigMotionPreset(assembled.rig, 'walk');
   assert.equal(motion.status, 'ready');
