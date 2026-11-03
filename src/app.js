@@ -30,7 +30,7 @@ import { createSceneVideoStorage } from "./scene-video-storage.js";
 import { createFacialAssetStorage } from "./facial-asset-storage.js";
 import { generateStoryboardVideos, readVideoProgressPercent } from "./scene-video-batch.js";
 import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./huggingface-zerogpu-video-provider.js";
-import { syncSceneVideoPlayback } from "./scene-video-transport.js";
+import { fitSceneVideoToDuration, syncSceneVideoPlayback } from "./scene-video-transport.js";
 import { waitForSceneVideoReady, waitForSceneImageReady } from "./scene-video-readiness.js";
 import { createAnimationClock } from "./animation-clock.js";
 import { getPromptCameraTransform } from "./prompt-camera-motion.js";
@@ -131,8 +131,12 @@ function attachSceneVideo(index,meta,blob,filename){
  disposeSceneVideoEntry(sceneVideoCache.get(key));
  const url=URL.createObjectURL(blob);
  const video=document.createElement("video");
- video.muted=true;video.loop=true;video.playsInline=true;video.preload="auto";video.src=url;
- video.addEventListener("loadeddata",()=>{if(sceneIndex===index)draw()},{once:true});
+ const sceneDuration=Number(meta.durationSeconds??meta.duration??$('duration').value)||3;
+ video.muted=true;video.loop=false;video.playsInline=true;video.preload="auto";video.src=url;
+ const fitDuration=()=>fitSceneVideoToDuration(video,sceneDuration);
+ video.addEventListener("loadedmetadata",fitDuration,{once:true});
+ if(video.readyState>=1)fitDuration();
+ video.addEventListener("loadeddata",()=>{fitDuration();if(sceneIndex===index)draw()},{once:true});
  const entry={video,url,filename};
  sceneVideoCache.set(key,entry);
  if(index===sceneIndex)syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:key,shouldPlay:playing,restart:true});
@@ -1550,13 +1554,13 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   const registry=createVideoProviderRegistry();registry.register(provider);
   const scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
   if(mode==='huggingface'){
-   const unsupportedIndex=scenes.findIndex(scene=>{
+   const tooShortIndex=scenes.findIndex(scene=>{
     const seconds=Number(scene.durationSeconds??scene.duration??$('duration').value)||3;
-    return seconds<0.5||seconds>5;
+    return seconds<0.5;
    });
-   if(unsupportedIndex>=0){
-    const seconds=Number(scenes[unsupportedIndex].durationSeconds??scenes[unsupportedIndex].duration??$('duration').value)||3;
-    throw new RangeError('Hugging Face Wan 2.2 supports scene clips from 0.5 to 5 seconds. Scene '+(unsupportedIndex+1)+' is set to '+seconds+' seconds. Shorten this scene or choose local ComfyUI.');
+   if(tooShortIndex>=0){
+    const seconds=Number(scenes[tooShortIndex].durationSeconds??scenes[tooShortIndex].duration??$('duration').value)||3;
+    throw new RangeError('Hugging Face Wan 2.2 requires at least 0.5 seconds per scene. Scene '+(tooShortIndex+1)+' is set to '+seconds+' seconds.');
    }
   }
   filmProgressSceneStates=scenes.map((scene,index)=>{
@@ -1619,7 +1623,9 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      if(!imageInput.size)throw new Error('Изображение сцены пустое.');
     }
     const prompt=buildMotionGenerationPrompt(meta,characterBible);
-    const duration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
+    const requestedDuration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
+    // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
+    const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Отправка в видеодвижок','Submitting to video engine')});
     const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput},{signal,onProgress:job=>{
      const providerPercent=readVideoProgressPercent(job);
