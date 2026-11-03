@@ -30,8 +30,9 @@ export async function generateCharacterRigParts({
 
   const assets = [];
   const failures = [];
+  let cancelled = false;
   for (let index = 0; index < plan.parts.length; index++) {
-    if (signal?.aborted) throw new DOMException('Rig-part generation was cancelled.', 'AbortError');
+    if (signal?.aborted) { cancelled = true; break; }
     const part = plan.parts[index];
     onProgress?.({ phase: 'generating', index: index + 1, total: plan.parts.length, partId: part.partId });
     try {
