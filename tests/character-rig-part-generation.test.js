@@ -69,20 +69,21 @@ test('rejects unsupported image URLs and blocks incomplete character references'
   );
 });
 
-test('propagates cancellation instead of silently continuing', async () => {
+test('returns a cancelled result when the active image request is aborted', async () => {
   const controller = new AbortController();
-  await assert.rejects(
-    generateCharacterRigParts({
-      ...reference,
-      consentAccepted: true,
-      signal: controller.signal,
-      generateImage: async () => {
-        controller.abort();
-        throw new DOMException('Cancelled', 'AbortError');
-      }
-    }),
-    error => error?.name === 'AbortError'
-  );
+  const result = await generateCharacterRigParts({
+    ...reference,
+    consentAccepted: true,
+    signal: controller.signal,
+    generateImage: async () => {
+      controller.abort();
+      throw new DOMException('Cancelled', 'AbortError');
+    }
+  });
+  assert.equal(result.status, 'cancelled');
+  assert.equal(result.cancelled, true);
+  assert.equal(result.assets.length, 0);
+  assert.equal(result.readyForAnimation, false);
 });
 
 
