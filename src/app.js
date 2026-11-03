@@ -1,4 +1,5 @@
 import { drawProceduralSceneEnvironment } from './procedural-scene-environment.js';
+import { drawSceneProps } from './scene-prop-renderer.js';
 import { validateStoryScenes } from "./story-qa.js";
 import { buildStoryboardFromText } from "./storyboard-generator.js";
 import { resolveStoryProtagonist } from "./story-protagonist.js";
@@ -221,7 +222,7 @@ else if(generatedFrame){const motionTransform=getPromptCameraTransform(currentSc
 const sampledRigPoses=currentSceneData.characterRigTimeline?.keyframes?.length
  ? sampleCharacterRigTimeline(currentSceneData.characterRigTimeline,rigAnimationProgress)
  : currentSceneData.characterRigPoses;
-drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});
+drawSceneProps(ctx,currentSceneData,currentSceneData.characterLayers,sceneMotionProgress,w,h,t);drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});
 ctx.fillStyle='#fff';ctx.font='bold 21px system-ui';ctx.fillText($('character').value||(uiLang==='ru'?'Главный герой':'Main character'),24,38);if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);if(playing){frame++;raf=requestAnimationFrame(draw)}else{raf=0}}
 const storyTemplates={
 en:{titles:['The beginning','A turning point','The next step'],middle:'A new detail changes the moment.',ending:'The story moves forward.',status:'Local DRAVEX storyboard created.'},

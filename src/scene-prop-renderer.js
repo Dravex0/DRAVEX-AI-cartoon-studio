@@ -1,0 +1,112 @@
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const clean = value => String(value ?? '').trim();
+const key = value => clean(value).toLocaleLowerCase();
+
+function propKind(name) {
+  const value = key(name);
+  if (/star|звезд|зірк|estrella/.test(value)) return 'star';
+  if (/key|ключ|ключик|llave/.test(value)) return 'key';
+  if (/book|книг|книж|libro/.test(value)) return 'book';
+  if (/ball|мяч|куля|pelota/.test(value)) return 'ball';
+  if (/apple|яблок|яблук|manzana/.test(value)) return 'apple';
+  return 'generic';
+}
+
+/**
+ * Builds a deterministic visual plan from explicit, source-grounded prop holder changes.
+ * The pickup/drop transition is staged in the latter half of the scene because the
+ * current state-change schema does not contain event timestamps.
+ */
+export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progress = 1) {
+  const changes = Array.isArray(scene?.stateChanges) ? scene.stateChanges : [];
+  const layers = Array.isArray(characterLayers) ? characterLayers : [];
+  const p = clamp(Number.isFinite(progress) ? progress : 1, 0, 1);
+  const transition = clamp((p - 0.52) / 0.28, 0, 1);
+  const eased = transition * transition * (3 - 2 * transition);
+  const latest = new Map();
+  for (const change of changes) {
+    if (!change || change.entityType !== 'prop' || change.property !== 'holder') continue;
+    const entityId = clean(change.entityId);
+    if (!entityId) continue;
+    latest.set(key(entityId), change);
+  }
+  return [...latest.values()].map(change => {
+    const actorId = clean(change.actorId);
+    const actor = layers.find(layer => key(layer?.characterId) === key(actorId));
+    const actorX = Number.isFinite(actor?.x) ? actor.x : 0.5;
+    const actorY = Number.isFinite(actor?.y) ? actor.y : 0.68;
+    const heldByActor = change.value != null && key(change.value) === key(actorId);
+    const wasHeldByActor = change.previousValue != null && key(change.previousValue) === key(actorId);
+    const ground = { x: 0.68, y: 0.79 };
+    const hand = { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96), y: clamp(actorY - 0.08, 0.08, 0.9) };
+    const from = wasHeldByActor ? hand : ground;
+    const to = heldByActor ? hand : ground;
+    const x = from.x + (to.x - from.x) * eased;
+    const y = from.y + (to.y - from.y) * eased;
+    return {
+      id: clean(change.entityId),
+      kind: propKind(change.entityId),
+      x, y,
+      held: heldByActor,
+      visible: true,
+      scale: 1,
+      evidence: clean(change.evidence)
+    };
+  });
+}
+
+function drawStar(context, size) {
+  context.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const angle = -Math.PI / 2 + i * Math.PI / 5;
+    const radius = i % 2 ? size * 0.45 : size;
+    const x = Math.cos(angle) * radius, y = Math.sin(angle) * radius;
+    if (i === 0) context.moveTo(x, y); else context.lineTo(x, y);
+  }
+  context.closePath();
+  context.fill();
+}
+
+function drawProp(context, prop, x, y, time) {
+  const bob = prop.held ? Math.sin(time * 4) * 0.008 : 0;
+  context.save();
+  context.translate(x, y + bob);
+  context.lineWidth = 2.5;
+  context.lineJoin = 'round';
+  if (prop.kind === 'star') {
+    context.fillStyle = '#ffe58a'; context.strokeStyle = '#9b6b24';
+    drawStar(context, 0.027);
+    context.stroke();
+  } else if (prop.kind === 'key') {
+    context.strokeStyle = '#f6d36b'; context.fillStyle = '#f6d36b';
+    context.beginPath(); context.arc(-0.012, 0, 0.012, 0, Math.PI * 2); context.stroke();
+    context.fillRect(-0.002, -0.003, 0.035, 0.006);
+    context.fillRect(0.022, -0.003, 0.005, 0.014);
+  } else if (prop.kind === 'book') {
+    context.fillStyle = '#c86f52'; context.strokeStyle = '#5a3540';
+    context.fillRect(-0.025, -0.018, 0.05, 0.036); context.strokeRect(-0.025, -0.018, 0.05, 0.036);
+    context.strokeStyle = '#f5d9a8'; context.beginPath(); context.moveTo(0, -0.016); context.lineTo(0, 0.016); context.stroke();
+  } else if (prop.kind === 'ball') {
+    context.fillStyle = '#72c6df'; context.strokeStyle = '#24566c';
+    context.beginPath(); context.arc(0, 0, 0.022, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.beginPath(); context.arc(0, 0, 0.011, 0, Math.PI * 2); context.stroke();
+  } else if (prop.kind === 'apple') {
+    context.fillStyle = '#df5b50'; context.strokeStyle = '#783a37';
+    context.beginPath(); context.ellipse(0, 0.003, 0.019, 0.022, 0, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.strokeStyle = '#6e8b4d'; context.beginPath(); context.moveTo(0, -0.018); context.lineTo(0.004, -0.029); context.stroke();
+  } else {
+    context.fillStyle = '#e7b66b'; context.strokeStyle = '#775735';
+    context.beginPath(); context.roundRect(-0.021, -0.018, 0.042, 0.036, 0.008); context.fill(); context.stroke();
+  }
+  context.restore();
+}
+
+/** Draws explicit story props in the shared Canvas preview/export path. */
+export function drawSceneProps(context, scene, characterLayers, progress, width, height, time = 0) {
+  if (!context || typeof context.save !== 'function' || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return { drawn: 0, skipped: 0 };
+  }
+  const plan = buildScenePropRenderPlan(scene, characterLayers, progress);
+  for (const prop of plan) drawProp(context, prop, prop.x * width, prop.y * height, Number.isFinite(time) ? time : 0);
+  return { drawn: plan.length, skipped: 0, props: plan };
+}
