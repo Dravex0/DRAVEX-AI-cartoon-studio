@@ -42,7 +42,7 @@ test('exports a short storyboard to a non-empty playable WebM', async ({ page })
 
   await page.goto('/');
   await page.locator('#idea').fill(
-    'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\\nDuration: 0.25 seconds'
+    'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\nDuration: 0.25 seconds'
   );
   await page.locator('#make').click();
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
