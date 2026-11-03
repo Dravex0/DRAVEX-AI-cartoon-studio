@@ -50,14 +50,22 @@ test('exports a short storyboard to a non-empty playable WebM', async ({ page })
   await page.locator('#export').click();
   await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
 
-  const video = await page.locator('#finalFilmPlayer').evaluate(element => ({
-    source: element.currentSrc,
-    duration: element.duration,
-    width: element.videoWidth,
-    height: element.videoHeight,
-    readyState: element.readyState
-  }));
+  const video = await page.locator('#finalFilmPlayer').evaluate(async element => {
+    const response = await fetch(element.currentSrc);
+    const blob = await response.blob();
+    return {
+      source: element.currentSrc,
+      mimeType: blob.type,
+      byteLength: blob.size,
+      duration: element.duration,
+      width: element.videoWidth,
+      height: element.videoHeight,
+      readyState: element.readyState
+    };
+  });
   expect(video.source).toMatch(/^blob:/);
+  expect(video.mimeType).toMatch(/^video\/webm/i);
+  expect(video.byteLength).toBeGreaterThan(1024);
   expect(video.duration).toBeGreaterThanOrEqual(1);
   expect(video.duration).toBeLessThan(2);
   expect(video.width).toBe(1280);
