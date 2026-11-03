@@ -186,3 +186,15 @@ describe('character rig foundation', () => {
   });
 
 });
+
+
+describe('authored prop grip offsets', () => {
+  it('normalizes bounded grip offsets and preserves zero defaults for legacy rigs', () => {
+    const legacy = normalizeCharacterRig(validRig());
+    assert.equal(legacy.parts[0].gripOffsetX, 0);
+    assert.equal(legacy.parts[0].gripOffsetY, 0);
+    const authored = normalizeCharacterRig({ ...validRig(), parts: [{ ...validRig().parts[0], gripOffsetX: 2, gripOffsetY: -0.25 }] });
+    assert.equal(authored.parts[0].gripOffsetX, 1);
+    assert.equal(authored.parts[0].gripOffsetY, -0.25);
+  });
+});
