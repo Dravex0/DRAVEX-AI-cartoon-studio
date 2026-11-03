@@ -28,6 +28,7 @@ import { createVoiceAudioStorage } from "./voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./scene-voice-workflow.js";
 import { createSceneVideoStorage } from "./scene-video-storage.js";
 import { createFacialAssetStorage } from "./facial-asset-storage.js";
+import { createCharacterReferenceImageStorage } from "./character-reference-image-storage.js";
 import { generateStoryboardVideos, readVideoProgressPercent } from "./scene-video-batch.js";
 import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./huggingface-zerogpu-video-provider.js";
 import { fitSceneVideoToDuration, syncSceneVideoPlayback } from "./scene-video-transport.js";
@@ -119,6 +120,7 @@ let finalFilmObjectUrl=null;
 let sceneVideoRestorePromise=Promise.resolve();
 const sceneVideoStorage=createSceneVideoStorage();
 const facialAssetStorage=createFacialAssetStorage();
+const characterReferenceImageStorage=createCharacterReferenceImageStorage();
 function disposeSceneVideoEntry(entry){
  if(!entry)return;
  entry.video.pause();
@@ -290,6 +292,7 @@ function renderCharacterBible(){
     $('bibleClothing').value=profile.clothing||'';
     $('bibleColors').value=profile.colors||'';
     $('bibleDistinctiveFeatures').value=profile.distinctiveFeatures||'';
+    $('bibleReferenceImageStatus').textContent=profile.referenceImageAssetId?(uiLang==='ru'?'Фото-референс сохранён локально на этом устройстве.':'Reference image is saved locally on this device.'):(uiLang==='ru'?'Фото-референс не добавлен.':'No reference image saved yet.');
     activeId.dataset.loaded=String(sceneIndex);
   }
   const cards=$('characterReferenceCards');
@@ -309,7 +312,8 @@ $('saveCharacterReference').addEventListener('click',()=>{
       visualDescription:$('bibleVisualDescription').value,
       clothing:$('bibleClothing').value,
       colors:$('bibleColors').value,
-      distinctiveFeatures:$('bibleDistinctiveFeatures').value
+      distinctiveFeatures:$('bibleDistinctiveFeatures').value,
+      referenceImageAssetId:characterBible.find(entry=>entry.characterId.toLowerCase()===$('bibleCharacterId').value.trim().toLowerCase())?.referenceImageAssetId||''
     });
     $('bibleCharacterId').dataset.loaded=String(sceneIndex);
     $('characterReferenceStatus').textContent=uiLang==='ru'?'Образ сохранён. Он будет добавляться в промпты сцен с этим персонажем. Нажми «Сохранить черновик», чтобы сохранить его в браузере.':'Reference saved. It will be included in prompts for scenes featuring this character. Save the draft to persist it in this browser.';
@@ -319,6 +323,50 @@ $('saveCharacterReference').addEventListener('click',()=>{
     $('characterReferenceStatus').textContent=error.message;
   }
 });
+$('bibleReferenceImageFile').addEventListener('change',async()=>{
+  const file=$('bibleReferenceImageFile').files?.[0]||null;
+  if(!file)return;
+  const characterId=$('bibleCharacterId').value.trim();
+  if(!characterId){
+    $('bibleReferenceImageStatus').textContent=uiLang==='ru'?'Сначала укажи имя персонажа.':'Enter the character name first.';
+    $('bibleReferenceImageFile').value='';
+    return;
+  }
+  try{
+    const current=characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase())||{};
+    const randomPart=window.crypto?.randomUUID?.().replace(/-/g,'')||Date.now().toString(36)+Math.random().toString(36).slice(2);
+    const assetId='refimg_'+randomPart;
+    await characterReferenceImageStorage.put(assetId,file,file.name);
+    characterBible=upsertCharacterReference(characterBible,{
+      ...current,
+      characterId,
+      visualDescription:$('bibleVisualDescription').value,
+      clothing:$('bibleClothing').value,
+      colors:$('bibleColors').value,
+      distinctiveFeatures:$('bibleDistinctiveFeatures').value,
+      referenceImageAssetId:assetId
+    });
+    $('bibleCharacterId').dataset.loaded=String(sceneIndex);
+    $('bibleReferenceImageStatus').textContent=uiLang==='ru'
+      ?'Фото сохранено только в этом браузере ('+Math.round(file.size/1024)+' КБ). Для использования в сцене выбери локальный ComfyUI и настрой входы Reference Image 1/2 в workflow.'
+      :'Image saved only in this browser ('+Math.round(file.size/1024)+' KB). To use it in a scene, choose local ComfyUI and configure Reference Image 1/2 workflow inputs.';
+    renderCharacterBible();
+  }catch(error){
+    $('bibleReferenceImageStatus').textContent=error.message||'Could not save character reference image.';
+  }
+});
+async function loadCharacterReferenceImagesForScene(scene){
+  const cast=normalizeSceneCast('',scene?.characters);
+  const profiles=characterBible.filter(profile=>cast.some(name=>name.toLowerCase()===profile.characterId.toLowerCase()));
+  const images=[];
+  for(const profile of profiles){
+    if(images.length>=2)break;
+    if(!profile.referenceImageAssetId)continue;
+    const record=await characterReferenceImageStorage.get(profile.referenceImageAssetId);
+    if(record?.blob?.size)images.push({name:record.filename||profile.characterId+'.png',blob:record.blob});
+  }
+  return images;
+}
 function updateProductionPreview(){
 const meta=sceneMetadata[sceneIndex]||{};
 const scene={...meta,title:titles[sceneIndex],characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),imagePrompt:$('sceneImagePrompt').value,motionPrompt:$('sceneMotionPrompt').value,camera:$('sceneCamera').value,startState:$('sceneStartState').value,endState:$('sceneEndState').value,negativePrompt:$('sceneNegativePrompt').value,continuityLock:$('sceneContinuityLock').value};
@@ -1494,7 +1542,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
-  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages:comfyCharacterReferenceFiles.slice(0,2)},{onProgress:progress=>{
+  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages:(await loadCharacterReferenceImagesForScene(motionScene)).concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2)},{onProgress:progress=>{
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
    status.textContent=(uiLang==='ru'?'ComfyUI · ':'ComfyUI · ')+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'');
   }});
@@ -1638,7 +1686,8 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
     const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Отправка в видеодвижок','Submitting to video engine')});
-    const referenceImages=mode==='comfyui'?comfyCharacterReferenceFiles.filter(Boolean).slice(0,2):[];
+    const profileReferenceImages=mode==='comfyui'?await loadCharacterReferenceImagesForScene(meta):[];
+    const referenceImages=mode==='comfyui'?profileReferenceImages.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2):[];
     const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput,referenceImages},{signal,onProgress:job=>{
      const providerPercent=readVideoProgressPercent(job);
      const providerStage=String(job.stage||'processing');
