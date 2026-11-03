@@ -154,3 +154,11 @@ test('wires landscape and portrait formats through canvas preview and export', (
   assert.ok(html.includes('getSceneComposition(activeCanvasFormat,sceneIndex)'));
   assert.ok(html.includes('canvasFormat:activeCanvasFormat'));
 });
+
+
+test('does not publish a successful WebM after MediaRecorder reports an error', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes('recorderFailed=false'));
+  assert.ok(app.includes("recorder.onerror=()=>{\n      recorderFailed=true;"));
+  assert.ok(app.includes("if(recorderFailed)throw new Error('MediaRecorder failed before producing a complete video.')"));
+});
