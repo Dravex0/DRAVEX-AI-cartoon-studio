@@ -1581,13 +1581,21 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const key=sceneVideoKey(index,motionScene);
   const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
   const filename='dravex-scene-'+(index+1)+extension;
-  attachSceneVideo(index,motionScene,result.video,filename);
-  let persistenceNote='';
-  try{await sceneVideoStorage.put(key,result.video,filename);}
-  catch(storageError){console.warn('Scene video remains available only until this tab is closed:',storageError);persistenceNote=uiLang==='ru'?' Не удалось сохранить видео в памяти браузера; скачай его отдельно.':' Browser storage was unavailable; download the video before closing this tab.';}
+  const videoEntry=attachSceneVideo(index,motionScene,result.video,filename);
+  try{
+   await waitForSceneVideoReady(videoEntry.video,{timeoutMs:20000});
+  }catch(readinessError){
+   if(sceneVideoCache.get(key)===videoEntry)sceneVideoCache.delete(key);
+   disposeSceneVideoEntry(videoEntry);
+   throw new Error('Сцена '+(index+1)+' вернула видео, которое браузер не смог декодировать: '+(readinessError.message||'unknown decode error'));
+  }
+  const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
+  const persistenceNote=persistence.persisted?'':(uiLang==='ru'
+   ?' Видео доступно в этой вкладке, но не сохранено для следующего запуска: '+(persistence.error||'ошибка хранилища')
+   :' The video is available in this tab but could not be saved for the next visit: '+(persistence.error||'storage error'));
   if(sceneIndex===index)renderComfySceneVideo();
   if(!playing)draw();
-  status.textContent=(uiLang==='ru'?'Готово: видео сцены подключено к предпросмотру и экспорту.':'Completed: scene video is now used in preview and storyboard export.')+persistenceNote;
+  status.textContent=(uiLang==='ru'?'Готово: видео сцены декодировано и подключено к предпросмотру и экспорту.':'Completed: scene video decoded and connected to preview and storyboard export.')+persistenceNote;
  }catch(error){status.textContent=(error.name==='AbortError'?'Cancelled: ':'Generation failed: ')+(error.code?error.code+' · ':'')+(error.message||'Unknown error');}
  finally{button.disabled=false;$('checkComfyConnection').disabled=false;updateComfyAnimateAvailability();}
 });
