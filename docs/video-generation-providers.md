@@ -4,7 +4,7 @@ DRAVEX uses a provider-neutral contract for optional video-generation engines.
 
 - The editor and storyboard remain usable when no video provider is configured.
 - Providers register explicitly and declare supported task types.
-- Requests are validated before a provider is called (prompt, source media, duration and FPS).
+- Requests are validated before a provider is called (prompt, source media, duration, FPS, and up to four optional Blob/File character reference images). Reference images are passed through to compatible providers; ComfyUI uploads them only when matching reference-node bindings are explicitly configured.
 - Providers may return queued/processing/pending jobs or a completed Blob/URL.
 - Cancellation is forwarded as an AbortSignal-like context.
 - Provider keys and network calls are owned by the provider adapter, never hard-coded into the editor.
