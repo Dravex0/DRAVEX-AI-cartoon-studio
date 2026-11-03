@@ -49,6 +49,7 @@ import { createVideoProviderRegistry, generateVideoWithProvider } from "./video-
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./scene-production.js";
 import { buildCharacterSpriteAssetPlan } from "./character-sprite-asset-plan.js";
 import { generateCharacterRigParts } from "./character-rig-part-generation.js";
+import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
 import { generateCharacterSpriteAsset } from "./character-sprite-generation.js";
 import { verifySpriteTransparency } from "./character-sprite-verification.js";
 import { upsertCharacterReference, mergeCharacterReferences } from "./character-reference.js";
@@ -1177,19 +1178,93 @@ function renderCharacterRigPartSets(){
   const heading=document.createElement('strong');heading.textContent=characterId+' · '+(set.status||'unverified');
   host.appendChild(heading);
   const grid=document.createElement('div');grid.className='sprite-results';
-  (Array.isArray(set.assets)?set.assets:[]).forEach(asset=>{
+  const assets=Array.isArray(set.assets)?set.assets:[];
+  assets.forEach(asset=>{
    if(!asset||!/^https:\/\//i.test(String(asset.imageUrl||'')))return;
    const card=document.createElement('div');card.className='sprite-result';
    const image=document.createElement('img');image.src=asset.imageUrl;image.alt=characterId+' · '+String(asset.partId||'rig part');image.loading='lazy';image.referrerPolicy='no-referrer';
    const title=document.createElement('strong');title.textContent=String(asset.partId||'Part');
-   const note=document.createElement('small');note.textContent=uiLang==='ru'?'Не проверено · прозрачность, сходство и стыки требуют проверки':'Unverified · alpha, identity and joints need review';
-   card.append(image,title,note);grid.appendChild(card);
+   const savedReview=set.reviews?.[asset.partId]||null;
+   const note=document.createElement('small');note.textContent=savedReview?.approved
+    ?(uiLang==='ru'?'Проверено: прозрачность и ручные отметки подтверждены':'Reviewed: alpha and manual checks confirmed')
+    :(uiLang==='ru'?'Не проверено: проверь изображение ниже':'Unverified: review the image below');
+   const controls=document.createElement('div');controls.className='rig-part-review-controls';
+   const decisions={};
+   const labels=[
+    ['correctPart',uiLang==='ru'?'Это правильная часть тела':'Correct body part'],
+    ['characterIdentity',uiLang==='ru'?'Персонаж сохраняет внешний вид':'Character identity matches'],
+    ['jointAlignment',uiLang==='ru'?'Стыки подходят для соединения':'Joint edges align']
+   ];
+   labels.forEach(([key,label])=>{
+    const row=document.createElement('label');row.className='consent-row';
+    const input=document.createElement('input');input.type='checkbox';input.checked=savedReview?.decisions?.[key]===true;
+    input.addEventListener('change',()=>{decisions[key]=input.checked});
+    decisions[key]=input.checked;
+    const textNode=document.createElement('span');textNode.textContent=label;
+    row.append(input,textNode);controls.appendChild(row);
+   });
+   const reviewButton=document.createElement('button');reviewButton.type='button';reviewButton.className='secondary';
+   reviewButton.textContent=uiLang==='ru'?'Проверить прозрачность и сохранить оценку':'Check transparency and save review';
+   reviewButton.addEventListener('click',async()=>{
+    reviewButton.disabled=true;
+    note.textContent=uiLang==='ru'?'Проверяю пиксели изображения…':'Checking image pixels…';
+    try{
+     const loaded=new Image();loaded.crossOrigin='anonymous';loaded.referrerPolicy='no-referrer';
+     await new Promise((resolve,reject)=>{loaded.onload=resolve;loaded.onerror=()=>reject(new Error('Image load failed or provider blocks cross-origin access.'));loaded.src=asset.imageUrl;});
+     const canvas=document.createElement('canvas');canvas.width=loaded.naturalWidth;canvas.height=loaded.naturalHeight;
+     if(!canvas.width||!canvas.height)throw new Error('Image has invalid dimensions.');
+     const context=canvas.getContext('2d',{willReadFrequently:true});
+     if(!context)throw new Error('Canvas pixel inspection is unavailable.');
+     context.drawImage(loaded,0,0);
+     const pixels=context.getImageData(0,0,canvas.width,canvas.height);
+     const review=reviewCharacterRigPart(asset,pixels,canvas.width,canvas.height,decisions);
+     const current=sceneMetadata[sceneIndex]||{};
+     const currentSets={...(current.characterRigPartSets||{})};
+     const currentSet={...(currentSets[characterId]||set)};
+     currentSet.reviews={...(currentSet.reviews||{}),[asset.partId]:review};
+     currentSets[characterId]=currentSet;
+     sceneMetadata[sceneIndex]={...current,characterRigPartSets:currentSets};
+     const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
+     note.textContent=(review.approved?(uiLang==='ru'?'Часть одобрена. ':'Part approved. '):(uiLang==='ru'?'Не одобрено: ':'Not approved: '))+review.issues.join(', ')+(saved?' · '+(uiLang==='ru'?'сохранено':'saved'):' · '+(uiLang==='ru'?'не сохранено':'not saved'));
+     renderCharacterRigPartSets();
+    }catch(error){
+     note.textContent=(uiLang==='ru'?'Не удалось проверить пиксели: ':'Pixel review failed: ')+(error?.message||'Unknown error')+(uiLang==='ru'?'. Провайдер должен разрешать CORS.':' Provider must allow CORS.');
+    }finally{reviewButton.disabled=false}
+   });
+   controls.appendChild(reviewButton);
+   card.append(image,title,note,controls);grid.appendChild(card);
   });
   host.appendChild(grid);
   if(Array.isArray(set.failures)&&set.failures.length){
-   const failures=document.createElement('small');failures.textContent=(uiLang==='ru'?'Ошибки: ':'Failures: ')+set.failures.map(item=>item.partId).join(', ');
+   const failures=document.createElement('small');failures.textContent=(uiLang==='ru'?'Ошибки генерации: ':'Generation failures: ')+set.failures.map(item=>item.partId).join(', ');
    host.appendChild(failures);
   }
+  const approved=assets.filter(asset=>set.reviews?.[asset.partId]?.approved===true).length;
+  const reviewSummary=document.createElement('small');
+  reviewSummary.textContent=(uiLang==='ru'?'Одобрено частей: ':'Approved parts: ')+approved+'/10. '+(uiLang==='ru'?'Автопроверка анализирует только alpha-канал; сходство, анатомию и стыки подтверждает человек.':'Automatic inspection checks alpha only; identity, anatomy and joints require human confirmation.');
+  host.appendChild(reviewSummary);
+  const assembleButton=document.createElement('button');assembleButton.type='button';assembleButton.className='secondary';
+  assembleButton.textContent=uiLang==='ru'?'Собрать одобренный скелет':'Assemble approved rig';
+  assembleButton.disabled=approved!==10||!set.rig;
+  assembleButton.addEventListener('click',()=>{
+   const reviews=Object.entries(set.reviews||{}).map(([partId,review])=>({partId,review}));
+   const result=assembleApprovedCharacterRig({characterId,rig:set.rig,assets,reviews});
+   if(!result.readyForAnimation){
+    reviewSummary.textContent=(uiLang==='ru'?'Сборка заблокирована: ':'Assembly blocked: ')+result.issues.join(', ');
+    return;
+   }
+   const meta=sceneMetadata[sceneIndex]||{};
+   const rigs=(meta.characterRigs||[]).filter(item=>String(item.characterId||'').toLowerCase()!==characterId.toLowerCase());
+   rigs.push(result.rig);
+   sceneMetadata[sceneIndex]={...meta,characterRigs:rigs};
+   const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
+   if($('sceneMotionActor')&&[...$('sceneMotionActor').options].some(option=>option.value.toLowerCase()===characterId.toLowerCase())){
+    $('sceneMotionActor').value=characterId;syncCharacterRigEditor();
+   }
+   reviewSummary.textContent=(uiLang==='ru'?'Скелет собран и прикреплён: 10 частей. ':'Rig assembled and attached: 10 parts. ')+(saved?(uiLang==='ru'?'черновик сохранён':'draft saved'):(uiLang==='ru'?'не удалось сохранить черновик':'draft save failed'))+'.';
+   if(!playing)draw();
+  });
+  host.appendChild(assembleButton);
  });
 }
 $('rigPartsConsent').addEventListener('change',()=>{$('generateCharacterRigParts').disabled=!$('rigPartsConsent').checked});
@@ -1228,7 +1303,7 @@ $('generateCharacterRigParts').addEventListener('click',async()=>{
   if(resolvedIndex>=0){
    const meta=sceneMetadata[resolvedIndex];
    const sets={...(meta.characterRigPartSets||{})};
-   sets[characterId]={status:result.status,identitySeed:result.identitySeed,assets:result.assets,failures:result.failures,verificationRequired:result.verificationRequired,readyForAnimation:false,generatedAt:new Date().toISOString()};
+   sets[characterId]={status:result.status,identitySeed:result.identitySeed,rig:result.rig,assets:result.assets,failures:result.failures,reviews:{},verificationRequired:result.verificationRequired,readyForAnimation:false,generatedAt:new Date().toISOString()};
    sceneMetadata[resolvedIndex]={...meta,characterRigPartSets:sets};
    if(sceneIndex===resolvedIndex)renderCharacterRigPartSets();
    const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
