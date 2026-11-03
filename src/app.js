@@ -1499,7 +1499,7 @@ $('export').onclick=async()=>{
   const wasPlaying=playing;
   const originalSceneIndex=sceneIndex;
   const sceneTimers=[];
-  let stream=null,recorder=null,stopTimer=null,cleaned=false,audioSession=null,exportProgressTimer=null,exportStartedAtMs=null;
+  let stream=null,recorder=null,stopTimer=null,cleaned=false,recorderFailed=false,audioSession=null,exportProgressTimer=null,exportStartedAtMs=null;
   const chunks=[];
   let audioScheduledStartAtMs=null;
   let lipSyncSkippedTracks=0;
@@ -1612,12 +1612,14 @@ $('export').onclick=async()=>{
     recorder=new MediaRecorder(stream,{mimeType});
     recorder.ondataavailable=event=>{if(event.data&&event.data.size>0)chunks.push(event.data)};
     recorder.onerror=()=>{
+      recorderFailed=true;
       cleanup();
       $('status').textContent=tr('exportFailed');
       if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка сборки WebM','WebM assembly failed'),tr('exportFailed'));filmProgressTracking=false;}
     };
     recorder.onstop=()=>{
       try{
+        if(recorderFailed)throw new Error('MediaRecorder failed before producing a complete video.');
         const blob=new Blob(chunks,{type:recorder.mimeType||'video/webm'});
         if(!blob.size)throw new Error('Recorder produced an empty file');
         const url=URL.createObjectURL(blob);
