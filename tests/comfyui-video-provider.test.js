@@ -127,6 +127,80 @@ test('uploads a source image, applies configured bindings and returns a complete
   assert.equal(progress.at(-1).stage, 'completed');
 });
 
+test('uploads and binds only explicitly configured character reference images', async () => {
+  const uploadedForms = [];
+  let submittedWorkflow;
+  const references = [
+    { name: 'alex.png', blob: new Blob(['alex-reference'], { type: 'image/png' }) },
+    { name: 'dragon.webp', blob: new Blob(['dragon-reference'], { type: 'image/webp' }) }
+  ];
+  const referenceBindings = {
+    ...nodeBindings,
+    referenceImage1: { nodeId: '21', input: 'image' },
+    referenceImage2: { nodeId: '22', input: 'image' }
+  };
+  const referenceWorkflow = {
+    ...workflow,
+    '21': { class_type: 'LoadImage', inputs: { image: '' } },
+    '22': { class_type: 'LoadImage', inputs: { image: '' } }
+  };
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).endsWith('/upload/image')) {
+      uploadedForms.push(options.body);
+      return jsonResponse({ name: `upload-${uploadedForms.length}.png`, subfolder: 'refs', type: 'input' });
+    }
+    if (String(url).endsWith('/prompt')) {
+      submittedWorkflow = JSON.parse(options.body).prompt;
+      return jsonResponse({ prompt_id: 'reference-job' });
+    }
+    if (String(url).endsWith('/history/reference-job')) {
+      return jsonResponse({ 'reference-job': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '90': { videos: [{ filename: 'reference.mp4', type: 'output' }] } }
+      }});
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188', workflow: referenceWorkflow,
+    nodeBindings: referenceBindings, outputNodeIds: ['90'], fetchImpl, pollIntervalMs: 250
+  });
+  await provider.generate({ ...request, referenceImages: references });
+  assert.equal(uploadedForms.length, 3);
+  assert.equal(submittedWorkflow['20'].inputs.image, 'refs/upload-1.png');
+  assert.equal(submittedWorkflow['21'].inputs.image, 'refs/upload-2.png');
+  assert.equal(submittedWorkflow['22'].inputs.image, 'refs/upload-3.png');
+});
+
+test('does not upload unbound character reference images', async () => {
+  let uploadCount = 0;
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).endsWith('/upload/image')) {
+      uploadCount += 1;
+      return jsonResponse({ name: 'source.png', type: 'input' });
+    }
+    if (String(url).endsWith('/prompt')) return jsonResponse({ prompt_id: 'no-ref-job' });
+    if (String(url).endsWith('/history/no-ref-job')) {
+      return jsonResponse({ 'no-ref-job': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '90': { videos: [{ filename: 'plain.mp4', type: 'output' }] } }
+      }});
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188', workflow, nodeBindings, outputNodeIds: ['90'],
+    fetchImpl, pollIntervalMs: 250
+  });
+  await provider.generate({
+    ...request,
+    referenceImages: [{ blob: new Blob(['private-reference'], { type: 'image/png' }) }]
+  });
+  assert.equal(uploadCount, 1);
+});
+
 test('aligns frame counts for workflows that require 1 + N times 8 frames', async () => {
   let submittedWorkflow;
   const fetchImpl = async (url, options = {}) => {
