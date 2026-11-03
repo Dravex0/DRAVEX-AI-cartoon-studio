@@ -14,14 +14,22 @@ function propKind(name) {
 
 /**
  * Builds a deterministic visual plan from explicit, source-grounded prop holder changes.
- * The pickup/drop transition is staged in the latter half of the scene because the
- * current state-change schema does not contain event timestamps.
+ * Uses the authored action phase when available; older scenes use a deterministic
+ * latter-half fallback because state changes do not carry their own event timestamps.
  */
 export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progress = 1) {
   const changes = Array.isArray(scene?.stateChanges) ? scene.stateChanges : [];
   const layers = Array.isArray(characterLayers) ? characterLayers : [];
   const p = clamp(Number.isFinite(progress) ? progress : 1, 0, 1);
-  const transition = clamp((p - 0.52) / 0.28, 0, 1);
+  const actionPhase = Array.isArray(scene?.actionTimeline?.phases)
+    ? scene.actionTimeline.phases.find(phase => phase?.phase === 'action'
+      && Number.isFinite(phase.start) && Number.isFinite(phase.end)
+      && phase.start >= 0 && phase.start < phase.end && phase.end <= 1)
+    : null;
+  // Prefer authored action timing; retain a stable fallback for older scenes.
+  const transitionStart = actionPhase ? actionPhase.start : 0.52;
+  const transitionEnd = actionPhase ? actionPhase.end : 0.8;
+  const transition = clamp((p - transitionStart) / (transitionEnd - transitionStart), 0, 1);
   const eased = transition * transition * (3 - 2 * transition);
   const latest = new Map();
   for (const change of changes) {
