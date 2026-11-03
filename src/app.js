@@ -918,7 +918,7 @@ async function runSceneMotionAnalysis(){
     for(const item of entries){
       if(sceneVideoCache.get(item.key)!==item.entry){
         sceneMotionAnalysisResults.set(item.key,{status:'skipped',message:'Video changed before analysis.'});
-        sceneMotionAnalysisSummary.skipped++;
+        sceneMotionAnalysisSummary=summarizeSceneMotionResults(sceneMotionAnalysisResults);
         renderSceneMediaReport();
         continue;
       }
