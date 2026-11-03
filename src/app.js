@@ -45,6 +45,7 @@ import { createAudioExportSession } from "./audio-export.js";
 import { waitForExportVideoReady, validateExportTracks } from "./film-export-readiness.js";
 import { buildSceneMediaReport } from "./scene-media-report.js";
 import { analyzeSceneVideoMotion } from "./scene-motion-analysis.js";
+import { summarizeSceneMotionResults } from "./scene-motion-results.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
@@ -926,12 +927,10 @@ async function runSceneMotionAnalysis(){
         if(sceneVideoCache.get(item.key)!==item.entry)throw new Error('Video changed during analysis.');
         const result=await analyzeSceneVideoMotion(item.entry.video);
         sceneMotionAnalysisResults.set(item.key,result);
-        sceneMotionAnalysisSummary.checked++;
-        if(result.status==='likely-static')sceneMotionAnalysisSummary.static++;
-        else sceneMotionAnalysisSummary.changed++;
+        sceneMotionAnalysisSummary=summarizeSceneMotionResults(sceneMotionAnalysisResults);
       }catch(error){
         sceneMotionAnalysisResults.set(item.key,{status:'skipped',message:String(error?.message||'Analysis unavailable.')});
-        sceneMotionAnalysisSummary.skipped++;
+        sceneMotionAnalysisSummary=summarizeSceneMotionResults(sceneMotionAnalysisResults);
         console.warn('Scene motion analysis skipped for scene '+(item.index+1)+':',error);
       }
       renderSceneMediaReport();
