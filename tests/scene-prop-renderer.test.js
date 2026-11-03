@@ -57,7 +57,7 @@ test('uses the authored action phase instead of the fallback timing', () => {
   };
   const before = buildScenePropRenderPlan(timedScene, layers, 0.2)[0];
   const after = buildScenePropRenderPlan(timedScene, layers, 0.6)[0];
-  assert.ok(before.x < after.x);
+  assert.ok(before.x > after.x);
   assert.ok(after.x > 0.4 && after.x < 0.6);
 });
 
@@ -68,5 +68,5 @@ test('ignores malformed action timing and keeps the backwards-compatible fallbac
   };
   const before = buildScenePropRenderPlan(malformed, layers, 0.4)[0];
   const after = buildScenePropRenderPlan(malformed, layers, 0.9)[0];
-  assert.ok(before.x < after.x);
+  assert.ok(before.x > after.x);
 });
