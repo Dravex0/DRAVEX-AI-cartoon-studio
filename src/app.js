@@ -40,6 +40,7 @@ import { sampleCharacterFacialLipSync } from "./facial-lipsync-runtime.js";
 import { getAudioTimelineOffsetMs } from "./audio-clock-alignment.js";
 import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js";
 import { createAudioExportSession } from "./audio-export.js";
+import { waitForExportVideoReady, validateExportTracks } from "./film-export-readiness.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
@@ -1638,6 +1639,7 @@ $('export').onclick=async()=>{
     const mimeTypes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
     const mimeType=mimeTypes.find(type=>MediaRecorder.isTypeSupported(type));
     if(!mimeType)throw new Error('No supported WebM codec');
+    validateExportTracks(stream,{audioRequired:Boolean(musicFile||voiceTracks.length)});
     recorder=new MediaRecorder(stream,{mimeType});
     recorder.ondataavailable=event=>{if(event.data&&event.data.size>0)chunks.push(event.data)};
     recorder.onerror=()=>{
@@ -1646,11 +1648,12 @@ $('export').onclick=async()=>{
       $('status').textContent=tr('exportFailed');
       if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка сборки WebM','WebM assembly failed'),tr('exportFailed'));filmProgressTracking=false;}
     };
-    recorder.onstop=()=>{
+    recorder.onstop=async()=>{
       try{
         if(recorderFailed)throw new Error('MediaRecorder failed before producing a complete video.');
         const blob=new Blob(chunks,{type:recorder.mimeType||'video/webm'});
         if(!blob.size)throw new Error('Recorder produced an empty file');
+        await waitForExportVideoReady(blob);
         const url=URL.createObjectURL(blob);
         if(finalFilmObjectUrl)URL.revokeObjectURL(finalFilmObjectUrl);
         finalFilmObjectUrl=url;
