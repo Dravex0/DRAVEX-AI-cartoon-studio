@@ -76,7 +76,7 @@ export async function generateCharacterRigParts({
         generatedAt: new Date().toISOString()
       });
     } catch (error) {
-      if (signal?.aborted || error?.name === 'AbortError') throw error;
+      if (signal?.aborted || error?.name === 'AbortError') { cancelled = true; break; }
       failures.push({ partId: part.partId, message: clean(error?.message || 'Generation failed.', 300) });
     }
     onProgress?.({
@@ -90,7 +90,8 @@ export async function generateCharacterRigParts({
   }
 
   return {
-    status: failures.length === 0 ? 'generated_unverified' : assets.length ? 'partially_generated' : 'failed',
+    status: cancelled ? 'cancelled' : failures.length === 0 ? 'generated_unverified' : assets.length ? 'partially_generated' : 'failed',
+    cancelled,
     characterId: plan.characterId,
     identitySeed: plan.identitySeed,
     assets,
