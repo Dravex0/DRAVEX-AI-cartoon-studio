@@ -691,6 +691,7 @@ updateProductionPreview();
 renderCharacterBible();
 renderGeneratedSceneImage();
 renderCharacterSpriteAssets();
+renderCharacterRigPartSets();
 syncCharacterMotionEditor();
 syncCharacterRigEditor();
 renderComfySceneVideo();
