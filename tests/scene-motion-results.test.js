@@ -9,14 +9,14 @@ test("summarizes per-scene motion outcomes", () => {
     ["c", { status: "skipped" }]
   ]);
   assert.deepEqual(summarizeSceneMotionResults(results), {
-    checked: 0, static: 1, changed: 1, skipped: 1
+    checked: 2, static: 1, changed: 1, skipped: 1
   });
 });
 
 test("ignores missing or unknown result statuses", () => {
   assert.deepEqual(summarizeSceneMotionResults([
     null, {}, { status: "unknown" }, { status: "visible-change" }
-  ]), { checked: 0, static: 0, changed: 1, skipped: 0 });
+  ]), { checked: 1, static: 0, changed: 1, skipped: 0 });
 });
 
 test("accepts an empty result collection", () => {
