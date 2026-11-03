@@ -39,7 +39,7 @@ test('draws planned props through the canvas API', () => {
   const calls = [];
   const context = new Proxy({}, { get(target, property) {
     if (property === 'save' || property === 'restore' || property === 'beginPath' || property === 'closePath' || property === 'stroke' || property === 'fill') return () => calls.push(property);
-    if (property === 'translate' || property === 'moveTo' || property === 'lineTo' || property === 'fillRect' || property === 'strokeRect' || property === 'arc' || property === 'ellipse' || property === 'roundRect') return (...args) => calls.push([property, ...args]);
+    if (property === 'translate' || property === 'rotate' || property === 'moveTo' || property === 'lineTo' || property === 'fillRect' || property === 'strokeRect' || property === 'arc' || property === 'ellipse' || property === 'roundRect') return (...args) => calls.push([property, ...args]);
     return undefined;
   }, set(target, property, value) { target[property] = value; return true; } });
   const result = drawSceneProps(context, scene, layers, 1, 640, 360, 0.5);
@@ -78,7 +78,7 @@ test('anchors held props to the explicitly named hand after applying the sampled
     bones: [{ id: 'root', parentId: null }, { id: 'leftHand', parentId: 'root' }],
     parts: [{
       id: 'leftHand', boneId: 'leftHand', imageUrl: 'https://assets.example/hand.png',
-      x: 0.51, y: 0.58, width: 0.08, height: 0.08, zIndex: 2
+      x: 0.51, y: 0.58, width: 0.08, height: 0.08, rotation: 0.35, zIndex: 2
     }]
   };
   const plan = buildScenePropRenderPlan(scene, layers, 1, {
@@ -88,6 +88,7 @@ test('anchors held props to the explicitly named hand after applying the sampled
   assert.equal(plan.held, true);
   assert.ok(Math.abs(plan.x - 0.47) < 1e-9);
   assert.ok(Math.abs(plan.y - 0.61) < 1e-9);
+  assert.ok(Math.abs(plan.rotation - 0.35) < 1e-9);
 });
 
 test('uses the safe legacy hand estimate when the rig has no explicit hand or paw anchor', () => {
@@ -102,4 +103,21 @@ test('uses the safe legacy hand estimate when the rig has no explicit hand or pa
   const plan = buildScenePropRenderPlan(scene, layers, 1, { characterRigs: [rig] })[0];
   assert.equal(plan.x, 0.52);
   assert.equal(plan.y, 0.62);
+});
+
+test('interpolates prop orientation during pickup and restores ground orientation on drop', () => {
+  const rig = {
+    schemaVersion: 1, characterId: 'Fox',
+    bones: [{ id: 'root', parentId: null }, { id: 'rightHand', parentId: 'root' }],
+    parts: [{ id: 'rightHand', boneId: 'rightHand', imageUrl: 'https://assets.example/hand.png', x: 0.52, y: 0.6, width: 0.08, height: 0.08, rotation: 0.6 }]
+  };
+  const runtime = { characterRigs: [rig] };
+  const pickup = { ...scene, actionTimeline: { phases: [{ phase: 'action', start: 0.2, end: 0.8 }] } };
+  const before = buildScenePropRenderPlan(pickup, layers, 0.2, runtime)[0];
+  const after = buildScenePropRenderPlan(pickup, layers, 0.8, runtime)[0];
+  assert.equal(before.rotation, 0);
+  assert.ok(Math.abs(after.rotation - 0.6) < 1e-9);
+  const drop = { stateChanges: [{ entityType: 'prop', entityId: 'book', property: 'holder', previousValue: 'Fox', value: null, actorId: 'Fox' }] };
+  const released = buildScenePropRenderPlan(drop, layers, 1, runtime)[0];
+  assert.equal(released.rotation, 0);
 });
