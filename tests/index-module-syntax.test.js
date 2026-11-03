@@ -162,3 +162,20 @@ test('does not publish a successful WebM after MediaRecorder reports an error', 
   assert.ok(app.includes("recorder.onerror=()=>{\n      recorderFailed=true;"));
   assert.ok(app.includes("if(recorderFailed)throw new Error('MediaRecorder failed before producing a complete video.')"));
 });
+
+
+test('cinematic camera transform covers generated media, props, and rigged characters while keeping the title overlay fixed', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const cameraStart = app.indexOf('ctx.save();ctx.translate(w/2,h/2+cameraPlan.offsetY);');
+  const mediaDraw = app.indexOf('drawImageCover(ctx,generatedVideo,w,h,motionTransform)', cameraStart);
+  const propsDraw = app.indexOf('drawSceneProps(ctx,currentSceneData', cameraStart);
+  const characterDraw = app.indexOf('drawCharacterLayers(ctx,currentSceneData.characterLayers', cameraStart);
+  const cameraRestore = app.indexOf('ctx.restore();', characterDraw);
+  const titleDraw = app.indexOf("ctx.fillText($('character').value", cameraRestore);
+  assert.ok(cameraStart >= 0);
+  assert.ok(mediaDraw > cameraStart);
+  assert.ok(propsDraw > mediaDraw);
+  assert.ok(characterDraw > propsDraw);
+  assert.ok(cameraRestore > characterDraw);
+  assert.ok(titleDraw > cameraRestore);
+});
