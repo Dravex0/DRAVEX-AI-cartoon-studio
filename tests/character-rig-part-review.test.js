@@ -53,7 +53,7 @@ test('blocks assembly until every required part has an approved review', () => {
   }));
   const reviews = CHARACTER_RIG_REQUIRED_PARTS.map(partId => ({
     partId,
-    review: { approved: true }
+    review: { approved: true, transparency: { passed: true }, decisions: { correctPart: true, characterIdentity: true, jointAlignment: true } }
   }));
   reviews.pop();
   const result = assembleApprovedCharacterRig({
@@ -74,7 +74,7 @@ test('assembles a complete reviewed rig with all ten HTTPS image bindings', () =
     imageUrl: 'https://images.example.test/' + part.partId + '.png'
   }));
   const reviews = CHARACTER_RIG_REQUIRED_PARTS.map(partId => ({
-    partId, review: { approved: true }
+    partId, review: { approved: true, transparency: { passed: true }, decisions: { correctPart: true, characterIdentity: true, jointAlignment: true } }
   }));
   const result = assembleApprovedCharacterRig({
     characterId: 'Foxy', rig: plan.rig, assets, reviews
@@ -85,12 +85,23 @@ test('assembles a complete reviewed rig with all ten HTTPS image bindings', () =
   assert.ok(result.rig.parts.every(part => part.imageUrl.startsWith('https://')));
 });
 
+test('does not trust an approval flag without transparency proof and all human decisions', () => {
+  const plan = buildCharacterRigAssetPlan({ characterId: 'Foxy', appearanceReference: 'Orange fox' });
+  const assets = plan.parts.map(part => ({ partId: part.partId, imageUrl: 'https://images.example.test/' + part.partId + '.png' }));
+  const reviews = CHARACTER_RIG_REQUIRED_PARTS.map(partId => ({
+    partId, review: { approved: true }
+  }));
+  const result = assembleApprovedCharacterRig({ characterId: 'Foxy', rig: plan.rig, assets, reviews });
+  assert.equal(result.status, 'blocked');
+  assert.ok(result.issues.includes('part-not-approved:torso'));
+});
+
 test('rejects duplicate or missing part assets and malformed input', () => {
   const plan = buildCharacterRigAssetPlan({
     characterId: 'Foxy',
     appearanceReference: 'Orange fox'
   });
-  const reviews = CHARACTER_RIG_REQUIRED_PARTS.map(partId => ({ partId, review: { approved: true } }));
+  const reviews = CHARACTER_RIG_REQUIRED_PARTS.map(partId => ({ partId, review: { approved: true, transparency: { passed: true }, decisions: { correctPart: true, characterIdentity: true, jointAlignment: true } } }));
   const assets = plan.parts.map(part => ({
     partId: part.partId,
     imageUrl: 'https://images.example.test/' + part.partId + '.png'
