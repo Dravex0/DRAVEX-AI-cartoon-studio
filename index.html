@@ -168,6 +168,8 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="field"><label for="comfyBaseUrl">ComfyUI address / Адрес сервера</label><input id="comfyBaseUrl" type="url" value="http://127.0.0.1:8188" autocomplete="off"></div>
 <div class="field"><label for="comfyWorkflowFile">ComfyUI API workflow JSON / Файл workflow</label><input id="comfyWorkflowFile" type="file" accept=".json,application/json"><small id="comfyWorkflowStatus">No workflow selected. Export API format from ComfyUI.</small></div>
 <div class="field"><label for="comfySourceImageFile">Optional local scene image / Локальное изображение сцены</label><input id="comfySourceImageFile" type="file" accept="image/png,image/jpeg,image/webp"><small id="comfySourceImageStatus">If selected, this image is sent only to your configured local ComfyUI server and takes priority over the generated preview image.</small></div>
+<div class="field"><label for="comfyCharacterReference1">Character reference 1 / Референс персонажа 1</label><input id="comfyCharacterReference1" type="file" accept="image/png,image/jpeg,image/webp"><small>Optional. Uploaded only when you start this scene's ComfyUI generation.</small></div>
+<div class="field"><label for="comfyCharacterReference2">Character reference 2 / Референс персонажа 2</label><input id="comfyCharacterReference2" type="file" accept="image/png,image/jpeg,image/webp"><small>Optional. Supports workflows with a second Load Image input.</small></div>
 <div class="comfy-grid">
 <div class="field"><label for="comfyPromptNode">Prompt node ID / Узел промпта</label><input id="comfyPromptNode" value="6"></div>
 <div class="field"><label for="comfyPromptInput">Prompt input</label><input id="comfyPromptInput" value="text"></div>
@@ -175,6 +177,10 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 <div class="field"><label for="comfyNegativeInput">Negative input</label><input id="comfyNegativeInput" value="text"></div>
 <div class="field"><label for="comfyImageNode">Image node ID / Узел изображения</label><input id="comfyImageNode" value="56"></div>
 <div class="field"><label for="comfyImageInput">Image input</label><input id="comfyImageInput" value="image"></div>
+<div class="field"><label for="comfyReference1Node">Reference 1 node ID</label><input id="comfyReference1Node" placeholder="Optional"></div>
+<div class="field"><label for="comfyReference1Input">Reference 1 input</label><input id="comfyReference1Input" value="image" placeholder="image"></div>
+<div class="field"><label for="comfyReference2Node">Reference 2 node ID</label><input id="comfyReference2Node" placeholder="Optional"></div>
+<div class="field"><label for="comfyReference2Input">Reference 2 input</label><input id="comfyReference2Input" value="image" placeholder="image"></div>
 <div class="field"><label for="comfyFramesNode">Frame count node ID</label><input id="comfyFramesNode" value="55"></div>
 <div class="field"><label for="comfyFramesInput">Frame count input</label><input id="comfyFramesInput" value="length"></div>
 <div class="field"><label for="comfyFpsNode">FPS node ID</label><input id="comfyFpsNode" value="57"></div>
