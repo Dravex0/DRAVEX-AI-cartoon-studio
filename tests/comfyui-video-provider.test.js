@@ -166,7 +166,9 @@ test('uploads and binds only explicitly configured character reference images', 
     baseUrl: 'http://127.0.0.1:8188', workflow: referenceWorkflow,
     nodeBindings: referenceBindings, outputNodeIds: ['90'], fetchImpl, pollIntervalMs: 250
   });
-  await provider.generate({ ...request, referenceImages: references });
+  const registry = createVideoProviderRegistry();
+  registry.register(provider);
+  await generateVideoWithProvider(registry, provider.id, { ...request, referenceImages: references });
   assert.equal(uploadedForms.length, 3);
   assert.equal(submittedWorkflow['20'].inputs.image, 'refs/upload-1.png');
   assert.equal(submittedWorkflow['21'].inputs.image, 'refs/upload-2.png');

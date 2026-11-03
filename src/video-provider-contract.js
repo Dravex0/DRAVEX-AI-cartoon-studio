@@ -20,6 +20,18 @@ export function validateVideoGenerationRequest(input = {}) {
   const fps = finite(input.fps ?? 24);
   const image = input.image ?? null;
   const video = input.video ?? null;
+  const suppliedReferences = Array.isArray(input.referenceImages) ? input.referenceImages : [];
+  const referenceImages = suppliedReferences.slice(0, 4);
+  if (suppliedReferences.length > 4) {
+    issues.push({ code: 'too-many-reference-images', field: 'referenceImages' });
+  }
+  for (const reference of referenceImages) {
+    const media = reference?.blob ?? reference?.image ?? reference;
+    if (!media || typeof media.arrayBuffer !== 'function') {
+      issues.push({ code: 'invalid-reference-image', field: 'referenceImages' });
+      break;
+    }
+  }
 
   if (!VIDEO_TASK_TYPES.includes(taskType)) issues.push({ code: 'unsupported-task-type', field: 'taskType' });
   if (!prompt) issues.push({ code: 'missing-prompt', field: 'prompt' });
@@ -46,6 +58,7 @@ export function validateVideoGenerationRequest(input = {}) {
       aspectRatio: text(input.aspectRatio, 20) || 'source',
       image: taskType === 'image-to-video' ? image : null,
       video: taskType === 'video-to-video' ? video : null,
+      referenceImages: taskType === 'image-to-video' ? referenceImages : [],
       seed: Number.isInteger(input.seed) && input.seed >= 0 ? input.seed : null
     } : null
   };

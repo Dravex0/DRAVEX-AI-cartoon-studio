@@ -168,3 +168,40 @@ test('text-to-video requests do not require an image or video source', () => {
   assert.equal(result.value.image, null);
   assert.equal(result.value.video, null);
 });
+
+
+test('preserves up to four validated character reference images for image-to-video providers', async () => {
+  const references = [
+    { name: 'fox.png', blob: new Blob(['fox'], { type: 'image/png' }) },
+    new Blob(['companion'], { type: 'image/png' })
+  ];
+  const validation = validateVideoGenerationRequest({ ...validRequest, referenceImages: references });
+  assert.equal(validation.valid, true);
+  assert.deepEqual(validation.value.referenceImages, references);
+
+  const registry = createVideoProviderRegistry();
+  let received;
+  registry.register({
+    id: 'reference-aware',
+    taskTypes: ['image-to-video'],
+    generate: async request => {
+      received = request.referenceImages;
+      return { status: 'completed', video: new Blob(['video'], { type: 'video/webm' }) };
+    }
+  });
+  await generateVideoWithProvider(registry, 'reference-aware', { ...validRequest, referenceImages: references });
+  assert.deepEqual(received, references);
+});
+
+test('rejects malformed or excessive character reference image inputs', () => {
+  const malformed = validateVideoGenerationRequest({ ...validRequest, referenceImages: [{ name: 'not-a-blob' }] });
+  assert.equal(malformed.valid, false);
+  assert.deepEqual(malformed.issues, [{ code: 'invalid-reference-image', field: 'referenceImages' }]);
+
+  const excessive = validateVideoGenerationRequest({
+    ...validRequest,
+    referenceImages: Array.from({ length: 5 }, () => new Blob(['ref'], { type: 'image/png' }))
+  });
+  assert.equal(excessive.valid, false);
+  assert.ok(excessive.issues.some(issue => issue.code === 'too-many-reference-images'));
+});
