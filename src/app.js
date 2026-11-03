@@ -1716,6 +1716,12 @@ $('export').onclick=async()=>{
   try{
     await stopSceneVoicePreview();
     await sceneVideoRestorePromise;
+    // Freeze preview while export assets/audio are prepared. Otherwise async setup
+    // time advances the scene clock before the recorder has even started.
+    playing=false;
+    if(raf)cancelAnimationFrame(raf);
+    raf=0;
+    syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:false});
     $('status').textContent=uiLang==='ru'?'Ожидание готовности медиа сцен…':'Waiting for scene media to become ready…';
     const readinessTasks=[];
     for(const segment of timeline.segments){
@@ -1738,10 +1744,6 @@ $('export').onclick=async()=>{
     await Promise.all(readinessTasks);
     sceneIndex=timeline.segments[0].sceneIndex;
     sceneMotionSceneIndex=-1;
-    playing=true;
-    syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:true,restart:true});
-    $('play').textContent=tr('pauseButton');
-    if(!raf)draw();
     stream=canvas.captureStream(24);
     const musicFile=$('audioFile').files?.[0]||null;
     const voiceTracks=[];
@@ -1840,6 +1842,20 @@ $('export').onclick=async()=>{
         cleanup();
       }
     };
+    // Start the animation clock and canvas recording together, after every
+    // asynchronous preparation step has completed. The first captured frame is
+    // therefore scene time zero, not the time spent preparing audio/assets.
+    sceneMotionSceneIndex=-1;
+    sceneMotionStartTimeMs=0;
+    rigPreviewProgress=null;
+    animationClock.reset(0);
+    frame=0;
+    playing=true;
+    syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:true,restart:true});
+    $('play').textContent=tr('pauseButton');
+    if(raf)cancelAnimationFrame(raf);
+    raf=0;
+    draw();
     recorder.start(250);
     exportMouthOriginTimeMs=performance.now();
     if(audioScheduledStartAtMs!==null){
