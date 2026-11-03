@@ -15,6 +15,7 @@ import { drawCharacterLayers } from "./scene-character-layers.js";
 import { validateCharacterRigTimeline, sampleCharacterRigTimeline } from "./character-rig-timeline.js";
 import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from "./character-rig-motion-presets.js";
 import { createCharacterRigTimelineFromActionTimeline } from "./character-rig-action-planner.js";
+import { generateCharacterRigTimelinesForScenes } from "./character-rig-scene-batch.js";
 import { validateCharacterRig, normalizeCharacterRigPoses, characterRigPosesFor } from "./character-rig.js";
 import { upsertCharacterMotionPhase } from "./character-motion-editor.js";
 import { planCharacterMotionFromActionTimeline } from "./character-motion-planner.js";
@@ -492,24 +493,8 @@ $('generateCharacterRigPreset').addEventListener('click',()=>{
 });
 
 $('generateCharacterRigFromStory').addEventListener('click',()=>{
-  let generatedScenes=0,generatedActions=0,scenesWithoutRig=0,scenesWithoutActions=0,preservedTimelines=0;
-  const summaries=[];
-  sceneMetadata=sceneMetadata.map((meta,index)=>{
-   const rigs=Array.isArray(meta?.characterRigs)?meta.characterRigs:[];
-   if(!rigs.length){scenesWithoutRig++;return meta}
-   if(meta.characterRigTimeline?.keyframes?.length){preservedTimelines++;return meta}
-   const result=createCharacterRigTimelineFromActionTimeline(meta,rigs);
-   if(!result.timeline){
-    scenesWithoutActions++;
-    if(result.reason)summaries.push('Scene '+(index+1)+': '+result.reason);
-    return meta;
-   }
-   generatedScenes++;
-   generatedActions+=result.generatedCount||0;
-   const skippedCount=(result.skipped||[]).length;
-   if(skippedCount)summaries.push('Scene '+(index+1)+': '+skippedCount+' action(s) skipped');
-   return {...meta,characterRigTimeline:result.timeline};
-  });
+  const batch=generateCharacterRigTimelinesForScenes(sceneMetadata,createCharacterRigTimelineFromActionTimeline);
+  sceneMetadata=batch.scenes;
   const current=sceneMetadata[sceneIndex]||{};
   syncCharacterRigEditor();
   $('characterRigTimelineJson').value=current.characterRigTimeline?JSON.stringify(current.characterRigTimeline,null,2):'';
@@ -518,7 +503,8 @@ $('generateCharacterRigFromStory').addEventListener('click',()=>{
   rigPreviewProgress=current.characterRigTimeline?.keyframes?.length?0:null;
   $('characterRigScrubber').value='0';
   $('characterRigScrubberValue').textContent=rigPreviewProgress===null?'Scene clock':'0%';
-  $('characterRigStatus').textContent='Story animation generated for '+generatedScenes+' scene(s), '+generatedActions+' action(s). '+scenesWithoutRig+' scene(s) have no attached segmented rig; '+scenesWithoutActions+' scene(s) have no supported validated actions; '+preservedTimelines+' existing timeline(s) preserved.'+(summaries.length?' Details: '+summaries.join(' · '):'')+' Preview and canvas export sample the same rig timelines.';
+  const details=batch.skipped.map(item=>'Scene '+(item.sceneIndex+1)+': '+(item.reason||((item.skippedActions||0)+' action(s) skipped')));
+  $('characterRigStatus').textContent='Story animation generated for '+batch.generatedScenes+' scene(s), '+batch.generatedActions+' action(s). '+batch.scenesWithoutRig+' scene(s) have no attached segmented rig; '+batch.scenesWithoutActions+' scene(s) have no supported validated actions; '+batch.preservedTimelines+' existing timeline(s) preserved.'+(details.length?' Details: '+details.join(' · '):'')+' Preview and canvas export sample the same rig timelines.';
   sceneMotionSceneIndex=-1;
   if(!playing)draw();
 });
