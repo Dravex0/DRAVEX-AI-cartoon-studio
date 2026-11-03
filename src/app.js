@@ -44,7 +44,7 @@ import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js"
 import { createAudioExportSession } from "./audio-export.js";
 import { waitForExportVideoReady, validateExportTracks } from "./film-export-readiness.js";
 import { buildSceneMediaReport } from "./scene-media-report.js";
-import { analyzeSceneVideoMotion } from "./scene-motion-analysis.js";
+import { analyzeSceneVideoMotion, captureSceneVideoFrameSamples } from "./scene-motion-analysis.js";
 import { summarizeSceneMotionResults } from "./scene-motion-results.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
@@ -926,7 +926,15 @@ async function runSceneMotionAnalysis(){
         await waitForSceneVideoReady(item.entry.video,{timeoutMs:12000});
         if(sceneVideoCache.get(item.key)!==item.entry)throw new Error('Video changed during analysis.');
         const result=await analyzeSceneVideoMotion(item.entry.video);
-        sceneMotionAnalysisResults.set(item.key,result);
+        let frameSamples=[];
+        let frameCaptureMessage='';
+        try{
+          frameSamples=await captureSceneVideoFrameSamples(item.entry.video);
+        }catch(frameError){
+          frameCaptureMessage=String(frameError?.message||'Frame evidence unavailable.');
+          console.warn('Scene frame evidence skipped for scene '+(item.index+1)+':',frameError);
+        }
+        sceneMotionAnalysisResults.set(item.key,{...result,frameSamples,frameCaptureMessage});
         sceneMotionAnalysisSummary=summarizeSceneMotionResults(sceneMotionAnalysisResults);
       }catch(error){
         sceneMotionAnalysisResults.set(item.key,{status:'skipped',message:String(error?.message||'Analysis unavailable.')});
@@ -982,6 +990,39 @@ function renderSceneMediaReport(){
         detail.textContent=(russian?'Проверка пропущена: ':'Analysis skipped: ')+String(result.message||'');
       }
       row.append(heading,detail);
+      if(Array.isArray(result.frameSamples)&&result.frameSamples.length){
+        const strip=document.createElement('div');
+        strip.style.display='flex';
+        strip.style.flexWrap='wrap';
+        strip.style.gap='6px';
+        strip.style.marginTop='7px';
+        for(const sample of result.frameSamples){
+          const frame=document.createElement('div');
+          frame.style.display='grid';
+          frame.style.gap='2px';
+          const image=document.createElement('img');
+          image.src=sample.dataUrl;
+          image.alt=(russian?'Кадр сцены ':'Scene frame ')+(item.index+1)+' · '+sample.time+'s';
+          image.loading='lazy';
+          image.decoding='async';
+          image.style.width='min(112px, 28vw)';
+          image.style.aspectRatio='16 / 9';
+          image.style.objectFit='cover';
+          image.style.borderRadius='5px';
+          image.style.background='#111';
+          const caption=document.createElement('small');
+          caption.textContent=sample.time.toFixed(2)+' s';
+          caption.style.opacity='.75';
+          frame.append(image,caption);
+          strip.appendChild(frame);
+        }
+        row.appendChild(strip);
+      }else if(result.frameCaptureMessage){
+        const note=document.createElement('small');
+        note.textContent=(russian?'Кадры не получены: ':'Frame samples unavailable: ')+result.frameCaptureMessage;
+        note.style.display='block';
+        row.appendChild(note);
+      }
       details.appendChild(row);
     }
     if(details.childElementCount)target.appendChild(details);

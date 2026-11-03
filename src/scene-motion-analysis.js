@@ -102,3 +102,59 @@ export async function analyzeSceneVideoMotion(video, {
     message: isLikelyStatic ? "Very little pixel change was detected between sampled frames." : "Pixel changes were detected between sampled frames."
   };
 }
+
+/**
+ * Capture a small, browser-local contact sheet source from a decoded scene clip.
+ * Returned data URLs are ephemeral UI evidence; this function does not upload or persist frames.
+ */
+export async function captureSceneVideoFrameSamples(video, {
+  sampleCount = 3, width = 160, height = 90, timeoutMs = 5000,
+  canvasFactory = () => document.createElement("canvas")
+} = {}) {
+  if (!video || typeof video.addEventListener !== "function" || typeof video.removeEventListener !== "function") {
+    throw new TypeError("video must be an HTMLVideoElement-like event target.");
+  }
+  if (!Number.isInteger(sampleCount) || sampleCount < 1 || sampleCount > 5) {
+    throw new RangeError("sampleCount must be an integer from 1 to 5.");
+  }
+  if (![width, height].every(value => Number.isInteger(value) && value > 0 && value <= 512)) {
+    throw new RangeError("Frame capture dimensions must be integers from 1 to 512.");
+  }
+  if (!Number.isFinite(Number(video.duration)) || video.duration <= 0 ||
+      !Number.isFinite(Number(video.videoWidth)) || video.videoWidth <= 0 || video.readyState < 2) {
+    throw new Error("Scene video must have a decoded frame and a finite duration.");
+  }
+  if (typeof canvasFactory !== "function") throw new TypeError("canvasFactory must be a function.");
+  const canvas = canvasFactory();
+  const context = canvas?.getContext?.("2d");
+  if (!canvas || !context || typeof context.drawImage !== "function" || typeof canvas.toDataURL !== "function") {
+    throw new Error("A readable canvas with data URL support is required for local frame capture.");
+  }
+  canvas.width = width;
+  canvas.height = height;
+  const wasPaused = Boolean(video.paused);
+  const originalTime = Number(video.currentTime) || 0;
+  const samples = [];
+  video.pause?.();
+  try {
+    for (let index = 0; index < sampleCount; index += 1) {
+      const fraction = sampleCount === 1 ? 0.5 : 0.08 + (0.84 * index) / (sampleCount - 1);
+      const time = Math.min(Math.max(0, video.duration - 0.01), video.duration * fraction);
+      await waitForSeek(video, time, timeoutMs);
+      context.drawImage(video, 0, 0, width, height);
+      samples.push({ time: Number(time.toFixed(2)), dataUrl: canvas.toDataURL("image/jpeg", 0.72) });
+    }
+  } catch (error) {
+    if (error?.name === "SecurityError") {
+      throw new Error("Video pixels are not readable by canvas (CORS restriction); frame capture was skipped.");
+    }
+    throw error;
+  } finally {
+    try { await waitForSeek(video, Math.min(originalTime, Math.max(0, video.duration - 0.01)), timeoutMs); } catch {}
+    if (!wasPaused) {
+      const playback = video.play?.();
+      if (playback && typeof playback.catch === "function") playback.catch(() => {});
+    }
+  }
+  return samples;
+}
