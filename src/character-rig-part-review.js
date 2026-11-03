@@ -59,16 +59,34 @@ export function assembleApprovedCharacterRig({ characterId, rig, assets, reviews
     }
     byPart.set(partId, asset);
   }
-  const reviewByPart = new Map(reviews.map(item => [clean(item?.partId), item?.review]));
+  const reviewByPart = new Map();
+  for (const item of reviews) {
+    const partId = clean(item?.partId);
+    if (!partId || reviewByPart.has(partId)) {
+      return { status: 'blocked', readyForAnimation: false, issues: ['missing-or-duplicate-review'], rig: null };
+    }
+    reviewByPart.set(partId, item?.review);
+  }
   const missing = CHARACTER_RIG_REQUIRED_PARTS.filter(partId => !byPart.has(partId));
-  const unapproved = CHARACTER_RIG_REQUIRED_PARTS.filter(partId => reviewByPart.get(partId)?.approved !== true);
-  if (missing.length || unapproved.length) {
+  const unapproved = CHARACTER_RIG_REQUIRED_PARTS.filter(partId => {
+    const review = reviewByPart.get(partId);
+    return review?.approved !== true ||
+      review?.transparency?.passed !== true ||
+      review?.decisions?.correctPart !== true ||
+      review?.decisions?.characterIdentity !== true ||
+      review?.decisions?.jointAlignment !== true;
+  });
+  const invalidAssets = CHARACTER_RIG_REQUIRED_PARTS.filter(partId =>
+    !/^https:\/\//i.test(clean(byPart.get(partId)?.imageUrl, 2048))
+  );
+  if (missing.length || unapproved.length || invalidAssets.length) {
     return {
       status: 'blocked',
       readyForAnimation: false,
       issues: [
         ...missing.map(partId => 'missing-part:' + partId),
-        ...unapproved.map(partId => 'part-not-approved:' + partId)
+        ...unapproved.map(partId => 'part-not-approved:' + partId),
+        ...invalidAssets.map(partId => 'part-image-invalid:' + partId)
       ],
       rig: null
     };
