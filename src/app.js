@@ -44,6 +44,7 @@ import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js"
 import { createAudioExportSession } from "./audio-export.js";
 import { waitForExportVideoReady, validateExportTracks } from "./film-export-readiness.js";
 import { buildSceneMediaReport } from "./scene-media-report.js";
+import { analyzeSceneVideoMotion } from "./scene-motion-analysis.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
@@ -902,16 +903,66 @@ renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').
 $('addScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length>=12){$('status').textContent=t.limit;return}titles.push(uiLang==='ru'?'Новая сцена':'New scene');descriptions.push(uiLang==='ru'?'Добавь описание этой сцены.':'Add a description for this scene.');sceneMetadata.push({id:createSceneId(),title:titles[titles.length-1],description:descriptions[descriptions.length-1],prompt:descriptions[descriptions.length-1],visibleAction:descriptions[descriptions.length-1],camera:''});if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};sceneIndex=titles.length-1;$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();$('status').textContent=t.added};
 $('deleteScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length<=1){$('status').textContent=t.minimum;return}const removedScene=sceneMetadata[sceneIndex]||{};releaseSceneVideo(removedScene,sceneIndex);titles.splice(sceneIndex,1);descriptions.splice(sceneIndex,1);sceneMetadata.splice(sceneIndex,1);if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};sceneIndex=Math.min(sceneIndex,titles.length-1);$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=t.deleted};
 
+let sceneMotionAnalysisSummary=null;
+let sceneMotionAnalysisRunning=false;
+async function runSceneMotionAnalysis(){
+  if(sceneMotionAnalysisRunning)return;
+  const entries=sceneMetadata.map((meta,index)=>({meta,index,key:String(meta?.id||''),entry:sceneVideoCache.get(String(meta?.id||''))})).filter(item=>item.entry?.video);
+  if(!entries.length){
+    sceneMotionAnalysisSummary={checked:0,static:0,changed:0,skipped:0};
+    renderSceneMediaReport();
+    return;
+  }
+  sceneMotionAnalysisRunning=true;
+  sceneMotionAnalysisSummary={checked:0,static:0,changed:0,skipped:0};
+  renderSceneMediaReport();
+  for(const item of entries){
+    if(sceneVideoCache.get(item.key)!==item.entry)continue;
+    try{
+      await waitForSceneVideoReady(item.entry.video,{timeoutMs:12000});
+      const result=await analyzeSceneVideoMotion(item.entry.video);
+      sceneMotionAnalysisSummary.checked++;
+      if(result.status==='likely-static')sceneMotionAnalysisSummary.static++;
+      else sceneMotionAnalysisSummary.changed++;
+    }catch(error){
+      sceneMotionAnalysisSummary.skipped++;
+      console.warn('Scene motion analysis skipped for scene '+(item.index+1)+':',error);
+    }
+    renderSceneMediaReport();
+  }
+  sceneMotionAnalysisRunning=false;
+  renderSceneMediaReport();
+}
 function renderSceneMediaReport(){
   const target=$('sceneMediaReport');
   if(!target)return;
   const report=buildSceneMediaReport(sceneMetadata,new Set(sceneVideoCache.keys()));
   const russian=uiLang==='ru';
-  const videoLabel=russian?'Настоящие видеосцены':'Generated video scenes';
-  const stillLabel=russian?'Статичные сцены / холст':'Still-image / canvas scenes';
+  const videoLabel=russian?'Готовые видеосцены':'Generated video scenes';
+  const stillLabel=russian?'Изображения / холст':'Still-image / canvas scenes';
   const completeLabel=russian?'Все сцены имеют декодированные видеоклипы.':'Every scene has a decoded video clip.';
-  const partialLabel=russian?'WebM можно экспортировать, но он не означает, что все сцены анимированы.':'WebM can be exported, but this does not mean every scene is animated.';
-  target.textContent=videoLabel+': '+report.videoScenes+'/'+report.totalScenes+' · '+stillLabel+': '+report.stillScenes+'. '+(report.complete?completeLabel:partialLabel);
+  const partialLabel=russian?'Экспорт WebM не означает, что все сцены анимированы.':'WebM export does not mean every scene is animated.';
+  target.replaceChildren();
+  const summary=document.createElement('div');
+  summary.textContent=videoLabel+': '+report.videoScenes+'/'+report.totalScenes+' · '+stillLabel+': '+report.stillScenes+'. '+(report.complete?completeLabel:partialLabel);
+  target.appendChild(summary);
+  const motion=document.createElement('div');
+  motion.style.marginTop='6px';
+  if(sceneMotionAnalysisSummary){
+    const value=sceneMotionAnalysisSummary;
+    motion.textContent=(russian?'Проверка движения: ':'Motion check: ')+value.checked+' '+(russian?'проверено':'checked')+' · '+value.static+' '+(russian?'почти без изменений':'likely static')+' · '+value.changed+' '+(russian?'есть изменения пикселей':'pixel changes')+' · '+value.skipped+' '+(russian?'пропущено':'skipped')+'. '+(russian?'Это приблизительная проверка пикселей, не оценка качества анимации персонажа.':'Pixel heuristic only; it does not rate character animation quality.');
+    target.appendChild(motion);
+  }
+  const button=document.createElement('button');
+  button.type='button';
+  button.className='secondary';
+  button.style.marginTop='8px';
+  button.textContent=sceneMotionAnalysisRunning
+    ?(russian?'Проверяем движение…':'Analyzing motion…')
+    :(russian?'Проверить движение видеосцен':'Analyze scene motion');
+  button.disabled=sceneMotionAnalysisRunning||report.videoScenes===0;
+  button.addEventListener('click',()=>void runSceneMotionAnalysis());
+  target.appendChild(button);
   target.dataset.videoScenes=String(report.videoScenes);
   target.dataset.stillScenes=String(report.stillScenes);
   target.dataset.totalScenes=String(report.totalScenes);
