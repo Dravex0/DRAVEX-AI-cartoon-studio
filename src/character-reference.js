@@ -7,6 +7,7 @@ export function normalizeCharacterReference(input = {}) {
   const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
   return {
     characterId: clean(source.characterId, 120),
+    referenceImageAssetId: clean(source.referenceImageAssetId, 100),
     visualDescription: clean(source.visualDescription, 1200),
     clothing: clean(source.clothing, 700),
     colors: clean(source.colors, 300),
