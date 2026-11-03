@@ -26,7 +26,7 @@ import { createBrowserLocalTtsEngine } from "./browser-local-tts-engine.js";
 import { createTimestampedKokoroEngine } from "./timestamped-kokoro-engine.js";
 import { createVoiceAudioStorage } from "./voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./scene-voice-workflow.js";
-import { createSceneVideoStorage } from "./scene-video-storage.js";
+import { createSceneVideoStorage, persistSceneVideoBestEffort } from "./scene-video-storage.js";
 import { createFacialAssetStorage } from "./facial-asset-storage.js";
 import { createCharacterReferenceImageStorage } from "./character-reference-image-storage.js";
 import { generateStoryboardVideos, readVideoProgressPercent } from "./scene-video-batch.js";
@@ -1739,10 +1739,11 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      disposeSceneVideoEntry(videoEntry);
      throw new Error('Сцена '+(index+1)+' вернула видео, которое браузер не смог декодировать: '+(readinessError.message||'unknown decode error'));
     }
-    await sceneVideoStorage.put(key,result.video,filename);
+    const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
+    if(!persistence.persisted)console.warn('Generated scene video is kept in memory but could not be saved for reload:',persistence.error);
     if(sceneIndex===index)renderComfySceneVideo();
     if(!playing)draw();
-    return result;
+    return persistence.persisted?result:{...result,storageWarning:persistence.error};
    }
   });
   if(report.cancelled){
@@ -1750,15 +1751,17 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
    setFilmProgress(Math.floor(((report.completed+report.skipped)/report.total)*85),filmProgressText('Создание остановлено','Generation cancelled'),filmProgressText('Готовые сцены сохранены. Можно продолжить позже.','Completed scenes are saved. You can resume later.'));
    status.textContent='Создание остановлено. Уже готовые сцены сохранены; можно продолжить позже.';return;
   }
+  const persistenceWarnings=report.results.filter(item=>item.status==='completed'&&item.result?.storageWarning).map(item=>'сцена '+(item.index+1)+': '+item.result.storageWarning);
+  const persistenceNote=persistenceWarnings.length?' Видео останутся доступны только в этой вкладке до закрытия: '+persistenceWarnings.join(' · ')+'.':'';
   if(report.failed){
    filmProgressTracking=false;
    const failed=report.results.filter(item=>item.status==='failed').map(item=>'сцена '+(item.index+1)+': '+item.error).join(' · ');
-   status.textContent='Готово '+(report.completed+report.skipped)+' из '+report.total+'. Не удалось создать '+report.failed+' сцен: '+failed+'. Исправь ошибки и запусти повторно — готовые сцены будут пропущены.';
+   status.textContent='Готово '+(report.completed+report.skipped)+' из '+report.total+'. Не удалось создать '+report.failed+' сцен: '+failed+'. Исправь ошибки и запусти повторно — готовые сцены будут пропущены.'+persistenceNote;
    setFilmProgress(Math.floor(((report.completed+report.skipped)/report.total)*85),filmProgressText('Есть ошибки сцен','Scene errors'),status.textContent);
    return;
   }
   setFilmProgress(85,filmProgressText('Сцены готовы · сборка WebM','Scenes ready · assembling WebM'),filmProgressText('Все видеосцены созданы. Начинается запись итогового мультфильма.','All scene videos are ready. Final film recording is starting.'));
-  status.textContent='Все '+report.total+' видеосцен готовы. Собираем итоговый мультфильм…';
+  status.textContent='Все '+report.total+' видеосцен готовы. Собираем итоговый мультфильм…'+persistenceNote;
   $('export').click();
  }catch(error){
   filmProgressTracking=false;
