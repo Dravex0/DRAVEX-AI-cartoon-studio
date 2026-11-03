@@ -199,6 +199,7 @@ export function createComfyUIVideoProvider({
         const key = `referenceImage${index + 1}`;
         if (!Object.prototype.hasOwnProperty.call(nodeBindings, key)) continue;
         const reference = references[index];
+        if (!reference) continue;
         const blob = reference?.blob || reference?.image || reference;
         referenceValues[key] = await uploadImage(blob, `character reference ${index + 1}`, `dravex-character-reference-${index + 1}.png`);
       }
