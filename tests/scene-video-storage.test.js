@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSceneVideoStorage } from "../src/scene-video-storage.js";
+import { createSceneVideoStorage, persistSceneVideoBestEffort } from "../src/scene-video-storage.js";
 
 function createMemoryIndexedDB() {
   const records = new Map();
@@ -87,4 +87,28 @@ test("closes stale connections and reopens after an IndexedDB version change", a
   assert.equal(closed, 1);
   await storage.get("scene-1");
   assert.equal(indexedDBRef.openCount, 2);
+});
+
+
+test("keeps a generated clip usable when optional persistence fails", async () => {
+  const blob = new Blob(["video-data"], { type: "video/webm" });
+  const storage = { put: async () => { throw new Error("QuotaExceededError"); } };
+  const result = await persistSceneVideoBestEffort(storage, "scene-1", blob, "scene-1.webm");
+  assert.deepEqual(result, { persisted: false, error: "QuotaExceededError" });
+  assert.equal(await blob.text(), "video-data");
+});
+
+test("reports successful best-effort scene video persistence", async () => {
+  const calls = [];
+  const storage = { put: async (...args) => { calls.push(args); } };
+  const blob = new Blob(["video-data"], { type: "video/webm" });
+  const result = await persistSceneVideoBestEffort(storage, "scene-2", blob, "scene-2.webm");
+  assert.deepEqual(result, { persisted: true, error: "" });
+  assert.deepEqual(calls, [["scene-2", blob, "scene-2.webm"]]);
+});
+
+test("reports unavailable scene video storage without throwing", async () => {
+  const result = await persistSceneVideoBestEffort(null, "scene-3", new Blob(["video"]), "scene-3.webm");
+  assert.equal(result.persisted, false);
+  assert.match(result.error, /unavailable/);
 });
