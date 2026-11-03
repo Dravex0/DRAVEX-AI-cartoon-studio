@@ -105,3 +105,23 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
     }
   };
 }
+
+/**
+ * Persist a generated clip without making browser storage a hard requirement.
+ * The in-memory video remains usable for preview/export when IndexedDB is blocked,
+ * full, or unavailable; callers can surface the returned warning to the user.
+ */
+export async function persistSceneVideoBestEffort(storage, sceneId, blob, filename) {
+  if (!storage || typeof storage.put !== "function") {
+    return { persisted: false, error: "Scene video storage is unavailable." };
+  }
+  try {
+    await storage.put(sceneId, blob, filename);
+    return { persisted: true, error: "" };
+  } catch (error) {
+    return {
+      persisted: false,
+      error: String(error?.message || "Could not persist the generated scene video.")
+    };
+  }
+}
