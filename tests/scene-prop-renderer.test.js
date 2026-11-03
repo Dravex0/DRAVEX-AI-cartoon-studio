@@ -46,3 +46,27 @@ test('draws planned props through the canvas API', () => {
   assert.equal(result.drawn, 1);
   assert.ok(calls.some(call => Array.isArray(call) && call[0] === 'translate'));
 });
+
+test('uses the authored action phase instead of the fallback timing', () => {
+  const timedScene = {
+    ...scene,
+    actionTimeline: { schemaVersion: 1, phases: [
+      { phase: 'preparation', start: 0.1, end: 0.25 },
+      { phase: 'action', start: 0.3, end: 0.45 }
+    ] }
+  };
+  const before = buildScenePropRenderPlan(timedScene, layers, 0.2)[0];
+  const after = buildScenePropRenderPlan(timedScene, layers, 0.6)[0];
+  assert.ok(before.x < after.x);
+  assert.ok(after.x > 0.4 && after.x < 0.6);
+});
+
+test('ignores malformed action timing and keeps the backwards-compatible fallback', () => {
+  const malformed = {
+    ...scene,
+    actionTimeline: { phases: [{ phase: 'action', start: 0.8, end: 0.2 }] }
+  };
+  const before = buildScenePropRenderPlan(malformed, layers, 0.4)[0];
+  const after = buildScenePropRenderPlan(malformed, layers, 0.9)[0];
+  assert.ok(before.x < after.x);
+});
