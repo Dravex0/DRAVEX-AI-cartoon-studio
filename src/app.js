@@ -1446,7 +1446,14 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const key=sceneVideoKey(index,meta);
     const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
     const filename='dravex-scene-'+(index+1)+extension;
-    attachSceneVideo(index,meta,result.video,filename);
+    const videoEntry=attachSceneVideo(index,meta,result.video,filename);
+    try{
+     await waitForSceneVideoReady(videoEntry.video,{timeoutMs:20000,signal});
+    }catch(readinessError){
+     sceneVideoCache.delete(key);
+     disposeSceneVideoEntry(videoEntry);
+     throw new Error('Сцена '+(index+1)+' вернула видео, которое браузер не смог декодировать: '+(readinessError.message||'unknown decode error'));
+    }
     await sceneVideoStorage.put(key,result.video,filename);
     if(sceneIndex===index)renderComfySceneVideo();
     if(!playing)draw();
