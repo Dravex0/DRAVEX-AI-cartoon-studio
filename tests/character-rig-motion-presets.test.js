@@ -406,3 +406,19 @@ describe('attack and defense motion presets', () => {
     assert.ok(Math.abs(defendMiddle.rightArm.rotation) > 0.4);
   });
 });
+
+describe('dance motion preset', () => {
+  it('creates a cyclic full-body groove that returns to its starting pose', () => {
+    const result = createCharacterRigMotionPreset(rig(), 'dance');
+    assert.equal(result.status, 'ready');
+    assert.equal(result.timeline.keyframes.length, 9);
+    const start = sampleCharacterRigTimeline(result.timeline, 0).Foxy;
+    const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+    const end = sampleCharacterRigTimeline(result.timeline, 1).Foxy;
+    assert.ok(Math.abs(middle.leftArm.rotation) > 0.2);
+    assert.ok(Math.abs(middle.rightArm.rotation) > 0.2);
+    assert.ok(Math.abs(middle.leftLeg.rotation) > 0.05);
+    assert.equal(start.root?.y || 0, end.root?.y || 0);
+    assert.equal(start.root?.rotation || 0, end.root?.rotation || 0);
+  });
+});
