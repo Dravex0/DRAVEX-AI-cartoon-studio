@@ -96,9 +96,9 @@ export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
     characterLock.length && `Keep these character designs unchanged: ${characterLock.join(' | ')}`,
     safe(scene.continuityLock) && `Continuity lock: ${safe(scene.continuityLock, 2000)}`,
     safe(scene.negativePrompt) && `Avoid: ${safe(scene.negativePrompt, 2000)}`,
-    '   'Use the supplied source image as the visual anchor and opening-frame reference. Keep the same character identities, face and muzzle shape, species, body proportions, silhouette, fur/skin colors, clothing, accessories, and relative positions throughout the clip.',
-    '   'Do not redesign, replace, duplicate, merge, or add characters. Do not change costumes, colors, age, anatomy, or art style between frames. Preserve the source image composition unless the requested camera movement or action requires a controlled change.',
-    '   'Animate only the described action. Preserve scene continuity and do not introduce new objects or characters.'
+    'Use the supplied source image as the visual anchor and opening-frame reference. Keep the same character identities, face and muzzle shape, species, body proportions, silhouette, fur/skin colors, clothing, accessories, and relative positions throughout the clip.',
+    'Do not redesign, replace, duplicate, merge, or add characters. Do not change costumes, colors, age, anatomy, or art style between frames. Preserve the source image composition unless the requested camera movement or action requires a controlled change.',
+    'Animate only the described action. Preserve scene continuity and do not introduce new objects or characters.'
   ].filter(Boolean).join('\n\n');
 }
 
