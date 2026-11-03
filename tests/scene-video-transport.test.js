@@ -61,3 +61,27 @@ test("rejects malformed video caches and playback flags", () => {
     cache: new Map([["scene-1", {}]])
   }), /playable video element/);
 });
+
+
+test("fits a shorter generated clip to the full storyboard scene without looping", async () => {
+  const { fitSceneVideoToDuration } = await import("../src/scene-video-transport.js");
+  const video = { duration: 5, loop: true, playbackRate: 1 };
+  const rate = fitSceneVideoToDuration(video, 7);
+  assert.ok(Math.abs(rate - (5 / 7)) < 0.000001);
+  assert.equal(video.playbackRate, rate);
+  assert.equal(video.loop, false);
+});
+
+test("speeds up a longer generated clip to fit a shorter scene", async () => {
+  const { fitSceneVideoToDuration } = await import("../src/scene-video-transport.js");
+  const video = { duration: 6, loop: true, playbackRate: 1 };
+  assert.equal(fitSceneVideoToDuration(video, 3), 2);
+  assert.equal(video.loop, false);
+});
+
+test("waits for decoded duration and rejects invalid scene timing", async () => {
+  const { fitSceneVideoToDuration } = await import("../src/scene-video-transport.js");
+  assert.equal(fitSceneVideoToDuration({ duration: Number.NaN, loop: true }, 4), null);
+  assert.throws(() => fitSceneVideoToDuration({ duration: 5 }, 0), /positive finite/);
+  assert.throws(() => fitSceneVideoToDuration(null, 4), /video element/);
+});
