@@ -43,6 +43,8 @@ function normalizePart(input = {}, index = 0) {
     width: clamp(source.width, 0.001, 2, 0.1),
     height: clamp(source.height, 0.001, 2, 0.1),
     rotation: clamp(source.rotation, -Math.PI * 2, Math.PI * 2),
+    gripOffsetX: clamp(source.gripOffsetX, -1, 1),
+    gripOffsetY: clamp(source.gripOffsetY, -1, 1),
     zIndex: Math.round(clamp(source.zIndex, -1000, 1000, index))
   };
 }
