@@ -185,3 +185,17 @@ test('uploads and restores a facial image from local IndexedDB storage', async (
   expect(restored).toEqual({ size: png.length, type: 'image/png' });
   expect(pageErrors).toEqual([]);
 });
+
+
+test('requires explicit AI Horde and LAION data-sharing consent before rig-part generation', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#generationTools > summary').click();
+  await expect(page.locator('#rigPartsConsent')).not.toBeChecked();
+  await expect(page.locator('#generateCharacterRigParts')).toBeDisabled();
+  await expect(page.locator('#characterRigPartsStatus')).toBeEmpty();
+  await expect(page.locator('#generationTools')).toContainText(/LAION/i);
+  await page.locator('#rigPartsConsent').check();
+  await expect(page.locator('#generateCharacterRigParts')).toBeEnabled();
+  await page.locator('#rigPartsConsent').uncheck();
+  await expect(page.locator('#generateCharacterRigParts')).toBeDisabled();
+});
