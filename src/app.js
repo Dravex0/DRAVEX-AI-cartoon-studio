@@ -1274,7 +1274,9 @@ function renderCharacterRigPartSets(){
   host.appendChild(assembleButton);
  });
 }
+let rigPartsAbortController=null;
 $('rigPartsConsent').addEventListener('change',()=>{$('generateCharacterRigParts').disabled=!$('rigPartsConsent').checked});
+$('cancelCharacterRigParts').addEventListener('click',()=>rigPartsAbortController?.abort());
 $('generateCharacterRigParts').addEventListener('click',async()=>{
  const button=$('generateCharacterRigParts'),status=$('characterRigPartsStatus');
  if(!$('rigPartsConsent').checked){status.textContent=uiLang==='ru'?'Сначала подтверди отдельное согласие на отправку частей персонажа в AI Horde.':'First confirm separate consent to send character-part prompts to AI Horde.';return}
@@ -1294,15 +1296,18 @@ $('generateCharacterRigParts').addEventListener('click',async()=>{
  const targetIndex=sceneIndex;
  const targetId=String(sceneMetadata[targetIndex]?.id||('scene_'+(targetIndex+1)));
  button.disabled=true;
+ rigPartsAbortController=new AbortController();
+ $('cancelCharacterRigParts').hidden=false;
  status.textContent=uiLang==='ru'?'Подготовка 10 отдельных частей персонажа…':'Preparing 10 separate character parts…';
  try{
   const result=await generateCharacterRigParts({
    characterId,
    appearanceReference,
    consentAccepted:$('rigPartsConsent').checked===true,
+   signal:rigPartsAbortController.signal,
    onProgress:progress=>{
     if(progress.phase==='generating')status.textContent=(uiLang==='ru'?'Создаём часть ':'Generating part ')+progress.index+' / '+progress.total+' · '+progress.partId;
-    else if(progress.phase==='queue')status.textContent='AI Horde · '+progress.partId+' · '+(uiLang==='ru'?'запрос в очереди':'queue request');
+    else if(progress.phase==='queue'){const queue=progress.queue||{};const position=Number.isFinite(queue.queuePosition)?' · '+(uiLang==='ru'?'позиция ':'position ')+queue.queuePosition:'';const waiting=Number.isFinite(queue.waiting)?' · '+(uiLang==='ru'?'ожидают ':'waiting ')+queue.waiting:'';status.textContent='AI Horde · '+progress.partId+position+waiting;}
     else if(progress.phase==='part-complete')status.textContent=(uiLang==='ru'?'Готово ':'Completed ')+progress.completed+' / '+progress.total+' · '+(uiLang==='ru'?'ошибок ':'failed ')+progress.failed;
    }
   });
@@ -1314,13 +1319,15 @@ $('generateCharacterRigParts').addEventListener('click',async()=>{
    sceneMetadata[resolvedIndex]={...meta,characterRigPartSets:sets};
    if(sceneIndex===resolvedIndex)renderCharacterRigPartSets();
    const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
-   status.textContent=(uiLang==='ru'?'Результат: ':'Result: ')+result.assets.length+'/10 · '+(uiLang==='ru'?'ошибок ':'failed ')+result.failures.length+' · '+(saved?(uiLang==='ru'?'сохранено в черновике':'saved to draft'):(uiLang==='ru'?'не удалось сохранить черновик':'draft save failed'))+'. '+(uiLang==='ru'?'Все части пока не проверены и не подключены к анимации.':'All parts remain unverified and are not attached to animation.');
+   status.textContent=(result.cancelled?(uiLang==='ru'?'Остановлено. Сохранены готовые части: ':'Cancelled. Saved completed parts: '):'')+(uiLang==='ru'?'Результат: ':'Result: ')+result.assets.length+'/10 · '+(uiLang==='ru'?'ошибок ':'failed ')+result.failures.length+' · '+(saved?(uiLang==='ru'?'сохранено в черновике':'saved to draft'):(uiLang==='ru'?'не удалось сохранить черновик':'draft save failed'))+'. '+(uiLang==='ru'?'Все части пока не проверены и не подключены к анимации.':'All parts remain unverified and are not attached to animation.');
   }else{
    status.textContent=uiLang==='ru'?'Сцена изменилась во время генерации. Результат не привязан к другой сцене.':'The scene changed during generation. Results were not attached to another scene.';
   }
  }catch(error){
   status.textContent=(uiLang==='ru'?'Ошибка генерации частей: ':'Rig-part generation failed: ')+(error?.message||'Unknown error');
  }finally{
+  rigPartsAbortController=null;
+  $('cancelCharacterRigParts').hidden=true;
   button.disabled=!$('rigPartsConsent').checked;
  }
 });
