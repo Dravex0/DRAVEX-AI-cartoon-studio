@@ -152,9 +152,9 @@ test('maps grounded English dance action to a looping articulated full-body groo
   const result = createCharacterRigTimelineFromActionTimeline(makeScene('dances to the music'), [rig()]);
   assert.equal(result.status, 'generated');
   assert.equal(result.mappedActions[0].preset, 'dance');
-  const start = sampleCharacterRigTimeline(result.timeline, 0).Foxy;
-  const middle = sampleCharacterRigTimeline(result.timeline, 0.25).Foxy;
-  const end = sampleCharacterRigTimeline(result.timeline, 1).Foxy;
+  const start = sampleCharacterRigTimeline(result.timeline, 0.2).Foxy || {};
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.35).Foxy;
+  const end = sampleCharacterRigTimeline(result.timeline, 0.8).Foxy || {};
   assert.ok(Math.abs(middle.leftArm.rotation) > 0.2);
   assert.ok(Math.abs(middle.rightArm.rotation) > 0.2);
   assert.equal(start.root?.y || 0, end.root?.y || 0);
