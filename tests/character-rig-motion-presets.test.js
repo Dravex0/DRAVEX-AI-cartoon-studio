@@ -158,7 +158,7 @@ describe('procedural character rig motion presets', () => {
     const rightStep = sampleCharacterRigTimeline(walk.timeline, 0.75).Foxy;
     assert.ok(leftStep['leg-left-upper'].rotation < 0);
     assert.ok(leftStep['leg-left-lower'].rotation > 0);
-    assert.ok(rightStep['leg-right-upper'].rotation > 0);
+    assert.ok(rightStep['leg-right-upper'].rotation < 0);
     assert.ok(rightStep['leg-right-lower'].rotation > 0);
     assert.ok(leftStep['arm-left-upper'].rotation > 0);
     assert.ok(leftStep['arm-left-lower'].rotation < 0);
