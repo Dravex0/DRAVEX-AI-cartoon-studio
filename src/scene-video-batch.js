@@ -95,6 +95,9 @@ export async function generateStoryboardVideos({
       if (!result || result.status !== "completed") {
         throw new Error("Scene provider did not return a completed video.");
       }
+      if (!(result.video instanceof Blob) || result.video.size <= 0) {
+        throw new Error("Scene provider reported completion without a non-empty video artifact.");
+      }
       report.completed += 1;
       report.results.push({ index, status: "completed", result });
       onProgress({ ...report, currentIndex: index, stage: "completed" });

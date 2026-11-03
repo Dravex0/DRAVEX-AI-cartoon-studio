@@ -28,7 +28,7 @@ test("skips already generated clips without calling the provider", async () => {
     hasVideo: scene => scene.id === "a",
     generateScene: async () => {
       calls += 1;
-      return { status: "completed" };
+      return { status: "completed", video: new Blob(["clip"]) };
     }
   });
 
@@ -37,12 +37,24 @@ test("skips already generated clips without calling the provider", async () => {
   assert.equal(report.completed, 1);
 });
 
+test("rejects provider completion when the video artifact is missing or empty", async () => {
+  for (const video of [undefined, new Blob([])]) {
+    const report = await generateStoryboardVideos({
+      scenes: [{ id: "invalid" }],
+      generateScene: async () => ({ status: "completed", video })
+    });
+    assert.equal(report.completed, 0);
+    assert.equal(report.failed, 1);
+    assert.match(report.results[0].error, /non-empty video artifact/);
+  }
+});
+
 test("continues after a scene failure and reports it", async () => {
   const report = await generateStoryboardVideos({
     scenes: [{ id: "bad" }, { id: "good" }],
     generateScene: async scene => {
       if (scene.id === "bad") throw new Error("provider unavailable");
-      return { status: "completed" };
+      return { status: "completed", video: new Blob(["clip"]) };
     }
   });
 
