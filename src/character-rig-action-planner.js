@@ -10,6 +10,8 @@ const PRESET_BY_ACTION = Object.freeze({ walk: 'walk', run: 'run', jump: 'jump',
 function presetForDescription(description) {
   const intent = inferSceneActionIntent(description);
   if (intent.intent === 'dodge') return 'dodge';
+  if (intent.intent === 'attack') return 'attack';
+  if (intent.intent === 'defend') return 'defend';
   const action = detectSceneAction(description);
   return PRESET_BY_ACTION[action] || null;
 }
