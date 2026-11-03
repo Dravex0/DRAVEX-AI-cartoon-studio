@@ -340,3 +340,12 @@ test('motion prompt timing respects the legacy duration field used by scene expo
   assert.match(prompt, /preparation \(0%-20%; 0\.00-1\.60s\)/);
   assert.match(prompt, /action \(20%-65%; 1\.60-5\.20s\)/);
 });
+
+test('motion prompt treats the supplied scene image as the visual anchor and locks character identity across frames', () => {
+  const prompt = buildMotionGenerationPrompt(scene, bible);
+  assert.match(prompt, /supplied source image as the visual anchor and opening-frame reference/i);
+  assert.match(prompt, /same character identities, face and muzzle shape, species, body proportions/i);
+  assert.match(prompt, /fur\/skin colors, clothing, accessories/i);
+  assert.match(prompt, /Do not redesign, replace, duplicate, merge, or add characters/i);
+  assert.match(prompt, /Preserve the source image composition/i);
+});
