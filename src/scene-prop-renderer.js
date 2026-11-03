@@ -34,7 +34,7 @@ export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}
   const anchor = anchors[0];
   if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)
     || anchor.x < 0 || anchor.x > 1 || anchor.y < 0 || anchor.y > 1) return null;
-  return { x: anchor.x, y: anchor.y, partId: anchor.id };
+  return { x: anchor.x, y: anchor.y, rotation: Number.isFinite(anchor.rotation) ? anchor.rotation : 0, partId: anchor.id };
 }
 
 /**
@@ -72,15 +72,18 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     const wasHeldByActor = change.previousValue != null && key(change.previousValue) === key(actorId);
     const ground = { x: 0.68, y: 0.79 };
     const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
-    const hand = rigAnchor ? { x: rigAnchor.x, y: rigAnchor.y } : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96), y: clamp(actorY - 0.08, 0.08, 0.9) };
+    const hand = rigAnchor
+      ? { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation }
+      : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96), y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
     const from = wasHeldByActor ? hand : ground;
     const to = heldByActor ? hand : ground;
     const x = from.x + (to.x - from.x) * eased;
     const y = from.y + (to.y - from.y) * eased;
+    const rotation = (from.rotation || 0) + ((to.rotation || 0) - (from.rotation || 0)) * eased;
     return {
       id: clean(change.entityId),
       kind: propKind(change.entityId),
-      x, y,
+      x, y, rotation,
       held: heldByActor,
       visible: true,
       scale: 1,
@@ -105,6 +108,7 @@ function drawProp(context, prop, x, y, time) {
   const bob = prop.held ? Math.sin(time * 4) * 0.008 : 0;
   context.save();
   context.translate(x, y + bob);
+  context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
   context.lineWidth = 2.5;
   context.lineJoin = 'round';
   if (prop.kind === 'star') {
