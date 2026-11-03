@@ -84,3 +84,27 @@ test('propagates cancellation instead of silently continuing', async () => {
     error => error?.name === 'AbortError'
   );
 });
+
+
+test("keeps completed rig-part images when generation is cancelled", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  const result = await generateCharacterRigParts({
+    characterId: "Foxy",
+    appearanceReference: "Small orange fox with a cream muzzle and blue scarf",
+    consentAccepted: true,
+    signal: controller.signal,
+    generateImage: async () => {
+      calls += 1;
+      controller.abort();
+      return { imageUrl: "https://images.example.test/torso.png", requestId: "first-part" };
+    }
+  });
+
+  assert.equal(calls, 1);
+  assert.equal(result.status, "cancelled");
+  assert.equal(result.cancelled, true);
+  assert.equal(result.assets.length, 1);
+  assert.equal(result.assets[0].partId, "torso");
+  assert.equal(result.readyForAnimation, false);
+});
