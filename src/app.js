@@ -121,6 +121,21 @@ let sceneVideoRestorePromise=Promise.resolve();
 const sceneVideoStorage=createSceneVideoStorage();
 const facialAssetStorage=createFacialAssetStorage();
 const characterReferenceImageStorage=createCharacterReferenceImageStorage();
+let characterReferencePreviewUrl=null;
+let characterReferencePreviewToken=0;
+async function showCharacterReferenceImage(profile){
+ const token=++characterReferencePreviewToken;
+ if(characterReferencePreviewUrl){URL.revokeObjectURL(characterReferencePreviewUrl);characterReferencePreviewUrl=null;}
+ const preview=$('bibleReferenceImagePreview'),remove=$('removeCharacterReferenceImage');
+ preview.hidden=true;remove.hidden=true;preview.removeAttribute('src');
+ if(!profile?.referenceImageAssetId)return;
+ try{
+  const record=await characterReferenceImageStorage.get(profile.referenceImageAssetId);
+  if(token!==characterReferencePreviewToken||!record?.blob?.size)return;
+  characterReferencePreviewUrl=URL.createObjectURL(record.blob);
+  preview.src=characterReferencePreviewUrl;preview.hidden=false;remove.hidden=false;
+ }catch(error){console.warn('Could not load character reference preview:',error);}
+}
 function disposeSceneVideoEntry(entry){
  if(!entry)return;
  entry.video.pause();
@@ -293,6 +308,7 @@ function renderCharacterBible(){
     $('bibleColors').value=profile.colors||'';
     $('bibleDistinctiveFeatures').value=profile.distinctiveFeatures||'';
     $('bibleReferenceImageStatus').textContent=profile.referenceImageAssetId?(uiLang==='ru'?'Фото-референс сохранён локально на этом устройстве.':'Reference image is saved locally on this device.'):(uiLang==='ru'?'Фото-референс не добавлен.':'No reference image saved yet.');
+    showCharacterReferenceImage(profile);
     activeId.dataset.loaded=String(sceneIndex);
   }
   const cards=$('characterReferenceCards');
@@ -337,6 +353,7 @@ $('bibleReferenceImageFile').addEventListener('change',async()=>{
     const randomPart=window.crypto?.randomUUID?.().replace(/-/g,'')||Date.now().toString(36)+Math.random().toString(36).slice(2);
     const assetId='refimg_'+randomPart;
     await characterReferenceImageStorage.put(assetId,file,file.name);
+    if(current.referenceImageAssetId)await characterReferenceImageStorage.delete(current.referenceImageAssetId);
     characterBible=upsertCharacterReference(characterBible,{
       ...current,
       characterId,
@@ -350,10 +367,24 @@ $('bibleReferenceImageFile').addEventListener('change',async()=>{
     $('bibleReferenceImageStatus').textContent=uiLang==='ru'
       ?'Фото сохранено только в этом браузере ('+Math.round(file.size/1024)+' КБ). Для использования в сцене выбери локальный ComfyUI и настрой входы Reference Image 1/2 в workflow.'
       :'Image saved only in this browser ('+Math.round(file.size/1024)+' KB). To use it in a scene, choose local ComfyUI and configure Reference Image 1/2 workflow inputs.';
+    showCharacterReferenceImage(characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase()));
     renderCharacterBible();
   }catch(error){
     $('bibleReferenceImageStatus').textContent=error.message||'Could not save character reference image.';
   }
+});
+$('removeCharacterReferenceImage').addEventListener('click',async()=>{
+ const characterId=$('bibleCharacterId').value.trim();
+ const profile=characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase());
+ if(!profile?.referenceImageAssetId)return;
+ try{
+  await characterReferenceImageStorage.delete(profile.referenceImageAssetId);
+  characterBible=upsertCharacterReference(characterBible,{...profile,referenceImageAssetId:''});
+  $('bibleReferenceImageFile').value='';
+  $('bibleReferenceImageStatus').textContent=uiLang==='ru'?'Фото удалено из локального хранилища. Нажми «Сохранить черновик», чтобы сохранить изменение.':'Photo removed from local storage. Save the draft to persist this change.';
+  showCharacterReferenceImage(null);
+  renderCharacterBible();
+ }catch(error){$('bibleReferenceImageStatus').textContent=error.message||'Could not remove reference image.';}
 });
 async function loadCharacterReferenceImagesForScene(scene){
   const cast=normalizeSceneCast('',scene?.characters);
