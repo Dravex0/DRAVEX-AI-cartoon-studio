@@ -18,6 +18,9 @@ const roleOf = boneId => {
   const id = normalizeId(boneId);
   if (/root|hips|pelvis|torso|body|spine/.test(id)) return 'root';
   if (/head|neck/.test(id)) return 'head';
+  // Match lower arm segments before generic arm patterns so elbow bends remain independent.
+  if (/left.*(lowerarm|forearm)|(lowerarm|forearm).*left|armleftlower|lforearm|forearml/.test(id)) return 'leftLowerArm';
+  if (/right.*(lowerarm|forearm)|(lowerarm|forearm).*right|armrightlower|rforearm|forearmr/.test(id)) return 'rightLowerArm';
   // Accept both word-order and common L/R suffix conventions after ID normalization.
   if (/left.*(arm|hand|shoulder)|(arm|hand|shoulder).*left|l(arm|hand|upperarm|shoulder)|(arm|hand|upperarm|shoulder)l/.test(id)) return 'leftArm';
   if (/right.*(arm|hand|shoulder)|(arm|hand|shoulder).*right|r(arm|hand|upperarm|shoulder)|(arm|hand|upperarm|shoulder)r/.test(id)) return 'rightArm';
@@ -26,8 +29,8 @@ const roleOf = boneId => {
   if (/foot|ankle|heel|toe/.test(id)) return 'foot';
   // Check lower-leg names before generic leg patterns so shins/calves do not
   // receive the same swing rotation as the upper leg.
-  if (/left.*(lowerleg|shin|calf)|(lowerleg|shin|calf).*left|l(lowerleg|shin|calf)|(lowerleg|shin|calf)l/.test(id)) return 'leftLowerLeg';
-  if (/right.*(lowerleg|shin|calf)|(lowerleg|shin|calf).*right|r(lowerleg|shin|calf)|(lowerleg|shin|calf)r/.test(id)) return 'rightLowerLeg';
+  if (/left.*(lowerleg|shin|calf)|(lowerleg|shin|calf).*left|l(lowerleg|shin|calf)|(lowerleg|shin|calf)l|legleftlower/.test(id)) return 'leftLowerLeg';
+  if (/right.*(lowerleg|shin|calf)|(lowerleg|shin|calf).*right|r(lowerleg|shin|calf)|(lowerleg|shin|calf)r|legrightlower/.test(id)) return 'rightLowerLeg';
   if (/left.*(leg|thigh)|(leg|thigh).*left|l(leg|thigh)|(leg|thigh)l/.test(id)) return 'leftLeg';
   if (/right.*(leg|thigh)|(leg|thigh).*right|r(leg|thigh)|(leg|thigh)r/.test(id)) return 'rightLeg';
   if (/arm|hand|shoulder/.test(id)) return 'arm';
@@ -151,6 +154,8 @@ function poseFor(rig, preset, phase) {
     if (preset === 'walk') {
       if (role === 'leftArm' || role === 'arm') rotation = cycle * 0.32;
       if (role === 'rightArm') rotation = -cycle * 0.32;
+      if (role === 'leftLowerArm') rotation = -cycle * 0.12;
+      if (role === 'rightLowerArm') rotation = cycle * 0.12;
       if (role === 'leftLeg' || role === 'leg') rotation = -cycle * 0.38;
       if (role === 'rightLeg') rotation = cycle * 0.38;
       if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = lift * 0.42;
@@ -160,6 +165,8 @@ function poseFor(rig, preset, phase) {
     } else if (preset === 'run') {
       if (role === 'leftArm' || role === 'arm') rotation = cycle * 0.62;
       if (role === 'rightArm') rotation = -cycle * 0.62;
+      if (role === 'leftLowerArm') rotation = -cycle * 0.2;
+      if (role === 'rightLowerArm') rotation = cycle * 0.2;
       if (role === 'leftLeg' || role === 'leg') rotation = -cycle * 0.72;
       if (role === 'rightLeg') rotation = cycle * 0.72;
       if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = lift * 0.68;
@@ -170,6 +177,8 @@ function poseFor(rig, preset, phase) {
       if (role === 'root') y = -0.2 * lift;
       if (role === 'leftArm' || role === 'arm') rotation = -0.55 * lift;
       if (role === 'rightArm') rotation = 0.55 * lift;
+      if (role === 'leftLowerArm') rotation = 0.18 * lift;
+      if (role === 'rightLowerArm') rotation = -0.18 * lift;
       if (role === 'leftLeg' || role === 'leg') rotation = -0.35 * lift;
       if (role === 'rightLeg') rotation = 0.35 * lift;
       if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = 0.24 * lift;
@@ -182,6 +191,8 @@ function poseFor(rig, preset, phase) {
       if (role === 'head') rotation = -0.08 * tuck;
       if (role === 'leftArm' || role === 'arm') rotation = -0.72 * tuck;
       if (role === 'rightArm') rotation = 0.72 * tuck;
+      if (role === 'leftLowerArm') rotation = 0.28 * tuck;
+      if (role === 'rightLowerArm') rotation = -0.28 * tuck;
       if (role === 'leftLeg' || role === 'leg') rotation = -0.28 * tuck;
       if (role === 'rightLeg') rotation = 0.28 * tuck;
       if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = 0.34 * tuck;
@@ -189,12 +200,14 @@ function poseFor(rig, preset, phase) {
     } else if (preset === 'wave') {
       if (role === 'rightArm' || role === 'arm') rotation = -0.8 + 0.22 * Math.sin(phase * Math.PI * 2);
       if (role === 'leftArm') rotation = -0.12;
+      if (role === 'rightLowerArm') rotation = -0.28 + 0.1 * Math.sin(phase * Math.PI * 2);
       if (role === 'head') rotation = 0.06 * Math.sin(phase * Math.PI * 2);
     } else if (preset === 'attack') {
       const strike = Math.sin(Math.PI * phase);
       if (role === 'root') { x = 0.055 * strike; rotation = -0.035 * strike; }
       if (role === 'rightArm' || role === 'arm') rotation = -1.05 * strike;
       if (role === 'leftArm') rotation = 0.22 * strike;
+      if (role === 'rightLowerArm') rotation = 0.32 * strike;
       if (role === 'head') rotation = -0.08 * strike;
       if (role === 'leftLeg') rotation = -0.12 * strike;
       if (role === 'rightLeg') rotation = 0.12 * strike;
@@ -204,6 +217,8 @@ function poseFor(rig, preset, phase) {
       if (role === 'head') rotation = -0.12 * brace;
       if (role === 'leftArm' || role === 'arm') rotation = -0.62 * brace;
       if (role === 'rightArm') rotation = 0.62 * brace;
+      if (role === 'leftLowerArm') rotation = 0.2 * brace;
+      if (role === 'rightLowerArm') rotation = -0.2 * brace;
       if (role === 'leftLeg') rotation = -0.16 * brace;
       if (role === 'rightLeg') rotation = 0.16 * brace;
     } else if (preset === 'idle') {
