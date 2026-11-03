@@ -36,6 +36,47 @@ test('uses a widescreen 16:9 720p canvas for preview and WebM export', async ({ 
   await expect(page.locator('#imageQuality option[value="ultra"]')).toHaveText('Maximum · 1024×576');
 });
 
+test('exports a short storyboard to a non-empty playable WebM', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#idea').fill(
+    'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.'
+  );
+  await page.getByRole('button', { name: /create storyboard/i }).click();
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+
+  // Keep this browser smoke test short while exercising the real export path.
+  await page.locator('#duration').evaluate(select => {
+    const option = document.createElement('option');
+    option.value = '0.25';
+    option.textContent = '0.25 seconds · test';
+    select.append(option);
+    select.value = '0.25';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  await page.locator('#export').click();
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
+  await expect(page.locator('#finalFilmPlayer')).toHaveJSProperty('readyState', 2);
+
+  const video = await page.locator('#finalFilmPlayer').evaluate(element => ({
+    source: element.currentSrc,
+    duration: element.duration,
+    width: element.videoWidth,
+    height: element.videoHeight,
+    readyState: element.readyState
+  }));
+  expect(video.source).toMatch(/^blob:/);
+  expect(video.duration).toBeGreaterThanOrEqual(1);
+  expect(video.duration).toBeLessThan(2);
+  expect(video.width).toBe(1280);
+  expect(video.height).toBe(720);
+  expect(video.readyState).toBeGreaterThanOrEqual(2);
+  expect(pageErrors).toEqual([]);
+});
+
 test('switches to a true 9:16 portrait canvas and persists the format for WebM capture', async ({ page }) => {
   await page.goto('/');
   await page.getByText(/more settings/i).click();
