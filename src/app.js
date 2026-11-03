@@ -904,34 +904,42 @@ $('addScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.
 $('deleteScene').onclick=()=>{const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;if(titles.length<=1){$('status').textContent=t.minimum;return}const removedScene=sceneMetadata[sceneIndex]||{};releaseSceneVideo(removedScene,sceneIndex);titles.splice(sceneIndex,1);descriptions.splice(sceneIndex,1);sceneMetadata.splice(sceneIndex,1);if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};sceneIndex=Math.min(sceneIndex,titles.length-1);$('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=t.deleted};
 
 let sceneMotionAnalysisSummary=null;
+let sceneMotionAnalysisResults=new Map();
 let sceneMotionAnalysisRunning=false;
 async function runSceneMotionAnalysis(){
   if(sceneMotionAnalysisRunning)return;
   const entries=sceneMetadata.map((meta,index)=>({meta,index,key:String(meta?.id||''),entry:sceneVideoCache.get(String(meta?.id||''))})).filter(item=>item.entry?.video);
-  if(!entries.length){
-    sceneMotionAnalysisSummary={checked:0,static:0,changed:0,skipped:0};
-    renderSceneMediaReport();
-    return;
-  }
   sceneMotionAnalysisRunning=true;
   sceneMotionAnalysisSummary={checked:0,static:0,changed:0,skipped:0};
+  sceneMotionAnalysisResults=new Map();
   renderSceneMediaReport();
-  for(const item of entries){
-    if(sceneVideoCache.get(item.key)!==item.entry)continue;
-    try{
-      await waitForSceneVideoReady(item.entry.video,{timeoutMs:12000});
-      const result=await analyzeSceneVideoMotion(item.entry.video);
-      sceneMotionAnalysisSummary.checked++;
-      if(result.status==='likely-static')sceneMotionAnalysisSummary.static++;
-      else sceneMotionAnalysisSummary.changed++;
-    }catch(error){
-      sceneMotionAnalysisSummary.skipped++;
-      console.warn('Scene motion analysis skipped for scene '+(item.index+1)+':',error);
+  try{
+    for(const item of entries){
+      if(sceneVideoCache.get(item.key)!==item.entry){
+        sceneMotionAnalysisResults.set(item.key,{status:'skipped',message:'Video changed before analysis.'});
+        sceneMotionAnalysisSummary.skipped++;
+        renderSceneMediaReport();
+        continue;
+      }
+      try{
+        await waitForSceneVideoReady(item.entry.video,{timeoutMs:12000});
+        if(sceneVideoCache.get(item.key)!==item.entry)throw new Error('Video changed during analysis.');
+        const result=await analyzeSceneVideoMotion(item.entry.video);
+        sceneMotionAnalysisResults.set(item.key,result);
+        sceneMotionAnalysisSummary.checked++;
+        if(result.status==='likely-static')sceneMotionAnalysisSummary.static++;
+        else sceneMotionAnalysisSummary.changed++;
+      }catch(error){
+        sceneMotionAnalysisResults.set(item.key,{status:'skipped',message:String(error?.message||'Analysis unavailable.')});
+        sceneMotionAnalysisSummary.skipped++;
+        console.warn('Scene motion analysis skipped for scene '+(item.index+1)+':',error);
+      }
+      renderSceneMediaReport();
     }
+  }finally{
+    sceneMotionAnalysisRunning=false;
     renderSceneMediaReport();
   }
-  sceneMotionAnalysisRunning=false;
-  renderSceneMediaReport();
 }
 function renderSceneMediaReport(){
   const target=$('sceneMediaReport');
@@ -946,12 +954,38 @@ function renderSceneMediaReport(){
   const summary=document.createElement('div');
   summary.textContent=videoLabel+': '+report.videoScenes+'/'+report.totalScenes+' · '+stillLabel+': '+report.stillScenes+'. '+(report.complete?completeLabel:partialLabel);
   target.appendChild(summary);
-  const motion=document.createElement('div');
-  motion.style.marginTop='6px';
   if(sceneMotionAnalysisSummary){
     const value=sceneMotionAnalysisSummary;
+    const motion=document.createElement('div');
+    motion.style.marginTop='6px';
     motion.textContent=(russian?'Проверка движения: ':'Motion check: ')+value.checked+' '+(russian?'проверено':'checked')+' · '+value.static+' '+(russian?'почти без изменений':'likely static')+' · '+value.changed+' '+(russian?'есть изменения пикселей':'pixel changes')+' · '+value.skipped+' '+(russian?'пропущено':'skipped')+'. '+(russian?'Это приблизительная проверка пикселей, не оценка качества анимации персонажа.':'Pixel heuristic only; it does not rate character animation quality.');
     target.appendChild(motion);
+    const details=document.createElement('div');
+    details.style.marginTop='8px';
+    details.style.display='grid';
+    details.style.gap='5px';
+    for(const item of report.items.filter(scene=>scene.mediaType==='video')){
+      const result=sceneMotionAnalysisResults.get(item.id);
+      if(!result)continue;
+      const row=document.createElement('div');
+      row.style.padding='6px 8px';
+      row.style.border='1px solid var(--border, #343746)';
+      row.style.borderRadius='8px';
+      const heading=document.createElement('strong');
+      heading.textContent=(russian?'Сцена ':'Scene ')+(item.index+1)+': '+item.title;
+      const detail=document.createElement('small');
+      detail.style.display='block';
+      if(result.status==='likely-static'){
+        detail.textContent=(russian?'Почти нет изменений пикселей':'Very little pixel change')+' · '+(russian?'среднее изменение: ':'mean change: ')+Number(result.meanPixelChange||0).toFixed(5);
+      }else if(result.status==='visible-change'){
+        detail.textContent=(russian?'Обнаружены изменения пикселей':'Pixel changes detected')+' · '+(russian?'доля изменившихся пикселей: ':'changed-pixel ratio: ')+(Number(result.changedPixelRatio||0)*100).toFixed(1)+'%';
+      }else{
+        detail.textContent=(russian?'Проверка пропущена: ':'Analysis skipped: ')+String(result.message||'');
+      }
+      row.append(heading,detail);
+      details.appendChild(row);
+    }
+    if(details.childElementCount)target.appendChild(details);
   }
   const button=document.createElement('button');
   button.type='button';
