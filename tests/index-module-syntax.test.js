@@ -119,7 +119,7 @@ test('WebM export uses model-timestamped visemes with measured dialogue energy a
   assert.ok(html.includes('buildVisemeTimeline({text:track.text,durationMs:envelope.durationMs,language:track.language,fps:24,phonemeChunks:track.phonemeChunks,visemeEvents:track.visemeEvents})'));
   assert.ok(html.includes('sampleVisemeTimeline(activeMouthTrack.visemes,mouthTrackTimeMs)'));
   const renderer = readFileSync(new URL('../src/demo-character-renderer.js', import.meta.url), 'utf8');
-  assert.match(app, /drawProceduralDemoFox/);
+  assert.match(html, /drawProceduralDemoFox/);
   assert.ok(renderer.includes("viseme === 'closed'"));
   assert.ok(renderer.includes("viseme === 'round'"));
   assert.ok(renderer.includes("viseme === 'wide'"));
