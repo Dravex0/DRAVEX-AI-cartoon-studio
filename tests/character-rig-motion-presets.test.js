@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from '../src/character-rig-motion-presets.js';
 import { sampleCharacterRigTimeline } from '../src/character-rig-timeline.js';
 import { applyCharacterRigPose } from '../src/character-rig.js';
+import { buildCharacterRigAssetPlan } from '../src/character-rig-asset-plan.js';
 
 const rig = () => ({
   schemaVersion: 1,
@@ -136,6 +137,39 @@ describe('procedural character rig motion presets', () => {
     const legacyPose = sampleCharacterRigTimeline(legacyWalk.timeline, 0.25).Foxy;
     assert.equal(legacyPose.leftShin, undefined);
     assert.ok(legacyWalk.warnings.some(message => message.includes('lower-leg bones have no knee pivots defined')));
+  });
+
+  it('animates the generated ten-part rig upper and lower segments independently', () => {
+    const plan = buildCharacterRigAssetPlan({
+      characterId: 'Foxy',
+      appearanceReference: 'Orange fox, cream muzzle, green scarf'
+    });
+    const generatedRig = {
+      ...plan.rig,
+      parts: plan.rig.parts.map(part => ({
+        ...part,
+        imageUrl: 'https://assets.example/' + part.id + '.png'
+      }))
+    };
+
+    const walk = createCharacterRigMotionPreset(generatedRig, 'walk');
+    assert.equal(walk.status, 'ready');
+    const leftStep = sampleCharacterRigTimeline(walk.timeline, 0.25).Foxy;
+    const rightStep = sampleCharacterRigTimeline(walk.timeline, 0.75).Foxy;
+    assert.ok(leftStep['leg-left-upper'].rotation < 0);
+    assert.ok(leftStep['leg-left-lower'].rotation > 0);
+    assert.ok(rightStep['leg-right-upper'].rotation > 0);
+    assert.ok(rightStep['leg-right-lower'].rotation > 0);
+    assert.ok(leftStep['arm-left-upper'].rotation > 0);
+    assert.ok(leftStep['arm-left-lower'].rotation < 0);
+    assert.ok(leftStep['arm-right-upper'].rotation < 0);
+    assert.ok(leftStep['arm-right-lower'].rotation > 0);
+
+    const wave = createCharacterRigMotionPreset(generatedRig, 'wave');
+    assert.equal(wave.status, 'ready');
+    const greeting = sampleCharacterRigTimeline(wave.timeline, 0.25).Foxy;
+    assert.ok(greeting['arm-right-upper'].rotation < 0);
+    assert.ok(greeting['arm-right-lower'].rotation < 0);
   });
 
   it('creates different run and walk amplitudes', () => {
