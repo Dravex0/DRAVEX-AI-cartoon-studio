@@ -1721,6 +1721,7 @@ $('export').onclick=async()=>{
     playing=false;
     if(raf)cancelAnimationFrame(raf);
     raf=0;
+    animationClock.advance(performance.now(),false);
     syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:false});
     $('status').textContent=uiLang==='ru'?'Ожидание готовности медиа сцен…':'Waiting for scene media to become ready…';
     const readinessTasks=[];
