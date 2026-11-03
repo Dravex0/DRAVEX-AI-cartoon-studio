@@ -70,3 +70,36 @@ test('ignores malformed action timing and keeps the backwards-compatible fallbac
   const after = buildScenePropRenderPlan(malformed, layers, 0.9)[0];
   assert.ok(before.x > after.x);
 });
+
+test('anchors held props to the explicitly named hand after applying the sampled rig pose', () => {
+  const rig = {
+    schemaVersion: 1,
+    characterId: 'Fox',
+    bones: [{ id: 'root', parentId: null }, { id: 'leftHand', parentId: 'root' }],
+    parts: [{
+      id: 'leftHand', boneId: 'leftHand', imageUrl: 'https://assets.example/hand.png',
+      x: 0.51, y: 0.58, width: 0.08, height: 0.08, zIndex: 2
+    }]
+  };
+  const plan = buildScenePropRenderPlan(scene, layers, 1, {
+    characterRigs: [rig],
+    rigPoses: { Fox: { leftHand: { x: -0.04, y: 0.03 } } }
+  })[0];
+  assert.equal(plan.held, true);
+  assert.equal(plan.x, 0.47);
+  assert.equal(plan.y, 0.61);
+});
+
+test('uses the safe legacy hand estimate when the rig has no explicit hand or paw anchor', () => {
+  const rig = {
+    schemaVersion: 1, characterId: 'Fox',
+    bones: [{ id: 'root', parentId: null }],
+    parts: [{
+      id: 'body', boneId: 'root', imageUrl: 'https://assets.example/body.png',
+      x: 0.5, y: 0.6, width: 0.2, height: 0.3
+    }]
+  };
+  const plan = buildScenePropRenderPlan(scene, layers, 1, { characterRigs: [rig] })[0];
+  assert.equal(plan.x, 0.52);
+  assert.equal(plan.y, 0.62);
+});
