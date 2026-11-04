@@ -270,15 +270,20 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
    const frames = entry.frames;
    if (!frames.length) continue;
    const warningFrames = frames.filter(frame => frame.status === 'possible-joint-gaps').length;
+   const incompleteFrames = frames.filter(frame => frame.status === 'incomplete').length;
    const checked = frames.reduce((sum, frame) => sum + frame.checkedConnections, 0);
    const possible = frames.reduce((sum, frame) => sum + frame.possibleGapCount, 0);
+   const skipped = frames.reduce((sum, frame) => sum + frame.skippedConnections, 0);
    const label = warningFrames
     ? (uiLang === 'ru' ? 'возможные геометрические разрывы' : 'possible geometry gaps')
-    : (uiLang === 'ru' ? 'разрывы по геометрии не выявлены' : 'no geometry gaps flagged');
+    : incompleteFrames
+     ? (uiLang === 'ru' ? 'неполная геометрия соединений' : 'incomplete joint geometry')
+     : (uiLang === 'ru' ? 'разрывы по геометрии не выявлены' : 'no geometry gaps flagged');
    jointSummaries.push(entry.characterId + ': ' + label + ' (' + warningFrames + '/' + frames.length
-    + (uiLang === 'ru' ? ' кадров; ' : ' frames; ') + possible + ' '
-    + (uiLang === 'ru' ? 'предупреждений, ' : 'warnings, ') + checked
-    + (uiLang === 'ru' ? ' проверок соединений)' : ' joint checks)'));
+    + (uiLang === 'ru' ? ' кадров с предупреждениями; ' : ' frames with warnings; ') + possible + ' '
+    + (uiLang === 'ru' ? 'возможных разрывов, ' : 'possible gaps, ') + checked
+    + (uiLang === 'ru' ? ' проверок, ' : ' checks, ') + skipped
+    + (uiLang === 'ru' ? ' пропущенных соединений)' : ' skipped connections)'));
   }
   const bodyPartSummaries = [];
   for (const entry of characterMotionAudit.bodyPartFrames.values()) {
