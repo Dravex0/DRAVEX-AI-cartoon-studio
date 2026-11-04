@@ -100,13 +100,19 @@ export function analyzeCharacterRigJointContinuity({
     partsByBone.get(key).push(part);
   }
 
+  const rootBoneId = rig.bones.find(bone => !bone.parentId)?.id?.toLowerCase();
   const joints = [];
   let skippedConnections = 0;
   for (const childBone of rig.bones) {
     if (!childBone.parentId) continue;
     const parentParts = partsByBone.get(childBone.parentId.toLowerCase()) || [];
     const childParts = partsByBone.get(childBone.id.toLowerCase()) || [];
-    if (!parentParts.length || !childParts.length) continue;
+    // The root is a control pivot, not a rendered body part; its lack of an image is expected.
+    if (childBone.parentId.toLowerCase() === rootBoneId && !parentParts.length) continue;
+    if (!parentParts.length || !childParts.length) {
+      skippedConnections++;
+      continue;
+    }
     const nearest = nearestPartPair(parentParts, childParts, boundsByPart);
     if (!nearest) {
       skippedConnections++;
@@ -121,9 +127,10 @@ export function analyzeCharacterRigJointContinuity({
   }
 
   const possibleGaps = joints.filter(item => item.status === "possible-geometry-gap");
-  const status = !joints.length
-    ? (skippedConnections ? "incomplete" : "no-connected-parts")
-    : possibleGaps.length ? "possible-joint-gaps" : "geometry-overlap-or-near";
+  const status = possibleGaps.length
+    ? "possible-joint-gaps"
+    : skippedConnections ? "incomplete"
+    : joints.length ? "geometry-overlap-or-near" : "no-connected-parts";
   return {
     status,
     characterId: rig.characterId,
