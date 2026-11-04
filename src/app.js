@@ -985,6 +985,7 @@ function renderSceneMediaReport(){
     'sprite-motion-only':russian?'Есть движение спрайта, но нет движения костей':'Sprite transform only; no bone animation',
     'sprite-motion-defined':russian?'Задано движение спрайта':'Sprite transform is defined',
     'action-described-only':russian?'Действие описано, анимация не задана':'Action described; animation not defined',
+    'invalid-action-timeline':russian?'Ошибка таймлайна действий':'Invalid action timeline',
     'invalid-rig-timeline':russian?'Ошибка таймлайна костей':'Invalid bone timeline',
     'rig-character-binding-missing':russian?'Движение есть, но не привязано к ригу персонажа':'Keyframe motion has no matching character rig',
     'rig-bone-binding-missing':russian?'Ключевые кадры не совпадают с костями рига':'Keyframes do not match rig bone IDs',
