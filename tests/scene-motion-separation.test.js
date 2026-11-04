@@ -61,3 +61,17 @@ test("keeps minority background activity inconclusive and handles missing contro
   assert.equal(classifyCharacterBackgroundMotion(character, []).status,
     "insufficient-background-controls");
 });
+
+test("distributes background controls across the viewport", () => {
+  const regions = buildBackgroundControlRegions({
+    viewport: { width: 500, height: 500 },
+    maxRegions: 8
+  });
+  const quadrants = new Set(regions.map(region => {
+    const x = region.bounds.x + region.bounds.width / 2;
+    const y = region.bounds.y + region.bounds.height / 2;
+    return (x < 250 ? "left" : "right") + "-" + (y < 250 ? "top" : "bottom");
+  }));
+  assert.equal(regions.length, 8);
+  assert.equal(quadrants.size, 4);
+});
