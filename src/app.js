@@ -46,6 +46,7 @@ import { waitForExportVideoReady, validateExportTracks } from "./film-export-rea
 import { buildSceneMediaReport } from "./scene-media-report.js";
 import { analyzeSceneVideoMotion, captureSceneVideoFrameSamples } from "./scene-motion-analysis.js";
 import { createSceneFrameContactSheet } from "./scene-frame-contact-sheet.js";
+import { buildCompositedCharacterRegions, sampleCanvasRegion, analyzeCharacterRegionFrames } from "./scene-character-region.js";
 import { summarizeSceneMotionResults } from "./scene-motion-results.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
@@ -116,6 +117,71 @@ context.globalAlpha=Math.max(0,Math.min(1,p.life));context.fillStyle=p.color;con
 }
 context.globalAlpha=1;
 }
+}
+let characterMotionAudit = null;
+const CHARACTER_MOTION_SAMPLE_PROGRESS = [0.1, 0.3, 0.5, 0.7, 0.9];
+function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewportWidth, viewportHeight, camera, focusX, focusY, rigPoses }) {
+ if (!characterMotionAudit || !playing || characterMotionAudit.sceneIndex !== sceneIndex) return;
+ if (!Number.isFinite(progress)) return;
+ if (characterMotionAudit.startProgress === null) {
+  characterMotionAudit.startProgress = progress;
+  characterMotionAudit.targets = CHARACTER_MOTION_SAMPLE_PROGRESS.map(value =>
+   progress + (1 - progress) * value
+  );
+ }
+ const target = characterMotionAudit.targets[characterMotionAudit.nextSample];
+ if (target === undefined || progress + 0.0001 < target) return;
+ const regions = buildCompositedCharacterRegions({
+  layers: currentSceneData.characterLayers,
+  characterRigs: currentSceneData.characterRigs,
+  rigPoses,
+  motionTimeline: currentSceneData.characterMotionTimeline || currentSceneData.actionTimeline,
+  progress,
+  viewport: { width: viewportWidth, height: viewportHeight },
+  camera: { zoom: camera.zoom, offsetY: camera.offsetY, focusX, focusY }
+ });
+ if (!regions.length) {
+  characterMotionAudit = null;
+  $('characterMotionAuditStatus').textContent = uiLang === 'ru'
+   ? 'В этой сцене нет подключённых слоёв персонажа или проверяемого скелета.'
+   : 'This scene has no attached character sprite layers or valid rig parts to inspect.';
+  return;
+ }
+ const scaleX = canvas.width / viewportWidth;
+ const scaleY = canvas.height / viewportHeight;
+ for (const region of regions) {
+  const frame = sampleCanvasRegion(canvas, region.bounds, { width: 32, height: 32, scaleX, scaleY });
+  const key = region.characterId.toLocaleLowerCase();
+  const entry = characterMotionAudit.frames.get(key) || { characterId: region.characterId, frames: [] };
+  entry.frames.push(frame);
+  characterMotionAudit.frames.set(key, entry);
+ }
+ characterMotionAudit.nextSample += 1;
+ const total = CHARACTER_MOTION_SAMPLE_PROGRESS.length;
+ if (characterMotionAudit.nextSample >= total) {
+  const summaries = [];
+  for (const entry of characterMotionAudit.frames.values()) {
+   if (entry.frames.length < 2) continue;
+   const report = analyzeCharacterRegionFrames(entry.frames);
+   summaries.push(entry.characterId + ': ' + (report.status === 'likely-static'
+    ? (uiLang === 'ru' ? 'почти нет изменений пикселей' : 'very little pixel change')
+    : (uiLang === 'ru' ? 'обнаружены изменения пикселей' : 'pixel changes detected'))
+    + ' (' + entry.frames.length + '/5)');
+  }
+  $('characterMotionAuditStatus').textContent = (uiLang === 'ru'
+   ? 'Проверка областей персонажей завершена. '
+   : 'Character-region check completed. ')
+   + (summaries.length ? summaries.join('; ') : (uiLang === 'ru' ? 'Недостаточно кадров для сравнения.' : 'Not enough samples to compare.'))
+   + (uiLang === 'ru'
+    ? '. Изменения пикселей не доказывают правильность действия персонажа.'
+    : '. Pixel changes do not prove that the intended character action occurred.');
+  characterMotionAudit = null;
+ } else {
+  $('characterMotionAuditStatus').textContent = (uiLang === 'ru'
+   ? 'Проверяю итоговую композицию: кадр '
+   : 'Sampling final composition: frame ')
+   + (characterMotionAudit.nextSample + 1) + '/' + total + '.';
+ }
 }
 const magicParticles=new ParticleEmitter();
 const sceneImageCache=new Map();
@@ -273,6 +339,23 @@ const sampledRigPoses=currentSceneData.characterRigTimeline?.keyframes?.length
  ? sampleCharacterRigTimeline(currentSceneData.characterRigTimeline,rigAnimationProgress)
  : currentSceneData.characterRigPoses;
 drawSceneProps(ctx,currentSceneData,currentSceneData.characterLayers,sceneMotionProgress,w,h,t,{characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);ctx.restore();
+try {
+ captureCharacterMotionAuditFrame({
+  currentSceneData,
+  progress: sceneMotionProgress,
+  viewportWidth: w,
+  viewportHeight: h,
+  camera: cameraPlan,
+  focusX,
+  focusY,
+  rigPoses: sampledRigPoses
+ });
+} catch (error) {
+ characterMotionAudit = null;
+ $('characterMotionAuditStatus').textContent = (uiLang === 'ru'
+  ? 'Не удалось прочитать пиксели композиции: '
+  : 'Could not read composed pixels: ') + (error?.message || 'Canvas readback failed');
+}
 ctx.fillStyle='#fff';ctx.font='bold 21px system-ui';ctx.fillText($('character').value||(uiLang==='ru'?'Главный герой':'Main character'),24,38);if(playing){frame++;raf=requestAnimationFrame(draw)}else{raf=0}}
 const storyTemplates={
 en:{titles:['The beginning','A turning point','The next step'],middle:'A new detail changes the moment.',ending:'The story moves forward.',status:'Local DRAVEX storyboard created.'},
