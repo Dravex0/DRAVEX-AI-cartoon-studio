@@ -143,7 +143,8 @@ export function auditSceneMotionContract(scene = {}) {
   const missingGroups = requirements.filter(group => !animatedGroups.has(group));
   let animationStatus = 'no-action-cue';
   if (action.intent !== 'unknown') {
-    if (rigTimeline.status === 'invalid') animationStatus = 'invalid-rig-timeline';
+    if (actionTimeline.status === 'invalid') animationStatus = 'invalid-action-timeline';
+    else if (rigTimeline.status === 'invalid') animationStatus = 'invalid-rig-timeline';
     else if (requirements.length && !rigTimeline.passed) {
       animationStatus = spriteMotionDefined ? 'sprite-motion-only' : 'no-rig-motion-data';
     } else if (requirements.length && rigTimeline.passed && !animatedBones.length && hasUnboundTimelineMotion) {
