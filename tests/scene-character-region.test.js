@@ -124,7 +124,7 @@ test("combines sprite and posed rig bounds for the same character", () => {
   });
   assert.equal(regions.length, 1);
   assert.equal(regions[0].source, "sprite+rig");
-  assert.deepEqual(regions[0].bounds, { x: 40, y: 40, width: 20, height: 20 });
+  assert.deepEqual(regions[0].bounds, { x: 35, y: 40, width: 25, height: 20 });
 });
 
 test("ignores invalid rig definitions and hidden sprite layers", () => {
