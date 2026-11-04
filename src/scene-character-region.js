@@ -1,3 +1,7 @@
+import { applyCharacterActionTimelineToLayers } from "./character-action-runtime.js";
+import { applyCharacterRigPose, validateCharacterRig } from "./character-rig.js";
+import { normalizeCharacterLayers } from "./scene-character-layers.js";
+
 /**
  * Geometry and pixel diagnostics for character regions in the final composed canvas.
  * Pixel activity is evidence of visual change inside a region, not semantic action recognition.
@@ -65,6 +69,95 @@ export function unionCharacterBounds(regions) {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
+
+/**
+ * Derive the visible viewport-space region for each character at one scene timestamp.
+ * Sprite transforms and validated rig-part transforms use the same camera transform
+ * as the compositor. This is geometry only; it does not prove which pixels belong
+ * to the character when transparent assets, occlusion, or background overlap occur.
+ */
+export function buildCompositedCharacterRegions({
+  layers = [],
+  characterRigs = [],
+  rigPoses = {},
+  motionTimeline = null,
+  progress = 0,
+  viewport,
+  camera = {},
+  resolveImage = null
+} = {}) {
+  if (!viewport || !Number.isFinite(Number(viewport.width)) || !Number.isFinite(Number(viewport.height))
+      || Number(viewport.width) <= 0 || Number(viewport.height) <= 0) {
+    throw new TypeError("A positive logical viewport is required.");
+  }
+  // Match the compositor: discard invalid/duplicate layers and apply the same defaults.
+  const safeLayers = normalizeCharacterLayers(layers);
+  const movedLayers = motionTimeline
+    ? applyCharacterActionTimelineToLayers(safeLayers, motionTimeline, progress)
+    : safeLayers.map(layer => layer && typeof layer === "object" ? { ...layer } : layer);
+  const readyRigCharacterIds = new Set();
+  if (typeof resolveImage === "function") {
+    for (const input of Array.isArray(characterRigs) ? characterRigs.slice(0, 20) : []) {
+      const report = validateCharacterRig(input);
+      if (!report.passed) continue;
+      const ready = report.rig.parts.every(part => {
+        const image = resolveImage(part.imageUrl, report.rig.characterId);
+        const imageWidth = Number(image?.naturalWidth || image?.videoWidth || image?.width);
+        const imageHeight = Number(image?.naturalHeight || image?.videoHeight || image?.height);
+        return Boolean(image && Number.isFinite(imageWidth) && Number.isFinite(imageHeight)
+          && imageWidth > 0 && imageHeight > 0);
+      });
+      if (ready) readyRigCharacterIds.add(report.rig.characterId.toLocaleLowerCase());
+    }
+  }
+  const regions = new Map();
+  const add = (characterId, bounds, source) => {
+    const id = String(characterId || "").trim();
+    if (!id || !bounds) return;
+    const key = id.toLocaleLowerCase();
+    const previous = regions.get(key);
+    regions.set(key, {
+      characterId: previous?.characterId || id,
+      bounds: unionCharacterBounds([previous?.bounds, bounds]),
+      sources: [...new Set([...(previous?.sources || []), source])]
+    });
+  };
+
+  for (const layer of movedLayers) {
+    if (!layer || typeof layer !== "object" || layer.visible === false) continue;
+    // The preview renderer suppresses the legacy sprite when all rig assets are ready.
+    if (readyRigCharacterIds.has(String(layer.characterId || "").toLocaleLowerCase())) continue;
+    add(layer.characterId, getCharacterLayerBounds(layer, viewport, camera), "sprite");
+  }
+
+  for (const input of Array.isArray(characterRigs) ? characterRigs.slice(0, 20) : []) {
+    const report = validateCharacterRig(input);
+    if (!report.passed || typeof resolveImage !== "function") continue;
+    // The renderer suppresses the whole sprite only when every rig-part image is ready.
+    // Do not include rig bounds when the renderer would fall back to the sprite.
+    const rigImagesReady = report.rig.parts.every(part => {
+      const image = resolveImage(part.imageUrl, report.rig.characterId);
+      const imageWidth = Number(image?.naturalWidth || image?.videoWidth || image?.width);
+      const imageHeight = Number(image?.naturalHeight || image?.videoHeight || image?.height);
+      return Boolean(image && Number.isFinite(imageWidth) && Number.isFinite(imageHeight)
+        && imageWidth > 0 && imageHeight > 0);
+    });
+    if (!rigImagesReady) continue;
+    const candidate = rigPoses && typeof rigPoses === "object"
+      ? (rigPoses[report.rig.characterId] || Object.entries(rigPoses).find(([key]) =>
+          key.toLocaleLowerCase() === report.rig.characterId.toLocaleLowerCase())?.[1])
+      : null;
+    const pose = candidate && typeof candidate === "object" && !Array.isArray(candidate) ? candidate : {};
+    const posedParts = applyCharacterRigPose(report.rig.parts, report.rig, pose);
+    add(report.rig.characterId, getCharacterRigBounds(posedParts, viewport, camera), "rig");
+  }
+
+  return [...regions.values()].map(item => ({
+    ...item,
+    source: item.sources.length > 1 ? "sprite+rig" : item.sources[0]
+  }));
+}
+
 /**
  * Copy a crop from the already-composited output canvas into a small readable canvas.
  * A SecurityError is allowed to reach the caller so the UI can report CORS restrictions.
@@ -72,6 +165,8 @@ export function unionCharacterBounds(regions) {
 export function sampleCanvasRegion(canvas, region, {
   width = 32,
   height = 32,
+  scaleX = 1,
+  scaleY = 1,
   canvasFactory = () => document.createElement("canvas")
 } = {}) {
   if (!canvas || typeof canvas.width !== "number" || typeof canvas.height !== "number") {
@@ -84,11 +179,14 @@ export function sampleCanvasRegion(canvas, region, {
   if (![width, height].every(value => Number.isInteger(value) && value > 0 && value <= 128)) {
     throw new RangeError("Sample dimensions must be integers from 1 to 128.");
   }
+  if (![scaleX, scaleY].every(value => Number.isFinite(value) && value > 0)) {
+    throw new RangeError("Canvas coordinate scales must be finite positive numbers.");
+  }
   if (typeof canvasFactory !== "function") throw new TypeError("canvasFactory must be a function.");
-  const left = clamp(region.x, 0, canvas.width);
-  const top = clamp(region.y, 0, canvas.height);
-  const right = clamp(region.x + region.width, 0, canvas.width);
-  const bottom = clamp(region.y + region.height, 0, canvas.height);
+  const left = clamp(region.x * scaleX, 0, canvas.width);
+  const top = clamp(region.y * scaleY, 0, canvas.height);
+  const right = clamp((region.x + region.width) * scaleX, 0, canvas.width);
+  const bottom = clamp((region.y + region.height) * scaleY, 0, canvas.height);
   if (right <= left || bottom <= top) throw new RangeError("Character region is outside the source canvas.");
 
   const sampleCanvas = canvasFactory();
