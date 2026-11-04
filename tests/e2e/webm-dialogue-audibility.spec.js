@@ -178,8 +178,8 @@ test('records all three synthetic dialogue tones in the exported WebM', async ({
       });
 
       const sampleRange = (startSeconds, endSeconds) => {
-        const startIndex = Math.max(0, Math.floor(startSeconds * sampleRate));
-        const endIndex = Math.min(channel.length, Math.ceil(endSeconds * sampleRate));
+        const startIndex = Math.max(0, Math.min(channel.length, Math.floor(startSeconds * sampleRate)));
+        const endIndex = Math.max(startIndex, Math.min(channel.length, Math.ceil(endSeconds * sampleRate)));
         return channel.subarray(startIndex, endIndex);
       };
       const rms = values => {
