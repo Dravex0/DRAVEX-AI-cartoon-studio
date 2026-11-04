@@ -19,21 +19,12 @@ function waitForSeek(video, targetTime, timeoutMs) {
     try { video.currentTime = targetTime; } catch (error) { cleanup(); reject(error); }
   });
 }
-function frameLuminance(imageData) {
-  const { data, width, height } = imageData;
-  const values = new Float32Array(width * height);
-  for (let pixel = 0, offset = 0; pixel < values.length; pixel += 1, offset += 4) {
-    values[pixel] = (0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2]) / 255;
-  }
-  return values;
-}
 /**
  * Samples small frames locally and compares adjacent-frame luminance.
  * @returns {Promise<{status:string,sampleCount:number,meanPixelChange:number,changedPixelRatio:number,message:string}>}
  */
 export async function analyzeSceneVideoMotion(video, {
-  sampleCount = 5, width = 32, height = 32, pixelDeltaThreshold = 0.06,
-  staticMotionThreshold = 0.008, changedPixelThreshold = 0.01,
+  sampleCount = 5, width = 32, height = 32, pixelThreshold = 12,
   timeoutMs = 5000, canvasFactory = () => document.createElement("canvas")
 } = {}) {
   if (!video || typeof video.addEventListener !== "function" || typeof video.removeEventListener !== "function") {
@@ -67,7 +58,7 @@ export async function analyzeSceneVideoMotion(video, {
       const targetTime = Math.min(Math.max(0, video.duration - 0.01), video.duration * fraction);
       await waitForSeek(video, targetTime, timeoutMs);
       context.drawImage(video, 0, 0, width, height);
-      frames.push(frameLuminance(context.getImageData(0, 0, width, height)));
+      frames.push(new Uint8ClampedArray(context.getImageData(0, 0, width, height).data));
     }
   } catch (error) {
     if (error?.name === "SecurityError") {
@@ -81,19 +72,10 @@ export async function analyzeSceneVideoMotion(video, {
       if (playback && typeof playback.catch === "function") playback.catch(() => {});
     }
   }
-  let totalChange = 0, changedPixels = 0, comparisons = 0;
-  const pixelCount = width * height;
-  for (let frame = 1; frame < frames.length; frame += 1) {
-    for (let pixel = 0; pixel < pixelCount; pixel += 1) {
-      const delta = Math.abs(frames[frame][pixel] - frames[frame - 1][pixel]);
-      totalChange += delta;
-      if (delta >= pixelDeltaThreshold) changedPixels += 1;
-      comparisons += 1;
-    }
-  }
-  const meanPixelChange = comparisons ? totalChange / comparisons : 0;
-  const changedPixelRatio = comparisons ? changedPixels / comparisons : 0;
-  const isLikelyStatic = meanPixelChange < staticMotionThreshold && changedPixelRatio < changedPixelThreshold;
+  const analysis = analyzeVideoFrameSequence(frames, { pixelThreshold });
+  const meanPixelChange = analysis.averageMeanAbsoluteDifference / 255;
+  const changedPixelRatio = analysis.averageChangedPixelRatio;
+  const isLikelyStatic = analysis.classification === "low-pixel-change";
   return {
     status: isLikelyStatic ? "likely-static" : "visible-change",
     sampleCount: frames.length,
@@ -158,3 +140,6 @@ export async function captureSceneVideoFrameSamples(video, {
   }
   return samples;
 }
+import { analyzeVideoFrameSequence } from "./video-frame-motion-metrics.js";
+
+
