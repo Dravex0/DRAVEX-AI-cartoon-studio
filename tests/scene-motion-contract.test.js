@@ -102,3 +102,12 @@ test('keeps scenes without a detectable action out of the coverage denominator',
   assert.equal(report.coverage, 100);
   assert.equal(report.items[0].animationStatus, 'no-action-cue');
 });
+
+test('distinguishes changed timeline data with no character rig binding', () => {
+  const report = auditSceneMotionContract({
+    motionPrompt: 'The fox attacks.',
+    characters: ['Foxy'],
+    characterRigTimeline: rigTimeline({ leftArm: 0.7 })
+  });
+  assert.equal(report.animationStatus, 'rig-character-binding-missing');
+});
