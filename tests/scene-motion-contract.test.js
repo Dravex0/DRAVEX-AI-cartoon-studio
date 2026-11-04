@@ -132,3 +132,15 @@ test('handles malformed storyboard entries without throwing', () => {
   assert.equal(report.actionSceneCount, 0);
   assert.equal(report.coverage, null);
 });
+
+test('does not report action coverage when the supplied action timeline is invalid', () => {
+  const report = auditSceneMotionContract({
+    motionPrompt: 'The fox walks forward.',
+    characters: ['Foxy'],
+    characterRigs: [rig()],
+    actionTimeline: { schemaVersion: 2, phases: [] },
+    characterRigTimeline: rigTimeline({ leftLeg: 0.3, rightLeg: -0.3 })
+  });
+  assert.equal(report.actionTimelineStatus, 'invalid');
+  assert.equal(report.animationStatus, 'invalid-action-timeline');
+});
