@@ -51,7 +51,7 @@ import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
 import { createVideoProviderRegistry, generateVideoWithProvider } from "./video-provider-contract.js";
-import { buildImageGenerationPrompt, buildMotionGenerationPrompt, validateSceneProductionReadiness } from "./scene-production.js";
+import { buildImageGenerationPrompt, buildMotionGenerationPrompt, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from "./scene-production.js";
 import { buildCharacterSpriteAssetPlan } from "./character-sprite-asset-plan.js";
 import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
@@ -1607,12 +1607,14 @@ const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targ
 titles[targetIndex]=scene.title;descriptions[targetIndex]=scene.description;
 sceneMetadata[targetIndex]=scene;
 const prompt=buildImageGenerationPrompt(scene,characterBible,{includeNegative:false,visualStyle:$('style').value});
+const hasSavedPhotoReference=sceneHasSavedCharacterImageReference(scene,characterBible);
+const referenceNotice=hasSavedPhotoReference?(uiLang==='ru'?'Фото-референсы не отправляются; AI Horde использует текстовое описание. ':'Photo references are not uploaded; AI Horde uses text descriptions only. '):'';
 renderScenes();
-button.disabled=true;status.textContent=uiLang==='ru'?'Отправляем текстовый промпт в бесплатную очередь AI Horde…':'Submitting the text prompt to the free AI Horde queue…';
+button.disabled=true;status.textContent=referenceNotice+(uiLang==='ru'?'Отправляем текстовый промпт в бесплатную очередь AI Horde…':'Submitting the text prompt to the free AI Horde queue…');
 try{
 const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);const result=await generateImageWithHorde({prompt,negativePrompt:scene.negativePrompt,...quality,onProgress:progress=>{
 const position=progress.queuePosition===null?'?':progress.queuePosition;
-status.textContent=uiLang==='ru'?'Очередь AI Horde · позиция: '+position+' · ожидают: '+progress.waiting+' · обрабатываются: '+progress.processing:'AI Horde queue · position: '+position+' · waiting: '+progress.waiting+' · processing: '+progress.processing;
+status.textContent=referenceNotice+(uiLang==='ru'?'Очередь AI Horde · позиция: '+position+' · ожидают: '+progress.waiting+' · обрабатываются: '+progress.processing:'AI Horde queue · position: '+position+' · waiting: '+progress.waiting+' · processing: '+progress.processing);
 }});
 const resolvedIndex=sceneMetadata.findIndex(item=>item&&item.id===targetId);
 if(resolvedIndex>=0)sceneMetadata[resolvedIndex]={...sceneMetadata[resolvedIndex],generatedImageUrl:result.imageUrl,generatedImageSeed:result.seed,generatedImageModel:result.model,generatedImageWorker:result.workerName};
@@ -1883,9 +1885,11 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      updateFilmVideoProgress(null,filmProgressText('Подготовка изображений сцен','Preparing scene images'));
      status.textContent='Создаём изображение сцены '+(index+1)+' из '+scenes.length+' в AI Horde…';
      const imagePrompt=buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value});
+     const referenceNotice=sceneHasSavedCharacterImageReference(meta,characterBible)?(uiLang==='ru'?'Фото-референсы не отправляются; AI Horde использует текстовые описания. ':'Photo references are not uploaded; AI Horde uses text descriptions only. '):'';
+     status.textContent=referenceNotice+'Создаём изображение сцены '+(index+1)+' из '+scenes.length+' в AI Horde…';
      const imageResult=await generateImageWithHorde({prompt:imagePrompt,negativePrompt:meta.negativePrompt||'',...quality,signal,onProgress:queue=>{
       updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Очередь AI Horde','AI Horde queue')});
-      status.textContent='AI Horde · сцена '+(index+1)+' · очередь '+(queue.queuePosition===null?'?':queue.queuePosition);
+      status.textContent=referenceNotice+'AI Horde · сцена '+(index+1)+' · очередь '+(queue.queuePosition===null?'?':queue.queuePosition);
      }});
      meta.generatedImageUrl=imageResult.imageUrl;meta.generatedImageSeed=imageResult.seed;meta.generatedImageModel=imageResult.model;meta.generatedImageWorker=imageResult.workerName;
      sceneMetadata[index]={...sceneMetadata[index],...meta};

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildProductionScene, validateSceneProductionReadiness } from '../src/scene-production.js';
+import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildProductionScene, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from '../src/scene-production.js';
 
 const scene = {
   title: 'The key turns',
@@ -348,4 +348,26 @@ test('motion prompt treats the supplied scene image as the visual anchor and loc
   assert.match(prompt, /fur\/skin colors, clothing, accessories/i);
   assert.match(prompt, /Do not redesign, replace, duplicate, merge, or add characters/i);
   assert.match(prompt, /Preserve the source image composition/i);
+});
+
+
+test('detects saved photo references only for characters present in the scene cast', () => {
+  const profiles = [
+    { characterId: 'Foxy', referenceImageAssetId: 'refimg_foxy123' },
+    { characterId: 'Bird', referenceImageAssetId: 'refimg_bird123' },
+    { characterId: 'Wolf', referenceImageAssetId: '' }
+  ];
+  assert.equal(sceneHasSavedCharacterImageReference({ characters: ['foxy'] }, profiles), true);
+  assert.equal(sceneHasSavedCharacterImageReference({ characters: ['Bird'] }, profiles), true);
+  assert.equal(sceneHasSavedCharacterImageReference({ characters: ['Wolf'] }, profiles), false);
+  assert.equal(sceneHasSavedCharacterImageReference({ characters: [] }, profiles), false);
+});
+
+test('uses all saved photo references only when a legacy scene has no explicit cast', () => {
+  assert.equal(sceneHasSavedCharacterImageReference({ imagePrompt: 'A forest' }, [
+    { characterId: 'Foxy', referenceImageAssetId: 'refimg_foxy123' }
+  ]), true);
+  assert.equal(sceneHasSavedCharacterImageReference({ characters: [] }, [
+    { characterId: 'Foxy', referenceImageAssetId: 'refimg_foxy123' }
+  ]), false);
 });
