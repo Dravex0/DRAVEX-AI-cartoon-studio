@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DRAVEX Character Rig Visual Diagnostic</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101522; color: #eef3ff; }
+    body { margin: 0; padding: 20px; }
+    main { max-width: 1000px; margin: 0 auto; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    p { color: #b8c4d9; margin: 0 0 16px; }
+    canvas { display: block; width: 100%; height: auto; border: 1px solid #39445b; border-radius: 12px; background: #151e30; }
+    #status { margin-top: 12px; font: 13px ui-monospace, monospace; color: #9fe2bc; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Character rig — dance motion visual diagnostic</h1>
+    <p>Local vector placeholder assets · four timeline samples · actual Canvas rig-part renderer</p>
+    <canvas id="contactSheet" width="960" height="840" aria-label="Four-frame character rig dance contact sheet"></canvas>
+    <div id="status" role="status">Preparing visual diagnostic…</div>
+  </main>
+  <script type="module" src="./character-rig-visual.js"></script>
+</body>
+</html>
