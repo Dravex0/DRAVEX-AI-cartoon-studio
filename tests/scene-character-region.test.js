@@ -120,6 +120,7 @@ test("combines sprite and posed rig bounds for the same character", () => {
       parts: [{ id: "body", boneId: "root", imageUrl: "https://example.com/body.png", x: 0.2, y: 0.5, width: 0.1, height: 0.2 }]
     }],
     rigPoses: { HERO: { root: { x: 0.2 } } },
+    resolveImage: () => ({ naturalWidth: 64, naturalHeight: 64 }),
     viewport: { width: 100, height: 100 }
   });
   assert.equal(regions.length, 1);
@@ -150,4 +151,22 @@ test("scales logical crop coordinates to the backing canvas pixel dimensions", (
     { width: 8, height: 8, scaleX: 2, scaleY: 2, canvasFactory: factory }
   );
   assert.deepEqual(drawArgs.slice(1), [20, 10, 40, 30, 0, 0, 8, 8]);
+});
+
+
+test("keeps the sprite region when rig assets are not ready, matching renderer fallback", () => {
+  const regions = buildCompositedCharacterRegions({
+    layers: [{ characterId: "Hero", imageUrl: "https://example.com/hero.png", x: 0.5, y: 0.5, width: 0.2, height: 0.2 }],
+    characterRigs: [{
+      schemaVersion: 1,
+      characterId: "Hero",
+      bones: [{ id: "root", parentId: null }],
+      parts: [{ id: "body", boneId: "root", imageUrl: "https://example.com/body.png", x: 0.2, y: 0.5, width: 0.1, height: 0.2 }]
+    }],
+    resolveImage: () => null,
+    viewport: { width: 100, height: 100 }
+  });
+  assert.equal(regions.length, 1);
+  assert.equal(regions[0].source, "sprite");
+  assert.deepEqual(regions[0].bounds, { x: 40, y: 40, width: 20, height: 20 });
 });
