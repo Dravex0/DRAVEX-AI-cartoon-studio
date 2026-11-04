@@ -19,11 +19,11 @@ test("maps a sprite layer into final canvas coordinates with camera zoom and off
 
 test("includes rotation when calculating the axis-aligned character bounds", () => {
   const bounds = getCharacterLayerBounds(
-    { x: 0.5, y: 0.5, width: 0.2, height: 0.2, rotation: Math.PI / 2 },
+    { x: 0.5, y: 0.5, width: 0.4, height: 0.2, rotation: Math.PI / 2 },
     { width: 100, height: 100 }
   );
   assert.ok(Math.abs(bounds.width - 20) < 1e-8);
-  assert.ok(Math.abs(bounds.height - 20) < 1e-8);
+  assert.ok(Math.abs(bounds.height - 40) < 1e-8);
 });
 
 test("clips character regions to the canvas and ignores invisible or invalid layers", () => {
