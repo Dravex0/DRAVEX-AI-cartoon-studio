@@ -47,6 +47,7 @@ import { buildSceneMediaReport } from "./scene-media-report.js";
 import { analyzeSceneVideoMotion, captureSceneVideoFrameSamples } from "./scene-motion-analysis.js";
 import { createSceneFrameContactSheet } from "./scene-frame-contact-sheet.js";
 import { summarizeSceneMotionResults } from "./scene-motion-results.js";
+import { auditStoryboardMotionContracts } from "./scene-motion-contract.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
@@ -962,6 +963,53 @@ function renderSceneMediaReport(){
   const summary=document.createElement('div');
   summary.textContent=videoLabel+': '+report.videoScenes+'/'+report.totalScenes+' · '+stillLabel+': '+report.stillScenes+'. '+(report.complete?completeLabel:partialLabel);
   target.appendChild(summary);
+  const semanticReport=auditStoryboardMotionContracts(sceneMetadata);
+  const semanticTitle=document.createElement('div');
+  semanticTitle.style.marginTop='10px';
+  semanticTitle.style.fontWeight='600';
+  semanticTitle.textContent=russian?'Проверка действий и анимации персонажей':'Character action and animation contract';
+  target.appendChild(semanticTitle);
+  const semanticNote=document.createElement('small');
+  semanticNote.style.display='block';
+  semanticNote.textContent=russian
+    ?'Сопоставляет описание действия с ключевыми кадрами костей. Это проверка метаданных, а не распознавание движения в готовом видео.'
+    :'Compares the described action with bone keyframes. This checks metadata; it does not recognize motion in the rendered video.';
+  target.appendChild(semanticNote);
+  const semanticDetails=document.createElement('div');
+  semanticDetails.style.display='grid';
+  semanticDetails.style.gap='5px';
+  semanticDetails.style.marginTop='7px';
+  const semanticStatusLabels={
+    'no-action-cue':russian?'Действие не определено':'No explicit action detected',
+    'no-rig-motion-data':russian?'Нет данных скелетной анимации':'No skeletal motion data',
+    'sprite-motion-only':russian?'Есть движение спрайта, но нет движения костей':'Sprite transform only; no bone animation',
+    'sprite-motion-defined':russian?'Задано движение спрайта':'Sprite transform is defined',
+    'action-described-only':russian?'Действие описано, анимация не задана':'Action described; animation not defined',
+    'invalid-rig-timeline':russian?'Ошибка таймлайна костей':'Invalid bone timeline',
+    'rig-character-binding-missing':russian?'Движение есть, но не привязано к ригу персонажа':'Keyframe motion has no matching character rig',
+    'rig-bone-binding-missing':russian?'Ключевые кадры не совпадают с костями рига':'Keyframes do not match rig bone IDs',
+    'rig-timeline-has-no-changing-bones':russian?'Ключевые кадры не меняют положение костей':'Keyframes contain no changing bone transforms',
+    'partial-rig-motion-coverage':russian?'Не все необходимые группы костей анимированы':'Some required bone groups are not animated',
+    'rig-motion-metadata-covers-action':russian?'Ключевые кадры покрывают нужные группы костей':'Keyframes cover the expected bone groups'
+  };
+  semanticReport.items.forEach((item,index)=>{
+    const row=document.createElement('div');
+    row.style.padding='6px 8px';
+    row.style.border='1px solid var(--border, #343746)';
+    row.style.borderRadius='8px';
+    const heading=document.createElement('strong');
+    heading.textContent=(russian?'Сцена ':'Scene ')+(index+1)+': '+String(sceneMetadata[index]?.title||'');
+    const detail=document.createElement('small');
+    detail.style.display='block';
+    const actionLabel=item.action.intent==='unknown'?(russian?'не определено':'unknown'):item.action.intent;
+    const missing=item.missingGroups.length
+      ?(russian?' · не хватает групп: ':' · missing groups: ')+item.missingGroups.join(', ')
+      :'';
+    detail.textContent=(russian?'Действие: ':'Action: ')+actionLabel+' · '+(semanticStatusLabels[item.animationStatus]||item.animationStatus)+missing;
+    row.append(heading,detail);
+    semanticDetails.appendChild(row);
+  });
+  target.appendChild(semanticDetails);
   if(sceneMotionAnalysisSummary){
     const value=sceneMotionAnalysisSummary;
     const motion=document.createElement('div');
