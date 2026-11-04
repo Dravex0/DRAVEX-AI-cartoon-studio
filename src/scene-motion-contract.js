@@ -110,13 +110,20 @@ export function auditSceneMotionContract(scene = {}) {
   const animatedBones = [];
   const animatedGroups = new Set();
   const rigCharacterIds = [];
+  let hasUnboundTimelineMotion = false;
   if (rigTimeline.passed) {
     const timelineCharacters = new Set(rigTimeline.timeline.keyframes.flatMap(frame => Object.keys(frame.poses)));
+    hasUnboundTimelineMotion = [...timelineCharacters].some(characterId =>
+      changedRigBones(rigTimeline.timeline, characterId).length > 0
+    );
     for (const rig of rigs) {
       const characterId = clean(rig.characterId);
-      if (!characterId || !timelineCharacters.has(characterId)) continue;
-      const boneIds = new Set((Array.isArray(rig.bones) ? rig.bones : []).map(bone => clean(bone?.id)).filter(Boolean));
-      const changed = changedRigBones(rigTimeline.timeline, characterId).filter(id => boneIds.has(id));
+      const timelineCharacterId = [...timelineCharacters].find(id => normalizeId(id) === normalizeId(characterId));
+      if (!characterId || !timelineCharacterId) continue;
+      const boneIds = new Map((Array.isArray(rig.bones) ? rig.bones : [])
+        .map(bone => [normalizeId(bone?.id), clean(bone?.id)]).filter(([key, value]) => key && value));
+      const changed = changedRigBones(rigTimeline.timeline, timelineCharacterId)
+        .map(id => boneIds.get(normalizeId(id))).filter(Boolean);
       if (!changed.length) continue;
       rigCharacterIds.push(characterId);
       for (const boneId of changed) {
@@ -134,6 +141,8 @@ export function auditSceneMotionContract(scene = {}) {
     if (rigTimeline.status === 'invalid') animationStatus = 'invalid-rig-timeline';
     else if (requirements.length && !rigTimeline.passed) {
       animationStatus = spriteMotionDefined ? 'sprite-motion-only' : 'no-rig-motion-data';
+    } else if (requirements.length && rigTimeline.passed && !animatedBones.length && hasUnboundTimelineMotion) {
+      animationStatus = rigs.length ? 'rig-bone-binding-missing' : 'rig-character-binding-missing';
     } else if (requirements.length && rigTimeline.passed && !animatedBones.length) {
       animationStatus = 'rig-timeline-has-no-changing-bones';
     } else if (requirements.length && missingGroups.length) {
