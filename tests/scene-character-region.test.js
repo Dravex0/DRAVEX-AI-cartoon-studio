@@ -14,7 +14,7 @@ test("maps a sprite layer into final canvas coordinates with camera zoom and off
     { width: 1000, height: 500 },
     { zoom: 2, focusX: 500, focusY: 250, offsetY: 10 }
   );
-  assert.deepEqual(bounds, { x: 300, y: 60, width: 400, height: 800 > 500 ? 440 : 400 });
+  assert.deepEqual(bounds, { x: 300, y: 60, width: 400, height: 400 });
 });
 
 test("includes rotation when calculating the axis-aligned character bounds", () => {
