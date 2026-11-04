@@ -47,6 +47,12 @@ export function createHuggingFaceZeroGPUVideoProvider({
         throw new TypeError("Wan 2.2 ZeroGPU supports image-to-video requests only.");
       }
       if (!request.image) throw new TypeError("A source image is required.");
+      if (Array.isArray(request.referenceImages) && request.referenceImages.length > 0) {
+        context.onProgress?.({
+          stage: "warning",
+          message: "This Wan 2.2 endpoint uses only the source image; additional character reference images are not supported and were not uploaded."
+        });
+      }
       if (context.signal?.aborted) throw abortError();
 
       const duration = Number(request.durationSeconds ?? 3);
