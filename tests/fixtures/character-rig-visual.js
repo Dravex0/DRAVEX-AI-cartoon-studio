@@ -154,7 +154,22 @@ try {
     const pixels = context.getImageData(0, 0, WIDTH, HEIGHT).data;
     framePixels.push(new Uint8ClampedArray(pixels));
     frameReports.push({ phase, rigDrawn: result.rigDrawn, rigSkipped: result.rigSkipped });
-    sheetContext.drawImage(frameCanvas, column * WIDTH / 2, row * HEIGHT / 2, WIDTH / 2, HEIGHT / 2);
+    sheetContext.drawImage(frameCanvas, column * WIDTH, row * HEIGHT, WIDTH, HEIGHT);
+  });
+
+  const quadrantHeadPixels = phases.map((phase, index) => {
+    const column = index % 2;
+    const row = Math.floor(index / 2);
+    const pixel = sheetContext.getImageData(
+      column * WIDTH + Math.round(WIDTH / 2),
+      row * HEIGHT + Math.round(HEIGHT * 0.28),
+      1,
+      1
+    ).data;
+    if (!(pixel[0] > 100 && pixel[0] > pixel[1])) {
+      throw new Error(`Contact-sheet quadrant ${index + 1} is missing its rendered character head.`);
+    }
+    return { phase, red: pixel[0], green: pixel[1], blue: pixel[2] };
   });
 
   const motionDifferences = framePixels.slice(1).map((pixels, index) => ({
@@ -172,6 +187,7 @@ try {
     preset: motion.preset,
     partCount: rig.parts.length,
     frames: frameReports,
+    quadrantHeadPixels,
     motionDifferences,
     minMotionDifference
   };
