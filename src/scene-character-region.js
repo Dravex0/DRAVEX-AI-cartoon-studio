@@ -1,5 +1,6 @@
 import { applyCharacterActionTimelineToLayers } from "./character-action-runtime.js";
 import { applyCharacterRigPose, validateCharacterRig } from "./character-rig.js";
+import { normalizeCharacterLayers } from "./scene-character-layers.js";
 
 /**
  * Geometry and pixel diagnostics for character regions in the final composed canvas.
@@ -82,13 +83,15 @@ export function buildCompositedCharacterRegions({
   motionTimeline = null,
   progress = 0,
   viewport,
-  camera = {}
+  camera = {},
+  resolveImage = null
 } = {}) {
   if (!viewport || !Number.isFinite(Number(viewport.width)) || !Number.isFinite(Number(viewport.height))
       || Number(viewport.width) <= 0 || Number(viewport.height) <= 0) {
     throw new TypeError("A positive logical viewport is required.");
   }
-  const safeLayers = Array.isArray(layers) ? layers.slice(0, 12) : [];
+  // Match the compositor: discard invalid/duplicate layers and apply the same defaults.
+  const safeLayers = normalizeCharacterLayers(layers);
   const movedLayers = motionTimeline
     ? applyCharacterActionTimelineToLayers(safeLayers, motionTimeline, progress)
     : safeLayers.map(layer => layer && typeof layer === "object" ? { ...layer } : layer);
@@ -112,7 +115,17 @@ export function buildCompositedCharacterRegions({
 
   for (const input of Array.isArray(characterRigs) ? characterRigs.slice(0, 20) : []) {
     const report = validateCharacterRig(input);
-    if (!report.passed) continue;
+    if (!report.passed || typeof resolveImage !== "function") continue;
+    // The renderer suppresses the whole sprite only when every rig-part image is ready.
+    // Do not include rig bounds when the renderer would fall back to the sprite.
+    const rigImagesReady = report.rig.parts.every(part => {
+      const image = resolveImage(part.imageUrl, report.rig.characterId);
+      const imageWidth = Number(image?.naturalWidth || image?.videoWidth || image?.width);
+      const imageHeight = Number(image?.naturalHeight || image?.videoHeight || image?.height);
+      return Boolean(image && Number.isFinite(imageWidth) && Number.isFinite(imageHeight)
+        && imageWidth > 0 && imageHeight > 0);
+    });
+    if (!rigImagesReady) continue;
     const candidate = rigPoses && typeof rigPoses === "object"
       ? (rigPoses[report.rig.characterId] || Object.entries(rigPoses).find(([key]) =>
           key.toLocaleLowerCase() === report.rig.characterId.toLocaleLowerCase())?.[1])
