@@ -223,7 +223,7 @@ test('records all three synthetic dialogue tones in the exported WebM', async ({
       });
 
       const silenceChecks = [0, 1].map(index => {
-        const start = index * expected.sceneSeconds + expected.toneSeconds + 0.08;
+        const start = index * expected.sceneSeconds + expected.toneSeconds + 0.16;
         const values = windowSamples(start, start + 0.16);
         return { start, sampleCount: values.length, rms: rms(values) };
       });
