@@ -165,8 +165,9 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
   entry.frames.push(frame);
   characterMotionAudit.frames.set(key, entry);
  }
- // Re-evaluate safe control tiles at every timestamp: a moving character must
- // not enter a background crop and be mistaken for background activity.
+ // Lock the initial control tiles for this audit. If the character later
+ // enters a tile, invalidate that tile for the entire comparison so frames
+ // from different timestamps are never mixed into one background report.
  const backgroundRegions = buildBackgroundControlRegions({
   viewport: { width: viewportWidth, height: viewportHeight },
   characterRegions: regions,
@@ -174,18 +175,29 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
   rows: 5,
   maxRegions: 8
  });
- for (const region of backgroundRegions) {
+ const availableBackground = new Map(backgroundRegions.map(region => [region.id, region]));
+ if (characterMotionAudit.backgroundControlIds === null) {
+  characterMotionAudit.backgroundControlIds = backgroundRegions.map(region => region.id);
+ }
+ for (const id of characterMotionAudit.backgroundControlIds) {
+  if (!availableBackground.has(id)) {
+   characterMotionAudit.blockedBackgroundControlIds.add(id);
+   characterMotionAudit.backgroundFrames.delete(id);
+   continue;
+  }
+  if (characterMotionAudit.blockedBackgroundControlIds.has(id)) continue;
+  const region = availableBackground.get(id);
   const frame = sampleCanvasRegion(canvas, region.bounds, { width: 32, height: 32, scaleX, scaleY });
-  const entry = characterMotionAudit.backgroundFrames.get(region.id) || { id: region.id, frames: [] };
+  const entry = characterMotionAudit.backgroundFrames.get(id) || { id, frames: [] };
   entry.frames.push(frame);
-  characterMotionAudit.backgroundFrames.set(region.id, entry);
+  characterMotionAudit.backgroundFrames.set(id, entry);
  }
  characterMotionAudit.nextSample += 1;
  const total = CHARACTER_MOTION_SAMPLE_PROGRESS.length;
  if (characterMotionAudit.nextSample >= total) {
   const backgroundReports = [];
   for (const entry of characterMotionAudit.backgroundFrames.values()) {
-   if (entry.frames.length < 2) continue;
+   if (entry.frames.length !== CHARACTER_MOTION_SAMPLE_PROGRESS.length) continue;
    backgroundReports.push(analyzeCharacterRegionFrames(entry.frames));
   }
   const labels = uiLang === 'ru' ? {
@@ -2120,7 +2132,7 @@ $('analyzeCharacterMotion').onclick=()=>{
    :'Attach a character sprite layer or validated rig to this scene first. The procedural demo character is not included in this check yet.';
   return;
  }
- characterMotionAudit={sceneIndex,startProgress:null,targets:[],nextSample:0,frames:new Map(),backgroundFrames:new Map()};
+ characterMotionAudit={sceneIndex,startProgress:null,targets:[],nextSample:0,frames:new Map(),backgroundFrames:new Map(),backgroundControlIds:null,blockedBackgroundControlIds:new Set()};
  sceneMotionSceneIndex=-1;
  $('characterMotionAuditStatus').textContent=uiLang==='ru'
   ?'Проверка подготовлена. Запусти предпросмотр сцены — будут собраны 5 кадров итоговой композиции.'
