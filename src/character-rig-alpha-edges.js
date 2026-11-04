@@ -61,20 +61,30 @@ export function analyzeRigPartAlphaEdges({
       const depthX = Math.max(1, Math.ceil(dimensions.width * edgeDepthRatio));
       const depthY = Math.max(1, Math.ceil(dimensions.height * edgeDepthRatio));
       const edgeSpecs = {
-        top: { count: depthY * dimensions.width, test: (x, y) => y < depthY },
-        bottom: { count: depthY * dimensions.width, test: (x, y) => y >= dimensions.height - depthY },
-        left: { count: depthX * dimensions.height, test: (x, y) => x < depthX },
-        right: { count: depthX * dimensions.height, test: (x, y) => x >= dimensions.width - depthX }
+        top: { count: depthY * dimensions.width, scan: visit => {
+          for (let y = 0; y < depthY; y++) for (let x = 0; x < dimensions.width; x++) visit(x, y);
+        } },
+        bottom: { count: depthY * dimensions.width, scan: visit => {
+          for (let y = dimensions.height - depthY; y < dimensions.height; y++) {
+            for (let x = 0; x < dimensions.width; x++) visit(x, y);
+          }
+        } },
+        left: { count: depthX * dimensions.height, scan: visit => {
+          for (let y = 0; y < dimensions.height; y++) for (let x = 0; x < depthX; x++) visit(x, y);
+        } },
+        right: { count: depthX * dimensions.height, scan: visit => {
+          for (let y = 0; y < dimensions.height; y++) {
+            for (let x = dimensions.width - depthX; x < dimensions.width; x++) visit(x, y);
+          }
+        } }
       };
       const edges = {};
       for (const edge of EDGES) {
         let opaque = 0;
         const spec = edgeSpecs[edge];
-        for (let y = 0; y < dimensions.height; y++) {
-          for (let x = 0; x < dimensions.width; x++) {
-            if (spec.test(x, y) && data[(y * dimensions.width + x) * 4 + 3] > alphaThreshold) opaque++;
-          }
-        }
+        spec.scan((x, y) => {
+          if (data[(y * dimensions.width + x) * 4 + 3] > alphaThreshold) opaque++;
+        });
         const opaqueRatio = opaque / spec.count;
         edges[edge] = {
           opaqueRatio: Number(opaqueRatio.toFixed(4)),
