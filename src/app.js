@@ -1757,10 +1757,11 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
+  let referenceWarning='';
   const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages:(await loadCharacterReferenceImagesForScene(motionScene)).concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2)},{onProgress:progress=>{
-   if(progress.stage==='warning'&&progress.message){status.textContent='ComfyUI · Внимание: '+String(progress.message);return;}
+   if(progress.stage==='warning'&&progress.message){referenceWarning=String(progress.message);status.textContent='ComfyUI · Внимание: '+referenceWarning;return;}
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
-   status.textContent=(uiLang==='ru'?'ComfyUI · ':'ComfyUI · ')+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'');
+   status.textContent='ComfyUI · '+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'')+(referenceWarning?' · Внимание: '+referenceWarning:'');
   }});
   if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI did not return a completed video.');
   const key=sceneVideoKey(index,motionScene);
@@ -1914,17 +1915,19 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Отправка в видеодвижок','Submitting to video engine')});
     const profileReferenceImages=mode==='comfyui'?await loadCharacterReferenceImagesForScene(meta):[];
     const referenceImages=mode==='comfyui'?profileReferenceImages.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2):[];
+    let referenceWarning='';
     const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput,referenceImages},{signal,onProgress:job=>{
      const providerPercent=readVideoProgressPercent(job);
      const providerStage=String(job.stage||'processing');
      if(providerStage==='warning'&&job.message){
-      status.textContent=(mode==='huggingface'?'Wan 2.2':'ComfyUI')+' · Внимание: '+String(job.message);
+      referenceWarning=String(job.message);
+      status.textContent=(mode==='huggingface'?'Wan 2.2':'ComfyUI')+' · Внимание: '+referenceWarning;
       return;
      }
      const sceneLabel=providerStage==='queued'||providerStage==='pending'?filmProgressText('В очереди','Queued'):providerStage==='completed'?filmProgressText('Готово','Ready'):filmProgressText('Генерируется','Generating');
      updateFilmSceneProgress(index,{status:'generating',progress:providerPercent,label:sceneLabel+(providerPercent===null?' · '+providerStage:' · '+providerPercent+'%')});
      updateFilmVideoProgress(providerPercent,filmProgressText('Генерация видеосцен','Generating video scenes'));
-     status.textContent=(mode==='huggingface'?'Hugging Face · ':'ComfyUI · ')+'сцена '+(index+1)+'/'+scenes.length+' · '+providerStage+(providerPercent===null?'': ' · '+providerPercent+'%')+(Number.isFinite(job.etaSeconds)?' · ETA '+Math.round(job.etaSeconds)+' сек.':'')+(Number.isFinite(job.queuePosition)?' · очередь '+job.queuePosition:'');
+     status.textContent=(mode==='huggingface'?'Hugging Face · ':'ComfyUI · ')+'сцена '+(index+1)+'/'+scenes.length+' · '+providerStage+(providerPercent===null?'': ' · '+providerPercent+'%')+(Number.isFinite(job.etaSeconds)?' · ETA '+Math.round(job.etaSeconds)+' сек.':'')+(Number.isFinite(job.queuePosition)?' · очередь '+job.queuePosition:'')+(referenceWarning?' · Внимание: '+referenceWarning:'');
     }});
     if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI не вернул готовый видеофайл.');
     const key=sceneVideoKey(index,meta);
