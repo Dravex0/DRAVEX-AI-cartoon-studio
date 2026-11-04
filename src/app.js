@@ -396,12 +396,18 @@ async function loadCharacterReferenceImagesForScene(scene){
   const profiles=characterBible.filter(profile=>cast.some(name=>name.toLowerCase()===profile.characterId.toLowerCase()));
   const images=[];
   for(const profile of profiles){
-    if(images.length>=2)break;
     if(!profile.referenceImageAssetId)continue;
     const record=await characterReferenceImageStorage.get(profile.referenceImageAssetId);
     if(record?.blob?.size)images.push({name:record.filename||profile.characterId+'.png',blob:record.blob});
   }
   return images;
+}
+async function buildCharacterReferenceImagesForScene(scene){
+  const manualImages=comfyCharacterReferenceFiles.filter(file=>file?.size).map(file=>({name:file.name||'dravex-manual-character-reference.png',blob:file}));
+  const profileImages=await loadCharacterReferenceImagesForScene(scene);
+  // Explicitly selected local files take the first workflow slots; saved profile images fill the remaining slots.
+  // The provider reports any references beyond its four supported inputs instead of silently implying they were used.
+  return manualImages.concat(profileImages);
 }
 function updateProductionPreview(){
 const meta=sceneMetadata[sceneIndex]||{};
@@ -1758,7 +1764,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
   let referenceWarning='';
-  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages:(await loadCharacterReferenceImagesForScene(motionScene)).concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2)},{onProgress:progress=>{
+  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages:await buildCharacterReferenceImagesForScene(motionScene)},{onProgress:progress=>{
    if(progress.stage==='warning'&&progress.message){referenceWarning=String(progress.message);status.textContent='ComfyUI · Внимание: '+referenceWarning;return;}
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
    status.textContent='ComfyUI · '+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'')+(referenceWarning?' · Внимание: '+referenceWarning:'');
@@ -1913,8 +1919,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
     const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Отправка в видеодвижок','Submitting to video engine')});
-    const profileReferenceImages=mode==='comfyui'?await loadCharacterReferenceImagesForScene(meta):[];
-    const referenceImages=mode==='comfyui'?profileReferenceImages.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2):[];
+    const referenceImages=mode==='comfyui'?await buildCharacterReferenceImagesForScene(meta):[];
     let referenceWarning='';
     const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput,referenceImages},{signal,onProgress:job=>{
      const providerPercent=readVideoProgressPercent(job);
