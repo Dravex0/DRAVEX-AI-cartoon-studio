@@ -48,6 +48,7 @@ import { analyzeSceneVideoMotion, captureSceneVideoFrameSamples } from "./scene-
 import { createSceneFrameContactSheet } from "./scene-frame-contact-sheet.js";
 import { buildCompositedCharacterRegions, sampleCanvasRegion, analyzeCharacterRegionFrames } from "./scene-character-region.js";
 import { buildBackgroundControlRegions, classifyCharacterBackgroundMotion } from "./scene-motion-separation.js";
+import { buildCharacterBodyPartRegions } from "./character-rig-body-regions.js";
 import { summarizeSceneMotionResults } from "./scene-motion-results.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
@@ -165,6 +166,34 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
   entry.frames.push(frame);
   characterMotionAudit.frames.set(key, entry);
  }
+ // Sample each articulated body group only when the compositor is actually using
+ // a complete, image-ready rig instead of the fallback whole-character sprite.
+ for (const rig of Array.isArray(currentSceneData.characterRigs) ? currentSceneData.characterRigs : []) {
+  const characterRegion = regions.find(item =>
+   item.characterId.toLocaleLowerCase() === String(rig.characterId || '').toLocaleLowerCase()
+   && Array.isArray(item.sources) && item.sources.includes('rig')
+  );
+  if (!characterRegion) continue;
+  const candidatePose = rigPoses && typeof rigPoses === 'object'
+   ? (rigPoses[rig.characterId] || Object.entries(rigPoses).find(([id]) =>
+      id.toLocaleLowerCase() === String(rig.characterId || '').toLocaleLowerCase())?.[1])
+   : null;
+  const bodyReport = buildCharacterBodyPartRegions({
+   rig,
+   rigPose: candidatePose && typeof candidatePose === 'object' ? candidatePose : {},
+   viewport: { width: viewportWidth, height: viewportHeight },
+   camera: { zoom: camera.zoom, offsetY: camera.offsetY, focusX, focusY }
+  });
+  for (const bodyRegion of bodyReport.regions) {
+   const frame = sampleCanvasRegion(canvas, bodyRegion.bounds, { width: 32, height: 32, scaleX, scaleY });
+   const key = rig.characterId.toLocaleLowerCase() + ':' + bodyRegion.bodyPart;
+   const entry = characterMotionAudit.bodyPartFrames.get(key) || {
+    characterId: rig.characterId, bodyPart: bodyRegion.bodyPart, frames: []
+   };
+   entry.frames.push(frame);
+   characterMotionAudit.bodyPartFrames.set(key, entry);
+  }
+ }
  // Re-evaluate safe control tiles at every timestamp: a moving character must
  // not enter a background crop and be mistaken for background activity.
  const backgroundRegions = buildBackgroundControlRegions({
@@ -215,13 +244,26 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
     + comparison.backgroundChangedRegions + '/' + comparison.backgroundSampledRegions
     + (uiLang === 'ru' ? ' областей фона изменились)' : ' background regions changed)'));
   }
+  const bodyPartSummaries = [];
+  for (const entry of characterMotionAudit.bodyPartFrames.values()) {
+   if (entry.frames.length < 2) continue;
+   const report = analyzeCharacterRegionFrames(entry.frames);
+   const statusLabel = report.status === 'visible-change'
+    ? (uiLang === 'ru' ? 'есть изменения' : 'changed')
+    : (uiLang === 'ru' ? 'почти без изменений' : 'little change');
+   bodyPartSummaries.push(entry.characterId + ' / ' + entry.bodyPart + ': ' + statusLabel
+    + ' (' + entry.frames.length + '/5)');
+  }
   $('characterMotionAuditStatus').textContent = (uiLang === 'ru'
    ? 'Сравнение движения персонажа и фона завершено. '
    : 'Character/background motion comparison completed. ')
    + (summaries.length ? summaries.join('; ') : (uiLang === 'ru' ? 'Недостаточно кадров для сравнения.' : 'Not enough samples to compare.'))
+   + (bodyPartSummaries.length
+    ? (uiLang === 'ru' ? ' Части тела: ' : ' Body parts: ') + bodyPartSummaries.join('; ')
+    : (uiLang === 'ru' ? ' Разбивка по частям тела недоступна: нет готового рига с загруженными изображениями.' : ' Body-part breakdown unavailable: no ready rig with loaded part images.'))
    + (uiLang === 'ru'
-    ? '. Изменения фона могут быть вызваны камерой, освещением, эффектами или анимацией окружения; это не распознавание действия.'
-    : '. Background changes may come from camera motion, lighting, effects, or animated scenery; this is not action recognition.');
+    ? '. Изменения пикселей не доказывают правильность жеста или действия; возможны перекрытия и фоновые пиксели.'
+    : '. Pixel changes do not prove the intended gesture or action; overlap and background pixels may be included.');
   characterMotionAudit = null;
  } else {
   $('characterMotionAuditStatus').textContent = (uiLang === 'ru'
@@ -2120,7 +2162,7 @@ $('analyzeCharacterMotion').onclick=()=>{
    :'Attach a character sprite layer or validated rig to this scene first. The procedural demo character is not included in this check yet.';
   return;
  }
- characterMotionAudit={sceneIndex,startProgress:null,targets:[],nextSample:0,frames:new Map(),backgroundFrames:new Map()};
+ characterMotionAudit={sceneIndex,startProgress:null,targets:[],nextSample:0,frames:new Map(),backgroundFrames:new Map(),bodyPartFrames:new Map()};
  sceneMotionSceneIndex=-1;
  $('characterMotionAuditStatus').textContent=uiLang==='ru'
   ?'Проверка подготовлена. Запусти предпросмотр сцены — будут собраны 5 кадров итоговой композиции.'
