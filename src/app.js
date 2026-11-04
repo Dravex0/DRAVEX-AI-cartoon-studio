@@ -1758,6 +1758,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
   const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages:(await loadCharacterReferenceImagesForScene(motionScene)).concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2)},{onProgress:progress=>{
+   if(progress.stage==='warning'&&progress.message){status.textContent='ComfyUI · Внимание: '+String(progress.message);return;}
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
    status.textContent=(uiLang==='ru'?'ComfyUI · ':'ComfyUI · ')+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'');
   }});
@@ -1917,7 +1918,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      const providerPercent=readVideoProgressPercent(job);
      const providerStage=String(job.stage||'processing');
      if(providerStage==='warning'&&job.message){
-      status.textContent='Wan 2.2 · Внимание: '+String(job.message);
+      status.textContent=(mode==='huggingface'?'Wan 2.2':'ComfyUI')+' · Внимание: '+String(job.message);
       return;
      }
      const sceneLabel=providerStage==='queued'||providerStage==='pending'?filmProgressText('В очереди','Queued'):providerStage==='completed'?filmProgressText('Готово','Ready'):filmProgressText('Генерируется','Generating');
