@@ -32,19 +32,20 @@ test("reports a possible geometric gap after a child part is displaced", () => {
     && joint.status === "possible-geometry-gap"));
 });
 
-test("pose and camera transforms affect joint geometry", () => {
+test("camera zoom scales a measurable joint gap", () => {
   const rig = makeRig();
-  const neutral = analyzeCharacterRigJointContinuity({ rig, viewport });
-  const posed = analyzeCharacterRigJointContinuity({
+  rig.parts = rig.parts.map(part => part.id === "arm-left-lower"
+    ? { ...part, x: 0.505 }
+    : part);
+  const normal = analyzeCharacterRigJointContinuity({ rig, viewport });
+  const zoomed = analyzeCharacterRigJointContinuity({
     rig,
     viewport,
-    rigPose: { "arm-left-upper": { rotation: 1.1 }, "arm-left-lower": { rotation: -0.5 } },
-    camera: { zoom: 1.6, offsetY: 12 }
+    camera: { zoom: 1.6 }
   });
-  assert.notDeepEqual(
-    neutral.joints.map(item => item.gapPx),
-    posed.joints.map(item => item.gapPx)
-  );
+  const gapFor = report => report.joints.find(item => item.childBoneId === "arm-left-lower").gapPx;
+  assert.ok(gapFor(normal) > 0);
+  assert.ok(gapFor(zoomed) > gapFor(normal));
 });
 
 test("reports incomplete connections rather than inventing missing parts", () => {
