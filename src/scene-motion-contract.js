@@ -78,10 +78,14 @@ function changedRigBones(timeline, characterId) {
 function hasSpriteTransform(timeline) {
   if (!isRecord(timeline) || !Array.isArray(timeline.phases)) return false;
   return timeline.phases.some(phase => {
-    const from = phase?.motion?.from || {};
-    const to = phase?.motion?.to || {};
-    return ['x', 'y', 'width', 'height', 'rotation', 'scale', 'opacity']
-      .some(key => typeof to[key] === 'number' && Math.abs(to[key] - (typeof from[key] === 'number' ? from[key] : to[key])) > 0.0001);
+    const motion = phase?.motion;
+    const from = motion?.from || {};
+    const to = motion?.to || {};
+    const keys = ['x', 'y', 'width', 'height', 'rotation', 'scale', 'opacity']
+      .filter(key => typeof to[key] === 'number');
+    if (!keys.length) return false;
+    if (!isRecord(motion.from)) return true;
+    return keys.some(key => Math.abs(to[key] - (typeof from[key] === 'number' ? from[key] : to[key])) > 0.0001);
   });
 }
 
@@ -91,6 +95,7 @@ function hasSpriteTransform(timeline) {
  * video follows the animation data.
  */
 export function auditSceneMotionContract(scene = {}) {
+  scene = isRecord(scene) ? scene : {};
   const action = actionFromScene(scene);
   const requirements = ACTION_REQUIREMENTS[action.intent] || [];
   const actionTimeline = validateCharacterActionTimeline(scene);
