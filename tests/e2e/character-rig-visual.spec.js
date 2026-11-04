@@ -12,6 +12,7 @@ test('renders an inspectable dance contact sheet through the real Canvas rig ren
   expect(report.preset).toBe('dance');
   expect(report.partCount).toBe(10);
   expect(report.frames).toHaveLength(4);
+  expect(report.quadrantHeadPixels).toHaveLength(4);
   expect(report.frames.every(frame => frame.rigDrawn === 10 && frame.rigSkipped === 0)).toBe(true);
   expect(report.minMotionDifference).toBeGreaterThan(0.002);
   expect(pageErrors, 'the visual rig diagnostic must not throw browser errors').toEqual([]);
