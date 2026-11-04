@@ -274,3 +274,100 @@ test('records all three synthetic dialogue tones in the exported WebM', async ({
   }
   expect(pageErrors, 'audio export should not throw uncaught browser errors').toEqual([]);
 });
+
+
+function createSineWaveWavBuffer(frequency, durationSeconds = 1.2, sampleRate = SAMPLE_RATE) {
+  const sampleCount = Math.round(sampleRate * durationSeconds);
+  const buffer = Buffer.alloc(44 + sampleCount * 2);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + sampleCount * 2, 4);
+  buffer.write('WAVE', 8);
+  buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(sampleCount * 2, 40);
+  for (let index = 0; index < sampleCount; index++) {
+    const envelope = Math.min(1, index / 240, (sampleCount - index) / 240);
+    const sample = Math.sin(2 * Math.PI * frequency * index / sampleRate) * 0.22 * envelope;
+    buffer.writeInt16LE(Math.max(-1, Math.min(1, sample)) * 32767, 44 + index * 2);
+  }
+  return buffer;
+}
+
+test('mixes local background music and all dialogue tones into the same exported WebM', async ({ page }) => {
+  test.setTimeout(60_000);
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await seedThreeToneDialogue(page);
+  await page.locator('#audioFile').setInputFiles({
+    name: 'synthetic-background-music.wav',
+    mimeType: 'audio/wav',
+    buffer: createSineWaveWavBuffer(220)
+  });
+  await page.locator('#audioVolume').fill('35');
+  await page.locator('#export').click();
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 20_000 });
+
+  const inspection = await page.locator('#finalFilmPlayer').evaluate(async (video, expected) => {
+    const response = await fetch(video.currentSrc);
+    const blob = await response.blob();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const context = new AudioContextClass();
+    try {
+      const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+      const channel = decoded.getChannelData(0);
+      const rate = decoded.sampleRate;
+      const powerAt = (start, end, frequency) => {
+        const first = Math.max(0, Math.min(channel.length, Math.floor(start * rate)));
+        const last = Math.max(first, Math.min(channel.length, Math.ceil(end * rate)));
+        const samples = channel.subarray(first, last);
+        if (!samples.length) return 0;
+        const omega = 2 * Math.PI * frequency / rate;
+        const coefficient = 2 * Math.cos(omega);
+        let q1 = 0;
+        let q2 = 0;
+        for (const sample of samples) {
+          const q0 = sample + coefficient * q1 - q2;
+          q2 = q1;
+          q1 = q0;
+        }
+        return (q1 * q1 + q2 * q2 - coefficient * q1 * q2) / (samples.length * samples.length);
+      };
+      const windows = expected.tones.map((frequency, index) => {
+        const sceneStart = index * expected.sceneSeconds;
+        const voiceWindow = [sceneStart + 0.12, sceneStart + 0.32];
+        const musicOnlyWindow = [sceneStart + 0.52, sceneStart + 0.72];
+        return {
+          voiceFrequency: frequency,
+          voicePower: powerAt(...voiceWindow, frequency),
+          musicDuringVoicePower: powerAt(...voiceWindow, 220),
+          musicOnlyPower: powerAt(...musicOnlyWindow, 220),
+          voiceOnlyPower: powerAt(...musicOnlyWindow, frequency)
+        };
+      });
+      return { duration: decoded.duration, channels: decoded.numberOfChannels, windows, size: blob.size };
+    } finally {
+      await context.close();
+    }
+  }, { tones: TONES, sceneSeconds: SCENE_SECONDS });
+
+  expect(inspection.size).toBeGreaterThan(0);
+  expect(inspection.channels).toBeGreaterThan(0);
+  expect(inspection.duration).toBeGreaterThan(2.1);
+  expect(inspection.windows).toHaveLength(3);
+  for (const window of inspection.windows) {
+    expect(window.voicePower, JSON.stringify(inspection)).toBeGreaterThan(0.00002);
+    expect(window.musicDuringVoicePower, JSON.stringify(inspection)).toBeGreaterThan(0.000002);
+    expect(window.musicOnlyPower, JSON.stringify(inspection)).toBeGreaterThan(0.000002);
+    expect(window.voicePower, JSON.stringify(inspection)).toBeGreaterThan(window.musicDuringVoicePower);
+    expect(window.voiceOnlyPower, JSON.stringify(inspection)).toBeLessThan(window.musicOnlyPower * 0.5);
+  }
+  expect(pageErrors, 'combined audio export should not throw uncaught browser errors').toEqual([]);
+});
