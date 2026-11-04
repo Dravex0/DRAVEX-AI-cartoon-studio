@@ -49,6 +49,7 @@ import { createSceneFrameContactSheet } from "./scene-frame-contact-sheet.js";
 import { buildCompositedCharacterRegions, sampleCanvasRegion, analyzeCharacterRegionFrames } from "./scene-character-region.js";
 import { buildBackgroundControlRegions, classifyCharacterBackgroundMotion } from "./scene-motion-separation.js";
 import { buildCharacterBodyPartRegions } from "./character-rig-body-regions.js";
+import { analyzeCharacterRigJointContinuity } from "./character-rig-joint-continuity.js";
 import { summarizeSceneMotionResults } from "./scene-motion-results.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
@@ -178,12 +179,32 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
    ? (rigPoses[rig.characterId] || Object.entries(rigPoses).find(([id]) =>
       id.toLocaleLowerCase() === String(rig.characterId || '').toLocaleLowerCase())?.[1])
    : null;
+  const activePose = candidatePose && typeof candidatePose === 'object' ? candidatePose : {};
+  const auditViewport = { width: viewportWidth, height: viewportHeight };
+  const auditCamera = { zoom: camera.zoom, offsetY: camera.offsetY, focusX, focusY };
   const bodyReport = buildCharacterBodyPartRegions({
    rig,
-   rigPose: candidatePose && typeof candidatePose === 'object' ? candidatePose : {},
-   viewport: { width: viewportWidth, height: viewportHeight },
-   camera: { zoom: camera.zoom, offsetY: camera.offsetY, focusX, focusY }
+   rigPose: activePose,
+   viewport: auditViewport,
+   camera: auditCamera
   });
+  const jointReport = analyzeCharacterRigJointContinuity({
+   rig,
+   rigPose: activePose,
+   viewport: auditViewport,
+   camera: auditCamera
+  });
+  const jointKey = rig.characterId.toLocaleLowerCase();
+  const jointEntry = characterMotionAudit.jointFrames.get(jointKey) || {
+   characterId: rig.characterId, frames: []
+  };
+  jointEntry.frames.push({
+   status: jointReport.status,
+   checkedConnections: jointReport.checkedConnections || 0,
+   possibleGapCount: jointReport.possibleGapCount || 0,
+   skippedConnections: jointReport.skippedConnections || 0
+  });
+  characterMotionAudit.jointFrames.set(jointKey, jointEntry);
   for (const bodyRegion of bodyReport.regions) {
    const frame = sampleCanvasRegion(canvas, bodyRegion.bounds, { width: 32, height: 32, scaleX, scaleY });
    const key = rig.characterId.toLocaleLowerCase() + ':' + bodyRegion.bodyPart;
@@ -244,6 +265,26 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
     + comparison.backgroundChangedRegions + '/' + comparison.backgroundSampledRegions
     + (uiLang === 'ru' ? ' областей фона изменились)' : ' background regions changed)'));
   }
+  const jointSummaries = [];
+  for (const entry of characterMotionAudit.jointFrames.values()) {
+   const frames = entry.frames;
+   if (!frames.length) continue;
+   const warningFrames = frames.filter(frame => frame.status === 'possible-joint-gaps').length;
+   const incompleteFrames = frames.filter(frame => frame.status === 'incomplete').length;
+   const checked = frames.reduce((sum, frame) => sum + frame.checkedConnections, 0);
+   const possible = frames.reduce((sum, frame) => sum + frame.possibleGapCount, 0);
+   const skipped = frames.reduce((sum, frame) => sum + frame.skippedConnections, 0);
+   const label = warningFrames
+    ? (uiLang === 'ru' ? 'возможные геометрические разрывы' : 'possible geometry gaps')
+    : incompleteFrames
+     ? (uiLang === 'ru' ? 'неполная геометрия соединений' : 'incomplete joint geometry')
+     : (uiLang === 'ru' ? 'разрывы по геометрии не выявлены' : 'no geometry gaps flagged');
+   jointSummaries.push(entry.characterId + ': ' + label + ' (' + warningFrames + '/' + frames.length
+    + (uiLang === 'ru' ? ' кадров с предупреждениями; ' : ' frames with warnings; ') + possible + ' '
+    + (uiLang === 'ru' ? 'возможных разрывов, ' : 'possible gaps, ') + checked
+    + (uiLang === 'ru' ? ' проверок, ' : ' checks, ') + skipped
+    + (uiLang === 'ru' ? ' пропущенных соединений)' : ' skipped connections)'));
+  }
   const bodyPartSummaries = [];
   for (const entry of characterMotionAudit.bodyPartFrames.values()) {
    if (entry.frames.length < 2) continue;
@@ -261,6 +302,9 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
    + (bodyPartSummaries.length
     ? (uiLang === 'ru' ? ' Части тела: ' : ' Body parts: ') + bodyPartSummaries.join('; ')
     : (uiLang === 'ru' ? ' Разбивка по частям тела недоступна: нет готового рига с загруженными изображениями.' : ' Body-part breakdown unavailable: no ready rig with loaded part images.'))
+   + (jointSummaries.length
+    ? (uiLang === 'ru' ? ' Соединения: ' : ' Joints: ') + jointSummaries.join('; ')
+    : (uiLang === 'ru' ? ' Геометрия соединений не проверена.' : ' Joint geometry was not checked.'))
    + (uiLang === 'ru'
     ? '. Изменения пикселей не доказывают правильность жеста или действия; возможны перекрытия и фоновые пиксели.'
     : '. Pixel changes do not prove the intended gesture or action; overlap and background pixels may be included.');
@@ -2162,7 +2206,7 @@ $('analyzeCharacterMotion').onclick=()=>{
    :'Attach a character sprite layer or validated rig to this scene first. The procedural demo character is not included in this check yet.';
   return;
  }
- characterMotionAudit={sceneIndex,startProgress:null,targets:[],nextSample:0,frames:new Map(),backgroundFrames:new Map(),bodyPartFrames:new Map()};
+ characterMotionAudit={sceneIndex,startProgress:null,targets:[],nextSample:0,frames:new Map(),backgroundFrames:new Map(),bodyPartFrames:new Map(),jointFrames:new Map()};
  sceneMotionSceneIndex=-1;
  $('characterMotionAuditStatus').textContent=uiLang==='ru'
   ?'Проверка подготовлена. Запусти предпросмотр сцены — будут собраны 5 кадров итоговой композиции.'
