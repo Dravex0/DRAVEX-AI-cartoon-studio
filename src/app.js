@@ -190,7 +190,7 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
   }
   const labels = uiLang === 'ru' ? {
    'character-localized-change': 'изменения локализованы в области персонажа',
-   'scene-wide-or-mixed-change': 'изменяются персонаж и фон: движение всей сцены или смешанные изменения',
+   'scene-wide-or-mixed-change': 'изменяются персонаж и фон: широкая активность или смешанные изменения',
    'background-or-camera-change': 'изменяется фон, персонаж почти неподвижен',
    'little-visible-change': 'почти нет видимых изменений',
    'insufficient-background-controls': 'недостаточно контрольных областей фона',
@@ -198,7 +198,7 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
    'inconclusive-character-samples': 'недостаточно кадров персонажа'
   } : {
    'character-localized-change': 'change localized to character region',
-   'scene-wide-or-mixed-change': 'character and background change: scene-wide or mixed activity',
+   'scene-wide-or-mixed-change': 'character and background show widespread or mixed pixel activity',
    'background-or-camera-change': 'background changes while character appears still',
    'little-visible-change': 'little visible change',
    'insufficient-background-controls': 'not enough background control regions',
@@ -212,7 +212,8 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
    const comparison = classifyCharacterBackgroundMotion(report, backgroundReports);
    summaries.push(entry.characterId + ': ' + (labels[comparison.status] || comparison.status)
     + ' (' + entry.frames.length + '/5; '
-    + comparison.backgroundSampledRegions + ' background controls)');
+    + comparison.backgroundChangedRegions + '/' + comparison.backgroundSampledRegions
+    + (uiLang === 'ru' ? ' областей фона изменились)' : ' background regions changed)'));
   }
   $('characterMotionAuditStatus').textContent = (uiLang === 'ru'
    ? 'Сравнение движения персонажа и фона завершено. '
