@@ -59,7 +59,48 @@ export function buildBackgroundControlRegions({
       candidates.push({ id: "bg-" + row + "-" + column, bounds });
     }
   }
-  return candidates.slice(0, maxRegions);
+  // Spread controls across the available viewport instead of filling the
+  // top-left first. This makes the background estimate less sensitive to a
+  // single local effect or moving object.
+  if (candidates.length <= maxRegions) return candidates;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const selected = [];
+  const remaining = [...candidates];
+  let firstIndex = 0;
+  let firstDistance = Infinity;
+  for (let index = 0; index < remaining.length; index += 1) {
+    const bounds = remaining[index].bounds;
+    const dx = bounds.x + bounds.width / 2 - centerX;
+    const dy = bounds.y + bounds.height / 2 - centerY;
+    const distance = dx * dx + dy * dy;
+    if (distance < firstDistance) {
+      firstDistance = distance;
+      firstIndex = index;
+    }
+  }
+  selected.push(remaining.splice(firstIndex, 1)[0]);
+  while (selected.length < maxRegions && remaining.length) {
+    let bestIndex = 0;
+    let bestDistance = -1;
+    for (let index = 0; index < remaining.length; index += 1) {
+      const bounds = remaining[index].bounds;
+      const x = bounds.x + bounds.width / 2;
+      const y = bounds.y + bounds.height / 2;
+      const nearestDistance = selected.reduce((nearest, item) => {
+        const other = item.bounds;
+        const dx = x - (other.x + other.width / 2);
+        const dy = y - (other.y + other.height / 2);
+        return Math.min(nearest, dx * dx + dy * dy);
+      }, Infinity);
+      if (nearestDistance > bestDistance) {
+        bestDistance = nearestDistance;
+        bestIndex = index;
+      }
+    }
+    selected.push(remaining.splice(bestIndex, 1)[0]);
+  }
+  return selected;
 }
 
 /**
