@@ -61,18 +61,21 @@ export function analyzeRigPartAlphaEdges({
       const depthX = Math.max(1, Math.ceil(dimensions.width * edgeDepthRatio));
       const depthY = Math.max(1, Math.ceil(dimensions.height * edgeDepthRatio));
       const edgeSpecs = {
-        top: { count: depthY * dimensions.width, indices: () => Array.from({length: depthY}, (_, y) => Array.from({length: dimensions.width}, (_, x) => y * dimensions.width + x)).flat() },
-        bottom: { count: depthY * dimensions.width, indices: () => Array.from({length: depthY}, (_, y) => Array.from({length: dimensions.width}, (_, x) => (dimensions.height - depthY + y) * dimensions.width + x)).flat() },
-        left: { count: depthX * dimensions.height, indices: () => Array.from({length: dimensions.height}, (_, y) => Array.from({length: depthX}, (_, x) => y * dimensions.width + x)).flat() },
-        right: { count: depthX * dimensions.height, indices: () => Array.from({length: dimensions.height}, (_, y) => Array.from({length: depthX}, (_, x) => y * dimensions.width + dimensions.width - depthX + x)).flat() }
+        top: { count: depthY * dimensions.width, test: (x, y) => y < depthY },
+        bottom: { count: depthY * dimensions.width, test: (x, y) => y >= dimensions.height - depthY },
+        left: { count: depthX * dimensions.height, test: (x, y) => x < depthX },
+        right: { count: depthX * dimensions.height, test: (x, y) => x >= dimensions.width - depthX }
       };
       const edges = {};
       for (const edge of EDGES) {
         let opaque = 0;
-        for (const pixelIndex of edgeSpecs[edge].indices()) {
-          if (data[pixelIndex * 4 + 3] > alphaThreshold) opaque++;
+        const spec = edgeSpecs[edge];
+        for (let y = 0; y < dimensions.height; y++) {
+          for (let x = 0; x < dimensions.width; x++) {
+            if (spec.test(x, y) && data[(y * dimensions.width + x) * 4 + 3] > alphaThreshold) opaque++;
+          }
         }
-        const opaqueRatio = opaque / edgeSpecs[edge].count;
+        const opaqueRatio = opaque / spec.count;
         edges[edge] = {
           opaqueRatio: Number(opaqueRatio.toFixed(4)),
           transparentRatio: Number((1 - opaqueRatio).toFixed(4)),
