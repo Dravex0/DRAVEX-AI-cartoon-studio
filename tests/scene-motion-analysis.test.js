@@ -32,6 +32,33 @@ test("detects pixel changes in a moving test clip",async()=>{
   const report=await analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,true)});
   assert.equal(report.status,"visible-change");assert.ok(report.meanPixelChange>0);
 });
+test("detects color-only frame changes that luminance sampling can miss", async () => {
+  const video = new FakeVideo();
+  const canvasFactory = () => ({
+    width: 0, height: 0,
+    getContext: () => ({
+      drawImage() {},
+      getImageData(_x, _y, width, height) {
+        const data = new Uint8ClampedArray(width * height * 4);
+        const isAfterColorChange = video.currentTime >= 2;
+        for (let pixel = 0; pixel < width * height; pixel += 1) {
+          const offset = pixel * 4;
+          data[offset] = isAfterColorChange ? 0 : 255;
+          data[offset + 1] = isAfterColorChange ? 76 : 0;
+          data[offset + 2] = 0;
+          data[offset + 3] = 255;
+        }
+        return { data, width, height };
+      }
+    })
+  });
+  const report = await analyzeSceneVideoMotion(video, { canvasFactory });
+  assert.equal(report.status, "visible-change");
+  assert.ok(report.meanPixelChange < 0.008, "the luminance difference should remain below the static threshold");
+  assert.ok(report.meanColorChange > 0.1, "RGB sampling should detect the chromatic change");
+  assert.ok(report.colorChangedPixelRatio > 0);
+});
+
 test("restores the original playback position and paused state",async()=>{
   const video=new FakeVideo();video.currentTime=1.25;video.paused=false;
   await analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,true)});
