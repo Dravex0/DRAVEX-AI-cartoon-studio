@@ -32,6 +32,24 @@ test("detects pixel changes in a moving test clip",async()=>{
   const report=await analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,true)});
   assert.equal(report.status,"visible-change");assert.ok(report.meanPixelChange>0);
 });
+test("detects chromatic changes even when sampled luminance stays nearly constant",async()=>{
+  const video=new FakeVideo();
+  const canvasFactory=()=>({width:0,height:0,getContext:()=>({
+    drawImage() {},
+    getImageData(_x,_y,width,height) {
+      const data=new Uint8ClampedArray(width*height*4);
+      const red=video.currentTime<2?255:0;
+      const green=video.currentTime<2?0:76;
+      for(let i=0;i<width*height;i++){
+        data[i*4]=red;data[i*4+1]=green;data[i*4+2]=0;data[i*4+3]=255;
+      }
+      return {data,width,height};
+    }
+  })});
+  const report=await analyzeSceneVideoMotion(video,{canvasFactory});
+  assert.equal(report.status,"visible-change");
+  assert.ok(report.changedPixelRatio>0);
+});
 test("restores the original playback position and paused state",async()=>{
   const video=new FakeVideo();video.currentTime=1.25;video.paused=false;
   await analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,true)});
@@ -69,3 +87,4 @@ test("rejects unsafe frame sample counts", async () => {
   const video = new FakeVideo();
   await assert.rejects(captureSceneVideoFrameSamples(video, { sampleCount: 6 }), /sampleCount/);
 });
+
