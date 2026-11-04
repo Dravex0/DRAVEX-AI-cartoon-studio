@@ -154,3 +154,26 @@ test("infers a generic download MIME type only from a known video extension", as
     /unknown format/
   );
 });
+
+test("warns that the Wan endpoint does not use additional character reference images", async () => {
+  const progress = [];
+  const provider = createHuggingFaceZeroGPUVideoProvider({
+    client: { submit: () => createSubmission([
+      { type: "data", data: [{ url: "https://files.example.test/scene.mp4" }] }
+    ]) },
+    handleFile: value => value,
+    fetchImpl: async () => ({
+      ok: true,
+      blob: async () => new Blob(["mp4"], { type: "video/mp4" })
+    })
+  });
+  await provider.generate({
+    taskType: "image-to-video",
+    prompt: "A character waves",
+    image: new Blob(["png"], { type: "image/png" }),
+    referenceImages: [{ blob: new Blob(["character-reference"], { type: "image/png" }) }]
+  }, { onProgress: value => progress.push(value) });
+  assert.equal(progress[0].stage, "warning");
+  assert.match(progress[0].message, /only the source image/i);
+  assert.equal(progress.at(-1).stage, "completed");
+});
