@@ -95,6 +95,21 @@ export function buildCompositedCharacterRegions({
   const movedLayers = motionTimeline
     ? applyCharacterActionTimelineToLayers(safeLayers, motionTimeline, progress)
     : safeLayers.map(layer => layer && typeof layer === "object" ? { ...layer } : layer);
+  const readyRigCharacterIds = new Set();
+  if (typeof resolveImage === "function") {
+    for (const input of Array.isArray(characterRigs) ? characterRigs.slice(0, 20) : []) {
+      const report = validateCharacterRig(input);
+      if (!report.passed) continue;
+      const ready = report.rig.parts.every(part => {
+        const image = resolveImage(part.imageUrl, report.rig.characterId);
+        const imageWidth = Number(image?.naturalWidth || image?.videoWidth || image?.width);
+        const imageHeight = Number(image?.naturalHeight || image?.videoHeight || image?.height);
+        return Boolean(image && Number.isFinite(imageWidth) && Number.isFinite(imageHeight)
+          && imageWidth > 0 && imageHeight > 0);
+      });
+      if (ready) readyRigCharacterIds.add(report.rig.characterId.toLocaleLowerCase());
+    }
+  }
   const regions = new Map();
   const add = (characterId, bounds, source) => {
     const id = String(characterId || "").trim();
@@ -110,6 +125,8 @@ export function buildCompositedCharacterRegions({
 
   for (const layer of movedLayers) {
     if (!layer || typeof layer !== "object" || layer.visible === false) continue;
+    // The preview renderer suppresses the legacy sprite when all rig assets are ready.
+    if (readyRigCharacterIds.has(String(layer.characterId || "").toLocaleLowerCase())) continue;
     add(layer.characterId, getCharacterLayerBounds(layer, viewport, camera), "sprite");
   }
 
