@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 test('published index loads one external module and the application module parses', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   const appPath = new URL('../src/app.js', import.meta.url);
   assert.match(html, /<script type="module" src="\.\/src\/app\.js"><\/script>/);
-  const result = spawnSync(process.execPath, ['--check', appPath.pathname], {
+  const result = spawnSync(process.execPath, ['--check', fileURLToPath(appPath)], {
     encoding: 'utf8'
   });
   assert.equal(result.status, 0, result.stderr || result.stdout || 'application module syntax check failed');
@@ -180,3 +181,4 @@ test('cinematic camera transform covers generated media, props, and rigged chara
   assert.ok(cameraRestore > characterDraw);
   assert.ok(titleDraw > cameraRestore);
 });
+
