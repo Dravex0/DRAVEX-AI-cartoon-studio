@@ -47,6 +47,7 @@ import { buildSceneMediaReport } from "./scene-media-report.js";
 import { analyzeSceneVideoMotion, captureSceneVideoFrameSamples } from "./scene-motion-analysis.js";
 import { createSceneFrameContactSheet } from "./scene-frame-contact-sheet.js";
 import { buildCompositedCharacterRegions, sampleCanvasRegion, analyzeCharacterRegionFrames } from "./scene-character-region.js";
+import { buildBackgroundControlRegions, classifyCharacterBackgroundMotion } from "./scene-motion-separation.js";
 import { summarizeSceneMotionResults } from "./scene-motion-results.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
@@ -164,30 +165,67 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
   entry.frames.push(frame);
   characterMotionAudit.frames.set(key, entry);
  }
+ // Re-evaluate safe control tiles at every timestamp: a moving character must
+ // not enter a background crop and be mistaken for background activity.
+ const backgroundRegions = buildBackgroundControlRegions({
+  viewport: { width: viewportWidth, height: viewportHeight },
+  characterRegions: regions,
+  columns: 5,
+  rows: 5,
+  maxRegions: 8
+ });
+ for (const region of backgroundRegions) {
+  const frame = sampleCanvasRegion(canvas, region.bounds, { width: 32, height: 32, scaleX, scaleY });
+  const entry = characterMotionAudit.backgroundFrames.get(region.id) || { id: region.id, frames: [] };
+  entry.frames.push(frame);
+  characterMotionAudit.backgroundFrames.set(region.id, entry);
+ }
  characterMotionAudit.nextSample += 1;
  const total = CHARACTER_MOTION_SAMPLE_PROGRESS.length;
  if (characterMotionAudit.nextSample >= total) {
+  const backgroundReports = [];
+  for (const entry of characterMotionAudit.backgroundFrames.values()) {
+   if (entry.frames.length < 2) continue;
+   backgroundReports.push(analyzeCharacterRegionFrames(entry.frames));
+  }
+  const labels = uiLang === 'ru' ? {
+   'character-localized-change': 'изменения локализованы в области персонажа',
+   'scene-wide-or-mixed-change': 'изменяются персонаж и фон: движение всей сцены или смешанные изменения',
+   'background-or-camera-change': 'изменяется фон, персонаж почти неподвижен',
+   'little-visible-change': 'почти нет видимых изменений',
+   'insufficient-background-controls': 'недостаточно контрольных областей фона',
+   'inconclusive-mixed-background': 'неоднозначные изменения в контрольных областях',
+   'inconclusive-character-samples': 'недостаточно кадров персонажа'
+  } : {
+   'character-localized-change': 'change localized to character region',
+   'scene-wide-or-mixed-change': 'character and background change: scene-wide or mixed activity',
+   'background-or-camera-change': 'background changes while character appears still',
+   'little-visible-change': 'little visible change',
+   'insufficient-background-controls': 'not enough background control regions',
+   'inconclusive-mixed-background': 'mixed background activity; inconclusive',
+   'inconclusive-character-samples': 'not enough character samples'
+  };
   const summaries = [];
   for (const entry of characterMotionAudit.frames.values()) {
    if (entry.frames.length < 2) continue;
    const report = analyzeCharacterRegionFrames(entry.frames);
-   summaries.push(entry.characterId + ': ' + (report.status === 'likely-static'
-    ? (uiLang === 'ru' ? 'почти нет изменений пикселей' : 'very little pixel change')
-    : (uiLang === 'ru' ? 'обнаружены изменения пикселей' : 'pixel changes detected'))
-    + ' (' + entry.frames.length + '/5)');
+   const comparison = classifyCharacterBackgroundMotion(report, backgroundReports);
+   summaries.push(entry.characterId + ': ' + (labels[comparison.status] || comparison.status)
+    + ' (' + entry.frames.length + '/5; '
+    + comparison.backgroundSampledRegions + ' background controls)');
   }
   $('characterMotionAuditStatus').textContent = (uiLang === 'ru'
-   ? 'Проверка областей персонажей завершена. '
-   : 'Character-region check completed. ')
+   ? 'Сравнение движения персонажа и фона завершено. '
+   : 'Character/background motion comparison completed. ')
    + (summaries.length ? summaries.join('; ') : (uiLang === 'ru' ? 'Недостаточно кадров для сравнения.' : 'Not enough samples to compare.'))
    + (uiLang === 'ru'
-    ? '. Изменения пикселей не доказывают правильность действия персонажа.'
-    : '. Pixel changes do not prove that the intended character action occurred.');
+    ? '. Изменения фона могут быть вызваны камерой, освещением, эффектами или анимацией окружения; это не распознавание действия.'
+    : '. Background changes may come from camera motion, lighting, effects, or animated scenery; this is not action recognition.');
   characterMotionAudit = null;
  } else {
   $('characterMotionAuditStatus').textContent = (uiLang === 'ru'
-   ? 'Проверяю итоговую композицию: кадр '
-   : 'Sampling final composition: frame ')
+   ? 'Сравниваю персонажа и фон: кадр '
+   : 'Comparing character and background: frame ')
    + (characterMotionAudit.nextSample + 1) + '/' + total + '.';
  }
 }
@@ -2081,7 +2119,7 @@ $('analyzeCharacterMotion').onclick=()=>{
    :'Attach a character sprite layer or validated rig to this scene first. The procedural demo character is not included in this check yet.';
   return;
  }
- characterMotionAudit={sceneIndex,startProgress:null,targets:[],nextSample:0,frames:new Map()};
+ characterMotionAudit={sceneIndex,startProgress:null,targets:[],nextSample:0,frames:new Map(),backgroundFrames:new Map()};
  sceneMotionSceneIndex=-1;
  $('characterMotionAuditStatus').textContent=uiLang==='ru'
   ?'Проверка подготовлена. Запусти предпросмотр сцены — будут собраны 5 кадров итоговой композиции.'
