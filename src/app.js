@@ -145,7 +145,8 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
   motionTimeline: currentSceneData.characterMotionTimeline || currentSceneData.actionTimeline,
   progress,
   viewport: { width: viewportWidth, height: viewportHeight },
-  camera: { zoom: camera.zoom, offsetY: camera.offsetY, focusX, focusY }
+  camera: { zoom: camera.zoom, offsetY: camera.offsetY, focusX, focusY },
+  resolveImage: getLoadedSceneImage
  });
  if (!regions.length) {
   characterMotionAudit = null;
