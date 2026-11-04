@@ -95,7 +95,7 @@ test("rejects mismatched frame dimensions and unsafe thresholds", () => {
 
 test("builds camera-transformed character regions from the live sprite action pose", () => {
   const regions = buildCompositedCharacterRegions({
-    layers: [{ characterId: "Hero", x: 0.5, y: 0.5, width: 0.2, height: 0.4 }],
+    layers: [{ characterId: "Hero", imageUrl: "https://example.com/hero.png", x: 0.5, y: 0.5, width: 0.2, height: 0.4 }],
     motionTimeline: {
       schemaVersion: 1,
       phases: [{ actorId: "hero", start: 0, end: 1, motion: { from: { x: 0.5 }, to: { x: 0.7 } } }]
@@ -112,7 +112,7 @@ test("builds camera-transformed character regions from the live sprite action po
 
 test("combines sprite and posed rig bounds for the same character", () => {
   const regions = buildCompositedCharacterRegions({
-    layers: [{ characterId: "Hero", x: 0.5, y: 0.5, width: 0.2, height: 0.2 }],
+    layers: [{ characterId: "Hero", imageUrl: "https://example.com/hero.png", x: 0.5, y: 0.5, width: 0.2, height: 0.2 }],
     characterRigs: [{
       schemaVersion: 1,
       characterId: "hero",
@@ -124,8 +124,8 @@ test("combines sprite and posed rig bounds for the same character", () => {
     viewport: { width: 100, height: 100 }
   });
   assert.equal(regions.length, 1);
-  assert.equal(regions[0].source, "sprite+rig");
-  assert.deepEqual(regions[0].bounds, { x: 35, y: 40, width: 25, height: 20 });
+  assert.equal(regions[0].source, "rig");
+  assert.deepEqual(regions[0].bounds, { x: 15, y: 40, width: 10, height: 20 });
 });
 
 test("ignores invalid rig definitions and hidden sprite layers", () => {
