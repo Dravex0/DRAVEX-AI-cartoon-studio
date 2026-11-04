@@ -2060,6 +2060,26 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
 });
 
 $('play').onclick=()=>{playing=!playing;$('play').textContent=playing?tr('pauseButton'):tr('playButton');syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:playing});if(playing){if(!raf)draw();void startSceneVoicePreview(sceneIndex)}else{void stopSceneVoicePreview()}};
+$('analyzeCharacterMotion').onclick=()=>{
+ if(characterMotionAudit){
+  characterMotionAudit=null;
+  $('characterMotionAuditStatus').textContent=uiLang==='ru'?'Проверка движения отменена.':'Character motion check cancelled.';
+  return;
+ }
+ const meta=sceneMetadata[sceneIndex]||{};
+ if(!(Array.isArray(meta.characterLayers)&&meta.characterLayers.length)&&!(Array.isArray(meta.characterRigs)&&meta.characterRigs.length)){
+  $('characterMotionAuditStatus').textContent=uiLang==='ru'
+   ?'Сначала добавь к сцене слой персонажа или проверенный скелет. Процедурный демонстрационный герой пока не входит в эту проверку.'
+   :'Attach a character sprite layer or validated rig to this scene first. The procedural demo character is not included in this check yet.';
+  return;
+ }
+ characterMotionAudit={sceneIndex,startProgress:null,targets:[],nextSample:0,frames:new Map()};
+ sceneMotionSceneIndex=-1;
+ $('characterMotionAuditStatus').textContent=uiLang==='ru'
+  ?'Проверка подготовлена. Запусти предпросмотр сцены — будут собраны 5 кадров итоговой композиции.'
+  :'Audit armed. Play this scene to capture five frames of the final composition.';
+ if(!playing)draw();
+};
 $('save').onclick=()=>{const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));$('status').textContent=saved?tr('saved'):tr('storageError')};
 $('export').onclick=async()=>{
   if(!canvas.captureStream||!window.MediaRecorder){
