@@ -194,7 +194,22 @@ export function createComfyUIVideoProvider({
       };
       const imagePath = await uploadImage(request.image, 'source image', 'dravex-scene.png');
       const referenceValues = {};
-      const references = Array.isArray(request.referenceImages) ? request.referenceImages.slice(0, 4) : [];
+      const requestedReferences = Array.isArray(request.referenceImages) ? request.referenceImages : [];
+      const references = requestedReferences.slice(0, 4);
+      const skippedReferenceIndexes = requestedReferences
+        .map((reference, index) => ({ reference, index }))
+        .filter(({ reference, index }) => reference && (
+          index >= 4 || !Object.prototype.hasOwnProperty.call(nodeBindings, `referenceImage${index + 1}`)
+        ))
+        .map(({ index }) => index + 1);
+      if (skippedReferenceIndexes.length) {
+        context.onProgress?.({
+          stage: 'warning',
+          code: 'CHARACTER_REFERENCE_NOT_BOUND',
+          skippedReferenceIndexes,
+          message: `ComfyUI workflow has no configured input for character reference image(s) ${skippedReferenceIndexes.join(', ')}. Those images were not uploaded or used.`
+        });
+      }
       for (let index = 0; index < references.length; index += 1) {
         const key = `referenceImage${index + 1}`;
         if (!Object.prototype.hasOwnProperty.call(nodeBindings, key)) continue;
