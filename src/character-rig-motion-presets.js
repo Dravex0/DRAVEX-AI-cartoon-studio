@@ -9,6 +9,7 @@ const PRESETS = Object.freeze({
   jump: { label: 'Jump / Прыжок', frames: 5 },
   dodge: { label: 'Dodge / Уклонение', frames: 5 },
   wave: { label: 'Wave / Приветствие', frames: 5 },
+  dance: { label: 'Dance / Танец', frames: 9 },
   attack: { label: 'Attack / Атака', frames: 5 },
   defend: { label: 'Defend / Защита', frames: 5 }
 });
@@ -202,6 +203,20 @@ function poseFor(rig, preset, phase) {
       if (role === 'leftArm') rotation = -0.12;
       if (role === 'rightLowerArm') rotation = -0.28 + 0.1 * Math.sin(phase * Math.PI * 2);
       if (role === 'head') rotation = 0.06 * Math.sin(phase * Math.PI * 2);
+    } else if (preset === 'dance') {
+      // A looping full-body groove with alternating limbs and a gentle torso sway.
+      const beat = Math.sin(phase * Math.PI * 2);
+      const bounce = (1 - Math.cos(phase * Math.PI * 4)) / 2;
+      if (role === 'root') { y = -0.035 * bounce; rotation = 0.055 * beat; }
+      if (role === 'head') rotation = -0.035 * beat;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.48 + 0.32 * beat;
+      if (role === 'rightArm') rotation = 0.48 - 0.32 * beat;
+      if (role === 'leftLowerArm') rotation = 0.18 + 0.16 * beat;
+      if (role === 'rightLowerArm') rotation = -0.18 - 0.16 * beat;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.2 * beat;
+      if (role === 'rightLeg') rotation = 0.2 * beat;
+      if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = 0.12 * bounce;
+      if (role === 'rightLowerLeg' && bone.pivotEnabled) rotation = 0.12 * (1 - bounce);
     } else if (preset === 'attack') {
       const strike = Math.sin(Math.PI * phase);
       if (role === 'root') { x = 0.055 * strike; rotation = -0.035 * strike; }
@@ -240,7 +255,7 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
   const report = validateCharacterRig(rigInput);
   if (!report.passed) return { status: 'invalid-rig', preset: presetName, timeline: null, issues: report.issues };
   const preset = PRESETS[presetName];
-  if (!preset) return { status: 'unknown-preset', preset: presetName, timeline: null, issues: [{ code: 'motion-preset-unknown', message: 'Choose idle, walk, run, jump, dodge, wave, attack, or defend.' }] };
+  if (!preset) return { status: 'unknown-preset', preset: presetName, timeline: null, issues: [{ code: 'motion-preset-unknown', message: 'Choose idle, walk, run, jump, dodge, wave, dance, attack, or defend.' }] };
   const rig = report.rig;
   const roles = new Set(rig.bones.map(bone => roleOf(bone.id)));
   const warnings = [];
@@ -260,6 +275,10 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
   }
   if (['attack', 'defend'].includes(presetName) && ![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) {
     warnings.push('No arm-like bone IDs found; the action gesture cannot be represented by this rig.');
+  }
+  if (presetName === 'dance') {
+    if (![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) warnings.push('No arm-like bone IDs found; upper-body dance motion will be omitted.');
+    if (![...roles].some(role => role === 'leftLeg' || role === 'rightLeg' || role === 'leg')) warnings.push('No leg-like bone IDs found; lower-body dance motion will be omitted.');
   }
   if (presetName === 'wave' && ![...roles].some(role => role === 'rightArm' || role === 'arm')) {
     warnings.push('No right-arm or generic arm bone found; the greeting gesture cannot be represented by this rig.');
