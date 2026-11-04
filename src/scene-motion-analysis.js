@@ -1,3 +1,5 @@
+import { analyzeVideoFrameSequence } from "./video-frame-motion-metrics.js";
+
 /**
  * Browser-local motion check for a decoded scene video.
  * Pixel-change heuristic only; it does not recognize semantic actions or quality.
@@ -140,6 +142,5 @@ export async function captureSceneVideoFrameSamples(video, {
   }
   return samples;
 }
-import { analyzeVideoFrameSequence } from "./video-frame-motion-metrics.js";
 
 
