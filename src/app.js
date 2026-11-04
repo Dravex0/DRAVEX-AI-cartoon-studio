@@ -121,8 +121,15 @@ context.globalAlpha=1;
 let characterMotionAudit = null;
 const CHARACTER_MOTION_SAMPLE_PROGRESS = [0.1, 0.3, 0.5, 0.7, 0.9];
 function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewportWidth, viewportHeight, camera, focusX, focusY, rigPoses }) {
- if (!characterMotionAudit || !playing || characterMotionAudit.sceneIndex !== sceneIndex) return;
- if (!Number.isFinite(progress)) return;
+ if (!characterMotionAudit) return;
+ if (characterMotionAudit.sceneIndex !== sceneIndex) {
+  characterMotionAudit = null;
+  $('characterMotionAuditStatus').textContent = uiLang === 'ru'
+   ? 'Проверка отменена: была выбрана другая сцена.'
+   : 'Audit cancelled because a different scene was selected.';
+  return;
+ }
+ if (!playing || !Number.isFinite(progress)) return;
  if (characterMotionAudit.startProgress === null) {
   characterMotionAudit.startProgress = progress;
   characterMotionAudit.targets = CHARACTER_MOTION_SAMPLE_PROGRESS.map(value =>
