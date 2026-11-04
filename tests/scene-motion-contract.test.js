@@ -111,3 +111,24 @@ test('distinguishes changed timeline data with no character rig binding', () => 
   });
   assert.equal(report.animationStatus, 'rig-character-binding-missing');
 });
+
+test('recognizes a sprite motion target when the start pose is implicit', () => {
+  const report = auditSceneMotionContract({
+    motionPrompt: 'The fox walks to the right.',
+    characterMotionTimeline: {
+      schemaVersion: 1,
+      phases: [{ phase: 'action', start: 0, end: 1, actorId: 'Foxy',
+        description: 'The fox walks to the right.', evidence: 'The fox walks to the right.',
+        motion: { to: { x: 0.8 } } }]
+    }
+  });
+  assert.equal(report.spriteMotionDefined, true);
+  assert.equal(report.animationStatus, 'sprite-motion-only');
+});
+
+test('handles malformed storyboard entries without throwing', () => {
+  const report = auditStoryboardMotionContracts([null, 'not-a-scene']);
+  assert.equal(report.sceneCount, 2);
+  assert.equal(report.actionSceneCount, 0);
+  assert.equal(report.coverage, null);
+});
