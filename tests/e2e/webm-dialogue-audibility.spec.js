@@ -152,49 +152,43 @@ test('records all three synthetic dialogue tones in the exported WebM', async ({
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) throw new Error('Web Audio is unavailable for decoded WebM inspection.');
     const context = new AudioContextClass();
-    const source = context.createMediaElementSource(video);
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 4096;
-    const silentOutput = context.createGain();
-    silentOutput.gain.value = 0;
-    source.connect(analyser);
-    analyser.connect(silentOutput);
-    silentOutput.connect(context.destination);
-    await context.resume();
-
-    const frame = new Float32Array(analyser.fftSize);
-    const samples = [];
-    const timeoutAt = performance.now() + 12_000;
-    video.pause();
-    video.currentTime = 0;
-    video.muted = true;
-    await video.play();
-    video.muted = false;
 
     try {
-      while (!video.ended && performance.now() < timeoutAt) {
-        const time = video.currentTime;
-        if (!samples.length || time - samples[samples.length - 1].time >= 0.035) {
-          analyser.getFloatTimeDomainData(frame);
-          samples.push({ time, data: Array.from(frame) });
-        }
-        await new Promise(resolve => requestAnimationFrame(resolve));
+      const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+      if (!decoded.numberOfChannels || !decoded.length || !Number.isFinite(decoded.duration)) {
+        throw new Error('Exported WebM contains no decodable audio samples.');
       }
-      if (!video.ended) throw new Error('Exported WebM did not reach its end during audio inspection.');
-      const playedDuration = video.currentTime;
+      const channel = decoded.getChannelData(0);
+      const sampleRate = decoded.sampleRate;
+      const playedDuration = await new Promise(async (resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Exported WebM did not reach ended during playback inspection.')), 12_000);
+        try {
+          video.pause();
+          video.currentTime = 0;
+          await video.play();
+          video.muted = true;
+          video.onended = () => {
+            clearTimeout(timeout);
+            resolve(video.currentTime);
+          };
+        } catch (error) {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      });
 
-      const windowSamples = (start, end) => samples
-        .filter(item => item.time >= start && item.time <= end)
-        .flatMap(item => item.data);
-
+      const sampleRange = (startSeconds, endSeconds) => {
+        const startIndex = Math.max(0, Math.floor(startSeconds * sampleRate));
+        const endIndex = Math.min(channel.length, Math.ceil(endSeconds * sampleRate));
+        return channel.subarray(startIndex, endIndex);
+      };
       const rms = values => {
         if (!values.length) return 0;
         let sum = 0;
         for (const value of values) sum += value * value;
         return Math.sqrt(sum / values.length);
       };
-
-      const goertzel = (values, frequency, sampleRate) => {
+      const goertzel = (values, frequency) => {
         if (!values.length) return 0;
         const omega = 2 * Math.PI * frequency / sampleRate;
         const coefficient = 2 * Math.cos(omega);
@@ -208,23 +202,33 @@ test('records all three synthetic dialogue tones in the exported WebM', async ({
         return (previous * previous + previousPrevious * previousPrevious
           - coefficient * previous * previousPrevious) / (values.length * values.length);
       };
-
       const toneChecks = expected.tones.map((frequency, index) => {
         const start = index * expected.sceneSeconds;
-        const values = windowSamples(start + 0.10, start + 0.34);
-        const powers = expected.tones.map(candidate => goertzel(values, candidate, context.sampleRate));
+        const values = sampleRange(start + 0.10, start + 0.34);
+        const powers = expected.tones.map(candidate => goertzel(values, candidate));
+        const envelope = [];
+        for (let offset = -0.08; offset < expected.toneSeconds + 0.12; offset += 0.02) {
+          const windowStart = start + offset;
+          envelope.push({
+            time: windowStart,
+            rms: rms(sampleRange(windowStart, windowStart + 0.02))
+          });
+        }
+        const active = envelope.filter(point => point.rms > 0.02);
+        const activeDuration = active.length ? active[active.length - 1].time + 0.02 - active[0].time : 0;
         return {
           expectedFrequency: frequency,
           sampleCount: values.length,
           rms: rms(values),
           expectedPower: powers[index],
-          strongestOtherPower: Math.max(...powers.filter((_power, powerIndex) => powerIndex !== index))
+          strongestOtherPower: Math.max(...powers.filter((_power, powerIndex) => powerIndex !== index)),
+          activeDuration,
+          activeStartOffset: active.length ? active[0].time - start : null
         };
       });
-
       const silenceChecks = [0, 1].map(index => {
         const start = index * expected.sceneSeconds + expected.toneSeconds + 0.16;
-        const values = windowSamples(start, start + 0.16);
+        const values = sampleRange(start, start + 0.16);
         return { start, sampleCount: values.length, rms: rms(values) };
       });
 
@@ -233,8 +237,8 @@ test('records all three synthetic dialogue tones in the exported WebM', async ({
         type: blob.type,
         signature,
         playedDuration,
+        decodedAudioDuration: decoded.duration,
         expectedDuration: expected.sceneSeconds * 3,
-        sampleCount: samples.length,
         toneChecks,
         silenceChecks
       };
@@ -248,6 +252,7 @@ test('records all three synthetic dialogue tones in the exported WebM', async ({
   expect(inspection.type).toContain('video/webm');
   expect(inspection.signature).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
   expect(inspection.playedDuration).toBeGreaterThan(0);
+  expect(inspection.decodedAudioDuration).toBeGreaterThan(0);
   expect(Math.abs(inspection.playedDuration - inspection.expectedDuration)).toBeLessThan(0.25);
   expect(inspection.toneChecks).toHaveLength(3);
 
@@ -255,6 +260,10 @@ test('records all three synthetic dialogue tones in the exported WebM', async ({
     expect(check.sampleCount, JSON.stringify(inspection)).toBeGreaterThan(0);
     expect(check.rms, JSON.stringify(inspection)).toBeGreaterThan(0.02);
     expect(check.expectedPower, JSON.stringify(inspection)).toBeGreaterThan(check.strongestOtherPower * 2);
+    expect(check.activeDuration, JSON.stringify(inspection)).toBeGreaterThan(0.30);
+    expect(check.activeDuration, JSON.stringify(inspection)).toBeLessThan(0.50);
+    expect(check.activeStartOffset, JSON.stringify(inspection)).not.toBeNull();
+    expect(Math.abs(check.activeStartOffset), JSON.stringify(inspection)).toBeLessThan(0.10);
   }
 
   expect(inspection.silenceChecks).toHaveLength(2);
