@@ -43,6 +43,16 @@ function characterDetails(scene, characterBible) {
     });
 }
 
+/** Return true when a scene cast has locally saved character photos that AI Horde cannot consume. */
+export function sceneHasSavedCharacterImageReference(scene = {}, characterBible = []) {
+  const hasExplicitCast = Array.isArray(scene?.characters);
+  const cast = new Set(list(scene?.characters).map(name => name.toLocaleLowerCase()));
+  return (Array.isArray(characterBible) ? characterBible : []).some(profile => {
+    const id = safe(profile?.characterId, 120).toLocaleLowerCase();
+    return Boolean(id && safe(profile?.referenceImageAssetId, 100) && (!hasExplicitCast || cast.has(id)));
+  });
+}
+
 /** Creates a provider-neutral still-image prompt without calling a paid or remote service. */
 export function buildImageGenerationPrompt(scene = {}, characterBible = [], options = {}) {
   const characterLock = characterDetails(scene, characterBible);
