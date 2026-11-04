@@ -317,3 +317,37 @@ test('normalizes generic binary responses to the MIME type implied by the video 
   assert.equal(result.status, 'completed');
   assert.equal(result.video.type, 'video/mp4');
 });
+
+
+test('warns when requested character references have no configured workflow inputs', async () => {
+  const progress = [];
+  let uploadCount = 0;
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).endsWith('/upload/image')) {
+      uploadCount += 1;
+      return jsonResponse({ name: uploadCount === 1 ? 'source.png' : 'reference.png', type: 'input' });
+    }
+    if (String(url).endsWith('/prompt')) return jsonResponse({ prompt_id: 'unbound-reference-job' });
+    if (String(url).endsWith('/history/unbound-reference-job')) {
+      return jsonResponse({ 'unbound-reference-job': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '90': { videos: [{ filename: 'unbound.mp4', type: 'output' }] } }
+      }});
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188', workflow, nodeBindings, outputNodeIds: ['90'],
+    fetchImpl, pollIntervalMs: 250
+  });
+  await provider.generate({
+    ...request,
+    referenceImages: [{ blob: new Blob(['private-reference'], { type: 'image/png' }) }]
+  }, { onProgress: event => progress.push(event) });
+  const warning = progress.find(event => event.stage === 'warning');
+  assert.equal(warning.code, 'CHARACTER_REFERENCE_NOT_BOUND');
+  assert.deepEqual(warning.skippedReferenceIndexes, [1]);
+  assert.match(warning.message, /not uploaded or used/i);
+  assert.equal(uploadCount, 1);
+});
