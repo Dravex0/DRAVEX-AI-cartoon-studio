@@ -1912,6 +1912,10 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput,referenceImages},{signal,onProgress:job=>{
      const providerPercent=readVideoProgressPercent(job);
      const providerStage=String(job.stage||'processing');
+     if(providerStage==='warning'&&job.message){
+      status.textContent='Wan 2.2 · Внимание: '+String(job.message);
+      return;
+     }
      const sceneLabel=providerStage==='queued'||providerStage==='pending'?filmProgressText('В очереди','Queued'):providerStage==='completed'?filmProgressText('Готово','Ready'):filmProgressText('Генерируется','Generating');
      updateFilmSceneProgress(index,{status:'generating',progress:providerPercent,label:sceneLabel+(providerPercent===null?' · '+providerStage:' · '+providerPercent+'%')});
      updateFilmVideoProgress(providerPercent,filmProgressText('Генерация видеосцен','Generating video scenes'));
