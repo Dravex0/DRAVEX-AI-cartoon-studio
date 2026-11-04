@@ -55,7 +55,7 @@ test("reports mixed change when several but not most regions change", () => {
 
 test("validates frame dimensions and grid limits", () => {
   assert.throws(() => analyzeSpatialPixelChange([new Float32Array(4), new Float32Array(4)], {
-    width: 3, height: 2
+    width: 3, height: 2, rows: 1, columns: 1
   }), /exactly width/);
   assert.throws(() => analyzeSpatialPixelChange([new Float32Array(64), new Float32Array(64)], {
     width: 8, height: 8, rows: 9, columns: 2
