@@ -22,7 +22,7 @@ function waitForSeek(video, targetTime, timeoutMs) {
   });
 }
 /**
- * Samples small frames locally and compares adjacent-frame luminance.
+ * Samples small frames locally and compares adjacent-frame RGBA values.
  * @returns {Promise<{status:string,sampleCount:number,meanPixelChange:number,changedPixelRatio:number,message:string}>}
  */
 export async function analyzeSceneVideoMotion(video, {
