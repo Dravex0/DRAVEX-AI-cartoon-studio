@@ -144,3 +144,22 @@ test('does not report action coverage when the supplied action timeline is inval
   assert.equal(report.actionTimelineStatus, 'invalid');
   assert.equal(report.animationStatus, 'invalid-action-timeline');
 });
+
+test('does not count changed bones that are absent from the attached rig', () => {
+  const report = auditSceneMotionContract({
+    motionPrompt: 'The fox walks forward.',
+    characters: ['Foxy'],
+    characterRigs: [{ characterId: 'Foxy', bones: [{ id: 'root' }, { id: 'leftArm' }] }],
+    characterRigTimeline: {
+      schemaVersion: 1,
+      keyframes: [
+        { time: 0, poses: { Foxy: {} } },
+        { time: 0.5, poses: { Foxy: { root: {}, leftLeg: { rotation: 0.3 } } } },
+        { time: 1, poses: { Foxy: {} } }
+      ]
+    }
+  });
+  assert.equal(report.animationStatus, 'rig-bone-binding-missing');
+  assert.deepEqual(report.animatedBones, []);
+  assert.deepEqual(report.missingGroups, ['legs']);
+});
