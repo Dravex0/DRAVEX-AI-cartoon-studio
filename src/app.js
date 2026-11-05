@@ -586,13 +586,17 @@ async function runFaceAnalysis({resume=false}={}){
     updateFaceAnalysisControls();
    },
    onFrameResult:value=>{
-    if(value.status==='face-detected'&&value.anchors){
-     samples.push({timestampMs:value.timestampMs,anchors:value.anchors});
-    }
+    samples.push({
+     timestampMs:value.timestampMs,
+     status:value.status,
+     faceCount:value.faceCount,
+     anchors:value.status==='face-detected'?value.anchors:null,
+     issues:value.issues
+    });
    }
   });
   lastFaceAnalysisExport={
-   format:'dravex-face-landmark-analysis-v1',
+   format:'dravex-face-landmark-analysis-v2',
    sceneId:String(meta.id),
    sceneTitle:String(meta.title||titles[sceneIndex]||''),
    videoFilename:String(entry.filename||''),
