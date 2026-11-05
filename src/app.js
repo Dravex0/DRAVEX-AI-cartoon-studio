@@ -2340,6 +2340,10 @@ $('hfVideoConsent').addEventListener('change',()=>{
  universalCapabilityRegistry.setRemoteConsent(granted);
  if(!granted&&activeUniversalExecutionController)activeUniversalExecutionController.abort();
  if(!granted&&fullFilmAbortController&&$('videoGenerationMode').value==='huggingface')fullFilmAbortController.abort();
+ if(lastUniversalTaskPlan){
+  const binding=bindUniversalPlanCapabilities(lastUniversalTaskPlan,universalCapabilityRegistry);
+  $('executeUniversalTask').disabled=binding.bindings[0]?.status!=='ready';
+ }
  updateComfyAnimateAvailability();
 });
 $('clearHfVideoToken').addEventListener('click',()=>{
