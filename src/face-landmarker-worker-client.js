@@ -49,10 +49,13 @@ export function createFaceLandmarkerWorkerClient({
       current.reject(error);
     }
   };
-  worker.onerror = event => {
-    failPending(new Error(String(event?.message || "Face landmark worker crashed.")));
+  const failWorker = error => {
+    failPending(error);
+    disposed = true;
+    worker.terminate();
   };
-  worker.onmessageerror = () => failPending(new Error("Could not read the face landmark worker response."));
+  worker.onerror = event => failWorker(new Error(String(event?.message || "Face landmark worker crashed.")));
+  worker.onmessageerror = () => failWorker(new Error("Could not read the face landmark worker response."));
 
   function request(type, payload = {}, transfer = []) {
     if (disposed) return Promise.reject(new Error("Face landmark worker client is disposed."));
