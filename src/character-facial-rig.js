@@ -13,6 +13,7 @@ function normalizePart(input = {}, index = 0) {
   return {
     id: clean(source.id),
     role: clean(source.role, 32).toLowerCase(),
+    viseme: clean(source.viseme, 20).toLowerCase(),
     imageUrl: /^(https:\/\/|blob:|dravex-facial-asset:)/i.test(imageUrl) ? imageUrl : "",
     x: clamp(source.x, -1, 1),
     y: clamp(source.y, -1, 1),
@@ -48,6 +49,7 @@ export function validateCharacterFacialRig(input = {}, bodyRig = null) {
     else if (ids.has(key)) issues.push({ code: "facial-part-id-duplicate", message: "Facial part IDs must be unique." });
     ids.add(key);
     if (!ROLES.has(part.role)) issues.push({ code: "facial-part-role-invalid", message: "Facial part role is not supported." });
+    if (part.viseme && (part.role !== "mouth" || !MOUTH_SHAPES.has(part.viseme))) issues.push({ code: "facial-part-viseme-invalid", message: "A viseme must be one of neutral, open, wide, round, closed, or teeth, and can only be assigned to a mouth part." });
     if (!part.imageUrl) issues.push({ code: "facial-part-image-invalid", message: "Every facial part needs an HTTPS, local blob, or saved local facial asset URL." });
   }
   if (bodyRig) {
