@@ -130,7 +130,7 @@ export function createUniversalImageGenerationCapability({
         if (fingerprint(latestScenes[resolvedIndex]) !== target.fingerprint) {
           throw new Error('Scene ' + (target.originalIndex + 1) + ' changed while AI Horde was working; the stale image was discarded.');
         }
-        await onSceneGenerated({ scene: latestScenes[resolvedIndex], sceneIndex: resolvedIndex, result });
+        await onSceneGenerated({ scene: latestScenes[resolvedIndex], sceneIndex: resolvedIndex, result, signal });
         const afterScenes = getScenes();
         if (!isImageReady(afterScenes.find(scene => clean(scene?.id, 120) === target.sceneId))) {
           throw new Error('The generated scene image was not saved to its storyboard scene.');
