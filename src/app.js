@@ -1084,7 +1084,7 @@ function syncFacialRigEditor(){
  for(const part of rig?.parts||[])select.add(new Option(String(part.id)+" · "+String(part.role),String(part.id)));
  select.value=(rig?.parts||[]).some(part=>String(part.id)===previous)?previous:"";
  const part=(rig?.parts||[]).find(item=>String(item.id)===select.value)||null;
- $("facialPartId").value=part?.id||"";$("facialPartRole").value=part?.role||"eye-left";$("facialPartImageUrl").value=part?.imageUrl||"";
+ $("facialPartId").value=part?.id||"";$("facialPartRole").value=part?.role||"eye-left";$("facialPartViseme").value=part?.viseme||"";$("facialPartImageUrl").value=part?.imageUrl||"";
  $("facialPartX").value=String(part?.x??0.5);$("facialPartY").value=String(part?.y??0.5);$("facialPartWidth").value=String(part?.width??0.1);$("facialPartHeight").value=String(part?.height??0.1);
  $("facialPartRotation").value=String((Number(part?.rotation)||0)*180/Math.PI);$("facialPartZIndex").value=String(part?.zIndex??10);
  const expression=meta.characterFacialExpressions?.[characterId]||{};
@@ -1130,7 +1130,7 @@ if(!saved)status.textContent+=" Draft storage is full; save the project manually
 }catch(error){status.textContent=error.message||"Could not save facial image.";event.target.value="";}
 });
 $("saveFacialPart").addEventListener("click",()=>{
- const result=upsertCharacterFacialPart(sceneMetadata[sceneIndex]||{},{characterId:$("facialCharacterId").value,headBoneId:$("facialHeadBoneId").value,partId:$("facialPartId").value,role:$("facialPartRole").value,imageUrl:$("facialPartImageUrl").value,x:Number($("facialPartX").value),y:Number($("facialPartY").value),width:Number($("facialPartWidth").value),height:Number($("facialPartHeight").value),rotation:Number($("facialPartRotation").value)*Math.PI/180,zIndex:Number($("facialPartZIndex").value)});
+ const result=upsertCharacterFacialPart(sceneMetadata[sceneIndex]||{},{characterId:$("facialCharacterId").value,headBoneId:$("facialHeadBoneId").value,partId:$("facialPartId").value,role:$("facialPartRole").value,viseme:$("facialPartViseme").value,imageUrl:$("facialPartImageUrl").value,x:Number($("facialPartX").value),y:Number($("facialPartY").value),width:Number($("facialPartWidth").value),height:Number($("facialPartHeight").value),rotation:Number($("facialPartRotation").value)*Math.PI/180,zIndex:Number($("facialPartZIndex").value)});
  if(result.status==="invalid"){$("facialEditorStatus").textContent=result.issues.map(issue=>issue.message).join(" ");return;}
  sceneMetadata[sceneIndex]=result.scene;
  const draftSaved=writeLocalStorage("dravex-cartoon-draft",JSON.stringify({idea:$("idea").value,character:$("character").value,style:$("style").value,canvasFormat:activeCanvasFormat,imageQuality:$("imageQuality").value,duration:$("duration").value,language:$("language").value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
