@@ -50,6 +50,8 @@ test('builds a universal prompt without assuming a cartoon-only request', () => 
   assert.match(prompt, /Analyze a product demo and create subtitles/);
   assert.match(prompt, /sceneNumber:N/);
   assert.match(prompt, /currently selected scene/);
+  assert.match(prompt, /image\.generate\.horde/);
+  assert.match(prompt, /separate AI Horde image consent/);
   assert.match(prompt, /film\.compose/);
   assert.match(prompt, /all per-scene video-generation steps/);
   assert.match(prompt, /dialogue\.generate/);
