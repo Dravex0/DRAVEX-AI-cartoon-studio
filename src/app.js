@@ -292,6 +292,7 @@ universalCapabilityRegistry.register({
  privacy:'remote',
  consentKey:'ai-horde-image',
  isAvailable:context=>universalImageGenerationCapability.isAvailable(context),
+ canRunWithoutConsent:context=>universalImageGenerationCapability.canRunWithoutConsent(context),
  run:async context=>{
   persistCurrentSceneEditorToMetadata();
   return universalImageGenerationCapability.run(context);
