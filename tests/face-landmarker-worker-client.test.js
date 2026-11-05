@@ -57,7 +57,14 @@ test("rejects invalid frame inputs without posting them", async () => {
 test("does not allow concurrent requests", async () => {
   let resolveMessage;
   const worker = new FakeWorker();
-  worker.postMessage = message => { worker.messages.push(message); resolveMessage = () => worker.onmessage?.({ data: { id: message.id, ok: true, result: { status: "ready" } } }); };
+  worker.postMessage = message => {
+    worker.messages.push(message);
+    if (message.type === "dispose") {
+      queueMicrotask(() => worker.onmessage?.({ data: { id: message.id, ok: true, result: { status: "disposed" } } }));
+    } else {
+      resolveMessage = () => worker.onmessage?.({ data: { id: message.id, ok: true, result: { status: "ready" } } });
+    }
+  };
   const client = createFaceLandmarkerWorkerClient({ workerFactory: () => worker });
   const first = client.initialize();
   await assert.rejects(client.initialize(), /already running/);
