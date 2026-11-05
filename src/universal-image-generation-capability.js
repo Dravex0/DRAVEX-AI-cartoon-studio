@@ -48,7 +48,10 @@ export function createUniversalImageGenerationCapability({
     try {
       const scenes = getScenes();
       const targets = resolve(step);
-      return targets.ok && targets.indices.some(index => !isImageReady(scenes[index]));
+      if (!targets.ok || !targets.indices.length) return false;
+      const missing = targets.indices.some(index => !isImageReady(scenes[index]));
+      const allReady = targets.indices.every(index => isImageReady(scenes[index]));
+      return missing || (Boolean(step) && allReady);
     } catch { return false; }
   }
 
@@ -93,9 +96,7 @@ export function createUniversalImageGenerationCapability({
           fingerprint: fingerprint(scenes[index])
         }));
       if (!targetScenes.length) {
-        const error = new Error('No storyboard scenes need a new image; existing images were preserved.');
-        error.code = 'SCENE_IMAGES_ALREADY_READY';
-        throw error;
+        return { type: 'scene-images', sceneIds: [], imageCount: 0, allScenes: targets.allScenes === true, shared: false, remote: true, alreadyReady: true };
       }
 
       const generated = [];
