@@ -256,7 +256,8 @@ const universalImageGenerationCapability=createUniversalImageGenerationCapabilit
   });
   return result;
  },
- onSceneGenerated:async({scene,result})=>{
+ onSceneGenerated:async({scene,result,signal})=>{
+  await waitForSceneImageReady(result.imageUrl,{signal});
   const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===String(scene.id||''));
   if(resolvedIndex<0)throw new Error('The target scene was removed before its generated image could be saved.');
   sceneMetadata[resolvedIndex]={
@@ -593,6 +594,42 @@ facialAssetStorage.get(assetId).then(record=>{if(!record?.blob)throw new Error("
 }
 return entry.state==='ready'&&entry.image.naturalWidth>0?entry.image:null;
 }
+function waitForSceneImageReady(url,{signal,timeoutMs=15000}={}){
+ const key=String(url||'').trim();
+ if(!key)return Promise.reject(new Error('Generated scene image URL is empty.'));
+ if(signal?.aborted)return Promise.reject(new DOMException('Image loading was cancelled.','AbortError'));
+ getLoadedSceneImage(key);
+ const entry=sceneImageCache.get(key);
+ if(!entry?.image)return Promise.reject(new Error('Generated scene image could not be initialized in the browser.'));
+ if(entry.state==='ready'&&entry.image.naturalWidth>0)return Promise.resolve({width:entry.image.naturalWidth,height:entry.image.naturalHeight});
+ if(entry.state==='error')return Promise.reject(new Error('Generated scene image cannot be loaded for browser composition (network or CORS restriction).'));
+ return new Promise((resolve,reject)=>{
+  const image=entry.image;
+  let timer=null,settled=false;
+  const cleanup=()=>{
+   if(timer!==null)clearTimeout(timer);
+   image.removeEventListener('load',onLoad);
+   image.removeEventListener('error',onError);
+   signal?.removeEventListener('abort',onAbort);
+  };
+  const finish=(handler,value)=>{
+   if(settled)return;
+   settled=true;cleanup();handler(value);
+  };
+  const onLoad=()=>{
+   if(entry.state==='ready'&&image.naturalWidth>0)finish(resolve,{width:image.naturalWidth,height:image.naturalHeight});
+   else finish(reject,new Error('Generated scene image loaded without valid dimensions.'));
+  };
+  const onError=()=>finish(reject,new Error('Generated scene image cannot be loaded for browser composition (network or CORS restriction).'));
+  const onAbort=()=>finish(reject,new DOMException('Image loading was cancelled.','AbortError'));
+  image.addEventListener('load',onLoad);
+  image.addEventListener('error',onError);
+  signal?.addEventListener('abort',onAbort,{once:true});
+  timer=setTimeout(()=>finish(reject,new Error('Timed out while loading the generated scene image.')),Math.max(1000,Math.min(30000,Number(timeoutMs)||15000)));
+  if(image.complete){if(image.naturalWidth>0)onLoad();else if(entry.state==='error')onError();}
+ });
+}
+
 async function stopSceneVoicePreview(){
  previewVoiceRequestToken++;
  const session=previewVoiceSession;previewVoiceSession=null;previewMouthTracks=[];previewMouthOriginTimeMs=null;
