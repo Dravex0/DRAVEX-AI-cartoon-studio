@@ -174,3 +174,24 @@ test("invalid capture results are counted without crashing the analysis", async 
   assert.match(report.errors[0].message, /ImageBitmap/);
   assert.equal(client.calls.length, 0);
 });
+
+
+test("publishes face landmarks from each detected frame", async () => {
+  const client = makeClient([
+    { status: "face-detected", faceCount: 1, anchors: { mouthCenter: { x: 0.5, y: 0.6 }, mouthOpenRatio: 0.2 } },
+    { status: "no-face", faceCount: 0, anchors: null }
+  ]);
+  const results = [];
+  const report = await analyzeFaceVideoFrames({
+    durationMs: 1000,
+    sampleIntervalMs: 500,
+    captureFrame: async () => makeFrame(),
+    workerClient: client,
+    onFrameResult: result => results.push(result)
+  });
+  assert.equal(report.detected, 1);
+  assert.equal(results.length, 2);
+  assert.deepEqual(results[0].anchors.mouthCenter, { x: 0.5, y: 0.6 });
+  assert.equal(results[0].status, "face-detected");
+  assert.equal(results[1].status, "no-face");
+});
