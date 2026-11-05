@@ -52,9 +52,11 @@ test('does not overwrite an existing scene image', async () => {
     onSceneGenerated: async () => {}
   });
   assert.equal(capability.isAvailable(), false);
-  await assert.rejects(capability.run({ plan, step: { requiredCapabilities: ['image.generate.horde'], inputs: ['allScenes'] } }), {
-    code: 'SCENE_IMAGES_ALREADY_READY'
-  });
+  const resumeStep = { requiredCapabilities: ['image.generate.horde'], inputs: ['allScenes'] };
+  assert.equal(capability.isAvailable({ step: resumeStep }), true);
+  const result = await capability.run({ plan, step: resumeStep });
+  assert.equal(result.alreadyReady, true);
+  assert.equal(result.imageCount, 0);
   assert.equal(calls, 0);
 });
 
