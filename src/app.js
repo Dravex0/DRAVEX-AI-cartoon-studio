@@ -486,7 +486,7 @@ function attachSceneVideo(index,meta,blob,filename){
  const fitDuration=()=>fitSceneVideoToDuration(video,sceneDuration);
  video.addEventListener("loadedmetadata",fitDuration,{once:true});
  if(video.readyState>=1)fitDuration();
- video.addEventListener("loadeddata",()=>{fitDuration();if(sceneIndex===index)draw()},{once:true});
+ video.addEventListener("loadeddata",()=>{fitDuration();updateFaceAnalysisControls();if(sceneIndex===index)draw()},{once:true});
  const entry={video,url,filename};
  sceneVideoCache.set(key,entry);
  if(index===sceneIndex)syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:key,shouldPlay:playing,restart:true});
