@@ -1549,7 +1549,7 @@ $('localModelConsent').addEventListener('change',()=>{$('loadLocalModel').disabl
 $('loadLocalModel').addEventListener('click',async()=>{
 const button=$('loadLocalModel'),status=$('localModelStatus'),ru=uiLang==='ru';
 if(!$('localModelConsent').checked){status.textContent=ru?'Сначала подтверди загрузку весов модели с Hugging Face.':'First confirm the model download from Hugging Face.';return}
-if(button.disabled)return;button.disabled=true;$('runLocalModel').disabled=true;
+if(button.disabled)return;button.disabled=true;$('runLocalModel').disabled=true;$('planUniversalTask').disabled=true;
 status.textContent=ru?'Загружаем модель с Hugging Face. Первый запуск требует интернета; генерация будет выполняться на устройстве…':'Downloading model weights from Hugging Face. First load requires internet; generation will run on this device…';
 try{
 const result=await localTextRuntime.load({backend:'auto',onProgress:event=>{
@@ -1565,7 +1565,7 @@ $('runLocalModel').addEventListener('click',async()=>{
 const button=$('runLocalModel'),status=$('localModelStatus'),output=$('localModelOutput'),ru=uiLang==='ru';
 const story=$('idea').value.trim();
 if(!story){status.textContent=ru?'Сначала введи историю.':'Enter a story first.';return}
-if(button.disabled)return;button.disabled=true;status.textContent=ru?'Локальный AI-режиссёр создаёт варианты сцен и проверяет их…':'Local AI director is drafting and evaluating the scenes…';output.hidden=true;
+if(button.disabled||activeUniversalPlanController)return;button.disabled=true;$('planUniversalTask').disabled=true;status.textContent=ru?'Локальный AI-режиссёр создаёт варианты сцен и проверяет их…':'Local AI director is drafting and evaluating the scenes…';output.hidden=true;
 try{
 const language=storyLanguage(),languageName={ru:'Russian',uk:'Ukrainian',en:'English',es:'Spanish'}[language]||'English';
 const character=resolveStoryProtagonist(story,$('character').value,language);
@@ -1581,7 +1581,7 @@ status.textContent=(ru?'AI-вариант не прошёл проверку. О
 }
 output.textContent=JSON.stringify({usedLocalModel:result.usedLocalModel,score:result.evaluation?.overallScore??null,issues:result.evaluation?.issues||[],fallbackReason:result.fallbackReason},null,2);output.hidden=false;
 }catch(error){status.textContent=(ru?'Локальный режиссёр не сработал: ':'Local director failed: ')+(error?.message||'Unknown error');}
-finally{button.disabled=false;}
+finally{button.disabled=false;$('planUniversalTask').disabled=!localTextRuntime.status.loaded;}
 });
 
 
@@ -1593,7 +1593,7 @@ if(!localTextRuntime.status.loaded){status.textContent=ru?'Сначала заг
 if(activeUniversalPlanController)return;
 const controller=new AbortController();
 activeUniversalPlanController=controller;
-button.disabled=true;cancel.disabled=false;output.hidden=true;
+button.disabled=true;cancel.disabled=false;$('runLocalModel').disabled=true;output.hidden=true;
 status.textContent=ru?'Универсальный ИИ анализирует запрос и строит план на этом устройстве. Это может занять время…':'Universal AI is analysing the request and building a plan on this device. This may take a while…';
 try{
 const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024});
@@ -1628,7 +1628,7 @@ status.textContent=ru?'План задачи создан. Следующий э
 status.textContent=(ru?'Ошибка планировщика: ':'Planner error: ')+(error?.message||'Unknown error');
 }finally{
 if(activeUniversalPlanController===controller)activeUniversalPlanController=null;
-button.disabled=false;cancel.disabled=true;
+button.disabled=false;cancel.disabled=true;$('runLocalModel').disabled=!localTextRuntime.status.loaded;
 }
 });
 $('cancelUniversalPlan').addEventListener('click',()=>{
