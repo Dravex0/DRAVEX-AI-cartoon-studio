@@ -1,5 +1,6 @@
 import { createCharacterRigMotionPreset } from './character-rig-motion-presets.js';
 import { sampleCharacterRigTimeline } from './character-rig-timeline.js';
+import { validateCharacterRig } from './character-rig.js';
 
 const norm = value => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 function roleOf(id) {
@@ -24,13 +25,14 @@ export function auditCharacterActionPose(rigInput, presetName) {
     preset: presetName, checks: [], issues: generated.issues || [],
     limitation: 'No rendered-pixel or semantic-action verification is performed.'
   };
+  const rig = validateCharacterRig(rigInput).rig;
   const roles = new Map();
-  for (const bone of generated.rig.bones) {
+  for (const bone of rig.bones) {
     const role = roleOf(bone.id);
     if (!roles.has(role)) roles.set(role, []);
     roles.get(role).push(bone.id);
   }
-  const characterId = generated.rig.characterId;
+  const characterId = rig.characterId;
   const pose = time => sampleCharacterRigTimeline(generated.timeline, time)[characterId] || {};
   const v = (time, role, field = 'rotation') => (roles.get(role) || [])
     .reduce((sum, id) => sum + (Number(pose(time)[id]?.[field]) || 0), 0);
