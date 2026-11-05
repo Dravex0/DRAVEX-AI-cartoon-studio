@@ -1,5 +1,38 @@
 import { analyzeVideoFrameSequence } from "./video-frame-motion-metrics.js";
 
+function getVideoTimeline(video) {
+  const duration = Number(video.duration);
+  if (Number.isFinite(duration) && duration > 0) return { start: 0, end: duration };
+
+  let ranges;
+  try { ranges = video.seekable; } catch { return null; }
+  if (!ranges || !Number.isInteger(ranges.length) || ranges.length < 1 ||
+      typeof ranges.start !== "function" || typeof ranges.end !== "function") return null;
+
+  let timeline = null;
+  for (let index = 0; index < ranges.length; index += 1) {
+    try {
+      const start = Number(ranges.start(index));
+      const end = Number(ranges.end(index));
+      if (Number.isFinite(start) && Number.isFinite(end) && end > start &&
+          (!timeline || end - start > timeline.end - timeline.start)) {
+        timeline = { start, end };
+      }
+    } catch {}
+  }
+  return timeline;
+}
+
+function sampleVideoTime(timeline, fraction) {
+  const lastSampleTime = Math.max(timeline.start, timeline.end - 0.01);
+  const requestedTime = timeline.start + (timeline.end - timeline.start) * fraction;
+  return Math.min(lastSampleTime, Math.max(timeline.start, requestedTime));
+}
+
+function clampVideoTime(time, timeline) {
+  return Math.min(Math.max(timeline.start, time), Math.max(timeline.start, timeline.end - 0.01));
+}
+
 /**
  * Browser-local motion check for a decoded scene video.
  * Pixel-change heuristic only; it does not recognize semantic actions or quality.
@@ -51,9 +84,10 @@ export async function analyzeSceneVideoMotion(video, {
   if (![width, height].every(value => Number.isInteger(value) && value > 0 && value <= 128)) {
     throw new RangeError("Frame analysis dimensions must be integers from 1 to 128.");
   }
-  if (!Number.isFinite(Number(video.duration)) || video.duration <= 0 ||
+  const timeline = getVideoTimeline(video);
+  if (!timeline ||
       !Number.isFinite(Number(video.videoWidth)) || video.videoWidth <= 0 || video.readyState < 2) {
-    throw new Error("Scene video must have a decoded frame and a finite duration.");
+    throw new Error("Scene video must have a decoded frame and a finite duration or seekable range.");
   }
   if (typeof canvasFactory !== "function") throw new TypeError("canvasFactory must be a function.");
   const canvas = canvasFactory();
@@ -70,7 +104,7 @@ export async function analyzeSceneVideoMotion(video, {
   try {
     for (let index = 0; index < sampleCount; index += 1) {
       const fraction = 0.08 + (0.84 * index) / (sampleCount - 1);
-      const targetTime = Math.min(Math.max(0, video.duration - 0.01), video.duration * fraction);
+      const targetTime = sampleVideoTime(timeline, fraction);
       await waitForSeek(video, targetTime, timeoutMs);
       context.drawImage(video, 0, 0, width, height);
       frames.push(framePixelValues(context.getImageData(0, 0, width, height)));
@@ -81,7 +115,7 @@ export async function analyzeSceneVideoMotion(video, {
     }
     throw error;
   } finally {
-    try { await waitForSeek(video, Math.min(originalTime, Math.max(0, video.duration - 0.01)), timeoutMs); } catch {}
+    try { await waitForSeek(video, clampVideoTime(originalTime, timeline), timeoutMs); } catch {}
     if (!wasPaused) {
       const playback = video.play?.();
       if (playback && typeof playback.catch === "function") playback.catch(() => {});
@@ -143,9 +177,10 @@ export async function captureSceneVideoFrameSamples(video, {
   if (![width, height].every(value => Number.isInteger(value) && value > 0 && value <= 512)) {
     throw new RangeError("Frame capture dimensions must be integers from 1 to 512.");
   }
-  if (!Number.isFinite(Number(video.duration)) || video.duration <= 0 ||
+  const timeline = getVideoTimeline(video);
+  if (!timeline ||
       !Number.isFinite(Number(video.videoWidth)) || video.videoWidth <= 0 || video.readyState < 2) {
-    throw new Error("Scene video must have a decoded frame and a finite duration.");
+    throw new Error("Scene video must have a decoded frame and a finite duration or seekable range.");
   }
   if (typeof canvasFactory !== "function") throw new TypeError("canvasFactory must be a function.");
   const canvas = canvasFactory();
@@ -162,7 +197,7 @@ export async function captureSceneVideoFrameSamples(video, {
   try {
     for (let index = 0; index < sampleCount; index += 1) {
       const fraction = sampleCount === 1 ? 0.5 : 0.08 + (0.84 * index) / (sampleCount - 1);
-      const time = Math.min(Math.max(0, video.duration - 0.01), video.duration * fraction);
+      const time = sampleVideoTime(timeline, fraction);
       await waitForSeek(video, time, timeoutMs);
       context.drawImage(video, 0, 0, width, height);
       samples.push({ time: Number(time.toFixed(2)), dataUrl: canvas.toDataURL("image/jpeg", 0.72) });
@@ -173,7 +208,7 @@ export async function captureSceneVideoFrameSamples(video, {
     }
     throw error;
   } finally {
-    try { await waitForSeek(video, Math.min(originalTime, Math.max(0, video.duration - 0.01)), timeoutMs); } catch {}
+    try { await waitForSeek(video, clampVideoTime(originalTime, timeline), timeoutMs); } catch {}
     if (!wasPaused) {
       const playback = video.play?.();
       if (playback && typeof playback.catch === "function") playback.catch(() => {});
