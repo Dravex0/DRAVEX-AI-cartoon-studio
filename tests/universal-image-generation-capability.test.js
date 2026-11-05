@@ -69,6 +69,7 @@ test('does not overwrite an existing scene image', async () => {
   const result = await capability.run({ plan, step: resumeStep });
   assert.equal(result.alreadyReady, true);
   assert.equal(result.imageCount, 0);
+  assert.equal(result.remote, false);
   assert.equal(calls, 0);
 });
 
