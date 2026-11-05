@@ -1456,20 +1456,22 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
   targetIndices=[target.index];
  }else targetIndices=[sceneIndex];
  if(!targetIndices.length)throw new Error(voiceText('Нет сцен для озвучивания.','There are no scenes to voice.'));
+ const targets=targetIndices.map(index=>({sceneId:String(sceneMetadata[index]?.id||''),dialogue:sceneDialogueLinesAt(index,locale,currentDialogueText,currentSceneId)}));
  const engine=getSceneVoiceEngine();
  if(!engine.status.loaded||engine.status.locale!==locale)throw new Error(voiceText('Сначала загрузи модель для выбранного языка.','Load the model for the selected language first.'));
  if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
  let savedMap={};
  try{const parsed=JSON.parse(readLocalStorage('dravex-character-voice-map')||'{}');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))savedMap=parsed}catch{}
- let overallTotal=0;
- for(const index of targetIndices)overallTotal+=sceneDialogueLinesAt(index,locale,currentDialogueText,currentSceneId).length;
+ const overallTotal=targets.reduce((total,target)=>total+target.dialogue.length,0);
  let overallIndex=0,lineCount=0,totalDurationMs=0,persistedInDraft=true;
  const sceneIds=[];
- for(const targetIndex of targetIndices){
+ for(const target of targets){
   if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
+  const targetId=target.sceneId;
+  const targetIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===targetId);
+  if(targetIndex<0)throw new Error('A target scene was removed during voice generation.');
   const targetMeta={...(sceneMetadata[targetIndex]||{})};
-  const targetId=String(targetMeta.id||('scene-'+(targetIndex+1)));
-  const dialogue=sceneDialogueLinesAt(targetIndex,locale,currentDialogueText,currentSceneId);
+  const dialogue=target.dialogue;
   if(!dialogue.length)continue;
   const assignments=assignCharacterVoices({
    speakers:dialogue.map(line=>line.characterId),
