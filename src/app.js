@@ -1755,7 +1755,7 @@ $('executeUniversalTask').addEventListener('click',async()=>{
  activeUniversalExecutionController=controller;
  button.disabled=true;cancel.disabled=false;
  $('planUniversalTask').disabled=true;$('runLocalModel').disabled=true;$('generateSceneVoices').disabled=true;
- status.textContent=ru?'Выполняем локальную раскадровку…':'Executing local storyboard step…';
+ status.textContent=ru?'Выполняем подключённые локальные этапы…':'Executing registered local task steps…';
  try{
   const result=await executeUniversalTaskPlan({
    plan,
