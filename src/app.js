@@ -1466,6 +1466,15 @@ async function generateSceneDialoguesForUniversal({plan,step,signal,reportProgre
  const allScenes=resolution.allScenes;
  const currentSceneId=String(sceneMetadata[sceneIndex]?.id||'');
  const currentDialogueText=$('sceneDialogue').value;
+ const selectedSceneIndex=sceneMetadata.findIndex(scene=>scene&&String(scene.id||'')===currentSceneId);
+ const selectedDialogue=parseDialogueLines(currentDialogueText,locale);
+ if(selectedSceneIndex>=0&&selectedDialogue.length){
+  sceneMetadata[selectedSceneIndex]={...sceneMetadata[selectedSceneIndex],dialogue:selectedDialogue};
+  writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
+   idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
+   language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
+  }));
+ }
  const initialSceneIds=sceneMetadata.map(scene=>String(scene?.id||''));
  const targets=resolution.indices
   .filter(index=>sceneDialogueLinesAt(index,locale,currentDialogueText,currentSceneId).length===0)
@@ -1549,7 +1558,7 @@ function isLocalSceneVoiceEngineLoaded(){
 function sceneDialogueLinesAt(index,locale=storyLanguage(),currentText=$('sceneDialogue').value,currentSceneId=String(sceneMetadata[sceneIndex]?.id||'')){
  const meta=sceneMetadata[index]||{};
  const id=String(meta.id||'');
- const source=id&&id===currentSceneId?currentText:formatDialogueLines(meta.dialogue);
+ const source=id&&id===currentSceneId&&String(currentText||'').trim()?currentText:formatDialogueLines(meta.dialogue);
  return parseDialogueLines(source,locale);
 }
 
