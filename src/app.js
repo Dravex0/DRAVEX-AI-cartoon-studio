@@ -49,6 +49,7 @@ import { createSceneFrameContactSheet } from "./scene-frame-contact-sheet.js";
 import { buildCompositedCharacterRegions, sampleCanvasRegion, analyzeCharacterRegionFrames } from "./scene-character-region.js";
 import { buildBackgroundControlRegions, classifyCharacterBackgroundMotion } from "./scene-motion-separation.js";
 import { buildCharacterBodyPartRegions } from "./character-rig-body-regions.js";
+import { createCharacterBodyPartContactSheet } from "./character-motion-evidence.js";
 import { summarizeSceneMotionResults } from "./scene-motion-results.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
@@ -121,6 +122,7 @@ context.globalAlpha=1;
 }
 }
 let characterMotionAudit = null;
+let lastCharacterMotionAuditEvidence = [];
 const CHARACTER_MOTION_SAMPLE_PROGRESS = [0.1, 0.3, 0.5, 0.7, 0.9];
 function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewportWidth, viewportHeight, camera, focusX, focusY, rigPoses }) {
  if (!characterMotionAudit) return;
@@ -266,6 +268,13 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
    bodyPartSummaries.push(entry.characterId + ' / ' + entry.bodyPart + ': ' + statusLabel
     + ' (' + entry.frames.length + '/5)');
   }
+  lastCharacterMotionAuditEvidence = [...characterMotionAudit.bodyPartFrames.values()].map(entry => ({
+   characterId: entry.characterId, bodyPart: entry.bodyPart, frames: [...entry.frames]
+  }));
+  $('downloadCharacterMotionEvidence').disabled = lastCharacterMotionAuditEvidence.length === 0;
+  $('downloadCharacterMotionEvidence').textContent = uiLang === 'ru'
+   ? 'Скачать визуальные доказательства движения'
+   : 'Download visual motion evidence';
   $('characterMotionAuditStatus').textContent = (uiLang === 'ru'
    ? 'Сравнение движения персонажа и фона завершено. '
    : 'Character/background motion comparison completed. ')
@@ -2161,6 +2170,34 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
 });
 
 $('play').onclick=()=>{playing=!playing;$('play').textContent=playing?tr('pauseButton'):tr('playButton');syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:playing});if(playing){if(!raf)draw();void startSceneVoicePreview(sceneIndex)}else{void stopSceneVoicePreview()}};
+$('downloadCharacterMotionEvidence').onclick=async()=>{
+ const button=$('downloadCharacterMotionEvidence');
+ if(button.disabled||!lastCharacterMotionAuditEvidence.length)return;
+ button.disabled=true;
+ const previousLabel=button.textContent;
+ button.textContent=uiLang==='ru'?'Готовим таблицу кадров…':'Preparing frame sheet…';
+ try{
+  const blob=await createCharacterBodyPartContactSheet(lastCharacterMotionAuditEvidence);
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download='dravex-character-motion-evidence.jpg';
+  link.hidden=true;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  button.textContent=uiLang==='ru'?'Таблица кадров скачана':'Evidence sheet downloaded';
+ }catch(error){
+  console.warn('Could not create character motion evidence:',error);
+  button.textContent=(uiLang==='ru'?'Ошибка: ':'Error: ')+String(error?.message||'');
+ }finally{
+  setTimeout(()=>{
+   button.disabled=lastCharacterMotionAuditEvidence.length===0;
+   button.textContent=previousLabel;
+  },1800);
+ }
+};
 $('analyzeCharacterMotion').onclick=()=>{
  if(characterMotionAudit){
   characterMotionAudit=null;
@@ -2174,6 +2211,8 @@ $('analyzeCharacterMotion').onclick=()=>{
    :'Attach a character sprite layer or validated rig to this scene first. The procedural demo character is not included in this check yet.';
   return;
  }
+ lastCharacterMotionAuditEvidence = [];
+ $('downloadCharacterMotionEvidence').disabled = true;
  characterMotionAudit={sceneIndex,startProgress:null,targets:[],nextSample:0,frames:new Map(),backgroundFrames:new Map(),backgroundControlIds:null,blockedBackgroundControlIds:new Set(),bodyPartFrames:new Map()};
  sceneMotionSceneIndex=-1;
  $('characterMotionAuditStatus').textContent=uiLang==='ru'
