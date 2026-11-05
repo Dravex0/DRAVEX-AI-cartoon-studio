@@ -148,7 +148,7 @@ universalCapabilityRegistry.register({
  privacy:'local',
  isAvailable:()=>Boolean(localTextRuntime.status.loaded&&sceneMetadata.length>0),
  run:async({plan,step,signal,reportProgress})=>{
-  if(!/(dialogue|speech|voice|narrat|script|реплик|диалог|голос|озвуч|текст)/i.test(String(plan?.sourceRequest||''))){
+  if(!/(dialogue|speech|spoken|voice|voiceover|narrat|script|реплик|диалог|голос|озвуч|текст)/i.test(String(plan?.sourceRequest||''))){
    const error=new Error('The dialogue writer only accepts explicit dialogue, speech, narration, or voice requests.');
    error.code='CAPABILITY_REQUEST_MISMATCH';
    throw error;
