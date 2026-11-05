@@ -572,7 +572,7 @@ async function runFaceAnalysis({resume=false}={}){
    startTimeMs,
    signal:controller.signal,
    onProgress:detail=>{
-    $('faceAnalysisProgress').value=detail.percent;
+    $('faceAnalysisProgress').value=Math.round(Math.min(durationMs,detail.currentTimestampMs+interval)/durationMs*100);
     $('faceAnalysisStatus').textContent=(uiLang==='ru'?'Анализ: ':'Analyzing: ')+detail.percent+'% · '+detail.processed+'/'+detail.total+
      (uiLang==='ru'?' · лиц обнаружено: ':' · faces detected: ')+detail.detected;
    },
