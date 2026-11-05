@@ -44,14 +44,17 @@ async function handleMessage(message) {
       return;
     }
     if (type === "process-frame") {
-      if (!landmarker) throw new Error("Face landmark worker is not initialized.");
       const frame = message.frame;
-      const timestampMs = Number(message.timestampMs);
-      if (!frame || typeof frame.close !== "function" || !Number.isFinite(timestampMs) || timestampMs < 0) {
-        throw new TypeError("A transferable ImageBitmap and non-negative timestamp are required.");
-      }
-      if (timestampMs <= lastTimestampMs) throw new RangeError("Video frame timestamps must increase monotonically.");
       try {
+        if (!frame || typeof frame.close !== "function") {
+          throw new TypeError("A transferable ImageBitmap is required.");
+        }
+        if (!landmarker) throw new Error("Face landmark worker is not initialized.");
+        const timestampMs = Number(message.timestampMs);
+        if (!Number.isFinite(timestampMs) || timestampMs < 0) {
+          throw new TypeError("A non-negative frame timestamp is required.");
+        }
+        if (timestampMs <= lastTimestampMs) throw new RangeError("Video frame timestamps must increase monotonically.");
         const detection = landmarker.detectForVideo(frame, timestampMs);
         lastTimestampMs = timestampMs;
         const faces = Array.isArray(detection?.faceLandmarks) ? detection.faceLandmarks : [];
@@ -68,7 +71,7 @@ async function handleMessage(message) {
           timestampMs
         } });
       } finally {
-        frame.close();
+        frame?.close?.();
       }
       return;
     }
