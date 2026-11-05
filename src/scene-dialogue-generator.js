@@ -63,6 +63,16 @@ export function buildSceneDialoguePrompt({
   const allowedCharacters = Array.isArray(scene.characters) && scene.characters.length
     ? scene.characters.map(value => clean(value, 120)).filter(Boolean)
     : [clean(mainCharacter, 120)].filter(Boolean);
+  const allowedKeys = new Set(allowedCharacters.map(value => value.toLocaleLowerCase()));
+  const relevantBible = (Array.isArray(characterBible) ? characterBible : [])
+    .filter(profile => profile && allowedKeys.has(clean(profile.characterId, 120).toLocaleLowerCase()))
+    .slice(0, 4)
+    .map(profile => ({
+      characterId: clean(profile.characterId, 120),
+      visualDescription: clean(profile.visualDescription, 220),
+      clothing: clean(profile.clothing, 140),
+      distinctiveFeatures: clean(profile.distinctiveFeatures, 140)
+    }));
   return [
     'You are DRAVEX, a careful dialogue writer for an animated film.',
     'Write short, natural spoken lines for exactly one storyboard scene. Do not rewrite the scene or add new events.',
@@ -72,14 +82,14 @@ export function buildSceneDialoguePrompt({
     'Do not invent characters, locations, objects, backstory, causes, or outcomes. Dialogue may express a reaction to facts already stated, but must not introduce new plot facts.',
     'Do not include stage directions, camera directions, sound effects, markdown, or speaker prefixes inside text.',
     'Write every line in this language: ' + locale + '.',
-    'CHARACTER BIBLE: ' + JSON.stringify(Array.isArray(characterBible) ? characterBible.slice(0, 12) : []),
-    'USER REQUEST: ' + clean(sourceRequest, 4000),
+    'CHARACTER BIBLE: ' + JSON.stringify(relevantBible),
+    'USER REQUEST: ' + clean(sourceRequest, 1800),
     'SCENE ' + sceneNumber + ' OF ' + sceneCount + ': ' + JSON.stringify({
       id: clean(scene.id, 120),
       title: clean(scene.title, 200),
       storyDetail: clean(scene.storyDetail, 1200),
       visibleAction: clean(scene.visibleAction, 1000),
-      description: clean(scene.description || scene.prompt, 1800),
+      description: clean(scene.description || scene.prompt, 800),
       characters: allowedCharacters
     })
   ].join('\n\n');
