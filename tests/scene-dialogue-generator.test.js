@@ -53,7 +53,7 @@ test('allows narrator only as a declared fallback speaker', () => {
 });
 
 test('repairs a trailing comma without changing quoted dialogue text', () => {
-  const result = validateSceneDialogueResponse('{"dialogue":[{"characterId":"Mira","text":"Look, a key, right?","},]}', {
+  const result = validateSceneDialogueResponse('{"dialogue":[{"characterId":"Mira","text":"Look, a key, right?",},]}', {
     scene, language: 'en'
   });
   assert.equal(result.ok, true);
