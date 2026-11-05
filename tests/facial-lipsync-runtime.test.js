@@ -46,3 +46,21 @@ test("returns neutral empty controls outside cue intervals or for malformed inpu
   ], 0, 99), { facialVisemes: {}, facialMouthOpenness: {}, activeCharacterIds: [] });
   assert.deepEqual(sampleCharacterFacialLipSync(null, 0, 0), { facialVisemes: {}, facialMouthOpenness: {}, activeCharacterIds: [] });
 });
+
+
+test("holds a neutral mouth when timestamped visemes overlap effective audio silence", () => {
+  const result = sampleCharacterFacialLipSync([
+    track("Foxy", 0, 0, ["open", "round", "teeth"], [0, 0.01, 0])
+  ], 0, 150);
+  assert.equal(result.facialVisemes.Foxy, "neutral");
+  assert.equal(result.facialMouthOpenness.Foxy, 0.005);
+  assert.deepEqual(result.activeCharacterIds, ["Foxy"]);
+});
+
+test("preserves timestamped visemes when the dialogue waveform is audible", () => {
+  const result = sampleCharacterFacialLipSync([
+    track("Foxy", 0, 0, ["closed", "round"], [0.2, 0.04])
+  ], 0, 150);
+  assert.equal(result.facialVisemes.Foxy, "round");
+  assert.equal(result.facialMouthOpenness.Foxy, 0.04);
+});

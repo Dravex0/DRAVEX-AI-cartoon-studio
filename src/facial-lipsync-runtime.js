@@ -2,6 +2,7 @@ import { sampleAudioMouthEnvelope } from "./audio-mouth-envelope.js";
 import { sampleVisemeTimeline } from "./viseme-timeline.js";
 
 const MAX_TRACKS = 2000;
+const MIN_VISEME_ACTIVITY = 0.025;
 const cleanId = value => String(value ?? "").trim().slice(0, 120);
 const isRecord = value => Boolean(value && typeof value === "object" && !Array.isArray(value));
 
@@ -33,8 +34,12 @@ export function sampleCharacterFacialLipSync(tracks, sceneIndex, elapsedMs) {
 
   for (const [characterId, active] of activeByCharacter) {
     try {
-      result.facialVisemes[characterId] = sampleVisemeTimeline(active.track.visemes, active.localTimeMs);
-      result.facialMouthOpenness[characterId] = sampleAudioMouthEnvelope(active.track.envelope, active.localTimeMs);
+      const mouthOpenness = sampleAudioMouthEnvelope(active.track.envelope, active.localTimeMs);
+      const timestampedViseme = sampleVisemeTimeline(active.track.visemes, active.localTimeMs);
+      // Model timestamps can extend across low-energy tails. Do not animate a
+      // phoneme-specific mouth image when the dialogue waveform is effectively silent.
+      result.facialVisemes[characterId] = mouthOpenness < MIN_VISEME_ACTIVITY ? "neutral" : timestampedViseme;
+      result.facialMouthOpenness[characterId] = mouthOpenness;
       result.activeCharacterIds.push(characterId);
     } catch {
       delete result.facialVisemes[characterId];
