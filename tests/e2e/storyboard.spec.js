@@ -243,7 +243,7 @@ test('exposes safe universal-plan execution controls without enabling an unplann
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
-  await page.locator('details.simple-options > summary').click();
+  await page.locator('details.simple-options').filter({ hasText: 'Optional local AI tools' }).locator('summary').click();
   await expect(page.locator('#planUniversalTask')).toBeVisible();
   await expect(page.locator('#executeUniversalTask')).toBeVisible();
   await expect(page.locator('#executeUniversalTask')).toBeDisabled();
