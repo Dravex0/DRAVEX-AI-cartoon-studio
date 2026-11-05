@@ -12,6 +12,7 @@ import { createUniversalCapabilityRegistry, bindUniversalPlanCapabilities } from
 import { executeUniversalTaskPlan } from "./universal-task-executor.js";
 import { createUniversalLocalVideoCapability } from "./universal-local-video-capability.js";
 import { createUniversalRemoteVideoCapability } from "./universal-remote-video-capability.js";
+import { createUniversalFilmCompositionCapability } from "./universal-film-composition-capability.js";
 import { resolveUniversalSceneTarget } from "./universal-scene-target.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
@@ -170,6 +171,15 @@ universalCapabilityRegistry.register(createUniversalRemoteVideoCapability({
  isAvailable:context=>isRemoteVideoGenerationReady(context),
  hasConsent:()=>universalCapabilityRegistry.remoteConsent&&$('hfVideoConsent').checked===true,
  generateScene:context=>generateRemoteSceneVideoForUniversal(context)
+}));
+universalCapabilityRegistry.register(createUniversalFilmCompositionCapability({
+ getSceneReport:()=>buildSceneMediaReport(sceneMetadata,new Set(sceneVideoCache.keys())),
+ composeFilm:async({signal,reportProgress,sceneCount})=>{
+  const result=await exportFilm({signal,requireAllVideos:true,download:true,onProgress:detail=>reportProgress?.(detail?.phase==='recording'?'Recording final film: '+detail.percent+'%':detail?.phase==='scene'?'Composing scene '+(detail.sceneIndex+1)+' / '+detail.sceneCount:String(detail||''))});
+  if(result?.status!=='completed')throw new Error(result?.reason||'Full-film WebM composition did not complete.');
+  if(result.sceneCount!==sceneCount)throw new Error('The number of exported scenes changed during full-film composition.');
+  return result;
+ }
 }));
 function getSceneAction(index){return detectSceneActionForScene(sceneMetadata[index]||{},titles[index]||'',descriptions[index]||'');}
 class ParticleEmitter {
@@ -1713,7 +1723,7 @@ activeUniversalPlanController=controller;
 button.disabled=true;cancel.disabled=false;$('runLocalModel').disabled=true;output.hidden=true;
 status.textContent=ru?'Универсальный ИИ анализирует запрос и строит план на этом устройстве. Это может занять время…':'Universal AI is analysing the request and building a plan on this device. This may take a while…';
 try{
-const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().filter(capability=>capability.available).map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
+const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().filter(capability=>capability.available||capability.id==='film.compose').map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
 if(result.status==='cancelled'){
 status.textContent=ru?'Отмена запрошена. Генерация модели завершилась без применения устаревшего результата.':'Cancellation requested. The model finished inference; its stale result was discarded.';
 return;
@@ -2632,20 +2642,28 @@ $('analyzeCharacterMotion').onclick=()=>{
  if(!playing)draw();
 };
 $('save').onclick=()=>{const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));$('status').textContent=saved?tr('saved'):tr('storageError')};
-$('export').onclick=async()=>{
+async function exportFilm({signal=null,requireAllVideos=false,download=true,onProgress=null}={}){
   if(!canvas.captureStream||!window.MediaRecorder){
     $('status').textContent=tr('unsupported');
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Экспорт не поддерживается','Export unsupported'),tr('unsupported'));filmProgressTracking=false;}
-    return;
+    return {status:'unsupported',reason:'MediaRecorder or canvas capture is unavailable.'};
   }
   const button=$('export');
-  if(button.disabled)return;
+  if(button.disabled)return {status:'busy',reason:'Another film export is already running.'};
   const exportScenes=titles.map((title,index)=>{const meta=sceneMetadata[index]||{title};const voiceDuration=Number(meta.voiceTimeline?.totalDurationMs)||0;if(voiceDuration>30000)throw new RangeError('Dialogue in scene '+(index+1)+' exceeds the 30-second scene export limit.');const requested=Number(meta.durationSeconds??meta.duration??$('duration').value)||3;return {...meta,durationSeconds:Math.max(requested,voiceDuration/1000)};});
   const timeline=buildExportTimeline(exportScenes,$('duration').value);
   if(!timeline.segments.length){
     $('status').textContent=uiLang==='ru'?'Сначала создай раскадровку.':'Create a storyboard before exporting.';
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Нет сцен для экспорта','No scenes to export'),$('status').textContent);filmProgressTracking=false;}
-    return;
+    return {status:'failed',reason:'There are no storyboard scenes to export.'};
+  }
+  if(requireAllVideos){
+    const missing=timeline.segments.filter(segment=>{
+      const meta=sceneMetadata[segment.sceneIndex]||{};
+      const entry=sceneVideoCache.get(String(meta.id||('scene-index-'+segment.sceneIndex)));
+      return !entry?.video;
+    }).map(segment=>segment.sceneIndex+1);
+    if(missing.length)return {status:'blocked',reason:'Every scene must have a decoded video clip. Missing scene(s): '+missing.join(', ')+'.'};
   }
   button.disabled=true;
   $('audioFile').disabled=true;
@@ -2656,10 +2674,17 @@ $('export').onclick=async()=>{
   let stream=null,recorder=null,stopTimer=null,cleaned=false,recorderFailed=false,audioSession=null,exportProgressTimer=null,exportStartedAtMs=null;
   const chunks=[];
   let audioScheduledStartAtMs=null;
+  let resolveCompletion,rejectCompletion,completionSettled=false;
+  const completion=new Promise((resolve,reject)=>{resolveCompletion=resolve;rejectCompletion=reject;});
+  const settleCompletion=(handler,value)=>{if(completionSettled)return;completionSettled=true;handler(value);};
+  const checkAbort=()=>{if(signal?.aborted){const error=new Error('Full-film composition was cancelled.');error.name='AbortError';throw error;}};
+  const onSignalAbort=()=>{if(recorder&&recorder.state!=='inactive'){recorderFailed=true;try{recorder.stop();}catch{}}};
+  signal?.addEventListener('abort',onSignalAbort,{once:true});
   let lipSyncSkippedTracks=0;
   const cleanup=()=>{
     if(cleaned)return;
     cleaned=true;
+    signal?.removeEventListener('abort',onSignalAbort);
     if(stopTimer!==null)clearTimeout(stopTimer);
     if(exportProgressTimer!==null)clearInterval(exportProgressTimer);
     sceneTimers.forEach(timer=>clearTimeout(timer));
@@ -2679,8 +2704,11 @@ $('export').onclick=async()=>{
     $('audioVolume').disabled=false;
   };
   try{
+    checkAbort();
     await stopSceneVoicePreview();
+    checkAbort();
     await sceneVideoRestorePromise;
+    checkAbort();
     // Freeze preview while export assets/audio are prepared. Otherwise async setup
     // time advances the scene clock before the recorder has even started.
     playing=false;
@@ -2695,7 +2723,7 @@ $('export').onclick=async()=>{
       const key=String(meta.id||('scene-index-'+segment.sceneIndex));
       const entry=sceneVideoCache.get(key);
       if(entry?.video){
-        readinessTasks.push(waitForSceneVideoReady(entry.video,{timeoutMs:12000}).then(()=>{
+        readinessTasks.push(waitForSceneVideoReady(entry.video,{timeoutMs:12000,signal}).then(()=>{
           try{entry.video.currentTime=0;}catch{}
         }));
       }
@@ -2708,6 +2736,7 @@ $('export').onclick=async()=>{
       }
     }
     await Promise.all(readinessTasks);
+    checkAbort();
     sceneIndex=timeline.segments[0].sceneIndex;
     sceneMotionSceneIndex=-1;
     stream=canvas.captureStream(24);
@@ -2724,6 +2753,7 @@ $('export').onclick=async()=>{
         if(cue.language&&cue.language!==storyLanguage())throw new Error('Scene '+(segment.sceneIndex+1)+' has dialogue generated for a different story language. Regenerate its voices first.');
         if(!/^[a-f0-9]{64}$/i.test(String(cue.audioHash||'')))throw new Error('Scene '+(segment.sceneIndex+1)+' contains an invalid dialogue audio reference.');
         const record=await voiceStorage.get(cue.audioHash);
+        checkAbort();
         if(!record?.blob)throw new Error('A generated voice file is missing from this device. Regenerate the dialogue before exporting.');
         const startMs=segment.startMs+(Number(cue.startFrame)||0)*(1000/24);
         if(startMs+Number(cue.durationMs||0)>segment.endMs+35)throw new Error('Dialogue exceeds its scene export interval. Regenerate the scene voice timeline.');
@@ -2744,6 +2774,7 @@ $('export').onclick=async()=>{
           for(const track of lipSyncRenderableTracks){
             try{
               const decoded=await decodeContext.decodeAudioData(await track.blob.arrayBuffer());
+              checkAbort();
               const channels=Array.from({length:decoded.numberOfChannels},(_,channel)=>decoded.getChannelData(channel));
               const envelope=buildAudioMouthEnvelope({channels,sampleRate:decoded.sampleRate,fps:24});
               const visemes=buildVisemeTimeline({text:track.text,durationMs:envelope.durationMs,language:track.language,fps:24,phonemeChunks:track.phonemeChunks,visemeEvents:track.visemeEvents});
@@ -2759,8 +2790,10 @@ $('export').onclick=async()=>{
       const audioElement=musicFile?new Audio(selectedMusicUrl):null;
       if(audioElement){audioElement.loop=true;audioElement.preload='auto';}
       audioSession=await createAudioExportSession({videoStream:stream,audioElement,volume:Number($('audioVolume').value)/100,voiceTracks,voiceVolume:0.9});
+      checkAbort();
       stream=audioSession.stream;
       const audioStartInfo=await audioSession.start();
+      checkAbort();
       audioScheduledStartAtMs=Number.isFinite(audioStartInfo?.scheduledStartAtMs)?audioStartInfo.scheduledStartAtMs:null;
     }
     const mimeTypes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
@@ -2771,16 +2804,20 @@ $('export').onclick=async()=>{
     recorder.ondataavailable=event=>{if(event.data&&event.data.size>0)chunks.push(event.data)};
     recorder.onerror=()=>{
       recorderFailed=true;
+      const error=new Error('MediaRecorder failed before producing a complete video.');
+      settleCompletion(rejectCompletion,error);
       cleanup();
       $('status').textContent=tr('exportFailed');
       if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка сборки WebM','WebM assembly failed'),tr('exportFailed'));filmProgressTracking=false;}
     };
     recorder.onstop=async()=>{
       try{
+        if(signal?.aborted){const error=new Error('Full-film composition was cancelled.');error.name='AbortError';throw error;}
         if(recorderFailed)throw new Error('MediaRecorder failed before producing a complete video.');
         const blob=new Blob(chunks,{type:recorder.mimeType||'video/webm'});
         if(!blob.size)throw new Error('Recorder produced an empty file');
-        await waitForExportVideoReady(blob);
+        const decoded=await waitForExportVideoReady(blob);
+        if(signal?.aborted){const error=new Error('Full-film composition was cancelled.');error.name='AbortError';throw error;}
         const url=URL.createObjectURL(blob);
         if(finalFilmObjectUrl)URL.revokeObjectURL(finalFilmObjectUrl);
         finalFilmObjectUrl=url;
@@ -2788,9 +2825,7 @@ $('export').onclick=async()=>{
         const anchor=document.createElement('a');
         anchor.href=url;
         anchor.download=$('finalFilmDownload').download||'dravex-cartoon-film.webm';
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
+        if(download){document.body.appendChild(anchor);anchor.click();anchor.remove();}
         const lipSyncWarnings=[];
         if(lipSyncSkippedTracks)lipSyncWarnings.push(uiLang==='ru'
           ?'Анализ синхронизации губ пропущен для '+lipSyncSkippedTracks+' реплик.'
@@ -2800,8 +2835,10 @@ $('export').onclick=async()=>{
           ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+lipSyncWarning
           :'Exported '+timeline.segments.length+' scenes · '+timeline.totalDurationSeconds.toFixed(2)+' sec.'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'')+lipSyncWarning;
         if(filmProgressTracking){setFilmProgress(100,filmProgressText('Мультфильм готов','Film ready'),filmProgressText('WebM создан и добавлен в предпросмотр.','WebM was created and added to the preview.'));filmProgressTracking=false;}
+        settleCompletion(resolveCompletion,{status:'completed',filename:anchor.download,mimeType:blob.type||'video/webm',size:blob.size,sceneCount:timeline.segments.length,durationMs:timeline.totalDurationMs,decoded:true,width:decoded.width,height:decoded.height});
       }catch(error){
         console.error('DRAVEX export failed:',error);
+        settleCompletion(rejectCompletion,error);
         $('status').textContent=tr('exportFailed');
         if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка сборки WebM','WebM assembly failed'),error.message||tr('exportFailed'));filmProgressTracking=false;}
       }finally{
@@ -2831,18 +2868,20 @@ $('export').onclick=async()=>{
     $('status').textContent=uiLang==='ru'
       ?'Записываем '+timeline.segments.length+' сцен'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+'…'
       :'Recording '+timeline.segments.length+' scenes'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'')+'…';
-    if(filmProgressTracking){
+    if(filmProgressTracking||typeof onProgress==='function'){
       exportStartedAtMs=performance.now();
-      setFilmProgress(85,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Запись итогового видео…','Recording the final video…'));
+      if(filmProgressTracking)setFilmProgress(85,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Запись итогового видео…','Recording the final video…'));
       exportProgressTimer=setInterval(()=>{
         const fraction=Math.max(0,Math.min(1,(performance.now()-exportStartedAtMs)/Math.max(1,timeline.totalDurationMs)));
         const percent=85+Math.min(14,Math.floor(fraction*14));
-        setFilmProgress(percent,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Записано примерно ','Recorded approximately ')+Math.round(fraction*100)+'%');
+        if(filmProgressTracking)setFilmProgress(percent,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Записано примерно ','Recorded approximately ')+Math.round(fraction*100)+'%');
+        onProgress?.({phase:'recording',percent,elapsedMs:Math.round(fraction*timeline.totalDurationMs),totalDurationMs:timeline.totalDurationMs});
       },250);
     }
     timeline.segments.slice(1).forEach(segment=>{
       const timer=setTimeout(()=>{
         sceneIndex=segment.sceneIndex;
+        onProgress?.({phase:'scene',sceneIndex:segment.sceneIndex,sceneCount:timeline.segments.length,percent:Math.round(segment.startMs/Math.max(1,timeline.totalDurationMs)*100)});
         $('status').textContent=uiLang==='ru'
           ?'Записываем сцену '+(segment.sceneIndex+1)+' из '+timeline.segments.length+'…'
           :'Recording scene '+(segment.sceneIndex+1)+' of '+timeline.segments.length+'…';
@@ -2851,13 +2890,17 @@ $('export').onclick=async()=>{
     });
     stopTimer=setTimeout(()=>{
       if(recorder&&recorder.state!=='inactive')recorder.stop();
-    },timeline.totalDurationMs);
+    },timeline.totalDurationMs+250);
+    return await completion;
   }catch(error){
     console.error('DRAVEX export failed:',error);
+    settleCompletion(rejectCompletion,error);
     cleanup();
     $('status').textContent=tr('exportFailed');
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка подготовки WebM','WebM preparation failed'),error.message||tr('exportFailed'));filmProgressTracking=false;}
+    return {status:signal?.aborted?'cancelled':'failed',reason:String(error?.message||'Film export failed').slice(0,500)};
   }
-};
+}
+$('export').onclick=()=>{void exportFilm().catch(error=>{console.error('DRAVEX export failed:',error);$('status').textContent=tr('exportFailed');})};
 try{const saved=JSON.parse(readLocalStorage('dravex-cartoon-draft')||'null');if(saved){$('idea').value=saved.idea||$('idea').value;activeCanvasFormat=normalizeCanvasFormat(saved.canvasFormat||activeCanvasFormat);$('uiLanguage').value=saved.uiLanguage||uiLang;uiLang=saved.uiLanguage||uiLang;$('character').value=saved.character||'';$('style').value=saved.style||'Storybook';$('imageQuality').value=saved.imageQuality||'standard';$('duration').value=saved.duration||'3';$('language').value=saved.language||'en';if(Array.isArray(saved.titles)&&Array.isArray(saved.descriptions)&&saved.titles.length===saved.descriptions.length&&saved.titles.length>0&&saved.titles.length<=12){titles=saved.titles.map(v=>String(v).slice(0,80));descriptions=saved.descriptions.map(v=>String(v).slice(0,500));sceneMetadata=ensureSceneIds(Array.isArray(saved.sceneMetadata)&&saved.sceneMetadata.length===titles.length?saved.sceneMetadata.map(item=>item&&typeof item==='object'?{...item}:{}):titles.map((title,index)=>({title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''})));characterBible=Array.isArray(saved.characterBible)?saved.characterBible.filter(entry=>entry&&typeof entry==='object').slice(0,20).map(entry=>({characterId:String(entry.characterId||'').slice(0,120),visualDescription:String(entry.visualDescription||'').slice(0,700),clothing:String(entry.clothing||'').slice(0,400),colors:String(entry.colors||'').slice(0,200),distinctiveFeatures:String(entry.distinctiveFeatures||'').slice(0,400)})):[];if(!characterBible.length)characterBible=upsertCharacterReference([],{characterId:$('character').value.trim()||''});sceneIndex=Math.min(Math.max(0,Number(saved.sceneIndex)||0),titles.length-1)}$('status').textContent=tr('restored')}}catch(e){}
 applyCanvasFormat();applyLanguage();renderScenes();applySceneEditorLanguage();syncSceneEditor();draw();sceneVideoRestorePromise=restorePersistedSceneVideos();
