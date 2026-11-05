@@ -15,7 +15,7 @@ import { createUniversalRemoteVideoCapability } from "./universal-remote-video-c
 import { createUniversalFilmCompositionCapability } from "./universal-film-composition-capability.js";
 import { resolveUniversalSceneTarget } from "./universal-scene-target.js";
 import { resolveUniversalVoiceTargets } from "./universal-voice-target.js";
-import { generateSceneDialogue } from "./scene-dialogue-generator.js";
+import { generateSceneDialogue, selectScenesMissingDialogue } from "./scene-dialogue-generator.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
@@ -146,7 +146,7 @@ universalCapabilityRegistry.register({
  id:'dialogue.generate',
  name:'Write source-grounded local dialogue for storyboard scenes',
  privacy:'local',
- isAvailable:()=>Boolean(localTextRuntime.status.loaded&&sceneMetadata.length>0),
+ isAvailable:context=>isLocalDialogueGenerationReady(context),
  run:async({plan,step,signal,reportProgress})=>{
   if(!/(dialogue|speech|spoken|voice|voiceover|narrat|script|реплик|диалог|голос|озвуч|текст)/i.test(String(plan?.sourceRequest||''))){
    const error=new Error('The dialogue writer only accepts explicit dialogue, speech, narration, or voice requests.');
@@ -161,9 +161,13 @@ universalCapabilityRegistry.register({
   const targets=resolveUniversalVoiceTargets(step,sceneMetadata,sceneIndex);
   if(!targets.ok)throw new Error('Could not resolve dialogue-generation target: '+targets.reason+'.');
   const locale=storyLanguage();
-  const targetScenes=targets.indices.map(index=>({sceneId:String(sceneMetadata[index]?.id||''),originalIndex:index}));
+  persistCurrentSceneDialogueToMetadata(locale);
+  const expectedSceneIds=new Set(sceneMetadata.map(meta=>String(meta?.id||'')));
+  const targetScenes=targets.indices
+   .filter(index=>selectScenesMissingDialogue([sceneMetadata[index]]).length>0)
+   .map(index=>({sceneId:String(sceneMetadata[index]?.id||''),originalIndex:index}));
+  if(!targetScenes.length)throw new Error('No scenes need generated dialogue. Existing dialogue was preserved.');
   if(targetScenes.some(target=>!target.sceneId)||new Set(targetScenes.map(target=>target.sceneId)).size!==targetScenes.length)throw new Error('Storyboard scenes need unique stable IDs before dialogue generation.');
-  const expectedSceneIds=new Set(targetScenes.map(target=>target.sceneId));
   const completed=[];
   for(let position=0;position<targetScenes.length;position++){
    if(signal?.aborted)throw new DOMException('Dialogue generation was cancelled.','AbortError');
@@ -185,7 +189,9 @@ universalCapabilityRegistry.register({
    const liveScene={...liveMeta,title:titles[resolvedIndex]||liveMeta.title||'',description:descriptions[resolvedIndex]||liveMeta.description||'',characters:Array.isArray(liveMeta.characters)?liveMeta.characters:[]};
    const liveFingerprint=JSON.stringify({id:liveScene.id,title:liveScene.title,storyDetail:liveScene.storyDetail,visibleAction:liveScene.visibleAction,description:liveScene.description,prompt:liveScene.prompt,characters:liveScene.characters});
    if(liveFingerprint!==fingerprint)throw new Error('Scene '+(index+1)+' changed while dialogue was being generated. The stale result was not attached.');
+   if(sceneIndex===resolvedIndex&&parseDialogueLines($('sceneDialogue').value,locale).length)throw new Error('Dialogue was added to scene '+(resolvedIndex+1)+' while generation was running; existing text was preserved.');
    sceneMetadata[resolvedIndex]={...liveMeta,dialogue:generated.lines,voiceCues:[],voiceTimeline:null};
+   persistCurrentSceneDialogueToMetadata(locale);
    const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
     idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
     language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
@@ -194,7 +200,12 @@ universalCapabilityRegistry.register({
    if(sceneIndex===resolvedIndex){syncSceneEditor();$('sceneVoiceStatus').textContent=uiLang==='ru'?'Диалоги созданы. Загрузи локальную модель голоса и запусти озвучку.':'Dialogue generated. Load the local voice model and run voice synthesis.';}
    reportProgress?.('Dialogue ready for scene '+(resolvedIndex+1)+' · '+generated.lines.length+' lines');
   }
-  if(targets.allScenes){const liveIds=sceneMetadata.map(meta=>String(meta?.id||''));if(liveIds.length!==expectedSceneIds.size||liveIds.some(id=>!expectedSceneIds.has(id)))throw new Error('The storyboard changed during all-scene dialogue generation. Completed scene dialogue was saved, but the batch must be reviewed.');}
+  if(targets.allScenes){
+   const liveIds=sceneMetadata.map(meta=>String(meta?.id||''));
+   if(liveIds.length!==expectedSceneIds.size||liveIds.some(id=>!expectedSceneIds.has(id)))throw new Error('The storyboard changed during all-scene dialogue generation. Completed scene dialogue was saved, but the batch must be reviewed.');
+   const missing=selectScenesMissingDialogue(sceneMetadata).map(item=>item.index+1);
+   if(missing.length)throw new Error('Dialogue generation is incomplete for scene(s): '+missing.join(', ')+'.');
+  }
   return {type:'scene-dialogue',sceneIds:completed.map(item=>item.sceneId),lineCount:completed.reduce((sum,item)=>sum+item.lineCount,0),scenes:completed.length,local:true,persistedInDraft:completed.every(item=>item.persistedInDraft)};
  }
 });
@@ -1477,10 +1488,38 @@ function getSceneVoiceEngine(){
  return sceneVoiceEngine;
 }
 
+function persistCurrentSceneDialogueToMetadata(locale=storyLanguage()){
+ const currentSceneId=String(sceneMetadata[sceneIndex]?.id||'');
+ const currentIndex=sceneMetadata.findIndex(scene=>scene&&String(scene.id||'')===currentSceneId);
+ const currentLines=parseDialogueLines($('sceneDialogue').value,locale);
+ if(currentIndex>=0&&currentLines.length)sceneMetadata[currentIndex]={...sceneMetadata[currentIndex],dialogue:currentLines};
+ return currentIndex;
+}
+
+function isLocalDialogueGenerationReady({step}={}){
+ try{
+  if(!localTextRuntime.status.loaded||!sceneMetadata.length)return false;
+  const locale=storyLanguage();
+  const indices=step
+   ?resolveUniversalVoiceTargets(step,sceneMetadata,sceneIndex)
+   :{ok:true,indices:sceneMetadata.map((_,index)=>index)};
+  if(!indices.ok)return false;
+  return indices.indices.some(index=>sceneDialogueLinesAt(index,locale).length===0);
+ }catch{return false}
+}
+
+function isLocalSceneVoiceEngineLoaded(){
+ try{
+  const selectedTimestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
+  const loadedTimestamped=sceneVoiceEngine?.status.engine==='headtts-timestamped-kokoro';
+  return Boolean(sceneVoiceEngine?.status.loaded&&sceneVoiceEngine.status.locale===storyLanguage()&&selectedTimestamped===loadedTimestamped);
+ }catch{return false}
+}
+
 function sceneDialogueLinesAt(index,locale=storyLanguage(),currentText=$('sceneDialogue').value,currentSceneId=String(sceneMetadata[sceneIndex]?.id||'')){
  const meta=sceneMetadata[index]||{};
  const id=String(meta.id||'');
- const source=id&&id===currentSceneId?currentText:formatDialogueLines(meta.dialogue);
+ const source=id&&id===currentSceneId&&String(currentText||'').trim()?currentText:formatDialogueLines(meta.dialogue);
  return parseDialogueLines(source,locale);
 }
 
@@ -1819,7 +1858,7 @@ activeUniversalPlanController=controller;
 button.disabled=true;cancel.disabled=false;$('runLocalModel').disabled=true;output.hidden=true;
 status.textContent=ru?'Универсальный ИИ анализирует запрос и строит план на этом устройстве. Это может занять время…':'Universal AI is analysing the request and building a plan on this device. This may take a while…';
 try{
-const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().filter(capability=>capability.available||capability.id==='film.compose').map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
+const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().filter(capability=>capability.available||capability.id==='film.compose'||(capability.id==='voice.generate'&&isLocalSceneVoiceEngineLoaded()&&(isLocalSceneVoiceReady()||isLocalDialogueGenerationReady()))).map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
 if(result.status==='cancelled'){
 status.textContent=ru?'Отмена запрошена. Генерация модели завершилась без применения устаревшего результата.':'Cancellation requested. The model finished inference; its stale result was discarded.';
 return;
