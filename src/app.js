@@ -14,6 +14,7 @@ import { createUniversalLocalVideoCapability } from "./universal-local-video-cap
 import { createUniversalRemoteVideoCapability } from "./universal-remote-video-capability.js";
 import { createUniversalFilmCompositionCapability } from "./universal-film-composition-capability.js";
 import { resolveUniversalSceneTarget } from "./universal-scene-target.js";
+import { resolveUniversalVoiceTargets } from "./universal-voice-target.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
@@ -1430,13 +1431,12 @@ function isLocalSceneVoiceReady({step}={}){
  try{
   const locale=storyLanguage();
   if(!sceneVoiceEngine?.status.loaded||sceneVoiceEngine.status.locale!==locale||$('generateSceneVoices').dataset.busy==='true')return false;
-  const allScenes=Array.isArray(step?.inputs)&&step.inputs.some(value=>/^allScenes$/i.test(String(value||'').trim()));
-  if(allScenes)return sceneMetadata.length>0&&sceneMetadata.every((_,index)=>sceneDialogueLinesAt(index,locale).length>0);
-  if(step){
-   const target=resolveUniversalSceneTarget(step,sceneMetadata,sceneIndex);
-   return target.ok&&sceneDialogueLinesAt(target.index,locale).length>0;
-  }
-  return sceneMetadata.some((_,index)=>sceneDialogueLinesAt(index,locale).length>0);
+  if(!step)return sceneMetadata.some((_,index)=>sceneDialogueLinesAt(index,locale).length>0);
+  const targets=resolveUniversalVoiceTargets(step,sceneMetadata,sceneIndex);
+  if(!targets.ok)return false;
+  return targets.allScenes
+   ?targets.indices.length>0&&targets.indices.every(index=>sceneDialogueLinesAt(index,locale).length>0)
+   :sceneDialogueLinesAt(targets.indices[0],locale).length>0;
  }catch{return false}
 }
 
@@ -1444,17 +1444,14 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
  const locale=storyLanguage();
  const currentSceneId=String(sceneMetadata[sceneIndex]?.id||'');
  const currentDialogueText=$('sceneDialogue').value;
- const allScenes=Array.isArray(step?.inputs)&&step.inputs.some(value=>/^allScenes$/i.test(String(value||'').trim()));
- let targetIndices=[];
+ const targetResolution=resolveUniversalVoiceTargets(step,sceneMetadata,sceneIndex);
+ if(!targetResolution.ok)throw new Error('Could not resolve voice-generation target: '+targetResolution.reason+'.');
+ const allScenes=targetResolution.allScenes;
+ const targetIndices=targetResolution.indices;
  if(allScenes){
-  targetIndices=sceneMetadata.map((_,index)=>index);
   const missing=targetIndices.filter(index=>sceneDialogueLinesAt(index,locale,currentDialogueText,currentSceneId).length===0);
   if(missing.length)throw new Error('Cannot generate voices for all scenes: dialogue is missing in scene(s) '+missing.map(index=>index+1).join(', ')+'.');
- }else if(step){
-  const target=resolveUniversalSceneTarget(step,sceneMetadata,sceneIndex);
-  if(!target.ok)throw new Error('Could not resolve voice-generation scene target: '+target.reason+'.');
-  targetIndices=[target.index];
- }else targetIndices=[sceneIndex];
+ }
  if(!targetIndices.length)throw new Error(voiceText('Нет сцен для озвучивания.','There are no scenes to voice.'));
  const targets=targetIndices.map(index=>({sceneId:String(sceneMetadata[index]?.id||''),dialogue:sceneDialogueLinesAt(index,locale,currentDialogueText,currentSceneId)}));
  const engine=getSceneVoiceEngine();
