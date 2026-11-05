@@ -1407,6 +1407,7 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{}}={})
  const locale=storyLanguage();
  const dialogue=parseDialogueLines($('sceneDialogue').value,locale);
  if(!dialogue.length)throw new Error(voiceText('Сначала добавь реплики в формате «Персонаж: текст».','Add dialogue lines first using “Character: text”.'));
+ if(dialogue.length>30)throw new RangeError('A scene supports at most 30 dialogue lines.');
  const engine=getSceneVoiceEngine();
  if(!engine.status.loaded||engine.status.locale!==locale)throw new Error(voiceText('Сначала загрузи модель для выбранного языка.','Load the model for the selected language first.'));
  if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
@@ -1435,7 +1436,7 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{}}={})
    filename:'scene-'+targetId+'-line-'+(index+1)+'.wav',
    signal
   });
-  artifacts.push({...result,voiceId:voiceId||null});
+  artifacts.push({audioHash:result.audioHash,durationMs:result.durationMs,voiceId:voiceId||null,...(Array.isArray(result.visemeEvents)?{visemeEvents:result.visemeEvents}:{})});
  }
  if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
  const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===targetId);
