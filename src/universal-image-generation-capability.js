@@ -61,6 +61,12 @@ export function createUniversalImageGenerationCapability({
     privacy: 'remote',
     consentKey: 'ai-horde-image',
     isAvailable,
+    canRunWithoutConsent({ step } = {}) {
+      if (!step) return false;
+      const scenes = getScenes();
+      const targets = resolve(step);
+      return targets.ok && targets.indices.length > 0 && targets.indices.every(index => isImageReady(scenes[index]));
+    },
     async run({ plan, step, signal, reportProgress } = {}) {
       if (signal?.aborted) throw abortError();
       if (!/(image|visual|scene|video|film|movie|animation|cartoon|изображ|зображ|картин|малюн|сцен|видео|відео|фильм|фільм|мульт|анимац|анімац)/i.test(clean(plan?.sourceRequest, 12000))) {
