@@ -1654,18 +1654,26 @@ activeUniversalPlanController=controller;
 button.disabled=true;cancel.disabled=false;$('runLocalModel').disabled=true;output.hidden=true;
 status.textContent=ru?'Универсальный ИИ анализирует запрос и строит план на этом устройстве. Это может занять время…':'Universal AI is analysing the request and building a plan on this device. This may take a while…';
 try{
-const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024});
+const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list()});
 if(result.status==='cancelled'){
 status.textContent=ru?'Отмена запрошена. Генерация модели завершилась без применения устаревшего результата.':'Cancellation requested. The model finished inference; its stale result was discarded.';
 return;
 }
 if(!result.ok){
+lastUniversalTaskPlan=null;
+$('executeUniversalTask').disabled=true;
 status.textContent=(ru?'Не удалось построить проверяемый план: ':'Could not create a valid plan: ')+result.reason;
 output.textContent=JSON.stringify({status:result.status,reason:result.reason,modelId:result.modelId||null},null,2);
 output.hidden=false;
 return;
 }
 const plan=result.plan;
+lastUniversalTaskPlan=plan;
+universalTaskCheckpoint=null;
+const capabilityBinding=bindUniversalPlanCapabilities(plan,universalCapabilityRegistry);
+const executableCount=capabilityBinding.readyCount;
+const canStart=capabilityBinding.bindings[0]?.status==='ready'&&executableCount===1;
+$('executeUniversalTask').disabled=!canStart;
 const lines=[
 (ru?'ЦЕЛЬ: ':'GOAL: ')+plan.goal,
 (ru?'РЕЗУЛЬТАТ: ':'DELIVERABLE: ')+plan.deliverable.type+' — '+plan.deliverable.description,
@@ -1678,16 +1686,70 @@ ru?'ЭТАПЫ ВЫПОЛНЕНИЯ:':'EXECUTION STEPS:',
 (ru?'НУЖНЫ УТОЧНЕНИЯ: ':'OPEN QUESTIONS: ')+(plan.openQuestions.join('; ')||'—'),
 '',
 (ru?'Модель: ':'Model: ')+(result.modelId||'local')+' · '+(result.backend||'local'),
-ru?'Проверена структура плана, но не смысловая правильность. Видео ещё не создавалось.':'Plan structure was validated, not semantic correctness. No video has been generated yet.'
+(ru?'Доступные реальные операции: ':'Registered executable steps: ')+executableCount+'/'+plan.steps.length,
+ru?'Структура проверена, но смысловая правильность не гарантируется. Доступен только локальный этап создания раскадровки; остальные операции пока не подключены.':'Structure validated, but semantic correctness is not guaranteed. Only local storyboard creation is currently wired; other operations are not yet connected.'
 ];
 output.textContent=lines.join('\n');output.hidden=false;
-status.textContent=ru?'План задачи создан. Следующий этап — подключить его этапы к реальным инструментам DRAVEX.':'Task plan created. Next, its steps must be connected to real DRAVEX tools.';
+status.textContent=canStart?(ru?'План готов. Можно выполнить подключённый локальный этап; неподключённые этапы будут остановлены безопасно.':'Plan ready. The connected local step can run; unsupported steps will be safely blocked.'):(ru?'План создан, но первый этап пока не имеет подключённого инструмента.':'Plan created, but its first step has no connected tool yet.');
 }catch(error){
 status.textContent=(ru?'Ошибка планировщика: ':'Planner error: ')+(error?.message||'Unknown error');
 }finally{
 if(activeUniversalPlanController===controller)activeUniversalPlanController=null;
 button.disabled=false;cancel.disabled=true;$('runLocalModel').disabled=!localTextRuntime.status.loaded;
 }
+});
+$('executeUniversalTask').addEventListener('click',async()=>{
+ const plan=lastUniversalTaskPlan;
+ const status=$('universalExecutionStatus');
+ const button=$('executeUniversalTask');
+ const cancel=$('cancelUniversalExecution');
+ const ru=uiLang==='ru';
+ if(!plan||activeUniversalExecutionController)return;
+ const binding=bindUniversalPlanCapabilities(plan,universalCapabilityRegistry);
+ if(binding.bindings[0]?.status!=='ready'||binding.readyCount!==1){
+  status.textContent=ru?'Выполнение остановлено: безопасно доступен только один подключённый первый этап.':'Execution blocked: only one registered first step can run safely.';
+  return;
+ }
+ const controller=new AbortController();
+ activeUniversalExecutionController=controller;
+ button.disabled=true;cancel.disabled=false;
+ $('planUniversalTask').disabled=true;$('runLocalModel').disabled=true;
+ status.textContent=ru?'Выполняем локальную раскадровку…':'Executing local storyboard step…';
+ try{
+  const result=await executeUniversalTaskPlan({
+   plan,
+   handlers:universalCapabilityRegistry.createHandlers(),
+   signal:controller.signal,
+   checkpoint:universalTaskCheckpoint,
+   onCheckpoint:checkpoint=>{universalTaskCheckpoint=checkpoint;},
+   onProgress:event=>{
+    if(event.status==='step-started')status.textContent=(ru?'Запуск этапа: ':'Starting step: ')+event.stepId;
+    else if(event.status==='step-progress')status.textContent=(ru?'Этап ':'Step ')+event.stepId+' · '+event.detail;
+    else if(event.status==='step-completed')status.textContent=(ru?'Готово: ':'Completed: ')+event.stepId+' · '+event.percent+'%';
+   }
+  });
+  if(result.checkpoint)universalTaskCheckpoint=result.checkpoint;
+  status.textContent=result.ok
+   ?(ru?'Подключённые этапы выполнены.':'Registered steps completed.')
+   :(ru?'Выполнение остановлено: ':'Execution stopped: ')+result.status+' · '+result.reason+(result.stepId?' · '+result.stepId:'');
+  const output=$('universalTaskPlanOutput');
+  output.textContent=JSON.stringify({status:result.status,completed:result.completed,total:result.total,results:result.results||{},checkpoint:result.checkpoint||null},null,2);
+  output.hidden=false;
+ }catch(error){
+  status.textContent=(ru?'Ошибка выполнения: ':'Execution error: ')+(error?.message||'Unknown error');
+ }finally{
+  if(activeUniversalExecutionController===controller)activeUniversalExecutionController=null;
+  button.disabled=!lastUniversalTaskPlan||bindUniversalPlanCapabilities(lastUniversalTaskPlan,universalCapabilityRegistry).bindings[0]?.status!=='ready';
+  cancel.disabled=true;
+  $('planUniversalTask').disabled=!localTextRuntime.status.loaded;
+  $('runLocalModel').disabled=!localTextRuntime.status.loaded;
+ }
+});
+$('cancelUniversalExecution').addEventListener('click',()=>{
+ if(!activeUniversalExecutionController)return;
+ activeUniversalExecutionController.abort();
+ $('cancelUniversalExecution').disabled=true;
+ $('universalExecutionStatus').textContent=uiLang==='ru'?'Запрошена отмена выполнения. Текущая синхронная операция может завершиться до проверки отмены.':'Execution cancellation requested. A synchronous operation may finish before cancellation is observed.';
 });
 $('cancelUniversalPlan').addEventListener('click',()=>{
 if(!activeUniversalPlanController)return;
