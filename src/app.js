@@ -147,7 +147,7 @@ universalCapabilityRegistry.register({
  privacy:'local',
  isAvailable:context=>isLocalSceneVoiceReady(context),
  run:async({plan,step,signal,reportProgress})=>{
-  if(!/(voice|speech|dialogue|audio|озвуч|голос|реплик|звук)/i.test(String(plan?.sourceRequest||''))){
+  if(!/(voice|speech|dialogue|audio|narrat|озвуч|голос|реплик|звук)/i.test(String(plan?.sourceRequest||''))){
    const error=new Error('The local voice adapter only accepts explicit voice, speech, dialogue, or audio requests.');
    error.code='CAPABILITY_REQUEST_MISMATCH';
    throw error;
@@ -1430,7 +1430,9 @@ function sceneDialogueLinesAt(index,locale=storyLanguage(),currentText=$('sceneD
 function isLocalSceneVoiceReady({step}={}){
  try{
   const locale=storyLanguage();
-  if(!sceneVoiceEngine?.status.loaded||sceneVoiceEngine.status.locale!==locale||$('generateSceneVoices').dataset.busy==='true')return false;
+  const selectedTimestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
+  const loadedTimestamped=sceneVoiceEngine?.status.engine==='headtts-timestamped-kokoro';
+  if(!sceneVoiceEngine?.status.loaded||sceneVoiceEngine.status.locale!==locale||selectedTimestamped!==loadedTimestamped||$('generateSceneVoices').dataset.busy==='true')return false;
   if(!step)return sceneMetadata.some((_,index)=>sceneDialogueLinesAt(index,locale).length>0);
   const targets=resolveUniversalVoiceTargets(step,sceneMetadata,sceneIndex);
   if(!targets.ok)return false;
@@ -1492,6 +1494,9 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
   if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
   const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===targetId);
   if(resolvedIndex<0)throw new Error('The target scene changed during voice generation. Generated audio was not attached to another scene.');
+  const liveDialogueText=String(sceneMetadata[sceneIndex]?.id||'')===targetId?$('sceneDialogue').value:formatDialogueLines(sceneMetadata[resolvedIndex]?.dialogue);
+  const liveDialogue=parseDialogueLines(liveDialogueText,locale);
+  if(JSON.stringify(liveDialogue)!==JSON.stringify(dialogue))throw new Error('Dialogue changed while voice generation was running; the generated audio was not attached to stale scene text.');
   const scheduled=buildSceneVoiceTimeline({sceneId:targetId,dialogue,artifacts,fps:24,gapMs:120});
   sceneMetadata[resolvedIndex]={...sceneMetadata[resolvedIndex],dialogue,voiceCues:scheduled.cues,voiceTimeline:scheduled.timeline};
   const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
@@ -1510,6 +1515,11 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
    );
   }
   onProgress({phase:'scene-completed',sceneIndex:resolvedIndex,sceneCount:targetIndices.length,overallIndex,overallTotal});
+ }
+ if(allScenes){
+  const expectedIds=new Set(targets.map(target=>target.sceneId));
+  const currentIds=sceneMetadata.map(meta=>String(meta?.id||''));
+  if(currentIds.length!==expectedIds.size||currentIds.some(id=>!expectedIds.has(id)))throw new Error('The storyboard scene set changed during all-scene voice generation; completed scene audio was saved, but the batch must be reviewed before continuing.');
  }
  return {type:'local-voice-artifacts',sceneIds,lineCount,durationMs:totalDurationMs,persistedInDraft,local:true,allScenes:allScenes===true};
 }
