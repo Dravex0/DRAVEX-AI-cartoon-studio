@@ -8,10 +8,13 @@ function normalizeCapability(raw) {
   if (typeof raw.run !== 'function') throw new TypeError('Capability adapter must implement run(context).');
   const privacy = raw.privacy || 'local';
   if (!['local', 'remote'].includes(privacy)) throw new TypeError('Capability privacy must be local or remote.');
+  const consentKey = clean(raw.consentKey, 80) || null;
+  if (consentKey && privacy !== 'remote') throw new TypeError('Scoped consent keys are only valid for remote capabilities.');
   return Object.freeze({
     id,
     name: clean(raw.name, 120) || id,
     privacy,
+    consentKey,
     requiresConsent: raw.requiresConsent === true || privacy === 'remote',
     isAvailable: typeof raw.isAvailable === 'function' ? raw.isAvailable : () => raw.available !== false,
     run: raw.run
@@ -34,15 +37,21 @@ export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}
   const adapters = new Map();
   let active = null;
   let consentGranted = remoteConsent === true;
+  const scopedConsent = new Map();
+
+  function hasConsent(adapter) {
+    if (!adapter.requiresConsent) return true;
+    return adapter.consentKey ? scopedConsent.get(adapter.consentKey) === true : consentGranted === true;
+  }
 
   function isAvailable(adapter, context) {
-    if (adapter.requiresConsent && consentGranted !== true) return false;
+    if (!hasConsent(adapter)) return false;
     try { return adapter.isAvailable(context) === true; }
     catch { return false; }
   }
 
   function assertAvailable(adapter, context) {
-    if (adapter.requiresConsent && consentGranted !== true) {
+    if (!hasConsent(adapter)) {
       const error = new Error('Explicit consent is required before using remote capability "' + adapter.id + '".');
       error.code = 'REMOTE_CONSENT_REQUIRED';
       throw error;
@@ -57,15 +66,26 @@ export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}
   return Object.freeze({
     setRemoteConsent(granted) {
       consentGranted = granted === true;
-      if (!consentGranted && active?.adapter.requiresConsent) active.controller.abort();
+      if (!consentGranted && active?.adapter.requiresConsent && !active.adapter.consentKey) active.controller.abort();
       return consentGranted;
+    },
+    setConsent(key, granted) {
+      const consentKey = clean(key, 80);
+      if (!consentKey) throw new TypeError('A scoped consent key is required.');
+      scopedConsent.set(consentKey, granted === true);
+      if (granted !== true && active?.adapter.consentKey === consentKey) active.controller.abort();
+      return scopedConsent.get(consentKey);
+    },
+    hasConsent(key) {
+      const consentKey = clean(key, 80);
+      return consentKey ? scopedConsent.get(consentKey) === true : consentGranted === true;
     },
     get remoteConsent() { return consentGranted; },
     register(raw) {
       const adapter = normalizeCapability(raw);
       if (adapters.has(adapter.id)) throw new Error('Capability "' + adapter.id + '" is already registered.');
       adapters.set(adapter.id, adapter);
-      return { id: adapter.id, name: adapter.name, privacy: adapter.privacy, requiresConsent: adapter.requiresConsent };
+      return { id: adapter.id, name: adapter.name, privacy: adapter.privacy, consentKey: adapter.consentKey, requiresConsent: adapter.requiresConsent };
     },
     has(id) {
       return adapters.has(clean(id, 80));
@@ -80,6 +100,7 @@ export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}
         name: adapter.name,
         privacy: adapter.privacy,
         requiresConsent: adapter.requiresConsent,
+        consentKey: adapter.consentKey,
         available: isAvailable(adapter, context)
       }));
     },
