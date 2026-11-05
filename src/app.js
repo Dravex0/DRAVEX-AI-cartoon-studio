@@ -1371,6 +1371,69 @@ function getSceneVoiceEngine(){
  }
  return sceneVoiceEngine;
 }
+
+function isLocalSceneVoiceReady(){
+ try{
+  const locale=storyLanguage();
+  return Boolean(sceneVoiceEngine?.status.loaded&&sceneVoiceEngine.status.locale===locale
+   &&parseDialogueLines($('sceneDialogue').value,locale).length>0);
+ }catch{return false}
+}
+
+async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{}}={}){
+ const locale=storyLanguage();
+ const dialogue=parseDialogueLines($('sceneDialogue').value,locale);
+ if(!dialogue.length)throw new Error(voiceText('Сначала добавь реплики в формате «Персонаж: текст».','Add dialogue lines first using “Character: text”.'));
+ const engine=getSceneVoiceEngine();
+ if(!engine.status.loaded||engine.status.locale!==locale)throw new Error(voiceText('Сначала загрузи модель для выбранного языка.','Load the model for the selected language first.'));
+ if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
+ const targetIndex=sceneIndex;
+ const targetMeta=sceneMetadata[targetIndex]||{};
+ const targetId=String(targetMeta.id||('scene-'+(targetIndex+1)));
+ let savedMap={};
+ try{const parsed=JSON.parse(readLocalStorage('dravex-character-voice-map')||'{}');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))savedMap=parsed}catch{}
+ const assignments=assignCharacterVoices({
+  speakers:dialogue.map(line=>line.characterId),
+  availableVoices:engine.availableVoices,
+  existingAssignments:savedMap,
+  fallbackVoiceId:engine.availableVoices[0]||null
+ });
+ writeLocalStorage('dravex-character-voice-map',JSON.stringify(assignments));
+ const artifacts=[];
+ for(let index=0;index<dialogue.length;index++){
+  if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
+  const line=dialogue[index];
+  const voiceId=assignments[normalizeSpeakerKey(line.characterId)]||undefined;
+  $('sceneVoiceStatus').textContent=voiceText('Создаём голос '+(index+1)+' из '+dialogue.length+'…','Generating voice '+(index+1)+' of '+dialogue.length+'…');
+  onProgress({phase:'generating',index:index+1,total:dialogue.length,characterId:line.characterId});
+  const result=await engine.synthesize({
+   text:line.text,
+   voiceId,
+   filename:'scene-'+targetId+'-line-'+(index+1)+'.wav',
+   signal
+  });
+  artifacts.push({...result,voiceId:voiceId||null});
+ }
+ if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
+ const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===targetId);
+ if(resolvedIndex<0)throw new Error('The target scene changed during voice generation. Generated audio was not attached to another scene.');
+ const meta={...sceneMetadata[resolvedIndex]};
+ const scheduled=buildSceneVoiceTimeline({sceneId:targetId,dialogue,artifacts,fps:24,gapMs:120});
+ meta.dialogue=dialogue;
+ meta.voiceCues=scheduled.cues;
+ meta.voiceTimeline=scheduled.timeline;
+ sceneMetadata[resolvedIndex]=meta;
+ const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
+  idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
+  language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex:resolvedIndex
+ }));
+ if(sceneIndex===resolvedIndex)await renderSceneVoiceAudio();
+ $('sceneVoiceStatus').textContent=voiceText(
+  'Готово: '+scheduled.cues.length+' реплик · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' сек. '+(saved?'Черновик сохранён.':'Не удалось сохранить черновик.'),
+  'Done: '+scheduled.cues.length+' lines · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' sec. '+(saved?'Draft saved.':'Draft could not be saved.')
+ );
+ return {type:'local-voice-artifacts',sceneId:targetId,lineCount:scheduled.cues.length,durationMs:scheduled.timeline.totalDurationMs,persistedInDraft:saved,local:true};
+}
 function voiceText(ru,en){return uiLang==='ru'?ru:en}
 function refreshSceneVoiceControls(){
  const locale=storyLanguage();
@@ -1475,63 +1538,9 @@ $('loadSceneVoiceModel').addEventListener('click',async()=>{
 $('generateSceneVoices').addEventListener('click',async()=>{
  const button=$('generateSceneVoices');
  if(button.dataset.busy==='true')return;
- const locale=storyLanguage();
- let dialogue=parseDialogueLines($('sceneDialogue').value,locale);
- if(!dialogue.length){
-  $('sceneVoiceStatus').textContent=voiceText('Сначала добавь реплики в формате «Персонаж: текст».','Add dialogue lines first using “Character: text”.');
-  return;
- }
- let engine;
- try{engine=getSceneVoiceEngine()}catch(error){$('sceneVoiceStatus').textContent=error.message;return}
- if(!engine.status.loaded||engine.status.locale!==locale){
-  $('sceneVoiceStatus').textContent=voiceText('Сначала загрузи модель для выбранного языка.','Load the model for the selected language first.');
-  refreshSceneVoiceControls();return;
- }
  button.dataset.busy='true';button.disabled=true;$('sceneVoiceStatus').dataset.touched='true';
  try{
-  let savedMap={};
-  try{const parsed=JSON.parse(readLocalStorage('dravex-character-voice-map')||'{}');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))savedMap=parsed}catch{}
-
-  const assignments=assignCharacterVoices({
-   speakers:dialogue.map(line=>line.characterId),
-   availableVoices:engine.availableVoices,
-   existingAssignments:savedMap,
-   fallbackVoiceId:engine.availableVoices[0]||null
-  });
-  writeLocalStorage('dravex-character-voice-map',JSON.stringify(assignments));
-  const artifacts=[];
-  for(let index=0;index<dialogue.length;index++){
-   const line=dialogue[index];
-   const voiceId=assignments[normalizeSpeakerKey(line.characterId)]||undefined;
-   $('sceneVoiceStatus').textContent=voiceText('Создаём голос '+(index+1)+' из '+dialogue.length+'…','Generating voice '+(index+1)+' of '+dialogue.length+'…');
-   const result=await engine.synthesize({
-    text:line.text,
-    voiceId,
-    filename:'scene-'+String(sceneMetadata[sceneIndex]?.id||sceneIndex+1)+'-line-'+(index+1)+'.wav'
-   });
-   artifacts.push({...result,voiceId:voiceId||null});
-  }
-  const meta=sceneMetadata[sceneIndex]||{};
-  const scheduled=buildSceneVoiceTimeline({
-   sceneId:meta.id||('scene-'+(sceneIndex+1)),
-   dialogue,
-   artifacts,
-   fps:24,
-   gapMs:120
-  });
-  meta.dialogue=dialogue;
-  meta.voiceCues=scheduled.cues;
-  meta.voiceTimeline=scheduled.timeline;
-  sceneMetadata[sceneIndex]=meta;
-  const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
-   idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
-   language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
-  }));
-  await renderSceneVoiceAudio();
-  $('sceneVoiceStatus').textContent=voiceText(
-   'Готово: '+scheduled.cues.length+' реплик · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' сек. '+(saved?'Черновик сохранён.':'Не удалось сохранить черновик.'),
-   'Done: '+scheduled.cues.length+' lines · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' sec. '+(saved?'Draft saved.':'Draft could not be saved.')
-  );
+  await generateSceneVoicesForCurrentScene();
  }catch(error){
   console.error('DRAVEX local voice generation failed:',error);
   $('sceneVoiceStatus').textContent=(error?.message||'Voice generation failed.');
