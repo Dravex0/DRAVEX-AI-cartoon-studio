@@ -144,7 +144,7 @@ universalCapabilityRegistry.register({
  id:'voice.generate',
  name:'Generate local scene dialogue audio',
  privacy:'local',
- isAvailable:()=>isLocalSceneVoiceReady(),
+ isAvailable:context=>isLocalSceneVoiceReady(context),
  run:async({plan,step,signal,reportProgress})=>{
   if(!/(voice|speech|dialogue|audio|озвуч|голос|реплик|звук)/i.test(String(plan?.sourceRequest||''))){
    const error=new Error('The local voice adapter only accepts explicit voice, speech, dialogue, or audio requests.');
@@ -158,7 +158,8 @@ universalCapabilityRegistry.register({
   }
   return generateSceneVoicesForCurrentScene({
    signal,
-   onProgress:progress=>reportProgress?.('Generating local voice '+progress.index+' / '+progress.total)
+   step,
+   onProgress:progress=>reportProgress?.('Generating local voice for scene '+(progress.sceneIndex+1)+' · '+progress.overallIndex+'/'+progress.overallTotal)
   });
  }
 });
@@ -1418,71 +1419,100 @@ function getSceneVoiceEngine(){
  return sceneVoiceEngine;
 }
 
-function isLocalSceneVoiceReady(){
+function sceneDialogueLinesAt(index,locale=storyLanguage(),currentText=$('sceneDialogue').value,currentSceneId=String(sceneMetadata[sceneIndex]?.id||'')){
+ const meta=sceneMetadata[index]||{};
+ const id=String(meta.id||'');
+ const source=id&&id===currentSceneId?currentText:formatDialogueLines(meta.dialogue);
+ return parseDialogueLines(source,locale);
+}
+
+function isLocalSceneVoiceReady({step}={}){
  try{
   const locale=storyLanguage();
-  return Boolean(sceneVoiceEngine?.status.loaded&&sceneVoiceEngine.status.locale===locale
-   &&$('generateSceneVoices').dataset.busy!=='true'
-   &&parseDialogueLines($('sceneDialogue').value,locale).length>0);
+  if(!sceneVoiceEngine?.status.loaded||sceneVoiceEngine.status.locale!==locale||$('generateSceneVoices').dataset.busy==='true')return false;
+  const allScenes=Array.isArray(step?.inputs)&&step.inputs.some(value=>/^allScenes$/i.test(String(value||'').trim()));
+  if(allScenes)return sceneMetadata.length>0&&sceneMetadata.every((_,index)=>sceneDialogueLinesAt(index,locale).length>0);
+  if(step){
+   const target=resolveUniversalSceneTarget(step,sceneMetadata,sceneIndex);
+   return target.ok&&sceneDialogueLinesAt(target.index,locale).length>0;
+  }
+  return sceneMetadata.some((_,index)=>sceneDialogueLinesAt(index,locale).length>0);
  }catch{return false}
 }
 
-async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{}}={}){
+async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step=null}={}){
  const locale=storyLanguage();
- const dialogue=parseDialogueLines($('sceneDialogue').value,locale);
- if(!dialogue.length)throw new Error(voiceText('Сначала добавь реплики в формате «Персонаж: текст».','Add dialogue lines first using “Character: text”.'));
- if(dialogue.length>30)throw new RangeError('A scene supports at most 30 dialogue lines.');
+ const currentSceneId=String(sceneMetadata[sceneIndex]?.id||'');
+ const currentDialogueText=$('sceneDialogue').value;
+ const allScenes=Array.isArray(step?.inputs)&&step.inputs.some(value=>/^allScenes$/i.test(String(value||'').trim()));
+ let targetIndices=[];
+ if(allScenes){
+  targetIndices=sceneMetadata.map((_,index)=>index);
+  const missing=targetIndices.filter(index=>sceneDialogueLinesAt(index,locale,currentDialogueText,currentSceneId).length===0);
+  if(missing.length)throw new Error('Cannot generate voices for all scenes: dialogue is missing in scene(s) '+missing.map(index=>index+1).join(', ')+'.');
+ }else if(step){
+  const target=resolveUniversalSceneTarget(step,sceneMetadata,sceneIndex);
+  if(!target.ok)throw new Error('Could not resolve voice-generation scene target: '+target.reason+'.');
+  targetIndices=[target.index];
+ }else targetIndices=[sceneIndex];
+ if(!targetIndices.length)throw new Error(voiceText('Нет сцен для озвучивания.','There are no scenes to voice.'));
  const engine=getSceneVoiceEngine();
  if(!engine.status.loaded||engine.status.locale!==locale)throw new Error(voiceText('Сначала загрузи модель для выбранного языка.','Load the model for the selected language first.'));
  if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
- const targetIndex=sceneIndex;
- const targetMeta=sceneMetadata[targetIndex]||{};
- const targetId=String(targetMeta.id||('scene-'+(targetIndex+1)));
  let savedMap={};
  try{const parsed=JSON.parse(readLocalStorage('dravex-character-voice-map')||'{}');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))savedMap=parsed}catch{}
- const assignments=assignCharacterVoices({
-  speakers:dialogue.map(line=>line.characterId),
-  availableVoices:engine.availableVoices,
-  existingAssignments:savedMap,
-  fallbackVoiceId:engine.availableVoices[0]||null
- });
- writeLocalStorage('dravex-character-voice-map',JSON.stringify(assignments));
- const artifacts=[];
- for(let index=0;index<dialogue.length;index++){
+ let overallTotal=0;
+ for(const index of targetIndices)overallTotal+=sceneDialogueLinesAt(index,locale,currentDialogueText,currentSceneId).length;
+ let overallIndex=0,lineCount=0,totalDurationMs=0,persistedInDraft=true;
+ const sceneIds=[];
+ for(const targetIndex of targetIndices){
   if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
-  const line=dialogue[index];
-  const voiceId=assignments[normalizeSpeakerKey(line.characterId)]||undefined;
-  $('sceneVoiceStatus').textContent=voiceText('Создаём голос '+(index+1)+' из '+dialogue.length+'…','Generating voice '+(index+1)+' of '+dialogue.length+'…');
-  onProgress({phase:'generating',index:index+1,total:dialogue.length,characterId:line.characterId});
-  const result=await engine.synthesize({
-   text:line.text,
-   voiceId,
-   filename:'scene-'+targetId+'-line-'+(index+1)+'.wav',
-   signal
+  const targetMeta={...(sceneMetadata[targetIndex]||{})};
+  const targetId=String(targetMeta.id||('scene-'+(targetIndex+1)));
+  const dialogue=sceneDialogueLinesAt(targetIndex,locale,currentDialogueText,currentSceneId);
+  if(!dialogue.length)continue;
+  const assignments=assignCharacterVoices({
+   speakers:dialogue.map(line=>line.characterId),
+   availableVoices:engine.availableVoices,
+   existingAssignments:savedMap,
+   fallbackVoiceId:engine.availableVoices[0]||null
   });
-  artifacts.push({audioHash:result.audioHash,durationMs:result.durationMs,voiceId:voiceId||null,...(Array.isArray(result.visemeEvents)?{visemeEvents:result.visemeEvents}:{})});
+  savedMap={...assignments};
+  writeLocalStorage('dravex-character-voice-map',JSON.stringify(savedMap));
+  const artifacts=[];
+  for(let index=0;index<dialogue.length;index++){
+   if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
+   const line=dialogue[index];
+   const voiceId=assignments[normalizeSpeakerKey(line.characterId)]||undefined;
+   if(sceneIndex===targetIndex)$('sceneVoiceStatus').textContent=voiceText('Создаём голос сцены '+(targetIndex+1)+': '+(index+1)+' из '+dialogue.length+'…','Generating scene '+(targetIndex+1)+' voice '+(index+1)+' of '+dialogue.length+'…');
+   onProgress({phase:'generating',sceneIndex:targetIndex,index:index+1,total:dialogue.length,overallIndex:overallIndex+1,overallTotal,characterId:line.characterId});
+   const result=await engine.synthesize({text:line.text,voiceId,filename:'scene-'+targetId+'-line-'+(index+1)+'.wav',signal});
+   artifacts.push({audioHash:result.audioHash,durationMs:result.durationMs,voiceId:voiceId||null,...(Array.isArray(result.visemeEvents)?{visemeEvents:result.visemeEvents}:{})});
+   overallIndex++;
+  }
+  if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
+  const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===targetId);
+  if(resolvedIndex<0)throw new Error('The target scene changed during voice generation. Generated audio was not attached to another scene.');
+  const scheduled=buildSceneVoiceTimeline({sceneId:targetId,dialogue,artifacts,fps:24,gapMs:120});
+  sceneMetadata[resolvedIndex]={...sceneMetadata[resolvedIndex],dialogue,voiceCues:scheduled.cues,voiceTimeline:scheduled.timeline};
+  const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
+   idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
+   language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
+  }));
+  persistedInDraft=persistedInDraft&&saved;
+  lineCount+=scheduled.cues.length;
+  totalDurationMs+=scheduled.timeline.totalDurationMs;
+  sceneIds.push(targetId);
+  if(sceneIndex===resolvedIndex){
+   await renderSceneVoiceAudio();
+   $('sceneVoiceStatus').textContent=voiceText(
+    'Готово: '+scheduled.cues.length+' реплик · сцена '+(resolvedIndex+1)+' · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' сек.',
+    'Done: '+scheduled.cues.length+' lines · scene '+(resolvedIndex+1)+' · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' sec.'
+   );
+  }
+  onProgress({phase:'scene-completed',sceneIndex:resolvedIndex,sceneCount:targetIndices.length,overallIndex,overallTotal});
  }
- if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
- const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===targetId);
- if(resolvedIndex<0)throw new Error('The target scene changed during voice generation. Generated audio was not attached to another scene.');
- const meta={...sceneMetadata[resolvedIndex]};
- const scheduled=buildSceneVoiceTimeline({sceneId:targetId,dialogue,artifacts,fps:24,gapMs:120});
- meta.dialogue=dialogue;
- meta.voiceCues=scheduled.cues;
- meta.voiceTimeline=scheduled.timeline;
- sceneMetadata[resolvedIndex]=meta;
- const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
-  idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
-  language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex:resolvedIndex
- }));
- if(sceneIndex===resolvedIndex){
-  await renderSceneVoiceAudio();
-  $('sceneVoiceStatus').textContent=voiceText(
-  'Готово: '+scheduled.cues.length+' реплик · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' сек. '+(saved?'Черновик сохранён.':'Не удалось сохранить черновик.'),
-  'Done: '+scheduled.cues.length+' lines · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' sec. '+(saved?'Draft saved.':'Draft could not be saved.')
-  );
- }
- return {type:'local-voice-artifacts',sceneId:targetId,lineCount:scheduled.cues.length,durationMs:scheduled.timeline.totalDurationMs,persistedInDraft:saved,local:true};
+ return {type:'local-voice-artifacts',sceneIds,lineCount,durationMs:totalDurationMs,persistedInDraft,local:true,allScenes:allScenes===true};
 }
 function voiceText(ru,en){return uiLang==='ru'?ru:en}
 function refreshSceneVoiceControls(){
