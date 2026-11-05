@@ -163,6 +163,7 @@ universalCapabilityRegistry.register({
   const locale=storyLanguage();
   persistCurrentSceneDialogueToMetadata(locale);
   const expectedSceneIds=new Set(sceneMetadata.map(meta=>String(meta?.id||'')));
+  if(expectedSceneIds.size!==sceneMetadata.length||expectedSceneIds.has(''))throw new Error('Storyboard scenes need unique stable IDs before dialogue generation.');
   const targetScenes=targets.indices
    .filter(index=>selectScenesMissingDialogue([sceneMetadata[index]]).length>0)
    .map(index=>({sceneId:String(sceneMetadata[index]?.id||''),originalIndex:index}));
