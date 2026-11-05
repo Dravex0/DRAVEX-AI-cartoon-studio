@@ -2117,7 +2117,7 @@ function comfyBindings(){
 }
 function isLocalVideoGenerationReady(){
  const meta=sceneMetadata[sceneIndex]||{};
- return comfyConnected&&!!comfyWorkflow&&!fullFilmAbortController&&!activeUniversalExecutionController&&
+ return comfyConnected&&!!comfyWorkflow&&!fullFilmAbortController&&
   (!!comfySourceImage||!!String(meta.generatedImageUrl||'').trim());
 }
 async function generateLocalSceneVideoForUniversal({signal,reportProgress}={}){
