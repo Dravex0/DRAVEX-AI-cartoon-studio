@@ -12,6 +12,7 @@ import { createUniversalCapabilityRegistry, bindUniversalPlanCapabilities } from
 import { executeUniversalTaskPlan } from "./universal-task-executor.js";
 import { createUniversalLocalVideoCapability } from "./universal-local-video-capability.js";
 import { createUniversalRemoteVideoCapability } from "./universal-remote-video-capability.js";
+import { resolveUniversalSceneTarget } from "./universal-scene-target.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
@@ -166,7 +167,7 @@ const localVideoCapability=createUniversalLocalVideoCapability({
 });
 universalCapabilityRegistry.register(localVideoCapability);
 universalCapabilityRegistry.register(createUniversalRemoteVideoCapability({
- isAvailable:()=>isRemoteVideoGenerationReady(),
+ isAvailable:context=>isRemoteVideoGenerationReady(context),
  hasConsent:()=>universalCapabilityRegistry.remoteConsent&&$('hfVideoConsent').checked===true,
  generateScene:context=>generateRemoteSceneVideoForUniversal(context)
 }));
@@ -2127,14 +2128,17 @@ function isLocalVideoGenerationReady(){
  return comfyConnected&&!!comfyWorkflow&&!fullFilmAbortController&&
   (!!comfySourceImage||!!String(meta.generatedImageUrl||'').trim());
 }
-function isRemoteVideoGenerationReady(){
- const meta=sceneMetadata[sceneIndex]||{};
+function resolveRemoteScene(step){return resolveUniversalSceneTarget(step,sceneMetadata,sceneIndex);}
+function isRemoteVideoGenerationReady({step}={}){
+ const target=resolveRemoteScene(step);
+ if(!target.ok)return false;
+ const meta=target.scene;
+ const imageReady=target.index===sceneIndex?!!comfySourceImage||!!String(meta.generatedImageUrl||'').trim():!!String(meta.generatedImageUrl||'').trim();
+ const motion=target.index===sceneIndex?$('sceneMotionPrompt').value:meta.motionPrompt||meta.visibleAction;
  return universalCapabilityRegistry.remoteConsent&&$('hfVideoConsent').checked===true&&
-  hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'&&
-  (!!comfySourceImage||!!String(meta.generatedImageUrl||'').trim())&&
-  !!String($('sceneMotionPrompt').value||meta.motionPrompt||meta.visibleAction||'').trim();
+  hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'&&imageReady&&!!String(motion||'').trim();
 }
-async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasConsent=()=>false}={}){
+async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasConsent=()=>false,step}={}){
  const assertConsent=()=>{
   if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
   if(!universalCapabilityRegistry.remoteConsent||$('hfVideoConsent').checked!==true||!hasConsent()){
@@ -2144,11 +2148,16 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  };
  assertConsent();
  await sceneVideoRestorePromise;
- const index=sceneIndex,originalMeta=sceneMetadata[index]||{},sceneId=String(originalMeta.id||'');
- const motionScene={...originalMeta,title:$('sceneTitle').value.trim()||titles[index],description:$('sceneDescription').value.trim()||descriptions[index],motionPrompt:$('sceneMotionPrompt').value.trim()||String(originalMeta.motionPrompt||originalMeta.visibleAction||''),visibleAction:$('sceneMotionPrompt').value.trim()||String(originalMeta.visibleAction||''),camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,originalMeta.characters)};
+ const target=resolveRemoteScene(step);
+ if(!target.ok)throw new Error('Cannot resolve the requested scene: '+target.reason);
+ const index=target.index,originalMeta=target.scene,sceneId=String(originalMeta.id||'');
+ const isCurrent=index===sceneIndex;
+ const readField=(id,key)=>isCurrent?$(id).value.trim():String(originalMeta[key]||'').trim();
+ const motionText=readField('sceneMotionPrompt','motionPrompt')||String(originalMeta.visibleAction||'');
+ const motionScene={...originalMeta,title:readField('sceneTitle','title')||titles[index],description:readField('sceneDescription','description')||descriptions[index],motionPrompt:motionText,visibleAction:motionText,camera:readField('sceneCamera','camera'),startState:readField('sceneStartState','startState'),endState:readField('sceneEndState','endState'),negativePrompt:readField('sceneNegativePrompt','negativePrompt'),continuityLock:readField('sceneContinuityLock','continuityLock'),characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])};
  const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
  if(!prompt.trim())throw new Error('Add a motion instruction before remote video generation.');
- let imageBlob=comfySourceImage;
+ let imageBlob=isCurrent?comfySourceImage:null;
  if(!imageBlob){
   const imageUrl=String(originalMeta.generatedImageUrl||'').trim();
   if(!imageUrl)throw new Error('Create or load a still image for the selected scene first.');
@@ -2175,8 +2184,7 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  try{await waitForSceneVideoReady(entry.video,{timeoutMs:20000,signal});}
  catch(error){if(sceneVideoCache.get(key)===entry)sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);throw new Error('Wan 2.2 returned a clip the browser could not decode: '+(error.message||'decode error'));}
  const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
- if(sceneIndex===index)renderComfySceneVideo();
- renderScenes();if(!playing)draw();
+ if(sceneIndex===index){renderComfySceneVideo();renderScenes();if(!playing)draw();}
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
 async function generateLocalSceneVideoForUniversal({signal,reportProgress}={}){
