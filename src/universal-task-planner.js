@@ -122,7 +122,7 @@ export function validateUniversalTaskPlan(candidate, sourceRequest, { availableC
   }
 
   const capabilityIds = normalizeCapabilityIds(availableCapabilities);
-  if (Array.isArray(availableCapabilities) && capabilityIds.length !== availableCapabilities.length) {
+  if (availableCapabilities !== undefined && (!Array.isArray(availableCapabilities) || capabilityIds.length !== availableCapabilities.length)) {
     return { ok: false, reason: 'invalid-capability-catalog' };
   }
   const validatedSteps = validateSteps(candidate.steps, capabilityIds);
@@ -147,6 +147,9 @@ export function buildUniversalPlannerPrompt(request, { availableCapabilities } =
   const source = clean(request, 12_000);
   if (!source) throw new TypeError('A non-empty user request is required.');
   const capabilityIds = normalizeCapabilityIds(availableCapabilities);
+  if (availableCapabilities !== undefined && (!Array.isArray(availableCapabilities) || capabilityIds.length !== availableCapabilities.length)) {
+    throw new TypeError('The available capability catalog must contain unique valid capability IDs.');
+  }
   return [
     'You are the Universal Task Planner inside DRAVEX.',
     'Plan the complete work needed to fulfil the user request. Do not assume the request is a cartoon or even a video unless the user asks for that.',
