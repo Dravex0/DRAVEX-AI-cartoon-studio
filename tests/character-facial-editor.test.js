@@ -49,3 +49,12 @@ test("adds an explicit clean face-base plate for mouth replacement", () => {
 });
 
 test("accepts persisted local facial image references", () => { const result=upsertCharacterFacialPart(scene,{...input,imageUrl:"dravex-facial-asset://faceasset_123456"}); assert.equal(result.status,"added"); });
+
+
+test("stores a selected viseme on an authored mouth asset", () => {
+  const result = upsertCharacterFacialPart(scene, { ...input, partId: "mouth-round", viseme: "round" });
+  assert.equal(result.status, "added");
+  assert.equal(result.scene.characterFacialRigs[0].parts[0].viseme, "round");
+  assert.equal(upsertCharacterFacialPart(scene, { ...input, role: "eye-left", viseme: "round" }).status, "invalid");
+  assert.equal(upsertCharacterFacialPart(scene, { ...input, viseme: "made-up" }).status, "invalid");
+});

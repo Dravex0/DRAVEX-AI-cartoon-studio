@@ -11,6 +11,7 @@ export function upsertCharacterFacialPart(scene = {}, input = {}) {
   const headBoneId = clean(input.headBoneId);
   const partId = clean(input.partId);
   const role = clean(input.role).toLowerCase();
+  const viseme = clean(input.viseme).toLowerCase();
   const imageUrl = String(input.imageUrl ?? "").trim().slice(0, 2048);
   const number = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
   const x = number(input.x, 0.5), y = number(input.y, 0.5);
@@ -21,6 +22,7 @@ export function upsertCharacterFacialPart(scene = {}, input = {}) {
   if (!headBoneId) issues.push({ code: "facial-editor-head-bone-missing", message: "Enter the head bone ID from the body rig." });
   if (!partId) issues.push({ code: "facial-editor-part-id-missing", message: "Enter a unique facial part ID." });
   if (!ROLES.has(role)) issues.push({ code: "facial-editor-role-invalid", message: "Choose a supported facial part role." });
+  if (viseme && (role !== "mouth" || !["neutral", "open", "wide", "round", "closed", "teeth"].includes(viseme))) issues.push({ code: "facial-editor-viseme-invalid", message: "Assign a supported viseme only to a mouth part." });
   if (!/^(https:\/\/|blob:|dravex-facial-asset:)/i.test(imageUrl)) issues.push({ code: "facial-editor-image-invalid", message: "Use HTTPS, a current local blob URL, or a saved local facial asset." });
   if (x < -1 || x > 1 || y < -1 || y > 1 || width < 0.001 || width > 1 || height < 0.001 || height > 1 || Math.abs(rotation) > Math.PI * 2 || Math.abs(zIndex) > 1000) {
     issues.push({ code: "facial-editor-geometry-invalid", message: "Part geometry is outside the supported bounds." });
@@ -29,7 +31,7 @@ export function upsertCharacterFacialPart(scene = {}, input = {}) {
   const rigs = Array.isArray(source.characterFacialRigs) ? source.characterFacialRigs : [];
   const existing = rigs.find(rig => clean(rig?.characterId).toLowerCase() === characterId.toLowerCase());
   const parts = Array.isArray(existing?.parts) ? [...existing.parts] : [];
-  const part = { id: partId, role, imageUrl, x, y, width, height, rotation, zIndex };
+  const part = { id: partId, role, imageUrl, x, y, width, height, rotation, zIndex, ...(viseme ? { viseme } : {}) };
   const partIndex = parts.findIndex(item => clean(item?.id).toLowerCase() === partId.toLowerCase());
   if (partIndex >= 0) parts[partIndex] = part;
   else if (parts.length >= 16) return { status: "invalid", scene: source, rig: existing || null, issues: [{ code: "facial-editor-part-limit", message: "A facial rig supports at most 16 parts." }] };

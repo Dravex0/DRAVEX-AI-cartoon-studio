@@ -84,7 +84,14 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
     let rigDrawn = 0;
     // Draw an explicitly supplied clean face plate first so it can cover the source mouth.
     // The renderer does not generate or inpaint this aligned asset.
-    const parts = [...rig.parts].sort((a, b) => {
+    const mouthParts = rig.parts.filter(part => part.role === "mouth");
+    const taggedMouthParts = mouthParts.filter(part => part.viseme);
+    const selectedViseme = viseme || "neutral";
+    const selectedTaggedMouth = taggedMouthParts.find(part => part.viseme === selectedViseme)
+      || taggedMouthParts.find(part => part.viseme === "neutral") || null;
+    const legacyMouth = mouthParts.find(part => !part.viseme) || null;
+    const selectedMouth = selectedTaggedMouth || legacyMouth;
+    const parts = [...rig.parts].filter(part => part.role !== "mouth" || part === selectedMouth).sort((a, b) => {
       if (a.role === "face-base" && b.role !== "face-base") return -1;
       if (b.role === "face-base" && a.role !== "face-base") return 1;
       return a.zIndex - b.zIndex;
@@ -116,7 +123,9 @@ export function drawCharacterFacialRigs(context, facialRigs, resolveImage, viewp
       }
       if (part.role === "mouth") {
         scaleX = mouthWidth;
-        scaleY = hasDialogueViseme ? mouthOpen : Math.max(0.04, mouthOpen);
+        // Viseme-tagged artwork already encodes the phoneme shape. Keep its
+        // authored silhouette intact; legacy single-mouth rigs retain scaling.
+        scaleY = part.viseme ? 1 : hasDialogueViseme ? mouthOpen : Math.max(0.04, mouthOpen);
       }
       if (part.role === "jaw") {
         // A separate jaw layer follows mouth opening instead of remaining static.
