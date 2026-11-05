@@ -48,6 +48,9 @@ import { detectSceneActionForScene } from "./scene-action.js";
 import { buildExportTimeline } from "./export-timeline.js";
 import { buildAudioMouthEnvelope, sampleAudioMouthEnvelope } from "./audio-mouth-envelope.js";
 import { sampleCharacterFacialLipSync } from "./facial-lipsync-runtime.js";
+import { createFaceLandmarkerWorkerClient } from "./face-landmarker-worker-client.js";
+import { analyzeFaceVideoFrames } from "./face-video-analysis.js";
+import { createVideoFrameCapture } from "./video-frame-capture.js";
 import { getAudioTimelineOffsetMs, getScheduledAudioStartAtMs } from "./audio-clock-alignment.js";
 import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js";
 import { createAudioExportSession } from "./audio-export.js";
@@ -443,6 +446,9 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
 const magicParticles=new ParticleEmitter();
 const sceneImageCache=new Map();
 const sceneVideoCache=new Map();
+let activeFaceAnalysisController=null;
+let activeFaceAnalysisWorker=null;
+let lastFaceAnalysisExport=null;
 let finalFilmObjectUrl=null;
 let sceneVideoRestorePromise=Promise.resolve();
 const sceneVideoStorage=createSceneVideoStorage();
@@ -484,8 +490,154 @@ function attachSceneVideo(index,meta,blob,filename){
  const entry={video,url,filename};
  sceneVideoCache.set(key,entry);
  if(index===sceneIndex)syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:key,shouldPlay:playing,restart:true});
+ updateFaceAnalysisControls();
  return entry;
 }
+function faceAnalysisCheckpointKey(sceneId){return 'dravex-face-analysis-checkpoint:'+String(sceneId||'')}
+function readFaceAnalysisCheckpoint(sceneId,entry,intervalMs){
+ const key=faceAnalysisCheckpointKey(sceneId);
+ try{
+  const value=JSON.parse(readLocalStorage(key)||'null');
+  const durationMs=Number(entry?.video?.duration)*1000;
+  if(!value||value.sceneId!==String(sceneId)||value.sampleIntervalMs!==intervalMs||
+     value.filename!==String(entry?.filename||'')||
+     !Number.isFinite(durationMs)||Math.abs(Number(value.durationMs)-durationMs)>1000||
+     !Number.isFinite(Number(value.nextTimestampMs))||Number(value.nextTimestampMs)<0||
+     Number(value.nextTimestampMs)>=durationMs)return null;
+  return value;
+ }catch{return null}
+}
+function updateFaceAnalysisControls(){
+ const button=$('analyzeFaceVideo'),resume=$('resumeFaceVideo'),cancel=$('cancelFaceVideo');
+ if(!button||!resume||!cancel)return;
+ const entry=sceneVideoCache.get(sceneVideoKey(sceneIndex));
+ const available=Boolean(entry&&entry.video.readyState>=2&&Number.isFinite(entry.video.duration)&&entry.video.duration>0);
+ const running=Boolean(activeFaceAnalysisController);
+ button.disabled=!available||running;
+ cancel.disabled=!running;
+ const interval=Number($('faceAnalysisInterval')?.value)||500;
+ const checkpoint=available?readFaceAnalysisCheckpoint(sceneMetadata[sceneIndex]?.id,entry,interval):null;
+ resume.disabled=!available||running||!checkpoint;
+}
+function downloadFaceAnalysisReport(){
+ if(!lastFaceAnalysisExport)return;
+ const blob=new Blob([JSON.stringify(lastFaceAnalysisExport,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob);
+ const anchor=document.createElement('a');
+ anchor.href=url;
+ anchor.download='dravex-face-landmarks-'+String(lastFaceAnalysisExport.sceneId||'scene')+'.json';
+ document.body.appendChild(anchor);
+ anchor.click();
+ anchor.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+async function runFaceAnalysis({resume=false}={}){
+ if(activeFaceAnalysisController)return;
+ const meta=sceneMetadata[sceneIndex];
+ const entry=sceneVideoCache.get(sceneVideoKey(sceneIndex,meta));
+ if(!entry||entry.video.readyState<2||!Number.isFinite(entry.video.duration)||entry.video.duration<=0){
+  $('faceAnalysisStatus').textContent=uiLang==='ru'?'Для этой сцены ещё нет готового декодируемого видеоклипа.':'This scene has no decoded generated video clip yet.';
+  return;
+ }
+ const video=entry.video;
+ const interval=Number($('faceAnalysisInterval').value)||500;
+ const durationMs=video.duration*1000;
+ const checkpoint=resume?readFaceAnalysisCheckpoint(meta.id,entry,interval):null;
+ if(resume&&!checkpoint){
+  $('faceAnalysisStatus').textContent=uiLang==='ru'?'Контрольная точка не подходит к текущему видео. Запусти новый анализ.':'The saved checkpoint does not match this video. Start a new analysis.';
+  updateFaceAnalysisControls();
+  return;
+ }
+ const startTimeMs=checkpoint?Number(checkpoint.nextTimestampMs):0;
+ const controller=new AbortController();
+ let capture=null,worker=null;
+ activeFaceAnalysisController=controller;
+ lastFaceAnalysisExport=null;
+ $('downloadFaceAnalysis').disabled=true;
+ $('faceAnalysisProgress').value=Math.round(startTimeMs/durationMs*100);
+ $('faceAnalysisStatus').textContent=uiLang==='ru'?'Подготавливаю локальный анализ. Модель может загружаться при первом запуске…':'Preparing local analysis. The model may download on first use…';
+ updateFaceAnalysisControls();
+ try{
+  capture=createVideoFrameCapture(video);
+  worker=createFaceLandmarkerWorkerClient({requestTimeoutMs:120000});
+  activeFaceAnalysisWorker=worker;
+  await worker.initialize({delegate:'CPU'});
+  if(controller.signal.aborted)throw new DOMException('Cancelled','AbortError');
+  const samples=[];
+  const report=await analyzeFaceVideoFrames({
+   durationMs,
+   captureFrame:capture.captureFrame,
+   workerClient:worker,
+   sampleIntervalMs:interval,
+   startTimeMs,
+   signal:controller.signal,
+   onProgress:detail=>{
+    $('faceAnalysisProgress').value=detail.percent;
+    $('faceAnalysisStatus').textContent=(uiLang==='ru'?'Анализ: ':'Analyzing: ')+detail.percent+'% · '+detail.processed+'/'+detail.total+
+     (uiLang==='ru'?' · лиц обнаружено: ':' · faces detected: ')+detail.detected;
+   },
+   onCheckpoint:value=>{
+    writeLocalStorage(faceAnalysisCheckpointKey(meta.id),JSON.stringify({
+     sceneId:String(meta.id),filename:String(entry.filename||''),durationMs,
+     sampleIntervalMs:interval,nextTimestampMs:value.nextTimestampMs,
+     lastTimestampMs:value.lastTimestampMs,processed:value.processed,total:value.total
+    }));
+    updateFaceAnalysisControls();
+   },
+   onFrameResult:value=>{
+    if(value.status==='face-detected'&&value.anchors){
+     samples.push({timestampMs:value.timestampMs,anchors:value.anchors});
+    }
+   }
+  });
+  lastFaceAnalysisExport={
+   format:'dravex-face-landmark-analysis-v1',
+   sceneId:String(meta.id),
+   sceneTitle:String(meta.title||titles[sceneIndex]||''),
+   videoFilename:String(entry.filename||''),
+   durationMs,
+   sampleIntervalMs:interval,
+   resumedFromMs:startTimeMs,
+   resultScope:resume?'Only face samples from this resumed session; earlier checkpoint samples were not retained in memory.':'All face samples from this analysis session.',
+   analysis:report,
+   faceSamples:samples,
+   limitations:[
+    'Only one face is detected in each sampled frame; identity is not tracked across time.',
+    'Landmarks are normalized coordinates and do not modify the source video pixels.',
+    'A face overlay or lip-sync export has not been applied.'
+   ]
+  };
+  $('downloadFaceAnalysis').disabled=false;
+  if(report.status==='completed'){
+   try{window.localStorage.removeItem(faceAnalysisCheckpointKey(meta.id))}catch{}
+   $('faceAnalysisProgress').value=100;
+  }
+  const summary=(uiLang==='ru'
+   ?'Готово: обработано кадров '
+   :'Finished: processed frames ')+report.processed+'/'+report.total+
+   (uiLang==='ru'?' · найдено лиц: ':' · faces found: ')+report.detected+
+   (uiLang==='ru'?' · без лица: ':' · no face: ')+report.noFace+
+   (report.failed?(uiLang==='ru'?' · ошибок: ':' · errors: ')+report.failed:'')+
+   (report.status==='cancelled'?(uiLang==='ru'?' · анализ остановлен, можно продолжить':' · cancelled; you can resume'):'');
+  $('faceAnalysisStatus').textContent=summary;
+ }catch(error){
+  $('faceAnalysisStatus').textContent=(error?.name==='AbortError'
+   ?(uiLang==='ru'?'Анализ отменён.':'Analysis cancelled.')
+   :(uiLang==='ru'?'Ошибка анализа: ':'Analysis error: ')+String(error?.message||error));
+ }finally{
+  try{await capture?.restore()}catch(error){console.warn('Could not restore scene video after face analysis:',error)}
+  try{await worker?.dispose()}catch(error){console.warn('Could not dispose face analysis worker:',error)}
+  if(activeFaceAnalysisWorker===worker)activeFaceAnalysisWorker=null;
+  if(activeFaceAnalysisController===controller)activeFaceAnalysisController=null;
+  if(sceneVideoCache.get(sceneVideoKey(sceneIndex))?.video===video)draw();
+  updateFaceAnalysisControls();
+ }
+}
+$('analyzeFaceVideo')?.addEventListener('click',()=>void runFaceAnalysis({resume:false}));
+$('resumeFaceVideo')?.addEventListener('click',()=>void runFaceAnalysis({resume:true}));
+$('cancelFaceVideo')?.addEventListener('click',()=>activeFaceAnalysisController?.abort());
+$('downloadFaceAnalysis')?.addEventListener('click',downloadFaceAnalysisReport);
+$('faceAnalysisInterval')?.addEventListener('change',updateFaceAnalysisControls);
 function releaseSceneVideo(meta,index){
  const key=sceneVideoKey(index,meta);
  disposeSceneVideoEntry(sceneVideoCache.get(key));
@@ -1466,6 +1618,7 @@ function renderScenes(){
     box.appendChild(button);
   });
   renderSceneMediaReport();
+  updateFaceAnalysisControls();
 }
 let sceneVoiceStorage=null;
 let sceneVoiceEngine=null;
