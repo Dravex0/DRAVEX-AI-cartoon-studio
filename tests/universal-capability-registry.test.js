@@ -136,6 +136,44 @@ test('allows consent to be granted and revoked at runtime', async () => {
   assert.equal(calls, 1);
 });
 
+test('scoped remote consent is independent from the global remote consent switch', () => {
+  const registry = createUniversalCapabilityRegistry();
+  registry.register({ id: 'horde-image', privacy: 'remote', consentKey: 'ai-horde-image', run: async () => 'image' });
+  assert.equal(registry.isAvailable('horde-image'), false);
+  registry.setRemoteConsent(true);
+  assert.equal(registry.isAvailable('horde-image'), false);
+  registry.setConsent('ai-horde-image', true);
+  assert.equal(registry.isAvailable('horde-image'), true);
+  registry.setRemoteConsent(false);
+  assert.equal(registry.isAvailable('horde-image'), true);
+  registry.setConsent('ai-horde-image', false);
+  assert.equal(registry.isAvailable('horde-image'), false);
+});
+
+test('revoking one scoped consent aborts only the matching active remote capability', async () => {
+  const registry = createUniversalCapabilityRegistry({ remoteConsent: true });
+  let observedAbort = false;
+  let started;
+  const ready = new Promise(resolve => { started = resolve; });
+  registry.register({
+    id: 'horde-image', privacy: 'remote', consentKey: 'ai-horde-image',
+    run: async ({ signal }) => {
+      signal.addEventListener('abort', () => { observedAbort = true; }, { once: true });
+      started();
+      await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true }));
+      return 'stale';
+    }
+  });
+  registry.register({ id: 'hf-video', privacy: 'remote', run: async () => 'video' });
+  const running = registry.createHandlers()['horde-image']({});
+  await ready;
+  registry.setConsent('ai-horde-image', false);
+  await assert.rejects(running, error => error.name === 'AbortError');
+  assert.equal(observedAbort, true);
+  assert.equal(registry.isAvailable('hf-video'), true);
+  assert.deepEqual(registry.status, { busy: false, activeCapability: null });
+});
+
 test('revoking remote consent aborts an active remote operation', async () => {
   const registry = createUniversalCapabilityRegistry({ remoteConsent: true });
   let observedAbort = false;
