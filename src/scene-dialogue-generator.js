@@ -83,6 +83,7 @@ export function buildSceneDialoguePrompt({
   characterBible = []
 } = {}) {
   const locale = SUPPORTED_LANGUAGES.has(String(language)) ? String(language) : 'en';
+  const languageName = { en: 'English', ru: 'Russian', uk: 'Ukrainian', es: 'Spanish' }[locale];
   const allowedCharacters = Array.isArray(scene.characters) && scene.characters.length
     ? scene.characters.map(value => clean(value, 120)).filter(Boolean)
     : [clean(mainCharacter, 120)].filter(Boolean);
@@ -104,7 +105,7 @@ export function buildSceneDialoguePrompt({
     'Use only these assigned character IDs: ' + JSON.stringify(allowedCharacters) + '. Use "Narrator" only when no assigned character can naturally speak.',
     'Do not invent characters, locations, objects, backstory, causes, or outcomes. Dialogue may express a reaction to facts already stated, but must not introduce new plot facts.',
     'Do not include stage directions, camera directions, sound effects, markdown, or speaker prefixes inside text.',
-    'Write every line in this language: ' + locale + '.',
+    'Write every line in this language: ' + languageName + ' (' + locale + ').',
     'CHARACTER BIBLE: ' + JSON.stringify(relevantBible),
     'USER REQUEST: ' + clean(sourceRequest, 1800),
     'SCENE ' + sceneNumber + ' OF ' + sceneCount + ': ' + JSON.stringify({
