@@ -102,7 +102,7 @@ export function createUniversalImageGenerationCapability({
           fingerprint: fingerprint(scenes[index])
         }));
       if (!targetScenes.length) {
-        return { type: 'scene-images', sceneIds: [], imageCount: 0, allScenes: targets.allScenes === true, shared: false, remote: true, alreadyReady: true };
+        return { type: 'scene-images', sceneIds: [], imageCount: 0, allScenes: targets.allScenes === true, shared: false, remote: false, alreadyReady: true };
       }
 
       const generated = [];
