@@ -150,6 +150,25 @@ test('scoped remote consent is independent from the global remote consent switch
   assert.equal(registry.isAvailable('horde-image'), false);
 });
 
+test('allows a consent-free resume only when the remote step is a verified no-op', async () => {
+  const registry = createUniversalCapabilityRegistry();
+  const step = { requiredCapabilities: ['horde-image'], inputs: ['allScenes'] };
+  let remoteCalls = 0;
+  registry.register({
+    id: 'horde-image',
+    privacy: 'remote',
+    consentKey: 'ai-horde-image',
+    isAvailable: ({ step: currentStep } = {}) => Boolean(currentStep),
+    canRunWithoutConsent: ({ step: currentStep } = {}) => Boolean(currentStep?.inputs?.includes('allScenes')),
+    run: async () => { remoteCalls += 1; return { alreadyReady: true }; }
+  });
+  assert.equal(registry.isAvailable('horde-image'), false);
+  assert.equal(registry.isAvailable('horde-image', { step }), true);
+  const result = await registry.createHandlers({ plan: { sourceRequest: 'video' }, step })['horde-image']({});
+  assert.deepEqual(result, { alreadyReady: true });
+  assert.equal(remoteCalls, 1);
+});
+
 test('revoking one scoped consent aborts only the matching active remote capability', async () => {
   const registry = createUniversalCapabilityRegistry({ remoteConsent: true });
   let observedAbort = false;
