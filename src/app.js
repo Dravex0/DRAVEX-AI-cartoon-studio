@@ -243,7 +243,7 @@ const universalImageGenerationCapability=createUniversalImageGenerationCapabilit
  getScenes:()=>sceneMetadata,
  isImageReady:scene=>Boolean(String(scene?.generatedImageUrl||'').trim()),
  generateSceneImage:async({scene,sceneIndex,signal,reportProgress})=>{
-  const meta={...scene,title:titles[sceneIndex]||scene.title||'',description:descriptions[sceneIndex]||scene.description||''};
+  const meta={...scene,title:scene.title||titles[sceneIndex]||'',description:scene.description||descriptions[sceneIndex]||''};
   meta.imagePrompt=String(meta.imagePrompt||meta.prompt||meta.description||meta.title);
   const prompt=buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value});
   const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);
@@ -256,7 +256,7 @@ const universalImageGenerationCapability=createUniversalImageGenerationCapabilit
   });
   return result;
  },
- onSceneGenerated:async({scene,sceneIndex,result})=>{
+ onSceneGenerated:async({scene,sceneIndex:targetIndex,result})=>{
   const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===String(scene.id||''));
   if(resolvedIndex<0)throw new Error('The target scene was removed before its generated image could be saved.');
   sceneMetadata[resolvedIndex]={
@@ -267,7 +267,7 @@ const universalImageGenerationCapability=createUniversalImageGenerationCapabilit
    generatedImageWorker:result.workerName
   };
   getLoadedSceneImage(result.imageUrl);
-  if(sceneIndex===resolvedIndex&&resolvedIndex===sceneIndex)renderGeneratedSceneImage();
+  if(resolvedIndex===sceneIndex)renderGeneratedSceneImage();
   if(!playing)draw();
   updateStoryQA();
   const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
@@ -1547,6 +1547,37 @@ function persistCurrentSceneDialogueToMetadata(locale=storyLanguage()){
  return currentIndex;
 }
 
+function persistCurrentSceneEditorToMetadata(){
+ const index=sceneIndex;
+ const meta=sceneMetadata[index]||{};
+ const scene={
+  ...meta,
+  id:String(meta.id||createSceneId()),
+  title:$('sceneTitle').value.trim()||titles[index]||meta.title||'',
+  description:$('sceneDescription').value.trim(),
+  imagePrompt:$('sceneImagePrompt').value.trim(),
+  prompt:$('sceneImagePrompt').value.trim(),
+  motionPrompt:$('sceneMotionPrompt').value.trim(),
+  visibleAction:$('sceneMotionPrompt').value.trim(),
+  camera:$('sceneCamera').value.trim(),
+  location:meta.location,
+  timeOfDay:meta.timeOfDay,
+  characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),
+  startState:$('sceneStartState').value.trim(),
+  endState:$('sceneEndState').value.trim(),
+  continuityLock:$('sceneContinuityLock').value.trim(),
+  negativePrompt:$('sceneNegativePrompt').value.trim()
+ };
+ titles[index]=scene.title;
+ descriptions[index]=scene.description;
+ sceneMetadata[index]=scene;
+ writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
+  idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
+  language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
+ }));
+ return scene;
+}
+
 function isLocalDialogueGenerationReady({step}={}){
  try{
   if(!localTextRuntime.status.loaded||!sceneMetadata.length)return false;
@@ -2013,7 +2044,11 @@ activeUniversalPlanController.abort();
 $('cancelUniversalPlan').disabled=true;
 $('universalPlannerStatus').textContent=uiLang==='ru'?'Запрошена отмена. Текущий расчёт модели нельзя прервать мгновенно; результат не будет применён.':'Cancellation requested. The current model inference cannot be interrupted immediately; its result will be discarded.';
 });
-$('hordeConsent').addEventListener('change',()=>{$('generateSceneImage').disabled=!$('hordeConsent').checked});
+universalCapabilityRegistry.setConsent('ai-horde-image',$('hordeConsent').checked===true);
+$('hordeConsent').addEventListener('change',()=>{
+ universalCapabilityRegistry.setConsent('ai-horde-image',$('hordeConsent').checked===true);
+ $('generateSceneImage').disabled=!$('hordeConsent').checked;
+});
 $('spriteHordeConsent').addEventListener('change',()=>{$('generateCharacterSprites').disabled=!$('spriteHordeConsent').checked});
 $('generateCharacterSprites').addEventListener('click',async()=>{
  const button=$('generateCharacterSprites'),status=$('characterSpriteStatus');
