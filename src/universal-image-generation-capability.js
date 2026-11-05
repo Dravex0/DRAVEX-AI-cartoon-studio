@@ -60,7 +60,7 @@ export function createUniversalImageGenerationCapability({
     isAvailable,
     async run({ plan, step, signal, reportProgress } = {}) {
       if (signal?.aborted) throw abortError();
-      if (!/(image|visual|scene|video|film|movie|animation|cartoon|изображ|картин|сцен|видео|фильм|мульт|анимац)/i.test(clean(plan?.sourceRequest, 12000))) {
+      if (!/(image|visual|scene|video|film|movie|animation|cartoon|изображ|зображ|картин|малюн|сцен|видео|відео|фильм|фільм|мульт|анимац|анімац)/i.test(clean(plan?.sourceRequest, 12000))) {
         const error = new Error('Scene image generation only accepts explicit image, scene, video, or film requests.');
         error.code = 'CAPABILITY_REQUEST_MISMATCH';
         throw error;
