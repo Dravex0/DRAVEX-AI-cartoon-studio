@@ -47,7 +47,7 @@ describe('action-specific character pose audit', () => {
   it('rejects an unsupported action preset explicitly', () => {
     const report = auditCharacterActionPose(rig(), 'teleport');
     assert.equal(report.status, 'failed');
-    assert.equal(report.issues[0].code, 'action-preset-unsupported');
+    assert.equal(report.issues[0].code, 'motion-preset-unknown');
   });
 
   it('does not claim rendered or exported visual correctness', () => {
