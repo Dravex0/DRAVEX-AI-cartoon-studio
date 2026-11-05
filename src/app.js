@@ -470,6 +470,7 @@ function updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGe
  const entry=sceneVideoCache.get(sceneVideoKey(sceneIndex,meta));
  const report=lastFaceAnalysisExport;
  if(!report||!hasGeneratedVideo||!generatedVideo||!entry||report.sceneId!==String(meta.id||'')||report.videoFilename!==String(entry.filename||'')){
+  faceLandmarkOverlayLastTimeBucket=-1;
   hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'Нет анализа для текущего видеоклипа. Сначала выполни анализ выбранной сцены.':'No matching analysis for this clip. Analyze the selected scene first.');
   return;
  }
