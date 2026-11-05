@@ -1748,13 +1748,13 @@ $('executeUniversalTask').addEventListener('click',async()=>{
  if(!plan||activeUniversalExecutionController)return;
  const binding=bindUniversalPlanCapabilities(plan,universalCapabilityRegistry);
  if(binding.bindings[0]?.status!=='ready'){
-  status.textContent=ru?'Выполнение остановлено: безопасно доступен только один подключённый первый этап.':'Execution blocked: only one registered first step can run safely.';
+  status.textContent=ru?'Выполнение остановлено: первый этап сейчас недоступен. Проверь локальную модель и материалы сцены.':'Execution blocked: the first step is not currently available. Check the local model and scene inputs.';
   return;
  }
  const controller=new AbortController();
  activeUniversalExecutionController=controller;
  button.disabled=true;cancel.disabled=false;
- $('planUniversalTask').disabled=true;$('runLocalModel').disabled=true;
+ $('planUniversalTask').disabled=true;$('runLocalModel').disabled=true;$('generateSceneVoices').disabled=true;
  status.textContent=ru?'Выполняем локальную раскадровку…':'Executing local storyboard step…';
  try{
   const result=await executeUniversalTaskPlan({
@@ -1784,6 +1784,7 @@ $('executeUniversalTask').addEventListener('click',async()=>{
   cancel.disabled=true;
   $('planUniversalTask').disabled=!localTextRuntime.status.loaded;
   $('runLocalModel').disabled=!localTextRuntime.status.loaded;
+  refreshSceneVoiceControls();
  }
 });
 $('cancelUniversalExecution').addEventListener('click',()=>{
