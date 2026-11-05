@@ -162,3 +162,43 @@ test("draws the clean face-base plate before facial features regardless of z-ind
   assert.equal(result.drawn, 4);
   assert.deepEqual(context.calls.filter(call => call[0] === "drawImage").map(call => call[1]), ["face-base", "eye", "brow", "mouth"]);
 });
+
+
+test("selects only the authored mouth image matching the active dialogue viseme", () => {
+  const candidate = rig();
+  candidate.parts = candidate.parts.filter(part => part.role !== "mouth");
+  for (const shape of ["neutral", "open", "round", "closed"]) {
+    candidate.parts.push({
+      id: "mouth-" + shape, role: "mouth", viseme: shape,
+      imageUrl: "blob:mouth-" + shape, x: 0.5, y: 0.55,
+      width: 0.08, height: 0.04, zIndex: 3
+    });
+  }
+  const images = Object.fromEntries(["neutral", "open", "round", "closed"].map(shape => [
+    "blob:mouth-" + shape, { id: shape, width: 20, height: 20 }
+  ]));
+  for (const shape of ["open", "round", "closed"]) {
+    const context = contextRecorder();
+    const result = drawCharacterFacialRigs(context, [candidate], key => images[key] || { width: 20, height: 20 }, 1000, 500, {
+      facialVisemes: { Foxy: shape },
+      facialMouthOpenness: { Foxy: 0.2 }
+    });
+    assert.equal(result.drawn, 1);
+    assert.deepEqual(context.calls.filter(call => call[0] === "drawImage").map(call => call[1]), [shape]);
+    assert.ok(context.calls.some(call => call[0] === "scale" && call[1] === 1 && call[2] === 1));
+  }
+});
+
+test("falls back to a neutral viseme asset when the active shape is unavailable", () => {
+  const candidate = rig();
+  candidate.parts = candidate.parts.filter(part => part.role !== "mouth");
+  candidate.parts.push(
+    { id: "mouth-neutral", role: "mouth", viseme: "neutral", imageUrl: "blob:neutral", x: 0.5, y: 0.55, width: 0.08, height: 0.04, zIndex: 3 },
+    { id: "mouth-closed", role: "mouth", viseme: "closed", imageUrl: "blob:closed", x: 0.5, y: 0.55, width: 0.08, height: 0.04, zIndex: 4 }
+  );
+  const context = contextRecorder();
+  drawCharacterFacialRigs(context, [candidate], key => ({ id: key, width: 20, height: 20 }), 1000, 500, {
+    facialVisemes: { Foxy: "wide" }
+  });
+  assert.deepEqual(context.calls.filter(call => call[0] === "drawImage").map(call => call[1]), ["blob:neutral"]);
+});
