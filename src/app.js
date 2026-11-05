@@ -606,7 +606,7 @@ function updateFaceAnalysisControls(){
  resume.disabled=!available||running||!checkpoint;
  const overlayToggle=$('showFaceLandmarkOverlay');
  const reportMatches=Boolean(lastFaceAnalysisExport&&lastFaceAnalysisVideoEntry===entry&&entry&&lastFaceAnalysisExport.sceneId===String(sceneMetadata[sceneIndex]?.id||'')&&lastFaceAnalysisExport.videoFilename===String(entry.filename||'')&&Array.isArray(lastFaceAnalysisExport.faceSamples)&&lastFaceAnalysisExport.faceSamples.some(sample=>sample.status==='face-detected'&&sample.anchors));
- if(overlayToggle)overlayToggle.disabled=!reportMatches;
+ if(overlayToggle){overlayToggle.disabled=!reportMatches;if(!reportMatches)overlayToggle.checked=false;}
  if(!reportMatches)hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'Сначала проанализируй текущее видео, чтобы включить рамку.':'Analyze the current clip before enabling the overlay.');
 }
 function downloadFaceAnalysisReport(){
