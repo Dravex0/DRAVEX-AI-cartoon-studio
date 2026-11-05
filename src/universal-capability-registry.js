@@ -17,6 +17,7 @@ function normalizeCapability(raw) {
     consentKey,
     requiresConsent: raw.requiresConsent === true || privacy === 'remote',
     isAvailable: typeof raw.isAvailable === 'function' ? raw.isAvailable : () => raw.available !== false,
+    canRunWithoutConsent: typeof raw.canRunWithoutConsent === 'function' ? raw.canRunWithoutConsent : null,
     run: raw.run
   });
 }
@@ -39,19 +40,22 @@ export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}
   let consentGranted = remoteConsent === true;
   const scopedConsent = new Map();
 
-  function hasConsent(adapter) {
+  function hasConsent(adapter, context) {
     if (!adapter.requiresConsent) return true;
-    return adapter.consentKey ? scopedConsent.get(adapter.consentKey) === true : consentGranted === true;
+    const granted = adapter.consentKey ? scopedConsent.get(adapter.consentKey) === true : consentGranted === true;
+    if (granted) return true;
+    try { return adapter.canRunWithoutConsent?.(context) === true; }
+    catch { return false; }
   }
 
   function isAvailable(adapter, context) {
-    if (!hasConsent(adapter)) return false;
+    if (!hasConsent(adapter, context)) return false;
     try { return adapter.isAvailable(context) === true; }
     catch { return false; }
   }
 
   function assertAvailable(adapter, context) {
-    if (!hasConsent(adapter)) {
+    if (!hasConsent(adapter, context)) {
       const error = new Error('Explicit consent is required before using remote capability "' + adapter.id + '".');
       error.code = 'REMOTE_CONSENT_REQUIRED';
       throw error;
