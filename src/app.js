@@ -256,7 +256,7 @@ const universalImageGenerationCapability=createUniversalImageGenerationCapabilit
   });
   return result;
  },
- onSceneGenerated:async({scene,sceneIndex:targetIndex,result})=>{
+ onSceneGenerated:async({scene,result})=>{
   const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===String(scene.id||''));
   if(resolvedIndex<0)throw new Error('The target scene was removed before its generated image could be saved.');
   sceneMetadata[resolvedIndex]={
