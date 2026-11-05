@@ -250,6 +250,7 @@ export function auditAnimationCompatibility(scenes) {
     rigTimelineCount,
     actionTimelineCount,
     spriteMotionTimelineCount,
+    voiceCueCount,
     errorCount: errors,
     warningCount: warnings,
     status: errors ? 'incompatible' : warnings ? 'compatible-with-warnings' : 'compatible',
