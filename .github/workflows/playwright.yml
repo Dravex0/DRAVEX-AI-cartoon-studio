@@ -27,7 +27,7 @@ jobs:
           node-version: 22
 
       - name: Install project dependencies
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund --onnxruntime-node-install-cuda=skip
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium

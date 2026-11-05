@@ -52,6 +52,8 @@ test('builds a universal prompt without assuming a cartoon-only request', () => 
   assert.match(prompt, /currently selected scene/);
   assert.match(prompt, /film\.compose/);
   assert.match(prompt, /all per-scene video-generation steps/);
+  assert.match(prompt, /voice\.generate/);
+  assert.match(prompt, /allScenes/);
 });
 
 test('accepts a valid model plan wrapped in a Markdown fence', async () => {
