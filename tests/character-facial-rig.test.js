@@ -66,4 +66,16 @@ test("accepts a clean face-base plate as a supported facial layer", () => {
   assert.equal(validateCharacterFacialRig(rig, bodyRig).status, "valid");
 });
 
+test("normalizes and validates viseme tags only on supported mouth shapes", () => {
+  const rig = facialRig();
+  rig.parts.push({ id: "mouth-open", role: "mouth", viseme: "open", imageUrl: "blob:mouth-open" });
+  const normalized = normalizeCharacterFacialRig(rig);
+  assert.equal(normalized.parts[2].viseme, "open");
+  assert.equal(validateCharacterFacialRig(normalized, bodyRig).status, "valid");
+  rig.parts[2].viseme = "invented";
+  assert.ok(validateCharacterFacialRig(rig, bodyRig).issues.some(issue => issue.code === "facial-part-viseme-invalid"));
+  rig.parts[0].viseme = "round";
+  assert.ok(validateCharacterFacialRig(rig, bodyRig).issues.some(issue => issue.code === "facial-part-viseme-invalid"));
+});
+
 test("accepts stable references to persisted local facial assets", () => { const rig=facialRig(); rig.parts[0].imageUrl="dravex-facial-asset://faceasset_123456"; assert.equal(validateCharacterFacialRig(rig,bodyRig).status,"valid"); });
