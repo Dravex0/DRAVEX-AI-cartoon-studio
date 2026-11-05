@@ -8,3 +8,12 @@ export function getAudioTimelineOffsetMs(scheduledStartAtMs, recordingStartAtMs)
   }
   return scheduledStartAtMs - recordingStartAtMs;
 }
+
+
+/** Read the performance-clock timestamp returned by an audio session start. */
+export function getScheduledAudioStartAtMs(startInfo) {
+  const timestamp = startInfo && typeof startInfo === "object"
+    ? startInfo.scheduledStartAtMs
+    : null;
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
