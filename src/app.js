@@ -15,6 +15,7 @@ import { createUniversalRemoteVideoCapability } from "./universal-remote-video-c
 import { createUniversalFilmCompositionCapability } from "./universal-film-composition-capability.js";
 import { resolveUniversalSceneTarget } from "./universal-scene-target.js";
 import { resolveUniversalVoiceTargets } from "./universal-voice-target.js";
+import { buildSceneDialoguePrompt, validateSceneDialogueResponse } from "./scene-dialogue-generator.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
@@ -139,6 +140,25 @@ universalCapabilityRegistry.register({
   const created=createStoryboard(plan.sourceRequest,{throwOnError:true});
   if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
   return {type:'storyboard',sceneCount:Array.isArray(created?.scenes)?created.scenes.length:0,sourceLanguage:created?.sourceLanguage||null};
+ }
+});
+universalCapabilityRegistry.register({
+ id:'dialogue.generate',
+ name:'Write source-grounded local dialogue for storyboard scenes',
+ privacy:'local',
+ isAvailable:context=>isLocalDialogueGenerationReady(context),
+ run:async({plan,step,signal,reportProgress})=>{
+  if(!/(dialogue|speech|voice|narrat|talk|реплик|диалог|озвуч|голос|диктор|говор)/i.test(String(plan?.sourceRequest||''))){
+   const error=new Error('The local dialogue adapter only accepts explicit dialogue, speech, narration, or voice requests.');
+   error.code='CAPABILITY_REQUEST_MISMATCH';
+   throw error;
+  }
+  if(!step||!Array.isArray(step.requiredCapabilities)||step.requiredCapabilities.length!==1||step.requiredCapabilities[0]!=='dialogue.generate'){
+   const error=new Error('The dialogue adapter requires one explicit dialogue.generate capability.');
+   error.code='CAPABILITY_BINDING_MISMATCH';
+   throw error;
+  }
+  return generateSceneDialoguesForUniversal({plan,step,signal,reportProgress});
  }
 });
 universalCapabilityRegistry.register({
