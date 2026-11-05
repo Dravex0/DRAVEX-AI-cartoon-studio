@@ -454,9 +454,9 @@ let lastFaceAnalysisExport=null;
 let faceLandmarkOverlayLastTimeBucket=-1;
 function hideFaceLandmarkPreviewOverlay(message=''){
  const overlay=$('faceLandmarkOverlay');
- if(overlay){overlay.hidden=true;overlay.replaceChildren();}
+ if(overlay&&(!overlay.hidden||overlay.childElementCount)){overlay.hidden=true;overlay.replaceChildren();}
  const status=$('faceLandmarkOverlayStatus');
- if(status&&message)status.textContent=message;
+ if(status&&message&&status.textContent!==message)status.textContent=message;
 }
 function updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGeneratedVideo,motionTransform,viewportWidth,viewportHeight,cameraPlan,focusX,focusY}){
  const overlay=$('faceLandmarkOverlay');
@@ -479,7 +479,7 @@ function updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGe
   return;
  }
  const bucket=Math.floor(timeMs/100);
- if(bucket===faceLandmarkOverlayLastTimeBucket&&overlay&&!overlay.hidden)return;
+ if(bucket===faceLandmarkOverlayLastTimeBucket&&overlay)return;
  faceLandmarkOverlayLastTimeBucket=bucket;
  const maxGapMs=Math.max(1000,Number(report.sampleIntervalMs||500)*2.5);
  const sample=sampleFaceLandmarkTimeline(report.faceSamples,timeMs,{maxGapMs});
