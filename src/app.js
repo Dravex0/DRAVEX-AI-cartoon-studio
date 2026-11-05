@@ -168,7 +168,13 @@ universalCapabilityRegistry.register({
   const targetScenes=targets.indices
    .filter(index=>selectScenesMissingDialogue([sceneMetadata[index]]).length>0)
    .map(index=>({sceneId:String(sceneMetadata[index]?.id||''),originalIndex:index}));
-  if(!targetScenes.length)throw new Error('No scenes need generated dialogue. Existing dialogue was preserved.');
+  if(!targetScenes.length){
+   const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
+    idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
+    language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
+   }));
+   return {type:'scene-dialogue',sceneIds:[],lineCount:0,scenes:0,local:true,persistedInDraft:saved,alreadyReady:true};
+  }
   if(targetScenes.some(target=>!target.sceneId)||new Set(targetScenes.map(target=>target.sceneId)).size!==targetScenes.length)throw new Error('Storyboard scenes need unique stable IDs before dialogue generation.');
   const completed=[];
   for(let position=0;position<targetScenes.length;position++){
@@ -1624,8 +1630,9 @@ function isLocalDialogueGenerationReady({step}={}){
   const indices=step
    ?resolveUniversalVoiceTargets(step,sceneMetadata,sceneIndex)
    :{ok:true,indices:sceneMetadata.map((_,index)=>index)};
-  if(!indices.ok)return false;
-  return indices.indices.some(index=>sceneDialogueLinesAt(index,locale).length===0);
+  if(!indices.ok||!indices.indices.length)return false;
+  if(!step)return indices.indices.some(index=>sceneDialogueLinesAt(index,locale).length===0);
+  return true;
  }catch{return false}
 }
 
