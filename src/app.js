@@ -8,6 +8,8 @@ import { detectDeviceCapabilities } from "./device-capabilities.js";
 import { createLocalTransformersRuntime } from "./transformers-local-runtime.js";
 import { directStoryboardWithLocalAI } from "./local-story-director.js";
 import { planUniversalTask } from "./universal-task-planner.js";
+import { createUniversalCapabilityRegistry, bindUniversalPlanCapabilities } from "./universal-capability-registry.js";
+import { executeUniversalTaskPlan } from "./universal-task-executor.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
@@ -108,6 +110,21 @@ function applyCanvasFormat(){const dimensions=getCanvasDimensions(activeCanvasFo
 applyCanvasFormat();
 $('canvasFormat').addEventListener('change',()=>{activeCanvasFormat=normalizeCanvasFormat($('canvasFormat').value);writeLocalStorage('dravex-canvas-format',activeCanvasFormat);applyCanvasFormat();if(playing){if(raf)cancelAnimationFrame(raf);raf=0;draw();}});
 const animationClock=createAnimationClock();let exportMouthTracks=[],exportMouthOriginTimeMs=null;let previewMouthTracks=[],previewMouthOriginTimeMs=null,previewVoiceSession=null,previewVoiceRequestToken=0;let sceneMotionSceneIndex=-1,sceneMotionStartTimeMs=0,rigPreviewProgress=null;let titles=[...translations[uiLang].sceneTitles];let descriptions=[...translations[uiLang].sceneDescriptions];let sceneMetadata=titles.map((title,index)=>({id:createSceneId(),title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''}));let characterBible=[];let currentStoryboardPlan=null;
+let lastUniversalTaskPlan=null;
+let universalTaskCheckpoint=null;
+let activeUniversalExecutionController=null;
+const universalCapabilityRegistry=createUniversalCapabilityRegistry();
+universalCapabilityRegistry.register({
+ id:'storyboard.create',
+ name:'Create a local storyboard',
+ privacy:'local',
+ run:async({plan,signal})=>{
+  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
+  const created=createStoryboard(plan.sourceRequest,{throwOnError:true});
+  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
+  return {type:'storyboard',sceneCount:Array.isArray(created?.scenes)?created.scenes.length:0,sourceLanguage:created?.sourceLanguage||null};
+ }
+});
 function getSceneAction(index){return detectSceneActionForScene(sceneMetadata[index]||{},titles[index]||'',descriptions[index]||'');}
 class ParticleEmitter {
 constructor(){this.particles=[];this.maxParticles=160}
@@ -1527,8 +1544,49 @@ $('language').addEventListener('change',()=>{
  $('sceneVoiceStatus').textContent=voiceText('Язык истории изменён. При необходимости загрузи соответствующую модель.','Story language changed. Load the matching voice model if needed.');
 });
 $('voiceNonCommercialConsent').addEventListener('change',refreshSceneVoiceControls);
-$('make').addEventListener('click',()=>createStoryboard(false));
-function createStoryboard(){const status=$('status');const idea=$('idea').value.trim();if(!idea){status.textContent=tr('emptyIdea');$('idea').focus();return}const lang=storyLanguage();const requestedCharacter=$('character').value.trim();const character=resolveStoryProtagonist(idea,requestedCharacter,lang);const proceduralDemoCharacter=!requestedCharacter&&['Главный герой','Головний герой','Main character','Personaje principal'].includes(character);$('character').value=character;try{status.textContent=uiLang==='ru'?'Создаём раскадровку локальным движком DRAVEX…':'Creating a storyboard with the local DRAVEX engine…';const plan=buildStoryboardFromText(idea,lang,character);const storyContext=prepareStoryCharacterContext(plan,characterBible,character,lang);characterBible=storyContext.characterBible;const preparedScenes=storyContext.scenes;const stateChanges=inferStoryboardStateChanges(preparedScenes,lang,character);sceneMetadata=ensureSceneIds(preparedScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]})));currentStoryboardPlan={...plan,eventChain:buildStoryEventChain(sceneMetadata),sourceText:idea,sourceLanguage:lang,sourceCharacter:character,proceduralDemoCharacter,scenes:sceneMetadata};titles=plan.titles;descriptions=plan.descriptions;sceneIndex=0;$('bibleCharacterId').value=character;$('bibleCharacterId').dataset.loaded='';$('sceneLabel').textContent=(storyLabels[lang]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();updateStoryQA();status.textContent=uiLang==='ru'?'Раскадровка создана локальным движком DRAVEX.':'Storyboard created by the local DRAVEX engine.';status.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(error){console.error('DRAVEX storyboard error:',error);status.textContent=(uiLang==='ru'?'Не удалось создать раскадровку: ':'Storyboard creation failed: ')+(error?.message||'Unknown error');}}
+$('make').addEventListener('click',()=>createStoryboard());
+function createStoryboard(ideaOverride, {throwOnError=false}={}){
+ const status=$('status');
+ const idea=(typeof ideaOverride==='string'?ideaOverride:$('idea').value).trim();
+ if(!idea){
+  status.textContent=tr('emptyIdea');
+  $('idea').focus();
+  if(throwOnError)throw new Error(tr('emptyIdea'));
+  return null;
+ }
+ const lang=storyLanguage();
+ const requestedCharacter=$('character').value.trim();
+ const character=resolveStoryProtagonist(idea,requestedCharacter,lang);
+ const proceduralDemoCharacter=!requestedCharacter&&['Главный герой','Головний герой','Main character','Personaje principal'].includes(character);
+ $('character').value=character;
+ try{
+  status.textContent=uiLang==='ru'?'Создаём раскадровку локальным движком DRAVEX…':'Creating a storyboard with the local DRAVEX engine…';
+  const plan=buildStoryboardFromText(idea,lang,character);
+  const storyContext=prepareStoryCharacterContext(plan,characterBible,character,lang);
+  characterBible=storyContext.characterBible;
+  const preparedScenes=storyContext.scenes;
+  const stateChanges=inferStoryboardStateChanges(preparedScenes,lang,character);
+  sceneMetadata=ensureSceneIds(preparedScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]})));
+  currentStoryboardPlan={...plan,eventChain:buildStoryEventChain(sceneMetadata),sourceText:idea,sourceLanguage:lang,sourceCharacter:character,proceduralDemoCharacter,scenes:sceneMetadata};
+  titles=plan.titles;
+  descriptions=plan.descriptions;
+  sceneIndex=0;
+  $('bibleCharacterId').value=character;
+  $('bibleCharacterId').dataset.loaded='';
+  $('sceneLabel').textContent=(storyLabels[lang]||'Scene')+' 1 · '+titles[0];
+  renderScenes();
+  syncSceneEditor();
+  updateStoryQA();
+  status.textContent=uiLang==='ru'?'Раскадровка создана локальным движком DRAVEX.':'Storyboard created by the local DRAVEX engine.';
+  status.scrollIntoView({behavior:'smooth',block:'nearest'});
+  return currentStoryboardPlan;
+ }catch(error){
+  console.error('DRAVEX storyboard error:',error);
+  status.textContent=(uiLang==='ru'?'Не удалось создать раскадровку: ':'Storyboard creation failed: ')+(error?.message||'Unknown error');
+  if(throwOnError)throw error;
+  return null;
+ }
+}
 $('checkLocalAI').addEventListener('click',async()=>{
 const button=$('checkLocalAI'),status=$('localAIStatus'),ru=uiLang==='ru';
 if(button.disabled)return;button.disabled=true;status.textContent=ru?'Проверяем возможности браузера и устройства…':'Checking browser and device capabilities…';
