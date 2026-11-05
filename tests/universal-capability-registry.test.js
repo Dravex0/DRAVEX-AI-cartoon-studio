@@ -6,7 +6,7 @@ test('registers adapters and exposes safe metadata', () => {
   const registry = createUniversalCapabilityRegistry();
   registry.register({ id: 'storyboard', name: 'Storyboard', run: async () => ({ scenes: 5 }) });
   assert.equal(registry.has('storyboard'), true);
-  assert.deepEqual(registry.list(), [{ id: 'storyboard', name: 'Storyboard', privacy: 'local', requiresConsent: false }]);
+  assert.deepEqual(registry.list(), [{ id: 'storyboard', name: 'Storyboard', privacy: 'local', requiresConsent: false, available: true }]);
   assert.throws(() => registry.register({ id: 'storyboard', run: async () => null }), /already registered/);
 });
 
@@ -91,4 +91,32 @@ test('binds only single registered capabilities and blocks ambiguous steps', () 
 
 test('rejects invalid plan or registry input', () => {
   assert.deepEqual(bindUniversalPlanCapabilities(null, null), { ok: false, reason: 'invalid-plan-or-registry' });
+});
+
+
+test('reports dynamic availability and blocks unavailable capabilities during plan binding', () => {
+  let ready = false;
+  const registry = createUniversalCapabilityRegistry();
+  registry.register({
+    id: 'local-voice',
+    isAvailable: ({ plan, step } = {}) => ready && plan?.sourceRequest === 'Add dialogue' && step?.id === 'voice',
+    run: async () => 'voice'
+  });
+  const plan = { sourceRequest: 'Add dialogue', steps: [{ id: 'voice', requiredCapabilities: ['local-voice'] }] };
+  assert.equal(registry.list()[0].available, false);
+  assert.equal(bindUniversalPlanCapabilities(plan, registry).bindings[0].reason, 'capability-unavailable');
+  ready = true;
+  assert.equal(registry.list({ plan, step: plan.steps[0] }).length, 1);
+  assert.equal(registry.list({ plan, step: plan.steps[0] })[0].available, true);
+  assert.equal(bindUniversalPlanCapabilities(plan, registry).bindings[0].status, 'ready');
+});
+
+test('reports remote capability unavailable until explicit consent is configured', () => {
+  const registry = createUniversalCapabilityRegistry();
+  registry.register({ id: 'remote-video', privacy: 'remote', run: async () => 'video' });
+  assert.equal(registry.isAvailable('remote-video'), false);
+  assert.equal(registry.list()[0].available, false);
+  const consented = createUniversalCapabilityRegistry({ remoteConsent: true });
+  consented.register({ id: 'remote-video', privacy: 'remote', run: async () => 'video' });
+  assert.equal(consented.isAvailable('remote-video'), true);
 });
