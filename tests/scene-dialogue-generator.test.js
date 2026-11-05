@@ -24,6 +24,7 @@ test('builds a local prompt grounded in the exact scene and assigned cast', () =
   assert.match(prompt, /Mira/);
   assert.match(prompt, /scene 2 of 5/i);
   assert.match(prompt, /Do not invent characters/);
+  assert.match(prompt, /English \(en\)/);
 });
 
 test('accepts valid dialogue from assigned characters and preserves the language', () => {
