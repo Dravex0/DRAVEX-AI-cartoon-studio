@@ -93,3 +93,58 @@ test('rejects empty requests before calling a model provider', async () => {
   assert.equal(result.status, 'invalid-request');
   assert.equal(called, false);
 });
+
+
+test('restricts required capabilities to the registered app catalog', () => {
+  const supported = validateUniversalTaskPlan(validPlan, request, {
+    availableCapabilities: ['text-planning', 'storyboarding']
+  });
+  assert.equal(supported.ok, false);
+  assert.equal(supported.reason, 'unsupported-required-capability');
+  const exact = validateUniversalTaskPlan(validPlan, request, {
+    availableCapabilities: ['text-planning', 'storyboarding', 'video-generation', 'video-rendering']
+  });
+  assert.equal(exact.ok, true);
+});
+
+test('includes exact registered capability IDs in the planner prompt', () => {
+  const prompt = buildUniversalPlannerPrompt('Create a storyboard.', {
+    availableCapabilities: [{ id: 'storyboard.create', name: 'Create storyboard' }]
+  });
+  assert.match(prompt, /storyboard\.create/);
+  assert.match(prompt, /Never invent or rename a capability/);
+  assert.match(prompt, /Create a storyboard/);
+});
+
+test('rejects malformed capability catalogs instead of silently weakening validation', () => {
+  const result = validateUniversalTaskPlan(validPlan, request, {
+    availableCapabilities: ['valid-id', 'NOT VALID']
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'invalid-capability-catalog');
+});
+
+test('plan generation validates against the same capability catalog supplied to the prompt', async () => {
+  let prompt = '';
+  const result = await planUniversalTask({
+    runtime: {
+      generate: async value => {
+        prompt = value;
+        return { text: JSON.stringify(validPlan) };
+      }
+    },
+    request,
+    availableCapabilities: ['text-planning', 'storyboarding']
+  });
+  assert.match(prompt, /text-planning, storyboarding/);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'unsupported-required-capability');
+});
+
+
+test('rejects non-array capability catalogs at both planner entry points', () => {
+  assert.throws(() => buildUniversalPlannerPrompt('Make a film.', { availableCapabilities: 'video' }), /capability catalog/i);
+  const result = validateUniversalTaskPlan(validPlan, request, { availableCapabilities: 'video' });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'invalid-capability-catalog');
+});
