@@ -1987,7 +1987,7 @@ activeUniversalPlanController=controller;
 button.disabled=true;cancel.disabled=false;$('runLocalModel').disabled=true;output.hidden=true;
 status.textContent=ru?'Универсальный ИИ анализирует запрос и строит план на этом устройстве. Это может занять время…':'Universal AI is analysing the request and building a plan on this device. This may take a while…';
 try{
-const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().filter(capability=>capability.available||capability.id==='film.compose'||(capability.id==='voice.generate'&&isLocalSceneVoiceEngineLoaded()&&(isLocalSceneVoiceReady()||isLocalDialogueGenerationReady()))).map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
+const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().filter(capability=>capability.available||capability.id==='film.compose'||(capability.id==='voice.generate'&&isLocalSceneVoiceEngineLoaded()&&(isLocalSceneVoiceReady()||isLocalDialogueGenerationReady()))||(capability.id==='video.generate.local'&&isLocalVideoProviderReadyForPlanning())||(capability.id==='video.generate.remote'&&isRemoteVideoProviderReadyForPlanning())).map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
 if(result.status==='cancelled'){
 status.textContent=ru?'Отмена запрошена. Генерация модели завершилась без применения устаревшего результата.':'Cancellation requested. The model finished inference; its stale result was discarded.';
 return;
@@ -2401,6 +2401,19 @@ function comfyBindings(){
  Object.entries(optional).forEach(([key,ids])=>{const value=binding(comfyText(ids[0]),comfyText(ids[1]));if(value)result[key]=value});
  return result;
 }
+function isLocalVideoProviderReadyForPlanning(){
+ try{
+  if(!comfyConnected||!comfyWorkflow||fullFilmAbortController)return false;
+  return sceneMetadata.some((meta,index)=>String(index===sceneIndex?$('sceneMotionPrompt').value:meta?.motionPrompt||meta?.visibleAction||'').trim().length>0);
+ }catch{return false}
+}
+function isRemoteVideoProviderReadyForPlanning(){
+ try{
+  if(!universalCapabilityRegistry.remoteConsent||$('hfVideoConsent').checked!==true||!hfVideoConnected||!hfVideoClient||typeof hfHandleFile!=='function')return false;
+  return sceneMetadata.some((meta,index)=>String(index===sceneIndex?$('sceneMotionPrompt').value:meta?.motionPrompt||meta?.visibleAction||'').trim().length>0);
+ }catch{return false}
+}
+
 function isLocalVideoGenerationReady({step}={}){
  const target=resolveRemoteScene(step);
  if(!target.ok)return false;
