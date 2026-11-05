@@ -36,7 +36,8 @@ export async function analyzeFaceVideoFrames({
   maxFrames = DEFAULT_MAX_FRAMES,
   signal,
   onProgress = () => {},
-  onCheckpoint = () => {}
+  onCheckpoint = () => {},
+  onFrameResult = () => {}
 } = {}) {
   const duration = Number(durationMs);
   const interval = Number(sampleIntervalMs);
@@ -61,8 +62,9 @@ export async function analyzeFaceVideoFrames({
   if (!Number.isInteger(limit) || limit < 1 || limit > 10000) {
     throw new RangeError("maxFrames must be an integer between 1 and 10000.");
   }
-  if (typeof onProgress !== "function" || typeof onCheckpoint !== "function") {
-    throw new TypeError("onProgress and onCheckpoint must be functions.");
+  if (typeof onProgress !== "function" || typeof onCheckpoint !== "function" ||
+      typeof onFrameResult !== "function") {
+    throw new TypeError("onProgress, onCheckpoint, and onFrameResult must be functions.");
   }
   if (signal?.aborted) throw makeAbortError();
 
@@ -116,6 +118,13 @@ export async function analyzeFaceVideoFrames({
         if (result?.status === "face-detected") report.detected += 1;
         else if (result?.status === "no-face") report.noFace += 1;
         else report.invalidLandmarks += 1;
+        notify(onFrameResult, {
+          timestampMs,
+          status: result?.status || "invalid-landmarks",
+          faceCount: Number(result?.faceCount) || 0,
+          anchors: result?.anchors || null,
+          issues: Array.isArray(result?.issues) ? result.issues : []
+        });
 
         const checkpoint = {
           nextTimestampMs: report.nextTimestampMs,
