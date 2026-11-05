@@ -114,7 +114,7 @@ export async function generateSceneDialogue({ runtime, scene, language = 'en', r
   let result = parseSceneDialogueResponse(generated?.text, scene, language);
   if (!result.ok && !signal?.aborted) {
     try {
-      generated = await runtime.generate(buildSceneDialoguePrompt({ scene, language, request, characterBible }) + '\\n\\nYour previous response failed validation: ' + result.reason + '. Return only the exact JSON object with this sceneId and 1 or 2 short lines from the assigned speakers.', {
+      generated = await runtime.generate(buildSceneDialoguePrompt({ scene, language, request, characterBible }) + '\n\nYour previous response failed validation: ' + result.reason + '. Return only the exact JSON object with this sceneId and 1 or 2 short lines from the assigned speakers.', {
         maxNewTokens: 256,
         temperature: 0.2,
         signal
