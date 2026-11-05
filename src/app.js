@@ -161,10 +161,15 @@ universalCapabilityRegistry.register({
   const targets=resolveUniversalVoiceTargets(step,sceneMetadata,sceneIndex);
   if(!targets.ok)throw new Error('Could not resolve dialogue-generation target: '+targets.reason+'.');
   const locale=storyLanguage();
+  const targetScenes=targets.indices.map(index=>({sceneId:String(sceneMetadata[index]?.id||''),originalIndex:index}));
+  if(targetScenes.some(target=>!target.sceneId)||new Set(targetScenes.map(target=>target.sceneId)).size!==targetScenes.length)throw new Error('Storyboard scenes need unique stable IDs before dialogue generation.');
+  const expectedSceneIds=new Set(targetScenes.map(target=>target.sceneId));
   const completed=[];
-  for(let position=0;position<targets.indices.length;position++){
+  for(let position=0;position<targetScenes.length;position++){
    if(signal?.aborted)throw new DOMException('Dialogue generation was cancelled.','AbortError');
-   const index=targets.indices[position];
+   const target=targetScenes[position];
+   const index=sceneMetadata.findIndex(item=>item&&String(item.id||'')===target.sceneId);
+   if(index<0)throw new Error('Scene '+(target.originalIndex+1)+' was removed during dialogue generation.');
    const meta=sceneMetadata[index];
    const sceneId=String(meta?.id||'');
    if(!sceneId)throw new Error('Scene '+(index+1)+' has no stable ID.');
@@ -186,9 +191,10 @@ universalCapabilityRegistry.register({
     language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
    }));
    completed.push({sceneId,lineCount:generated.lines.length,persistedInDraft:saved});
-   if(sceneIndex===resolvedIndex){$('sceneDialogue').value=formatDialogueLines(generated.lines);$('sceneVoiceStatus').textContent='Dialogue generated. Load the local voice model and run voice.generate to synthesize it.';}
+   if(sceneIndex===resolvedIndex){syncSceneEditor();$('sceneVoiceStatus').textContent=uiLang==='ru'?'Диалоги созданы. Загрузи локальную модель голоса и запусти озвучку.':'Dialogue generated. Load the local voice model and run voice synthesis.';}
    reportProgress?.('Dialogue ready for scene '+(resolvedIndex+1)+' · '+generated.lines.length+' lines');
   }
+  if(targets.allScenes){const liveIds=sceneMetadata.map(meta=>String(meta?.id||''));if(liveIds.length!==expectedSceneIds.size||liveIds.some(id=>!expectedSceneIds.has(id)))throw new Error('The storyboard changed during all-scene dialogue generation. Completed scene dialogue was saved, but the batch must be reviewed.');}
   return {type:'scene-dialogue',sceneIds:completed.map(item=>item.sceneId),lineCount:completed.reduce((sum,item)=>sum+item.lineCount,0),scenes:completed.length,local:true,persistedInDraft:completed.every(item=>item.persistedInDraft)};
  }
 });
@@ -1846,7 +1852,7 @@ ru?'ЭТАПЫ ВЫПОЛНЕНИЯ:':'EXECUTION STEPS:',
 '',
 (ru?'Модель: ':'Model: ')+(result.modelId||'local')+' · '+(result.backend||'local'),
 (ru?'Доступные реальные операции: ':'Registered executable steps: ')+executableCount+'/'+plan.steps.length,
-ru?'Структура проверена, но смысловая правильность не гарантируется. Выполняются только подключённые локальные операции; для озвучки нужна загруженная модель и реплики текущей сцены.':'Structure validated, but semantic correctness is not guaranteed. Only registered local operations execute; voice generation requires a loaded local model and dialogue for the current scene.'
+ru?'Структура проверена, но смысловая правильность не гарантируется. Диалоги создаются локальной моделью по сценам; озвучка требует загруженной локальной модели голоса.':'Structure validated, but semantic correctness is not guaranteed. Dialogue is written by the local text model from each scene; voice synthesis requires the local voice model.'
 ];
 output.textContent=lines.join('\n');output.hidden=false;
 status.textContent=canStart?(ru?'План готов. Можно выполнить подключённый локальный этап; неподключённые этапы будут остановлены безопасно.':'Plan ready. The connected local step can run; unsupported steps will be safely blocked.'):(ru?'План создан, но первый этап пока не имеет подключённого инструмента.':'Plan created, but its first step has no connected tool yet.');
