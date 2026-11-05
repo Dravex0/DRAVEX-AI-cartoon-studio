@@ -166,7 +166,7 @@ test("draws the clean face-base plate before facial features regardless of z-ind
 
 test("selects only the authored mouth image matching the active dialogue viseme", () => {
   const candidate = rig();
-  candidate.parts = candidate.parts.filter(part => part.role !== "mouth");
+  candidate.parts = [];
   for (const shape of ["neutral", "open", "round", "closed"]) {
     candidate.parts.push({
       id: "mouth-" + shape, role: "mouth", viseme: shape,
@@ -191,7 +191,7 @@ test("selects only the authored mouth image matching the active dialogue viseme"
 
 test("falls back to a neutral viseme asset when the active shape is unavailable", () => {
   const candidate = rig();
-  candidate.parts = candidate.parts.filter(part => part.role !== "mouth");
+  candidate.parts = [];
   candidate.parts.push(
     { id: "mouth-neutral", role: "mouth", viseme: "neutral", imageUrl: "blob:neutral", x: 0.5, y: 0.55, width: 0.08, height: 0.04, zIndex: 3 },
     { id: "mouth-closed", role: "mouth", viseme: "closed", imageUrl: "blob:closed", x: 0.5, y: 0.55, width: 0.08, height: 0.04, zIndex: 4 }
