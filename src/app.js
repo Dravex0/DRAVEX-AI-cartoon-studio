@@ -51,6 +51,7 @@ import { buildBackgroundControlRegions, classifyCharacterBackgroundMotion } from
 import { buildCharacterBodyPartRegions } from "./character-rig-body-regions.js";
 import { createCharacterBodyPartContactSheet } from "./character-motion-evidence.js";
 import { auditAnimationCompatibility } from './animation-compatibility-audit.js';
+import { auditCharacterActionPose } from './animation-action-pose-audit.js';
 import { summarizeSceneMotionResults } from "./scene-motion-results.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
@@ -269,6 +270,23 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
    bodyPartSummaries.push(entry.characterId + ' / ' + entry.bodyPart + ': ' + statusLabel
     + ' (' + entry.frames.length + '/5)');
   }
+  // Pair observed pixel activity with a separate action-specific pose-signature report.
+  // Neither result alone proves semantic correctness of the rendered action.
+  const actionCue = getSceneAction(sceneIndex);
+  const supportedPoseActions = new Set(listCharacterRigMotionPresets().map(item => item.id));
+  const actionPoseSummaries = [];
+  if (supportedPoseActions.has(actionCue)) {
+   for (const rig of Array.isArray(currentSceneData.characterRigs) ? currentSceneData.characterRigs : []) {
+    const report = auditCharacterActionPose(rig, actionCue);
+    const label = report.status === 'passed'
+     ? (uiLang === 'ru' ? 'сигнатура позы совпала' : 'pose signature matched')
+     : report.status === 'inconclusive'
+      ? (uiLang === 'ru' ? 'недостаточно частей рига' : 'rig roles insufficient')
+      : (uiLang === 'ru' ? 'сигнатура позы не совпала' : 'pose signature mismatch');
+    actionPoseSummaries.push(rig.characterId + ' / ' + actionCue + ': ' + label
+     + ' (' + (report.passedCheckCount || 0) + '/' + (report.checkCount || 0) + ')');
+   }
+  }
   lastCharacterMotionAuditEvidence = [...characterMotionAudit.bodyPartFrames.values()].map(entry => ({
    characterId: entry.characterId, bodyPart: entry.bodyPart, frames: [...entry.frames]
   }));
@@ -283,6 +301,9 @@ function captureCharacterMotionAuditFrame({ currentSceneData, progress, viewport
    + (bodyPartSummaries.length
     ? (uiLang === 'ru' ? ' Части тела: ' : ' Body parts: ') + bodyPartSummaries.join('; ')
     : (uiLang === 'ru' ? ' Разбивка по частям тела недоступна: нет готового рига с загруженными изображениями.' : ' Body-part breakdown unavailable: no ready rig with loaded part images.'))
+   + (actionPoseSummaries.length
+    ? (uiLang === 'ru' ? ' Проверка позы: ' : ' Pose signature: ') + actionPoseSummaries.join('; ')
+    : (uiLang === 'ru' ? ' Проверка позы действия недоступна для этого типа движения или рига.' : ' Action pose-signature check is unavailable for this motion type or rig.'))
    + (uiLang === 'ru'
     ? '. Изменения пикселей не доказывают правильность жеста или действия; возможны перекрытия и фоновые пиксели.'
     : '. Pixel changes do not prove the intended gesture or action; overlap and background pixels may be included.');
