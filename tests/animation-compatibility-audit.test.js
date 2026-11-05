@@ -97,3 +97,27 @@ test('keeps sprite-only motion compatible when a matching layer exists', () => {
   }]);
   assert.equal(report.status, 'compatible');
 });
+
+test('checks dialogue cue timing and warns when visible speakers have no facial rig', () => {
+  const report = auditAnimationCompatibility([{
+    durationSeconds: 3,
+    characterLayers: [{ characterId: 'Foxy', imageUrl: 'https://assets.example/foxy.png' }],
+    voiceCues: [{ cueId: 'line-1', characterId: 'Foxy', characterName: 'Foxy', startFrame: 60, durationMs: 800 }]
+  }]);
+  assert.equal(report.status, 'compatible-with-warnings');
+  assert.equal(report.voiceCueCount, 1);
+  assert.ok(report.issues.some(item => item.code === 'voice-cue-facial-rig-missing'));
+  assert.ok(report.issues.some(item => item.code === 'voice-cue-exceeds-scene'));
+});
+
+test('rejects malformed viseme timing in dialogue cues', () => {
+  const report = auditAnimationCompatibility([{
+    voiceCues: [{
+      cueId: 'line-1', characterId: 'Narrator', characterName: 'Narrator',
+      startFrame: 0, durationMs: 500,
+      visemeEvents: [{ shape: 'invalid-mouth-shape', startMs: 0, durationMs: 120 }]
+    }]
+  }]);
+  assert.equal(report.status, 'incompatible');
+  assert.ok(report.issues.some(item => item.code === 'voice-viseme-timing-invalid'));
+});
