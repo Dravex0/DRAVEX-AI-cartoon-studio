@@ -118,8 +118,18 @@ universalCapabilityRegistry.register({
  id:'storyboard.create',
  name:'Create a local storyboard',
  privacy:'local',
- run:async({plan,signal})=>{
+ run:async({plan,step,signal})=>{
   if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
+  if(!/(video|film|movie|clip|animation|cartoon|story|storyboard|scene|мульт|видео|ролик|істор|истор|сцен|анімац)/i.test(String(plan?.sourceRequest||''))){
+   const error=new Error('The local storyboard adapter only accepts explicit story, scene, animation, film, or video requests.');
+   error.code='CAPABILITY_REQUEST_MISMATCH';
+   throw error;
+  }
+  if(!step||!Array.isArray(step.requiredCapabilities)||step.requiredCapabilities.length!==1||step.requiredCapabilities[0]!=='storyboard.create'){
+   const error=new Error('The storyboard adapter requires one explicit storyboard.create capability.');
+   error.code='CAPABILITY_BINDING_MISMATCH';
+   throw error;
+  }
   const created=createStoryboard(plan.sourceRequest,{throwOnError:true});
   if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
   return {type:'storyboard',sceneCount:Array.isArray(created?.scenes)?created.scenes.length:0,sourceLanguage:created?.sourceLanguage||null};
