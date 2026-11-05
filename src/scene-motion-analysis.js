@@ -1,3 +1,5 @@
+import { analyzeVideoFrameSequence } from "./video-frame-motion-metrics.js";
+
 /**
  * Browser-local motion check for a decoded scene video.
  * Pixel-change heuristic only; it does not recognize semantic actions or quality.
@@ -19,13 +21,17 @@ function waitForSeek(video, targetTime, timeoutMs) {
     try { video.currentTime = targetTime; } catch (error) { cleanup(); reject(error); }
   });
 }
-function frameLuminance(imageData) {
+function framePixelValues(imageData) {
   const { data, width, height } = imageData;
-  const values = new Float32Array(width * height);
-  for (let pixel = 0, offset = 0; pixel < values.length; pixel += 1, offset += 4) {
-    values[pixel] = (0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2]) / 255;
+  const pixelCount = width * height;
+  const luminance = new Float32Array(pixelCount);
+  for (let pixel = 0, offset = 0; pixel < pixelCount; pixel += 1, offset += 4) {
+    const red = data[offset] / 255;
+    const green = data[offset + 1] / 255;
+    const blue = data[offset + 2] / 255;
+    luminance[pixel] = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
   }
-  return values;
+  return { luminance, rgba: data.slice() };
 }
 /**
  * Samples small frames locally and compares adjacent-frame luminance.
@@ -67,7 +73,7 @@ export async function analyzeSceneVideoMotion(video, {
       const targetTime = Math.min(Math.max(0, video.duration - 0.01), video.duration * fraction);
       await waitForSeek(video, targetTime, timeoutMs);
       context.drawImage(video, 0, 0, width, height);
-      frames.push(frameLuminance(context.getImageData(0, 0, width, height)));
+      frames.push(framePixelValues(context.getImageData(0, 0, width, height)));
     }
   } catch (error) {
     if (error?.name === "SecurityError") {
@@ -85,20 +91,37 @@ export async function analyzeSceneVideoMotion(video, {
   const pixelCount = width * height;
   for (let frame = 1; frame < frames.length; frame += 1) {
     for (let pixel = 0; pixel < pixelCount; pixel += 1) {
-      const delta = Math.abs(frames[frame][pixel] - frames[frame - 1][pixel]);
+      const previous = frames[frame - 1];
+      const current = frames[frame];
+      const delta = Math.abs(current.luminance[pixel] - previous.luminance[pixel]);
       totalChange += delta;
-      if (delta >= pixelDeltaThreshold) changedPixels += 1;
+      if (delta > 0 && delta >= pixelDeltaThreshold) changedPixels += 1;
       comparisons += 1;
     }
   }
   const meanPixelChange = comparisons ? totalChange / comparisons : 0;
   const changedPixelRatio = comparisons ? changedPixels / comparisons : 0;
-  const isLikelyStatic = meanPixelChange < staticMotionThreshold && changedPixelRatio < changedPixelThreshold;
+  const numericPixelThreshold = Number(pixelDeltaThreshold);
+  const rgbaPixelThreshold = Number.isFinite(numericPixelThreshold)
+    ? Math.min(255, Math.max(0, numericPixelThreshold * 255))
+    : 255;
+  const colorSequence = analyzeVideoFrameSequence(
+    frames.map(frame => frame.rgba),
+    { pixelThreshold: rgbaPixelThreshold }
+  );
+  const meanColorChange = colorSequence.averageMeanAbsoluteDifference / 255;
+  const colorChangedPixelRatio = colorSequence.averageChangedPixelRatio;
+  const isLikelyStatic = meanPixelChange < staticMotionThreshold &&
+    changedPixelRatio < changedPixelThreshold &&
+    meanColorChange < staticMotionThreshold &&
+    colorChangedPixelRatio < changedPixelThreshold;
   return {
     status: isLikelyStatic ? "likely-static" : "visible-change",
     sampleCount: frames.length,
     meanPixelChange: Number(meanPixelChange.toFixed(5)),
     changedPixelRatio: Number(changedPixelRatio.toFixed(4)),
+    meanColorChange: Number(meanColorChange.toFixed(5)),
+    colorChangedPixelRatio: Number(colorChangedPixelRatio.toFixed(4)),
     message: isLikelyStatic ? "Very little pixel change was detected between sampled frames." : "Pixel changes were detected between sampled frames."
   };
 }
@@ -158,3 +181,4 @@ export async function captureSceneVideoFrameSamples(video, {
   }
   return samples;
 }
+
