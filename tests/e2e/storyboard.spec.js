@@ -237,3 +237,16 @@ test('requires explicit AI Horde and LAION data-sharing consent before rig-part 
   await page.locator('#rigPartsConsent').uncheck();
   await expect(page.locator('#generateCharacterRigParts')).toBeDisabled();
 });
+
+
+test('exposes safe universal-plan execution controls without enabling an unplanned task', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.goto('/');
+  await expect(page.locator('#planUniversalTask')).toBeVisible();
+  await expect(page.locator('#executeUniversalTask')).toBeVisible();
+  await expect(page.locator('#executeUniversalTask')).toBeDisabled();
+  await expect(page.locator('#cancelUniversalExecution')).toBeDisabled();
+  await expect(page.locator('#universalExecutionStatus')).toContainText(/only explicitly registered/i);
+  expect(pageErrors).toEqual([]);
+});
