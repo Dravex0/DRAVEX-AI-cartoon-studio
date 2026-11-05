@@ -106,8 +106,8 @@ test('reports dynamic availability and blocks unavailable capabilities during pl
   assert.equal(registry.list()[0].available, false);
   assert.equal(bindUniversalPlanCapabilities(plan, registry).bindings[0].reason, 'capability-unavailable');
   ready = true;
-  assert.equal(registry.list(plan).length, 1);
-  assert.equal(registry.list(plan)[0].available, true);
+  assert.equal(registry.list({ plan, step: plan.steps[0] }).length, 1);
+  assert.equal(registry.list({ plan, step: plan.steps[0] })[0].available, true);
   assert.equal(bindUniversalPlanCapabilities(plan, registry).bindings[0].status, 'ready');
 });
 
