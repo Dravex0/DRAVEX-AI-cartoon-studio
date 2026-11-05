@@ -162,7 +162,7 @@ universalCapabilityRegistry.register({
  }
 });
 const localVideoCapability=createUniversalLocalVideoCapability({
- isAvailable:()=>isLocalVideoGenerationReady(),
+ isAvailable:context=>isLocalVideoGenerationReady(context),
  generateScene:context=>generateLocalSceneVideoForUniversal(context)
 });
 universalCapabilityRegistry.register(localVideoCapability);
@@ -2123,10 +2123,12 @@ function comfyBindings(){
  Object.entries(optional).forEach(([key,ids])=>{const value=binding(comfyText(ids[0]),comfyText(ids[1]));if(value)result[key]=value});
  return result;
 }
-function isLocalVideoGenerationReady(){
- const meta=sceneMetadata[sceneIndex]||{};
- return comfyConnected&&!!comfyWorkflow&&!fullFilmAbortController&&
-  (!!comfySourceImage||!!String(meta.generatedImageUrl||'').trim());
+function isLocalVideoGenerationReady({step}={}){
+ const target=resolveRemoteScene(step);
+ if(!target.ok)return false;
+ const imageReady=target.index===sceneIndex?!!comfySourceImage||!!String(target.scene.generatedImageUrl||'').trim():!!String(target.scene.generatedImageUrl||'').trim();
+ const motion=target.index===sceneIndex?$('sceneMotionPrompt').value:target.scene.motionPrompt||target.scene.visibleAction;
+ return comfyConnected&&!!comfyWorkflow&&!fullFilmAbortController&&imageReady&&!!String(motion||'').trim();
 }
 function resolveRemoteScene(step){return resolveUniversalSceneTarget(step,sceneMetadata,sceneIndex);}
 function isRemoteVideoGenerationReady({step}={}){
@@ -2187,22 +2189,27 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  if(sceneIndex===index){renderComfySceneVideo();renderScenes();if(!playing)draw();}
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
-async function generateLocalSceneVideoForUniversal({signal,reportProgress}={}){
+async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}={}){
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
  await sceneVideoRestorePromise;
- const index=sceneIndex,originalMeta=sceneMetadata[index]||{},sceneId=String(originalMeta.id||'');
+ const target=resolveRemoteScene(step);
+ if(!target.ok)throw new Error('Cannot resolve the requested scene: '+target.reason);
+ const index=target.index,originalMeta=target.scene,sceneId=String(originalMeta.id||'');
+ const isCurrent=index===sceneIndex;
+ const readField=(id,key)=>isCurrent?$(id).value.trim():String(originalMeta[key]||'').trim();
+ const motionText=readField('sceneMotionPrompt','motionPrompt')||String(originalMeta.visibleAction||'');
  const motionScene={
-  ...originalMeta,title:$('sceneTitle').value.trim()||titles[index],
-  description:$('sceneDescription').value.trim()||descriptions[index],
-  motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),
-  camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),
-  endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),
-  continuityLock:$('sceneContinuityLock').value.trim(),
-  characters:normalizeSceneCast($('sceneCharacters').value,originalMeta.characters)
+  ...originalMeta,title:readField('sceneTitle','title')||titles[index],
+  description:readField('sceneDescription','description')||descriptions[index],
+  motionPrompt:motionText,visibleAction:motionText,
+  camera:readField('sceneCamera','camera'),startState:readField('sceneStartState','startState'),
+  endState:readField('sceneEndState','endState'),negativePrompt:readField('sceneNegativePrompt','negativePrompt'),
+  continuityLock:readField('sceneContinuityLock','continuityLock'),
+  characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])
  };
  const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
  if(!prompt.trim())throw new Error('Добавь описание движения сцены перед генерацией.');
- let imageBlob=comfySourceImage;
+ let imageBlob=isCurrent?comfySourceImage:null;
  if(!imageBlob){
   const imageUrl=String(originalMeta.generatedImageUrl||'').trim();
   if(!imageUrl)throw new Error('Сначала создай или загрузи изображение выбранной сцены.');
@@ -2243,9 +2250,7 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress}={}){
   throw new Error('Полученный клип не удалось декодировать в браузере: '+(error.message||'ошибка декодирования'));
  }
  const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
- if(sceneIndex===index)renderComfySceneVideo();
- renderScenes();
- if(!playing)draw();
+ if(sceneIndex===index){renderComfySceneVideo();renderScenes();if(!playing)draw();}
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
 function setComfyStatus(message){$('comfyStatus').textContent=message}
