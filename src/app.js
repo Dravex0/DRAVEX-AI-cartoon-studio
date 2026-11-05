@@ -451,6 +451,7 @@ const sceneVideoCache=new Map();
 let activeFaceAnalysisController=null;
 let activeFaceAnalysisWorker=null;
 let lastFaceAnalysisExport=null;
+let lastFaceAnalysisVideoEntry=null;
 let faceLandmarkOverlayLastTimeBucket=-1;
 function hideFaceLandmarkPreviewOverlay(message=''){
  const overlay=$('faceLandmarkOverlay');
@@ -469,7 +470,7 @@ function updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGe
  const meta=currentSceneData||{};
  const entry=sceneVideoCache.get(sceneVideoKey(sceneIndex,meta));
  const report=lastFaceAnalysisExport;
- if(!report||!hasGeneratedVideo||!generatedVideo||!entry||report.sceneId!==String(meta.id||'')||report.videoFilename!==String(entry.filename||'')){
+ if(!report||!hasGeneratedVideo||!generatedVideo||!entry||lastFaceAnalysisVideoEntry!==entry||report.sceneId!==String(meta.id||'')||report.videoFilename!==String(entry.filename||'')) {
   faceLandmarkOverlayLastTimeBucket=-1;
   hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'Нет анализа для текущего видеоклипа. Сначала выполни анализ выбранной сцены.':'No matching analysis for this clip. Analyze the selected scene first.');
   return;
@@ -482,7 +483,7 @@ function updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGe
  const bucket=Math.floor(timeMs/100);
  if(bucket===faceLandmarkOverlayLastTimeBucket&&overlay)return;
  faceLandmarkOverlayLastTimeBucket=bucket;
- const maxGapMs=Math.max(1000,Number(report.sampleIntervalMs||500)*2.5);
+ const maxGapMs=Math.max(500,Math.min(1000,Number(report.sampleIntervalMs||500)*1.25));
  const sample=sampleFaceLandmarkTimeline(report.faceSamples,timeMs,{maxGapMs});
  if(sample.status!=='face-detected'||!sample.anchors){
   hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'На текущем участке лицо не обнаружено; рамка скрыта.':'No face detected at this moment; overlay hidden.');
@@ -604,7 +605,7 @@ function updateFaceAnalysisControls(){
  const checkpoint=available?readFaceAnalysisCheckpoint(sceneMetadata[sceneIndex]?.id,entry,interval):null;
  resume.disabled=!available||running||!checkpoint;
  const overlayToggle=$('showFaceLandmarkOverlay');
- const reportMatches=Boolean(lastFaceAnalysisExport&&entry&&lastFaceAnalysisExport.sceneId===String(sceneMetadata[sceneIndex]?.id||'')&&lastFaceAnalysisExport.videoFilename===String(entry.filename||'')&&Array.isArray(lastFaceAnalysisExport.faceSamples)&&lastFaceAnalysisExport.faceSamples.some(sample=>sample.status==='face-detected'&&sample.anchors));
+ const reportMatches=Boolean(lastFaceAnalysisExport&&lastFaceAnalysisVideoEntry===entry&&entry&&lastFaceAnalysisExport.sceneId===String(sceneMetadata[sceneIndex]?.id||'')&&lastFaceAnalysisExport.videoFilename===String(entry.filename||'')&&Array.isArray(lastFaceAnalysisExport.faceSamples)&&lastFaceAnalysisExport.faceSamples.some(sample=>sample.status==='face-detected'&&sample.anchors));
  if(overlayToggle)overlayToggle.disabled=!reportMatches;
  if(!reportMatches)hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'Сначала проанализируй текущее видео, чтобы включить рамку.':'Analyze the current clip before enabling the overlay.');
 }
@@ -642,6 +643,7 @@ async function runFaceAnalysis({resume=false}={}){
  let capture=null,worker=null;
  activeFaceAnalysisController=controller;
  lastFaceAnalysisExport=null;
+ lastFaceAnalysisVideoEntry=null;
  $('downloadFaceAnalysis').disabled=true;
  $('faceAnalysisProgress').value=Math.round(startTimeMs/durationMs*100);
  $('faceAnalysisStatus').textContent=uiLang==='ru'?'Подготавливаю локальный анализ. Модель может загружаться при первом запуске…':'Preparing local analysis. The model may download on first use…';
@@ -701,6 +703,7 @@ async function runFaceAnalysis({resume=false}={}){
     'A face overlay or lip-sync export has not been applied.'
    ]
   };
+  lastFaceAnalysisVideoEntry=entry;
   $('downloadFaceAnalysis').disabled=false;
   if(report.status==='completed'){
    try{window.localStorage.removeItem(faceAnalysisCheckpointKey(meta.id))}catch{}
