@@ -22,10 +22,10 @@ test("derives normalized face, eye, and mouth anchors from a detected face", () 
   assert.equal(result.status, "ready");
   assert.equal(result.anchors.coordinateSpace, "normalized-image");
   assert.deepEqual(result.anchors.mouthCenter, { x: 0.5, y: 0.65 });
-  assert.equal(result.anchors.mouthOpenRatio, 0.3);
-  assert.equal(result.anchors.mouthWidthRatio, 1 / 3);
-  assert.equal(result.anchors.faceBounds.x, 0.2);
-  assert.equal(result.anchors.faceBounds.width, 0.6);
+  assert.ok(Math.abs(result.anchors.mouthOpenRatio - 0.3) < 1e-9);
+  assert.ok(Math.abs(result.anchors.mouthWidthRatio - 1 / 3) < 1e-9);
+  assert.ok(Math.abs(result.anchors.faceBounds.x - 0.2) < 1e-9);
+  assert.ok(Math.abs(result.anchors.faceBounds.width - 0.6) < 1e-9);
   assert.ok(Math.abs(result.anchors.headRotation) < 1e-9);
 });
 
@@ -50,5 +50,5 @@ test("preserves out-of-frame coordinates for partially cropped faces", () => {
   landmarks[FACE_LANDMARK_ANCHOR_INDICES.leftCheek] = { x: -0.08, y: 0.5 };
   const result = deriveFaceLandmarkAnchors(landmarks);
   assert.equal(result.status, "ready");
-  assert.equal(result.anchors.faceBounds.x, -0.08);
+  assert.ok(Math.abs(result.anchors.faceBounds.x + 0.08) < 1e-9);
 });
