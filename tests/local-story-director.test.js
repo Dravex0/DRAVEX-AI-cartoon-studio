@@ -363,3 +363,29 @@ test('passes a source-backed action timeline from the local director into storyb
   assert.equal(result.evaluation.actionTimelineReport.integrity, 100);
   assert.ok(prompt.includes('actionTimeline.phases'));
 });
+
+
+test('recovers scene JSON wrapped in prose, markdown fences, and trailing commas', async () => {
+  const wrapped = await directStoryboardWithLocalAI({
+    runtime: { generate: async () => ({ text: 'Here is the result:\n```json\n' + JSON.stringify({ scenes: goodScenes }).replace(/}$/, ',}') + '\n```' }) },
+    basePlan
+  });
+  assert.equal(wrapped.usedLocalModel, true);
+  assert.equal(wrapped.scenes.length, basePlan.scenes.length);
+});
+
+test('allocates a bounded scene-count-aware token budget for the local director', async () => {
+  const { estimateDirectorTokenBudget } = await import('../src/local-story-director.js');
+  assert.equal(estimateDirectorTokenBudget(1), 384);
+  assert.equal(estimateDirectorTokenBudget(5), 980);
+  assert.equal(estimateDirectorTokenBudget(8), 1024);
+  let options;
+  const runtime = runtimeReturning(goodScenes, {
+    generate: async (_prompt, value) => {
+      options = value;
+      return { text: JSON.stringify({ scenes: goodScenes }), modelId: 'mock-local-model', backend: 'wasm' };
+    }
+  });
+  await directStoryboardWithLocalAI({ runtime, basePlan });
+  assert.equal(options.maxNewTokens, 980);
+});
