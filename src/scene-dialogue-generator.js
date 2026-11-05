@@ -90,6 +90,12 @@ export function parseSceneDialogueResponse(response, scene, language = 'en') {
   return { ok: true, sceneId: clean(scene.id, 120), lines };
 }
 
+export function selectScenesMissingDialogue(scenes) {
+  if (!Array.isArray(scenes)) return [];
+  return scenes.map((scene, index) => ({ scene, index }))
+    .filter(({ scene }) => !Array.isArray(scene?.dialogue) || scene.dialogue.length === 0);
+}
+
 export async function generateSceneDialogue({ runtime, scene, language = 'en', request = '', characterBible = [], signal } = {}) {
   if (!runtime || typeof runtime.generate !== 'function') return { ok: false, reason: 'local-runtime-unavailable' };
   if (signal?.aborted) return { ok: false, reason: 'cancelled' };
@@ -105,7 +111,21 @@ export async function generateSceneDialogue({ runtime, scene, language = 'en', r
     return { ok: false, reason: clean(error?.message, 300) || 'inference-failed' };
   }
   if (signal?.aborted) return { ok: false, reason: 'cancelled' };
-  const result = parseSceneDialogueResponse(generated?.text, scene, language);
+  let result = parseSceneDialogueResponse(generated?.text, scene, language);
+  if (!result.ok && !signal?.aborted) {
+    try {
+      generated = await runtime.generate(buildSceneDialoguePrompt({ scene, language, request, characterBible }) + '\\n\\nYour previous response failed validation: ' + result.reason + '. Return only the exact JSON object with this sceneId and 1 or 2 short lines from the assigned speakers.', {
+        maxNewTokens: 256,
+        temperature: 0.2,
+        signal
+      });
+      if (signal?.aborted) return { ok: false, reason: 'cancelled' };
+      result = parseSceneDialogueResponse(generated?.text, scene, language);
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') return { ok: false, reason: 'cancelled' };
+      return { ok: false, reason: clean(error?.message, 300) || 'retry-inference-failed' };
+    }
+  }
   return result.ok
     ? { ...result, modelId: generated?.modelId || runtime.status?.modelId || null, backend: generated?.backend || runtime.status?.backend || null }
     : result;
