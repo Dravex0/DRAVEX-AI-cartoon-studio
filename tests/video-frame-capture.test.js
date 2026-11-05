@@ -27,8 +27,11 @@ class FakeVideo {
   play() { this.paused = false; this.playCalls += 1; return Promise.resolve(); }
   set currentTime(value) {
     this._currentTime = value;
-    this.seeking = false;
-    queueMicrotask(() => this.emit("seeked"));
+    this.seeking = true;
+    queueMicrotask(() => {
+      this.seeking = false;
+      this.emit("seeked");
+    });
   }
   get currentTime() { return this._currentTime ?? 0; }
 }
