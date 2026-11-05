@@ -52,7 +52,9 @@ export function createVideoFrameCapture(video, {
         signal?.removeEventListener("abort", onSignalAbort);
       };
       const onSeeked = () => {
-        if (video.readyState < 2 ||
+        // currentTime changes before the browser has decoded the requested frame.
+        // Do not treat the assignment itself as a completed seek.
+        if (video.seeking || video.readyState < 2 ||
             Math.abs(Number(video.currentTime) - targetSeconds) > seekToleranceSeconds) return;
         cleanup();
         resolve();
