@@ -1637,7 +1637,7 @@ activeUniversalPlanController.abort();
 $('cancelUniversalPlan').disabled=true;
 $('universalPlannerStatus').textContent=uiLang==='ru'?'Запрошена отмена. Текущий расчёт модели нельзя прервать мгновенно; результат не будет применён.':'Cancellation requested. The current model inference cannot be interrupted immediately; its result will be discarded.';
 });
-\n$('hordeConsent').addEventListener('change',()=>{$('generateSceneImage').disabled=!$('hordeConsent').checked});
+$('hordeConsent').addEventListener('change',()=>{$('generateSceneImage').disabled=!$('hordeConsent').checked});
 $('spriteHordeConsent').addEventListener('change',()=>{$('generateCharacterSprites').disabled=!$('spriteHordeConsent').checked});
 $('generateCharacterSprites').addEventListener('click',async()=>{
  const button=$('generateCharacterSprites'),status=$('characterSpriteStatus');
