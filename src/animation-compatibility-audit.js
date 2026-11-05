@@ -63,7 +63,10 @@ export function auditAnimationCompatibility(scenes) {
     for (const facialInput of facialRigs) {
       const facialId = key(facialInput?.characterId);
       const bodyRig = rigById.get(facialId) || null;
-      const report = validateCharacterFacialRig(facialInput, bodyRig);
+      const facialBodyRig = bodyRig && key(bodyRig.characterId) === facialId
+        ? { ...bodyRig, characterId: facialInput.characterId }
+        : bodyRig;
+      const report = validateCharacterFacialRig(facialInput, facialBodyRig);
       if (!report.passed) {
         for (const item of report.issues) addIssue(issues, sceneIndex, item.code, 'error', item.message, facialInput?.characterId || null);
         continue;
@@ -121,6 +124,9 @@ export function auditAnimationCompatibility(scenes) {
         if (actorId && !rigById.has(actorId) && !layerIds.has(actorId)) {
           addIssue(issues, sceneIndex, 'action-actor-not-renderable', 'error', 'A story action references a character with neither a body rig nor a sprite layer.', phase.actorId);
         }
+        if (actorId && phase?.motion && rigById.has(actorId)) {
+          addIssue(issues, sceneIndex, 'rig-suppresses-sprite-motion', 'warning', 'This action phase contains sprite transforms, but the ready body rig is rendered instead of the sprite. Use a rig timeline for the character body.', phase.actorId);
+        }
       }
     }
 
@@ -143,8 +149,6 @@ export function auditAnimationCompatibility(scenes) {
           }
         }
       }
-    } else if (scene.actionTimeline && rigTimeline && rigs.length) {
-      addIssue(issues, sceneIndex, 'story-action-rig-motion-not-guaranteed', 'warning', 'A story action timeline and a rig timeline coexist; verify that the rig timeline contains the intended action because sprite transforms do not drive rig bones.');
     }
 
     const expressions = record(scene.characterFacialExpressions) ? scene.characterFacialExpressions : {};
