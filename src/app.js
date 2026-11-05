@@ -11,6 +11,7 @@ import { planUniversalTask } from "./universal-task-planner.js";
 import { createUniversalCapabilityRegistry, bindUniversalPlanCapabilities } from "./universal-capability-registry.js";
 import { executeUniversalTaskPlan } from "./universal-task-executor.js";
 import { createUniversalLocalVideoCapability } from "./universal-local-video-capability.js";
+import { createUniversalRemoteVideoCapability } from "./universal-remote-video-capability.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
@@ -115,6 +116,7 @@ let lastUniversalTaskPlan=null;
 let universalTaskCheckpoint=null;
 let activeUniversalExecutionController=null;
 const universalCapabilityRegistry=createUniversalCapabilityRegistry();
+universalCapabilityRegistry.setRemoteConsent(false);
 universalCapabilityRegistry.register({
  id:'storyboard.create',
  name:'Create a local storyboard',
@@ -163,6 +165,11 @@ const localVideoCapability=createUniversalLocalVideoCapability({
  generateScene:context=>generateLocalSceneVideoForUniversal(context)
 });
 universalCapabilityRegistry.register(localVideoCapability);
+universalCapabilityRegistry.register(createUniversalRemoteVideoCapability({
+ isAvailable:()=>isRemoteVideoGenerationReady(),
+ hasConsent:()=>universalCapabilityRegistry.remoteConsent&&$('hfVideoConsent').checked===true,
+ generateScene:context=>generateRemoteSceneVideoForUniversal(context)
+}));
 function getSceneAction(index){return detectSceneActionForScene(sceneMetadata[index]||{},titles[index]||'',descriptions[index]||'');}
 class ParticleEmitter {
 constructor(){this.particles=[];this.maxParticles=160}
@@ -2120,6 +2127,58 @@ function isLocalVideoGenerationReady(){
  return comfyConnected&&!!comfyWorkflow&&!fullFilmAbortController&&
   (!!comfySourceImage||!!String(meta.generatedImageUrl||'').trim());
 }
+function isRemoteVideoGenerationReady(){
+ const meta=sceneMetadata[sceneIndex]||{};
+ return universalCapabilityRegistry.remoteConsent&&$('hfVideoConsent').checked===true&&
+  hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'&&
+  (!!comfySourceImage||!!String(meta.generatedImageUrl||'').trim())&&
+  !!String($('sceneMotionPrompt').value||meta.motionPrompt||meta.visibleAction||'').trim();
+}
+async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasConsent=()=>false}={}){
+ const assertConsent=()=>{
+  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
+  if(!universalCapabilityRegistry.remoteConsent||$('hfVideoConsent').checked!==true||!hasConsent()){
+   const error=new Error('Remote upload stopped because explicit Hugging Face consent is no longer active.');
+   error.code='REMOTE_CONSENT_REQUIRED';throw error;
+  }
+ };
+ assertConsent();
+ await sceneVideoRestorePromise;
+ const index=sceneIndex,originalMeta=sceneMetadata[index]||{},sceneId=String(originalMeta.id||'');
+ const motionScene={...originalMeta,title:$('sceneTitle').value.trim()||titles[index],description:$('sceneDescription').value.trim()||descriptions[index],motionPrompt:$('sceneMotionPrompt').value.trim()||String(originalMeta.motionPrompt||originalMeta.visibleAction||''),visibleAction:$('sceneMotionPrompt').value.trim()||String(originalMeta.visibleAction||''),camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,originalMeta.characters)};
+ const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
+ if(!prompt.trim())throw new Error('Add a motion instruction before remote video generation.');
+ let imageBlob=comfySourceImage;
+ if(!imageBlob){
+  const imageUrl=String(originalMeta.generatedImageUrl||'').trim();
+  if(!imageUrl)throw new Error('Create or load a still image for the selected scene first.');
+  assertConsent();
+  const response=await fetch(imageUrl,{signal});
+  if(!response.ok)throw new Error('Cannot read the selected scene image (HTTP '+response.status+').');
+  imageBlob=await response.blob();
+ }
+ if(!imageBlob?.size)throw new Error('The selected scene image is empty.');
+ assertConsent();
+ const provider=createHuggingFaceZeroGPUVideoProvider({client:hfVideoClient,handleFile:hfHandleFile});
+ const registry=createVideoProviderRegistry();registry.register(provider);
+ const duration=Math.max(0.5,Math.min(5,Number(originalMeta.durationSeconds??originalMeta.duration??$('duration').value)||3));
+ reportProgress?.('Submitting the selected scene to Hugging Face Wan 2.2 (0.5–5 seconds)');
+ assertConsent();
+ const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages:[]},{signal,onProgress:job=>reportProgress?.('Wan 2.2 '+String(job.stage||'processing')+(Number.isFinite(job.queuePosition)?' · queue '+job.queuePosition:''))});
+ assertConsent();
+ if(result.status!=='completed'||!result.video)throw new Error(result.error||'Hugging Face Wan 2.2 did not return a completed video.');
+ if(String(sceneMetadata[index]?.id||'')!==sceneId)throw new Error('The selected scene changed during remote generation; the clip was not attached elsewhere.');
+ const key=sceneVideoKey(index,motionScene);
+ const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
+ const filename='dravex-scene-'+(index+1)+'-wan22'+extension;
+ const entry=attachSceneVideo(index,motionScene,result.video,filename);
+ try{await waitForSceneVideoReady(entry.video,{timeoutMs:20000,signal});}
+ catch(error){if(sceneVideoCache.get(key)===entry)sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);throw new Error('Wan 2.2 returned a clip the browser could not decode: '+(error.message||'decode error'));}
+ const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
+ if(sceneIndex===index)renderComfySceneVideo();
+ renderScenes();if(!playing)draw();
+ return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
+}
 async function generateLocalSceneVideoForUniversal({signal,reportProgress}={}){
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
  await sceneVideoRestorePromise;
@@ -2276,9 +2335,18 @@ $('animateSceneComfy').addEventListener('click',async()=>{
 
 
 $('videoGenerationMode').addEventListener('change',updateComfyAnimateAvailability);
-$('hfVideoConsent').addEventListener('change',()=>{if(!$('hfVideoConsent').checked&&fullFilmAbortController&&$('videoGenerationMode').value==='huggingface')fullFilmAbortController.abort();updateComfyAnimateAvailability()});
+$('hfVideoConsent').addEventListener('change',()=>{
+ const granted=$('hfVideoConsent').checked===true;
+ universalCapabilityRegistry.setRemoteConsent(granted);
+ if(!granted&&activeUniversalExecutionController)activeUniversalExecutionController.abort();
+ if(!granted&&fullFilmAbortController&&$('videoGenerationMode').value==='huggingface')fullFilmAbortController.abort();
+ updateComfyAnimateAvailability();
+});
 $('clearHfVideoToken').addEventListener('click',()=>{
  if(fullFilmAbortController&&$('videoGenerationMode').value==='huggingface')fullFilmAbortController.abort();
+ $('hfVideoConsent').checked=false;
+ universalCapabilityRegistry.setRemoteConsent(false);
+ if(activeUniversalExecutionController)activeUniversalExecutionController.abort();
  $('hfVideoToken').value='';hfVideoClient=null;hfHandleFile=null;hfVideoConnected=false;
  $('hfVideoStatus').textContent='Токен очищен. Подключись заново при необходимости.';
  updateComfyAnimateAvailability();
