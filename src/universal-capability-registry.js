@@ -33,15 +33,16 @@ function abortError() {
 export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}) {
   const adapters = new Map();
   let active = null;
+  let consentGranted = remoteConsent === true;
 
   function isAvailable(adapter, context) {
-    if (adapter.requiresConsent && remoteConsent !== true) return false;
+    if (adapter.requiresConsent && consentGranted !== true) return false;
     try { return adapter.isAvailable(context) === true; }
     catch { return false; }
   }
 
   function assertAvailable(adapter, context) {
-    if (adapter.requiresConsent && remoteConsent !== true) {
+    if (adapter.requiresConsent && consentGranted !== true) {
       const error = new Error('Explicit consent is required before using remote capability "' + adapter.id + '".');
       error.code = 'REMOTE_CONSENT_REQUIRED';
       throw error;
@@ -54,6 +55,12 @@ export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}
   }
 
   return Object.freeze({
+    setRemoteConsent(granted) {
+      consentGranted = granted === true;
+      if (!consentGranted && active?.adapter.requiresConsent) active.controller.abort();
+      return consentGranted;
+    },
+    get remoteConsent() { return consentGranted; },
     register(raw) {
       const adapter = normalizeCapability(raw);
       if (adapters.has(adapter.id)) throw new Error('Capability "' + adapter.id + '" is already registered.');
@@ -91,19 +98,26 @@ export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}
             error.code = 'CAPABILITY_RUNTIME_BUSY';
             throw error;
           }
-          const lease = { id: adapter.id, taskId };
+          const controller = new AbortController();
+          const externalSignal = context?.signal;
+          const relayAbort = () => controller.abort();
+          if (externalSignal?.aborted) controller.abort();
+          else externalSignal?.addEventListener('abort', relayAbort, { once: true });
+          const lease = { id: adapter.id, taskId, adapter, controller };
           active = lease;
           try {
-            if (context?.signal?.aborted) throw abortError();
+            if (controller.signal.aborted) throw abortError();
             const result = await adapter.run({
               ...context,
+              signal: controller.signal,
               capabilityId: adapter.id,
               taskId,
               privacy: adapter.privacy
             });
-            if (context?.signal?.aborted) throw abortError();
+            if (controller.signal.aborted) throw abortError();
             return result;
           } finally {
+            externalSignal?.removeEventListener('abort', relayAbort);
             if (active === lease) active = null;
           }
         };
