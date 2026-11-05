@@ -49,6 +49,8 @@ import { buildExportTimeline } from "./export-timeline.js";
 import { buildAudioMouthEnvelope, sampleAudioMouthEnvelope } from "./audio-mouth-envelope.js";
 import { sampleCharacterFacialLipSync } from "./facial-lipsync-runtime.js";
 import { createFaceLandmarkerWorkerClient } from "./face-landmarker-worker-client.js";
+import { sampleFaceLandmarkTimeline } from "./face-landmark-timeline.js";
+import { projectFaceLandmarkOverlay } from "./face-landmark-overlay.js";
 import { analyzeFaceVideoFrames } from "./face-video-analysis.js";
 import { createVideoFrameCapture } from "./video-frame-capture.js";
 import { getAudioTimelineOffsetMs, getScheduledAudioStartAtMs } from "./audio-clock-alignment.js";
@@ -449,6 +451,88 @@ const sceneVideoCache=new Map();
 let activeFaceAnalysisController=null;
 let activeFaceAnalysisWorker=null;
 let lastFaceAnalysisExport=null;
+let faceLandmarkOverlayLastTimeBucket=-1;
+function hideFaceLandmarkPreviewOverlay(message=''){
+ const overlay=$('faceLandmarkOverlay');
+ if(overlay){overlay.hidden=true;overlay.replaceChildren();}
+ const status=$('faceLandmarkOverlayStatus');
+ if(status&&message)status.textContent=message;
+}
+function updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGeneratedVideo,motionTransform,viewportWidth,viewportHeight,cameraPlan,focusX,focusY}){
+ const overlay=$('faceLandmarkOverlay');
+ const status=$('faceLandmarkOverlayStatus');
+ if(!$('showFaceLandmarkOverlay')?.checked){
+  hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'Диагностический слой выключен.':'Diagnostic overlay is off.');
+  faceLandmarkOverlayLastTimeBucket=-1;
+  return;
+ }
+ const meta=currentSceneData||{};
+ const entry=sceneVideoCache.get(sceneVideoKey(sceneIndex,meta));
+ const report=lastFaceAnalysisExport;
+ if(!report||!hasGeneratedVideo||!generatedVideo||!entry||report.sceneId!==String(meta.id||'')||report.videoFilename!==String(entry.filename||'')){
+  hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'Нет анализа для текущего видеоклипа. Сначала выполни анализ выбранной сцены.':'No matching analysis for this clip. Analyze the selected scene first.');
+  return;
+ }
+ const timeMs=Math.max(0,Number(generatedVideo.currentTime)*1000);
+ if(!Number.isFinite(timeMs)){
+  hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'Время видеокадра недоступно.':'Video frame time is unavailable.');
+  return;
+ }
+ const bucket=Math.floor(timeMs/100);
+ if(bucket===faceLandmarkOverlayLastTimeBucket&&overlay&&!overlay.hidden)return;
+ faceLandmarkOverlayLastTimeBucket=bucket;
+ const maxGapMs=Math.max(1000,Number(report.sampleIntervalMs||500)*2.5);
+ const sample=sampleFaceLandmarkTimeline(report.faceSamples,timeMs,{maxGapMs});
+ if(sample.status!=='face-detected'||!sample.anchors){
+  hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'На текущем участке лицо не обнаружено; рамка скрыта.':'No face detected at this moment; overlay hidden.');
+  return;
+ }
+ const projected=projectFaceLandmarkOverlay(
+  sample.anchors,
+  generatedVideo.videoWidth,
+  generatedVideo.videoHeight,
+  viewportWidth,
+  viewportHeight,
+  {cover:motionTransform,camera:{zoom:cameraPlan.zoom,offsetY:cameraPlan.offsetY,focusX,focusY}}
+ );
+ if(projected.status!=='ready'||!projected.overlay){
+  hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'Не удалось безопасно преобразовать координаты лица.':'Could not safely project face coordinates.');
+  return;
+ }
+ const stage=canvas.parentElement;
+ const stageRect=stage?.getBoundingClientRect();
+ const canvasRect=canvas.getBoundingClientRect();
+ if(!stage||!stageRect||!canvasRect.width||!canvasRect.height){
+  hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'Размер предпросмотра недоступен.':'Preview dimensions are unavailable.');
+  return;
+ }
+ overlay.style.left=(canvasRect.left-stageRect.left)+'px';
+ overlay.style.top=(canvasRect.top-stageRect.top)+'px';
+ overlay.style.width=canvasRect.width+'px';
+ overlay.style.height=canvasRect.height+'px';
+ overlay.setAttribute('viewBox','0 0 '+viewportWidth+' '+viewportHeight);
+ overlay.setAttribute('preserveAspectRatio','none');
+ overlay.replaceChildren();
+ const ns='http://www.w3.org/2000/svg';
+ const bounds=projected.overlay.bounds;
+ const rect=document.createElementNS(ns,'rect');
+ rect.setAttribute('x',String(bounds.x));rect.setAttribute('y',String(bounds.y));
+ rect.setAttribute('width',String(bounds.width));rect.setAttribute('height',String(bounds.height));
+ rect.setAttribute('fill','none');rect.setAttribute('stroke','#67e8f9');
+ rect.setAttribute('stroke-width',String(Math.max(2,viewportWidth/500)));
+ rect.setAttribute('stroke-dasharray','8 5');rect.setAttribute('vector-effect','non-scaling-stroke');
+ overlay.appendChild(rect);
+ for(const [name,point] of [['eye',projected.overlay.eyeCenter],['mouth',projected.overlay.mouthCenter]]){
+  const marker=document.createElementNS(ns,'circle');
+  marker.setAttribute('cx',String(point.x));marker.setAttribute('cy',String(point.y));
+  marker.setAttribute('r',String(Math.max(4,viewportWidth/180)));
+  marker.setAttribute('fill',name==='eye'?'#a7f3d0':'#f9a8d4');
+  marker.setAttribute('stroke','#111827');marker.setAttribute('stroke-width','2');
+  overlay.appendChild(marker);
+ }
+ overlay.hidden=false;
+ if(status)status.textContent=(uiLang==='ru'?'Показаны ориентиры лица из локального анализа. Это не привязка к персонажу и не изменение видео.':'Showing face landmarks from local analysis. This is not character binding or video editing.');
+}
 let finalFilmObjectUrl=null;
 let sceneVideoRestorePromise=Promise.resolve();
 const sceneVideoStorage=createSceneVideoStorage();
