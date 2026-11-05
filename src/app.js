@@ -1398,6 +1398,7 @@ function isLocalSceneVoiceReady(){
  try{
   const locale=storyLanguage();
   return Boolean(sceneVoiceEngine?.status.loaded&&sceneVoiceEngine.status.locale===locale
+   &&$('generateSceneVoices').dataset.busy!=='true'
    &&parseDialogueLines($('sceneDialogue').value,locale).length>0);
  }catch{return false}
 }
@@ -1449,11 +1450,13 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{}}={})
   idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
   language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex:resolvedIndex
  }));
- if(sceneIndex===resolvedIndex)await renderSceneVoiceAudio();
- $('sceneVoiceStatus').textContent=voiceText(
+ if(sceneIndex===resolvedIndex){
+  await renderSceneVoiceAudio();
+  $('sceneVoiceStatus').textContent=voiceText(
   'Готово: '+scheduled.cues.length+' реплик · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' сек. '+(saved?'Черновик сохранён.':'Не удалось сохранить черновик.'),
   'Done: '+scheduled.cues.length+' lines · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' sec. '+(saved?'Draft saved.':'Draft could not be saved.')
- );
+  );
+ }
  return {type:'local-voice-artifacts',sceneId:targetId,lineCount:scheduled.cues.length,durationMs:scheduled.timeline.totalDurationMs,persistedInDraft:saved,local:true};
 }
 function voiceText(ru,en){return uiLang==='ru'?ru:en}
