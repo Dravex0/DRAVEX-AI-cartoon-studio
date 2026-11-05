@@ -6,15 +6,76 @@ import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-sta
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
 const isRecord = value => value && typeof value === 'object' && !Array.isArray(value);
 
+function parseJsonWithTrailingCommaRepair(source) {
+  try { return JSON.parse(source); } catch { /* Try a conservative JSON-only repair below. */ }
+  let output = '';
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (inString) {
+      output += char;
+      if (escaped) escaped = false;
+      else if (char === '\\\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      output += char;
+      continue;
+    }
+    if (char === ',') {
+      let next = index + 1;
+      while (/\\s/.test(source[next] || '')) next += 1;
+      if (source[next] === '}' || source[next] === ']') continue;
+    }
+    output += char;
+  }
+  try { return JSON.parse(output); } catch { return null; }
+}
+
+function extractBalancedJson(source) {
+  for (let start = 0; start < source.length; start += 1) {
+    if (source[start] !== '{' && source[start] !== '[') continue;
+    const stack = [];
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < source.length; index += 1) {
+      const char = source[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === '\\\\') escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') { inString = true; continue; }
+      if (char === '{' || char === '[') stack.push(char);
+      else if (char === '}' || char === ']') {
+        const opening = stack.pop();
+        if ((char === '}' && opening !== '{') || (char === ']' && opening !== '[')) break;
+        if (!stack.length) return source.slice(start, index + 1);
+      }
+    }
+  }
+  return '';
+}
+
 function parseModelScenes(text) {
-  const source = clean(text, 100_000)
-    .replace(/^\s*```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/i, '')
+  const source = clean(text, 100_000).trim()
+    .replace(/^\\s*```(?:json)?\\s*/i, '')
+    .replace(/\\s*```\\s*$/i, '')
     .trim();
-  let parsed;
-  try { parsed = JSON.parse(source); } catch { return null; }
+  const parsed = parseJsonWithTrailingCommaRepair(source)
+    || parseJsonWithTrailingCommaRepair(extractBalancedJson(source));
   if (Array.isArray(parsed)) return parsed;
   return Array.isArray(parsed?.scenes) ? parsed.scenes : null;
+}
+
+/** Reserve enough output space for a complete multi-scene JSON response. */
+export function estimateDirectorTokenBudget(sceneCount) {
+  const count = Number.isFinite(Number(sceneCount)) ? Math.max(1, Math.min(8, Math.round(Number(sceneCount)))) : 5;
+  return Math.min(1024, Math.max(384, 180 + count * 160));
 }
 
 function buildStructuredStateMemory(modelScenes, baselineScenes) {
@@ -88,7 +149,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
   return [
     'You are DRAVEX, a careful animation film director.',
     'Create a scene-by-scene visual direction for the supplied story.',
-    'Return ONLY valid JSON with this exact top-level shape: {"scenes":[{"title":"...","purpose":"...","visibleAction":"...","camera":"...","imagePrompt":"...","motionPrompt":"...","startState":"...","endState":"...","startStateData":{...},"endStateData":{...},"actionTimeline":{"schemaVersion":1,"phases":[{"phase":"preparation|action|reaction|result","start":0,"end":1,"actorId":"...","targetId":null,"description":"...","evidence":"exact source-backed phrase"}]}}]}.',
+    'Return ONLY valid JSON with this exact top-level shape: {"scenes":[{"title":"...","purpose":"...","visibleAction":"...","camera":"...","imagePrompt":"...","motionPrompt":"...","startState":"...","endState":"...","actionTimeline":null}]}.',
     'Return exactly ' + basePlan.scenes.length + ' scenes, in the same order as the supplied source details.',
     'Each visibleAction must describe one concrete, filmable physical action, not a vague feeling or a static pose.',
     'Make every scene action and camera plan distinct. Use specific shot size, angle, and camera movement.',
@@ -106,7 +167,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'Build a strict scene-to-scene hand-off: scene N+1 startState must continue scene N endState. Preserve the exact positions and states of characters, props, clothing, lighting, weather, and location unless the supplied story explicitly changes them.',
     'Do not teleport characters or objects. If a character holds an object at the end of one scene, begin the next scene with that same character still holding it. Carry unresolved actions forward before starting a new action.',
     'Keep startState and endState concrete, visible, and mutually compatible across every adjacent scene.',
-    'Also provide startStateData and endStateData as structured JSON objects: {location,time,weather,characters:{characterId:{location,position,pose,clothing}},objects:{objectId:{location,owner,state}}}. Use null for unknown fields, never guess missing facts. Repeat unchanged known values exactly across scene boundaries. These structured fields must agree with the text states.',
+    'Structured startStateData/endStateData are optional: omit them unless every included value is explicit in the source and can be carried forward exactly. Never invent missing structured facts.',
     'The source details below are locked facts. Do not rewrite, reorder, omit, or duplicate them.',
     'LOCKED SOURCE DETAILS: ' + JSON.stringify(requiredDetails),
     'LOCKED EVENT CHAIN: ' + JSON.stringify(eventChain),
@@ -127,9 +188,12 @@ export async function directStoryboardWithLocalAI({
   language = 'English',
   character = 'Main character',
   characterBible = [],
-  maxNewTokens = 700
+  maxNewTokens = null
 } = {}) {
   const fallback = Array.isArray(basePlan?.scenes) ? basePlan.scenes : [];
+  const tokenBudget = maxNewTokens == null
+    ? estimateDirectorTokenBudget(fallback.length)
+    : Math.max(16, Math.min(1024, Math.round(Number(maxNewTokens) || estimateDirectorTokenBudget(fallback.length))));
   const eventChain = buildStoryEventChain(fallback);
   const fallbackResult = (reason, evaluation = null) => ({
     usedLocalModel: false,
@@ -146,7 +210,7 @@ export async function directStoryboardWithLocalAI({
   let generated;
   try {
     generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain }), {
-      maxNewTokens,
+      maxNewTokens: tokenBudget,
       temperature: 0.15
     });
   } catch (error) {
