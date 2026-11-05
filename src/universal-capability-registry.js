@@ -85,7 +85,7 @@ export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}
       const adapter = normalizeCapability(raw);
       if (adapters.has(adapter.id)) throw new Error('Capability "' + adapter.id + '" is already registered.');
       adapters.set(adapter.id, adapter);
-      return { id: adapter.id, name: adapter.name, privacy: adapter.privacy, consentKey: adapter.consentKey, requiresConsent: adapter.requiresConsent };
+      return { id: adapter.id, name: adapter.name, privacy: adapter.privacy, ...(adapter.consentKey ? { consentKey: adapter.consentKey } : {}), requiresConsent: adapter.requiresConsent };
     },
     has(id) {
       return adapters.has(clean(id, 80));
@@ -100,7 +100,7 @@ export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}
         name: adapter.name,
         privacy: adapter.privacy,
         requiresConsent: adapter.requiresConsent,
-        consentKey: adapter.consentKey,
+        ...(adapter.consentKey ? { consentKey: adapter.consentKey } : {}),
         available: isAvailable(adapter, context)
       }));
     },
