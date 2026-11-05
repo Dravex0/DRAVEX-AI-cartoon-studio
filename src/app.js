@@ -135,6 +135,28 @@ universalCapabilityRegistry.register({
   return {type:'storyboard',sceneCount:Array.isArray(created?.scenes)?created.scenes.length:0,sourceLanguage:created?.sourceLanguage||null};
  }
 });
+universalCapabilityRegistry.register({
+ id:'voice.generate',
+ name:'Generate local scene dialogue audio',
+ privacy:'local',
+ isAvailable:()=>isLocalSceneVoiceReady(),
+ run:async({plan,step,signal,reportProgress})=>{
+  if(!/(voice|speech|dialogue|audio|озвуч|голос|реплик|звук)/i.test(String(plan?.sourceRequest||''))){
+   const error=new Error('The local voice adapter only accepts explicit voice, speech, dialogue, or audio requests.');
+   error.code='CAPABILITY_REQUEST_MISMATCH';
+   throw error;
+  }
+  if(!step||!Array.isArray(step.requiredCapabilities)||step.requiredCapabilities.length!==1||step.requiredCapabilities[0]!=='voice.generate'){
+   const error=new Error('The voice adapter requires one explicit voice.generate capability.');
+   error.code='CAPABILITY_BINDING_MISMATCH';
+   throw error;
+  }
+  return generateSceneVoicesForCurrentScene({
+   signal,
+   onProgress:progress=>reportProgress?.('Generating local voice '+progress.index+' / '+progress.total)
+  });
+ }
+});
 function getSceneAction(index){return detectSceneActionForScene(sceneMetadata[index]||{},titles[index]||'',descriptions[index]||'');}
 class ParticleEmitter {
 constructor(){this.particles=[];this.maxParticles=160}
@@ -1673,7 +1695,7 @@ activeUniversalPlanController=controller;
 button.disabled=true;cancel.disabled=false;$('runLocalModel').disabled=true;output.hidden=true;
 status.textContent=ru?'Универсальный ИИ анализирует запрос и строит план на этом устройстве. Это может занять время…':'Universal AI is analysing the request and building a plan on this device. This may take a while…';
 try{
-const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list()});
+const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().filter(capability=>capability.available).map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
 if(result.status==='cancelled'){
 status.textContent=ru?'Отмена запрошена. Генерация модели завершилась без применения устаревшего результата.':'Cancellation requested. The model finished inference; its stale result was discarded.';
 return;
@@ -1691,7 +1713,7 @@ lastUniversalTaskPlan=plan;
 universalTaskCheckpoint=null;
 const capabilityBinding=bindUniversalPlanCapabilities(plan,universalCapabilityRegistry);
 const executableCount=capabilityBinding.readyCount;
-const canStart=capabilityBinding.bindings[0]?.status==='ready'&&executableCount===1;
+const canStart=capabilityBinding.bindings[0]?.status==='ready';
 $('executeUniversalTask').disabled=!canStart;
 const lines=[
 (ru?'ЦЕЛЬ: ':'GOAL: ')+plan.goal,
@@ -1706,7 +1728,7 @@ ru?'ЭТАПЫ ВЫПОЛНЕНИЯ:':'EXECUTION STEPS:',
 '',
 (ru?'Модель: ':'Model: ')+(result.modelId||'local')+' · '+(result.backend||'local'),
 (ru?'Доступные реальные операции: ':'Registered executable steps: ')+executableCount+'/'+plan.steps.length,
-ru?'Структура проверена, но смысловая правильность не гарантируется. Доступен только локальный этап создания раскадровки; остальные операции пока не подключены.':'Structure validated, but semantic correctness is not guaranteed. Only local storyboard creation is currently wired; other operations are not yet connected.'
+ru?'Структура проверена, но смысловая правильность не гарантируется. Выполняются только подключённые локальные операции; для озвучки нужна загруженная модель и реплики текущей сцены.':'Structure validated, but semantic correctness is not guaranteed. Only registered local operations execute; voice generation requires a loaded local model and dialogue for the current scene.'
 ];
 output.textContent=lines.join('\n');output.hidden=false;
 status.textContent=canStart?(ru?'План готов. Можно выполнить подключённый локальный этап; неподключённые этапы будут остановлены безопасно.':'Plan ready. The connected local step can run; unsupported steps will be safely blocked.'):(ru?'План создан, но первый этап пока не имеет подключённого инструмента.':'Plan created, but its first step has no connected tool yet.');
@@ -1725,7 +1747,7 @@ $('executeUniversalTask').addEventListener('click',async()=>{
  const ru=uiLang==='ru';
  if(!plan||activeUniversalExecutionController)return;
  const binding=bindUniversalPlanCapabilities(plan,universalCapabilityRegistry);
- if(binding.bindings[0]?.status!=='ready'||binding.readyCount!==1){
+ if(binding.bindings[0]?.status!=='ready'){
   status.textContent=ru?'Выполнение остановлено: безопасно доступен только один подключённый первый этап.':'Execution blocked: only one registered first step can run safely.';
   return;
  }
