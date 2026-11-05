@@ -2,6 +2,7 @@ import { validateCharacterRig } from './character-rig.js';
 import { validateCharacterFacialRig } from './character-facial-rig.js';
 import { validateCharacterRigTimeline } from './character-rig-timeline.js';
 import { validateCharacterActionTimeline } from './character-action-timeline.js';
+import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from './character-rig-motion-presets.js';
 
 const key = value => String(value ?? '').trim().toLocaleLowerCase();
 const record = value => Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -24,6 +25,7 @@ export function auditAnimationCompatibility(scenes) {
   let actionTimelineCount = 0;
   let spriteMotionTimelineCount = 0;
   let voiceCueCount = 0;
+  let presetCount = 0;
 
   source.forEach((rawScene, sceneIndex) => {
     const scene = record(rawScene) ? rawScene : {};
@@ -57,6 +59,17 @@ export function auditAnimationCompatibility(scenes) {
         addIssue(issues, sceneIndex, 'rig-character-duplicate', 'error', 'A scene contains more than one body rig for the same character.', report.rig.characterId);
       } else {
         rigById.set(id, report.rig);
+      }
+      for (const preset of listCharacterRigMotionPresets()) {
+        presetCount++;
+        const presetReport = createCharacterRigMotionPreset(report.rig, preset.id);
+        if (presetReport.status !== 'ready') {
+          addIssue(issues, sceneIndex, 'rig-preset-unavailable', 'error', 'Animation preset "' + preset.id + '" cannot produce a valid rig timeline: ' + (presetReport.issues || []).map(item => item.message).join(' '), report.rig.characterId);
+        } else {
+          for (const warning of presetReport.warnings || []) {
+            addIssue(issues, sceneIndex, 'rig-preset-limited', 'warning', 'Preset "' + preset.id + '": ' + warning, report.rig.characterId);
+          }
+        }
       }
     }
 
@@ -251,6 +264,7 @@ export function auditAnimationCompatibility(scenes) {
     actionTimelineCount,
     spriteMotionTimelineCount,
     voiceCueCount,
+    presetCount,
     errorCount: errors,
     warningCount: warnings,
     status: errors ? 'incompatible' : warnings ? 'compatible-with-warnings' : 'compatible',
