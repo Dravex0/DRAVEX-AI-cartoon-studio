@@ -41,7 +41,12 @@ function extractJsonObject(text) {
   return null;
 }
 
-function validateSteps(rawSteps) {
+function normalizeCapabilityIds(values) {
+  if (!Array.isArray(values)) return null;
+  return [...new Set(values.map(value => clean(isRecord(value) ? value.id : value, 80)).filter(value => /^[a-z][a-z0-9._-]*$/.test(value)))];
+}
+
+function validateSteps(rawSteps, availableCapabilities = null) {
   if (!Array.isArray(rawSteps) || rawSteps.length < 1 || rawSteps.length > 24) {
     return { ok: false, reason: 'step-count-out-of-range' };
   }
@@ -57,6 +62,9 @@ function validateSteps(rawSteps) {
       return { ok: false, reason: 'invalid-or-duplicate-step-id' };
     }
     if (!action || !purpose) return { ok: false, reason: 'step-action-or-purpose-missing' };
+    if (availableCapabilities && requiredCapabilities.some(capability => !availableCapabilities.includes(capability))) {
+      return { ok: false, reason: 'unsupported-required-capability' };
+    }
     ids.add(id);
     steps.push({
       id,
@@ -97,7 +105,7 @@ function validateSteps(rawSteps) {
  * Validate the structure of a provider-generated task plan.
  * This checks schema and dependency integrity, not whether the plan is semantically correct.
  */
-export function validateUniversalTaskPlan(candidate, sourceRequest) {
+export function validateUniversalTaskPlan(candidate, sourceRequest, { availableCapabilities } = {}) {
   const request = clean(sourceRequest, 12_000);
   if (!request) return { ok: false, reason: 'empty-source-request' };
   if (!isRecord(candidate)) return { ok: false, reason: 'plan-is-not-an-object' };
@@ -113,7 +121,11 @@ export function validateUniversalTaskPlan(candidate, sourceRequest) {
     return { ok: false, reason: 'invalid-deliverable-type' };
   }
 
-  const validatedSteps = validateSteps(candidate.steps);
+  const capabilityIds = normalizeCapabilityIds(availableCapabilities);
+  if (Array.isArray(availableCapabilities) && capabilityIds.length !== availableCapabilities.length) {
+    return { ok: false, reason: 'invalid-capability-catalog' };
+  }
+  const validatedSteps = validateSteps(candidate.steps, capabilityIds);
   if (!validatedSteps.ok) return validatedSteps;
 
   return {
@@ -131,14 +143,16 @@ export function validateUniversalTaskPlan(candidate, sourceRequest) {
   };
 }
 
-export function buildUniversalPlannerPrompt(request) {
+export function buildUniversalPlannerPrompt(request, { availableCapabilities } = {}) {
   const source = clean(request, 12_000);
   if (!source) throw new TypeError('A non-empty user request is required.');
+  const capabilityIds = normalizeCapabilityIds(availableCapabilities);
   return [
     'You are the Universal Task Planner inside DRAVEX.',
     'Plan the complete work needed to fulfil the user request. Do not assume the request is a cartoon or even a video unless the user asks for that.',
     'Identify the requested deliverable and break the work into ordered, executable steps. Use dependencies when a step requires an earlier output.',
     'Do not invent user facts, assets, permissions, or capabilities. Put genuinely missing decisions in openQuestions.',
+    ...(capabilityIds ? ['The only executable capabilities available to this app are: ' + (capabilityIds.join(', ') || '(none)') + '.', 'Every requiredCapabilities entry must be an exact ID from this list. Never invent or rename a capability. If no listed capability can perform a step, use an empty requiredCapabilities array and explain the limitation in openQuestions.'] : []),
     'Preserve explicit user requirements and constraints. Do not silently replace the requested result with a simpler one.',
     'Use 1 to 24 steps. Each step must have a unique id, a concrete action, a purpose, inputs, outputs, dependsOn, and requiredCapabilities.',
     'Return ONLY one JSON object with this shape:',
@@ -152,7 +166,7 @@ export function buildUniversalPlannerPrompt(request) {
  * Ask an injected model provider for a universal execution plan.
  * Provider output is accepted only after structural validation; this is not a semantic quality guarantee.
  */
-export async function planUniversalTask({ runtime, request, signal, maxNewTokens = 1024 } = {}) {
+export async function planUniversalTask({ runtime, request, signal, maxNewTokens = 1024, availableCapabilities } = {}) {
   const sourceRequest = clean(request, 12_000);
   if (!sourceRequest) return { ok: false, status: 'invalid-request', reason: 'empty-source-request' };
   if (signal?.aborted) return { ok: false, status: 'cancelled', reason: 'aborted' };
@@ -162,7 +176,7 @@ export async function planUniversalTask({ runtime, request, signal, maxNewTokens
 
   let generated;
   try {
-    generated = await runtime.generate(buildUniversalPlannerPrompt(sourceRequest), {
+    generated = await runtime.generate(buildUniversalPlannerPrompt(sourceRequest, { availableCapabilities }), {
       maxNewTokens: Math.max(128, Math.min(2048, Math.round(Number(maxNewTokens) || 1024))),
       temperature: 0.1,
       signal
@@ -176,7 +190,7 @@ export async function planUniversalTask({ runtime, request, signal, maxNewTokens
 
   if (signal?.aborted) return { ok: false, status: 'cancelled', reason: 'aborted' };
   const candidate = extractJsonObject(generated?.text);
-  const validation = validateUniversalTaskPlan(candidate, sourceRequest);
+  const validation = validateUniversalTaskPlan(candidate, sourceRequest, { availableCapabilities });
   if (!validation.ok) {
     return {
       ok: false,
