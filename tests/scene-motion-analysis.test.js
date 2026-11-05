@@ -22,6 +22,9 @@ function makeCanvasFactory(video, moving) {
     return {width:0,height:0,getContext:()=>context};
   };
 }
+function makeSeekableRange(start, end) {
+  return { length: 1, start: () => start, end: () => end };
+}
 test("flags a decoded clip with no sampled pixel changes as likely static",async()=>{
   const video=new FakeVideo();
   const report=await analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,false)});
@@ -78,6 +81,19 @@ test("rejects videos without decoded frames",async()=>{
   const video=new FakeVideo();video.readyState=1;
   await assert.rejects(analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,false)}),/decoded frame/);
 });
+
+test("analyzes an infinite-duration WebM from its finite seekable range", async () => {
+  const video = new FakeVideo();
+  video.duration = Infinity;
+  video.seekable = makeSeekableRange(1, 5);
+  video.currentTime = 2.5;
+  const report = await analyzeSceneVideoMotion(video, {
+    canvasFactory: makeCanvasFactory(video, true)
+  });
+  assert.equal(report.status, "visible-change");
+  assert.ok(report.meanColorChange > 0);
+  assert.ok(Math.abs(video.currentTime - 2.5) < 0.015);
+});
 test("validates sampling limits",async()=>{
   const video=new FakeVideo();
   await assert.rejects(analyzeSceneVideoMotion(video,{sampleCount:1,canvasFactory:makeCanvasFactory(video,false)}),/sampleCount/);
@@ -105,5 +121,24 @@ test("captures a few local frame samples and restores playback state", async () 
 test("rejects unsafe frame sample counts", async () => {
   const video = new FakeVideo();
   await assert.rejects(captureSceneVideoFrameSamples(video, { sampleCount: 6 }), /sampleCount/);
+});
+
+test("captures frame samples from an infinite-duration WebM seekable range", async () => {
+  const video = new FakeVideo();
+  video.duration = Infinity;
+  video.seekable = makeSeekableRange(1, 5);
+  video.currentTime = 2.5;
+  const canvasFactory = () => ({
+    width: 0,
+    height: 0,
+    getContext: () => ({ drawImage() {} }),
+    toDataURL: () => "data:image/jpeg;base64,ZmFrZQ=="
+  });
+  const samples = await captureSceneVideoFrameSamples(video, { canvasFactory });
+  assert.equal(samples.length, 3);
+  assert.ok(samples[0].time >= 1);
+  assert.ok(samples[2].time <= 5);
+  assert.ok(samples[0].time < samples[1].time && samples[1].time < samples[2].time);
+  assert.ok(Math.abs(video.currentTime - 2.5) < 0.015);
 });
 
