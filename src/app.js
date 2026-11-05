@@ -596,7 +596,7 @@ facialAssetStorage.get(assetId).then(record=>{if(!record?.blob)throw new Error("
 }
 return entry.state==='ready'&&entry.image.naturalWidth>0?entry.image:null;
 }
-function waitForSceneImageReady(url,{signal,timeoutMs=15000}={}){
+function waitForSceneImageReady(url,{signal,timeoutMs=45000}={}){
  const key=String(url||'').trim();
  if(!key)return Promise.reject(new Error('Generated scene image URL is empty.'));
  if(signal?.aborted)return Promise.reject(new DOMException('Image loading was cancelled.','AbortError'));
@@ -627,7 +627,7 @@ function waitForSceneImageReady(url,{signal,timeoutMs=15000}={}){
   image.addEventListener('load',onLoad);
   image.addEventListener('error',onError);
   signal?.addEventListener('abort',onAbort,{once:true});
-  timer=setTimeout(()=>finish(reject,new Error('Timed out while loading the generated scene image.')),Math.max(1000,Math.min(30000,Number(timeoutMs)||15000)));
+  timer=setTimeout(()=>finish(reject,new Error('Timed out while loading the generated scene image.')),Math.max(1000,Math.min(60000,Number(timeoutMs)||45000)));
   if(image.complete){if(image.naturalWidth>0)onLoad();else if(entry.state==='error')onError();}
  });
 }
