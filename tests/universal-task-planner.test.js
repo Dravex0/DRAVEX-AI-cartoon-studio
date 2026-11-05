@@ -111,7 +111,7 @@ test('includes exact registered capability IDs in the planner prompt', () => {
   const prompt = buildUniversalPlannerPrompt('Create a storyboard.', {
     availableCapabilities: [{ id: 'storyboard.create', name: 'Create storyboard' }]
   });
-  assert.match(prompt, /storyboard\\.create/);
+  assert.match(prompt, /storyboard\.create/);
   assert.match(prompt, /Never invent or rename a capability/);
   assert.match(prompt, /Create a storyboard/);
 });
@@ -139,4 +139,12 @@ test('plan generation validates against the same capability catalog supplied to 
   assert.match(prompt, /text-planning, storyboarding/);
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'unsupported-required-capability');
+});
+
+
+test('rejects non-array capability catalogs at both planner entry points', () => {
+  assert.throws(() => buildUniversalPlannerPrompt('Make a film.', { availableCapabilities: 'video' }), /capability catalog/i);
+  const result = validateUniversalTaskPlan(validPlan, request, { availableCapabilities: 'video' });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'invalid-capability-catalog');
 });
