@@ -2217,7 +2217,9 @@ $('auditAllAnimations').addEventListener('click',()=>{
   status.textContent=label+'. '+(uiLang==='ru'
    ?'Сцен: ':'Scenes: ')+report.sceneCount+' · '+(uiLang==='ru'?'скелетов: ':'body rigs: ')+report.rigCount
    +' · '+(uiLang==='ru'?'лицевых ригов: ':'facial rigs: ')+report.facialRigCount
-   +' · '+(uiLang==='ru'?'проверок пресетов: ':'preset checks: ')+report.presetCount
+   +' · '+(uiLang==='ru'?'пресетов тела: ':'body presets: ')+report.presetCount
+   +' · '+(uiLang==='ru'?'проб кадров: ':'runtime samples: ')+report.presetRuntimeSampleCount
+   +' · '+(uiLang==='ru'?'выражений лица: ':'facial presets: ')+report.facialExpressionPresetCount
    +' · '+(uiLang==='ru'?'ошибок: ':'errors: ')+report.errorCount
    +' · '+(uiLang==='ru'?'предупреждений: ':'warnings: ')+report.warningCount
    +(details.length?'\n'+details.join('\n'):'')
