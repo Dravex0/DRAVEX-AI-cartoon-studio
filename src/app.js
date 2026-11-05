@@ -175,7 +175,7 @@ universalCapabilityRegistry.register(createUniversalRemoteVideoCapability({
 universalCapabilityRegistry.register(createUniversalFilmCompositionCapability({
  getSceneReport:()=>buildSceneMediaReport(sceneMetadata,new Set(sceneVideoCache.keys())),
  composeFilm:async({signal,reportProgress,sceneCount})=>{
-  const result=await exportFilm({signal,requireAllVideos:true,download:true,onProgress:detail=>reportProgress?.(detail)});
+  const result=await exportFilm({signal,requireAllVideos:true,download:true,onProgress:detail=>reportProgress?.(detail?.phase==='recording'?'Recording final film: '+detail.percent+'%':detail?.phase==='scene'?'Composing scene '+(detail.sceneIndex+1)+' / '+detail.sceneCount:String(detail||''))});
   if(result?.status!=='completed')throw new Error(result?.reason||'Full-film WebM composition did not complete.');
   if(result.sceneCount!==sceneCount)throw new Error('The number of exported scenes changed during full-film composition.');
   return result;
@@ -2868,19 +2868,20 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     $('status').textContent=uiLang==='ru'
       ?'Записываем '+timeline.segments.length+' сцен'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+'…'
       :'Recording '+timeline.segments.length+' scenes'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'')+'…';
-    if(filmProgressTracking){
+    if(filmProgressTracking||typeof onProgress==='function'){
       exportStartedAtMs=performance.now();
-      setFilmProgress(85,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Запись итогового видео…','Recording the final video…'));
+      if(filmProgressTracking)setFilmProgress(85,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Запись итогового видео…','Recording the final video…'));
       exportProgressTimer=setInterval(()=>{
         const fraction=Math.max(0,Math.min(1,(performance.now()-exportStartedAtMs)/Math.max(1,timeline.totalDurationMs)));
         const percent=85+Math.min(14,Math.floor(fraction*14));
-        setFilmProgress(percent,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Записано примерно ','Recorded approximately ')+Math.round(fraction*100)+'%');
+        if(filmProgressTracking)setFilmProgress(percent,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Записано примерно ','Recorded approximately ')+Math.round(fraction*100)+'%');
         onProgress?.({phase:'recording',percent,elapsedMs:Math.round(fraction*timeline.totalDurationMs),totalDurationMs:timeline.totalDurationMs});
       },250);
     }
     timeline.segments.slice(1).forEach(segment=>{
       const timer=setTimeout(()=>{
         sceneIndex=segment.sceneIndex;
+        onProgress?.({phase:'scene',sceneIndex:segment.sceneIndex,sceneCount:timeline.segments.length,percent:Math.round(segment.startMs/Math.max(1,timeline.totalDurationMs)*100)});
         $('status').textContent=uiLang==='ru'
           ?'Записываем сцену '+(segment.sceneIndex+1)+' из '+timeline.segments.length+'…'
           :'Recording scene '+(segment.sceneIndex+1)+' of '+timeline.segments.length+'…';
