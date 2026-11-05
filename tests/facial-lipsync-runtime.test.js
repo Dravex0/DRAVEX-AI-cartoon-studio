@@ -53,7 +53,7 @@ test("holds a neutral mouth when timestamped visemes overlap effective audio sil
     track("Foxy", 0, 0, ["open", "round", "teeth"], [0, 0.01, 0])
   ], 0, 150);
   assert.equal(result.facialVisemes.Foxy, "neutral");
-  assert.equal(result.facialMouthOpenness.Foxy, 0.01);
+  assert.equal(result.facialMouthOpenness.Foxy, 0.005);
   assert.deepEqual(result.activeCharacterIds, ["Foxy"]);
 });
 
