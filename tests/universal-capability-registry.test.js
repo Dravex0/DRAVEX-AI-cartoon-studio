@@ -164,7 +164,7 @@ test('allows a consent-free resume only when the remote step is a verified no-op
   });
   assert.equal(registry.isAvailable('horde-image'), false);
   assert.equal(registry.isAvailable('horde-image', { step }), true);
-  const result = await registry.createHandlers({ plan: { sourceRequest: 'video' }, step })['horde-image']({});
+  const result = await registry.createHandlers()['horde-image']({ plan: { sourceRequest: 'video' }, step });
   assert.deepEqual(result, { alreadyReady: true });
   assert.equal(remoteCalls, 1);
 });
