@@ -837,14 +837,14 @@ function draw(){const animationTimeMs=animationClock.advance(performance.now(),p
 const generatedVideo=sceneVideoCache.get(String(currentSceneData.id||('scene-index-'+sceneIndex)));
 const hasGeneratedVideo=Boolean(generatedVideo&&generatedVideo.readyState>=2&&generatedVideo.videoWidth>0);
 const hasGeneratedMedia=hasGeneratedVideo||Boolean(generatedFrame);
-const mediaMotionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);
-if(hasGeneratedVideo){drawImageCover(ctx,generatedVideo,w,h,mediaMotionTransform)}
-else if(generatedFrame){drawImageCover(ctx,generatedFrame,w,h,mediaMotionTransform)}
+const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);
+if(hasGeneratedVideo){drawImageCover(ctx,generatedVideo,w,h,motionTransform)}
+else if(generatedFrame){drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
 const sampledRigPoses=currentSceneData.characterRigTimeline?.keyframes?.length
  ? sampleCharacterRigTimeline(currentSceneData.characterRigTimeline,rigAnimationProgress)
  : currentSceneData.characterRigPoses;
 drawSceneProps(ctx,currentSceneData,currentSceneData.characterLayers,sceneMotionProgress,w,h,t,{characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);ctx.restore();
-updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGeneratedVideo,motionTransform:mediaMotionTransform,viewportWidth:w,viewportHeight:h,cameraPlan,focusX,focusY});
+updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGeneratedVideo,motionTransform,viewportWidth:w,viewportHeight:h,cameraPlan,focusX,focusY});
 try {
  captureCharacterMotionAuditFrame({
   currentSceneData,
