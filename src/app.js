@@ -12,6 +12,7 @@ import { createUniversalCapabilityRegistry, bindUniversalPlanCapabilities } from
 import { executeUniversalTaskPlan } from "./universal-task-executor.js";
 import { createUniversalLocalVideoCapability } from "./universal-local-video-capability.js";
 import { createUniversalRemoteVideoCapability } from "./universal-remote-video-capability.js";
+import { createUniversalImageGenerationCapability } from "./universal-image-generation-capability.js";
 import { createUniversalFilmCompositionCapability } from "./universal-film-composition-capability.js";
 import { resolveUniversalSceneTarget } from "./universal-scene-target.js";
 import { resolveUniversalVoiceTargets } from "./universal-voice-target.js";
@@ -238,6 +239,55 @@ const localVideoCapability=createUniversalLocalVideoCapability({
  generateScene:context=>generateLocalSceneVideoForUniversal(context)
 });
 universalCapabilityRegistry.register(localVideoCapability);
+const universalImageGenerationCapability=createUniversalImageGenerationCapability({
+ getScenes:()=>sceneMetadata,
+ isImageReady:scene=>Boolean(String(scene?.generatedImageUrl||'').trim()),
+ generateSceneImage:async({scene,sceneIndex,signal,reportProgress})=>{
+  const meta={...scene,title:titles[sceneIndex]||scene.title||'',description:descriptions[sceneIndex]||scene.description||''};
+  meta.imagePrompt=String(meta.imagePrompt||meta.prompt||meta.description||meta.title);
+  const prompt=buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value});
+  const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);
+  const result=await generateImageWithHorde({
+   prompt,negativePrompt:meta.negativePrompt||'',...quality,signal,
+   onProgress:queue=>{
+    const position=queue.queuePosition===null?'?':queue.queuePosition;
+    reportProgress?.('AI Horde queue · scene '+(sceneIndex+1)+' · position '+position+' · waiting '+queue.waiting+' · processing '+queue.processing);
+   }
+  });
+  return result;
+ },
+ onSceneGenerated:async({scene,sceneIndex,result})=>{
+  const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===String(scene.id||''));
+  if(resolvedIndex<0)throw new Error('The target scene was removed before its generated image could be saved.');
+  sceneMetadata[resolvedIndex]={
+   ...sceneMetadata[resolvedIndex],
+   generatedImageUrl:result.imageUrl,
+   generatedImageSeed:result.seed,
+   generatedImageModel:result.model,
+   generatedImageWorker:result.workerName
+  };
+  getLoadedSceneImage(result.imageUrl);
+  if(sceneIndex===resolvedIndex&&resolvedIndex===sceneIndex)renderGeneratedSceneImage();
+  if(!playing)draw();
+  updateStoryQA();
+  const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
+   idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
+   language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
+  }));
+  return {persistedInDraft:saved};
+ }
+});
+universalCapabilityRegistry.register({
+ id:'image.generate.horde',
+ name:'Generate missing storyboard scene images with AI Horde',
+ privacy:'remote',
+ consentKey:'ai-horde-image',
+ isAvailable:context=>universalImageGenerationCapability.isAvailable(context),
+ run:async context=>{
+  persistCurrentSceneEditorToMetadata();
+  return universalImageGenerationCapability.run(context);
+ }
+});
 universalCapabilityRegistry.register(createUniversalRemoteVideoCapability({
  isAvailable:context=>isRemoteVideoGenerationReady(context),
  hasConsent:()=>universalCapabilityRegistry.remoteConsent&&$('hfVideoConsent').checked===true,
