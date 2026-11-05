@@ -184,6 +184,7 @@ test('revoking one scoped consent aborts only the matching active remote capabil
     }
   });
   registry.register({ id: 'hf-video', privacy: 'remote', run: async () => 'video' });
+  registry.setConsent('ai-horde-image', true);
   const running = registry.createHandlers()['horde-image']({});
   await ready;
   registry.setConsent('ai-horde-image', false);
