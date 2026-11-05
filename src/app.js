@@ -1440,6 +1440,104 @@ function getSceneVoiceEngine(){
  return sceneVoiceEngine;
 }
 
+function isLocalDialogueGenerationReady({step}={}){
+ try{
+  if(!localTextRuntime.status.loaded||!sceneMetadata.length)return false;
+  const locale=storyLanguage();
+  if(!step)return sceneMetadata.some((_,index)=>sceneDialogueLinesAt(index,locale).length===0);
+  const targets=resolveUniversalVoiceTargets(step,sceneMetadata,sceneIndex);
+  return targets.ok&&targets.indices.some(index=>sceneDialogueLinesAt(index,locale).length===0);
+ }catch{return false}
+}
+
+function dialogueSceneFingerprint(scene){
+ return JSON.stringify({
+  title:String(scene?.title||''),storyDetail:String(scene?.storyDetail||''),
+  visibleAction:String(scene?.visibleAction||''),description:String(scene?.description||scene?.prompt||''),
+  characters:Array.isArray(scene?.characters)?scene.characters.map(value=>String(value)):[],
+  sourceStoryText:String(scene?.sourceStoryText||'')
+ });
+}
+
+async function generateSceneDialoguesForUniversal({plan,step,signal,reportProgress=()=>{}}={}){
+ const locale=storyLanguage();
+ const resolution=resolveUniversalVoiceTargets(step,sceneMetadata,sceneIndex);
+ if(!resolution.ok)throw new Error('Could not resolve dialogue-generation target: '+resolution.reason+'.');
+ const allScenes=resolution.allScenes;
+ const currentSceneId=String(sceneMetadata[sceneIndex]?.id||'');
+ const currentDialogueText=$('sceneDialogue').value;
+ const initialSceneIds=sceneMetadata.map(scene=>String(scene?.id||''));
+ const targets=resolution.indices
+  .filter(index=>sceneDialogueLinesAt(index,locale,currentDialogueText,currentSceneId).length===0)
+  .map(index=>({
+   sceneId:String(sceneMetadata[index]?.id||''),
+   sceneNumber:index+1,
+   fingerprint:dialogueSceneFingerprint(sceneMetadata[index]),
+   scene:{...(sceneMetadata[index]||{}),characters:Array.isArray(sceneMetadata[index]?.characters)?[...sceneMetadata[index].characters]:[]}
+  }));
+ if(!targets.length)throw new Error('No scenes need generated dialogue. Existing scene dialogue was preserved.');
+ if(!allScenes&&targets.length!==1)throw new Error('A single-scene dialogue step must resolve to exactly one scene.');
+ let lineCount=0,persistedInDraft=true;
+ const completedSceneIds=[];
+ for(let index=0;index<targets.length;index++){
+  if(signal?.aborted)throw new DOMException('Dialogue generation was cancelled.','AbortError');
+  const target=targets[index];
+  const prompt=buildSceneDialoguePrompt({
+   sourceRequest:plan?.sourceRequest||'',
+   scene:target.scene,
+   sceneNumber:target.sceneNumber,
+   sceneCount:initialSceneIds.length,
+   language:locale,
+   mainCharacter:$('character').value,
+   characterBible
+  });
+  reportProgress('Writing dialogue for scene '+target.sceneNumber+' / '+initialSceneIds.length);
+  let generated=await localTextRuntime.generate(prompt,{maxNewTokens:320,temperature:0.25,signal});
+  let validated=validateSceneDialogueResponse(generated,{scene:target.scene,language:locale,mainCharacter:$('character').value,maxLines:4});
+  if(!validated.ok&&!signal?.aborted){
+   reportProgress('Correcting dialogue format for scene '+target.sceneNumber);
+   generated=await localTextRuntime.generate(prompt+'\n\nYour previous output failed validation: '+validated.reason+'. Return ONLY the required JSON object. Use only the assigned speaker IDs and 1 to 4 short lines.',{maxNewTokens:320,temperature:0.1,signal});
+   validated=validateSceneDialogueResponse(generated,{scene:target.scene,language:locale,mainCharacter:$('character').value,maxLines:4});
+  }
+  if(signal?.aborted)throw new DOMException('Dialogue generation was cancelled.','AbortError');
+  if(!validated.ok)throw new Error('Local dialogue model could not produce valid dialogue for scene '+target.sceneNumber+': '+validated.reason+'. No dialogue was attached to that scene.');
+  const resolvedIndex=sceneMetadata.findIndex(scene=>scene&&String(scene.id||'')===target.sceneId);
+  if(resolvedIndex<0)throw new Error('Scene '+target.sceneNumber+' was removed during dialogue generation.');
+  if(dialogueSceneFingerprint(sceneMetadata[resolvedIndex])!==target.fingerprint)throw new Error('Scene '+target.sceneNumber+' changed during dialogue generation; stale dialogue was not attached.');
+  if(sceneDialogueLinesAt(resolvedIndex,locale).length>0)throw new Error('Scene '+target.sceneNumber+' received dialogue while generation was running; existing text was preserved.');
+  sceneMetadata[resolvedIndex]={
+   ...sceneMetadata[resolvedIndex],
+   dialogue:validated.dialogue,
+   voiceCues:[],
+   voiceTimeline:null
+  };
+  const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
+   idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
+   language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
+  }));
+  persistedInDraft=persistedInDraft&&saved;
+  lineCount+=validated.dialogue.length;
+  completedSceneIds.push(target.sceneId);
+  if(sceneIndex===resolvedIndex){
+   $('sceneDialogue').value=formatDialogueLines(validated.dialogue);
+   await renderSceneVoiceAudio();
+   $('sceneVoiceStatus').textContent=voiceText(
+    'Создано реплик: '+validated.dialogue.length+' · сцена '+(resolvedIndex+1),
+    'Generated '+validated.dialogue.length+' dialogue lines · scene '+(resolvedIndex+1)
+   );
+  }
+  reportProgress('Dialogue ready for scene '+(resolvedIndex+1)+' · '+(index+1)+' / '+targets.length);
+ }
+ if(allScenes){
+  const currentIds=sceneMetadata.map(scene=>String(scene?.id||''));
+  const expectedIds=new Set(initialSceneIds);
+  if(currentIds.length!==expectedIds.size||currentIds.some(id=>!expectedIds.has(id)))throw new Error('The storyboard scene set changed during dialogue generation; review the completed scene dialogue before continuing.');
+  const missing=sceneMetadata.map((scene,index)=>sceneDialogueLinesAt(index,locale).length?null:index+1).filter(Boolean);
+  if(missing.length)throw new Error('Dialogue generation is incomplete for scene(s): '+missing.join(', ')+'.');
+ }
+ return {type:'scene-dialogue',sceneIds:completedSceneIds,lineCount,allScenes:allScenes===true,persistedInDraft,local:true};
+}
+
 function sceneDialogueLinesAt(index,locale=storyLanguage(),currentText=$('sceneDialogue').value,currentSceneId=String(sceneMetadata[sceneIndex]?.id||'')){
  const meta=sceneMetadata[index]||{};
  const id=String(meta.id||'');
