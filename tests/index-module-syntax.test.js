@@ -81,7 +81,7 @@ test('facial rig editor exposes bounded part positioning and expression controls
 test('scene Play preview schedules local dialogue and drives facial lip-sync from the same audio clock', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   assert.match(html, /createVoicePreviewSession/);
-  assert.match(html, /previewMouthOriginTimeMs=await pendingSession.start\(\)/);
+  assert.match(html, /const previewStartInfo=await pendingSession.start\(\);previewMouthOriginTimeMs=getScheduledAudioStartAtMs\(previewStartInfo\)/);
   assert.match(html, /previewMouthTracks=pendingSession\.decodedTracks\.map/);
   assert.match(html, /startSceneVoicePreview\(sceneIndex\)/);
   assert.match(html, /stopSceneVoicePreview\(\)/);

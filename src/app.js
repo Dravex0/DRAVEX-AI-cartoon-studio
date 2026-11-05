@@ -48,7 +48,7 @@ import { detectSceneActionForScene } from "./scene-action.js";
 import { buildExportTimeline } from "./export-timeline.js";
 import { buildAudioMouthEnvelope, sampleAudioMouthEnvelope } from "./audio-mouth-envelope.js";
 import { sampleCharacterFacialLipSync } from "./facial-lipsync-runtime.js";
-import { getAudioTimelineOffsetMs } from "./audio-clock-alignment.js";
+import { getAudioTimelineOffsetMs, getScheduledAudioStartAtMs } from "./audio-clock-alignment.js";
 import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js";
 import { createAudioExportSession } from "./audio-export.js";
 import { waitForExportVideoReady, validateExportTracks } from "./film-export-readiness.js";
@@ -570,7 +570,7 @@ async function startSceneVoicePreview(index=sceneIndex){
   pendingSession=await createVoicePreviewSession({voiceTracks:tracks,voiceVolume:0.9});
   if(token!==previewVoiceRequestToken||!playing||index!==sceneIndex){await pendingSession.cleanup();return;}
   previewVoiceSession=pendingSession;
-  previewMouthOriginTimeMs=await pendingSession.start();
+  const previewStartInfo=await pendingSession.start();previewMouthOriginTimeMs=getScheduledAudioStartAtMs(previewStartInfo);
   // Build facial controls for every scene. drawCharacterLayers applies them only
   // when a matching character facial rig is attached, including over generated media.
   previewMouthTracks=pendingSession.decodedTracks.map(track=>{
