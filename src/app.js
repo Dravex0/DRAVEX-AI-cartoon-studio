@@ -7,6 +7,7 @@ import { calculateCinematicShot } from "./director-engine.js";
 import { detectDeviceCapabilities } from "./device-capabilities.js";
 import { createLocalTransformersRuntime } from "./transformers-local-runtime.js";
 import { directStoryboardWithLocalAI } from "./local-story-director.js";
+import { planUniversalTask } from "./universal-task-planner.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
@@ -70,6 +71,7 @@ import { buildStoryEventChain } from "./story-event-chain.js";
 import { shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
 import { drawProceduralDemoFox } from './demo-character-renderer.js';
 const localTextRuntime = createLocalTransformersRuntime();
+let activeUniversalPlanController = null;
 const translations={
 en:{freeTag:'FREE · LOCAL-FIRST',previewTag:'CARTOON WORKSPACE · EARLY PREVIEW',headline:'Turn your idea<br>into a story.',intro:'Create a storyboard, generate short AI scene clips through the optional free Hugging Face ZeroGPU queue or local ComfyUI, and assemble a WebM with timed dialogue and optional local music. Free cloud GPU is quota-limited; production voice and lip-sync are still in development.',createTitle:'01 · Create a story',ideaLabel:'Story idea',ideaPlaceholder:'A curious fox discovers a glowing star in the forest...',characterLabel:'Main character',styleLabel:'Visual style',durationLabel:'Scene duration',seconds3:'3 seconds',seconds5:'5 seconds',seconds8:'8 seconds',storyLanguageLabel:'Story language',createButton:'Start working',qualityLabel:'Image quality',qualityNote:'Applies to optional AI-generated still images. Higher quality takes longer in the free queue.',styleStorybook:'Storybook',styleAnime:'2D Anime',styleFlat2D:'Flat 2D',stylePixelArt:'Pixel Art',style3DAnimated:'3D Animation',style3DRealistic:'Realistic 3D',styleClay3D:'Clay 3D',styleWatercolor:'Watercolor',styleManga:'Comic / Manga',stylePaperCutout:'Paper Cutout',styleStopMotion:'Stop-motion',qualityStandard:'Standard · 640×384',qualityHigh:'High · 768×448',qualityUltra:'Maximum · 1024×576',saveButton:'Save draft',readyStatus:'Ready. Your idea stays in this browser unless you export it.',previewTitle:'02 · Preview',playButton:'Play preview',pauseButton:'Pause preview',exportButton:'Export WebM with dialogue',previewDisclaimer:'Generated scene video clips are used when available; scenes without clips use the still-image/canvas preview. WebM combines the clips with timed dialogue and optional local music. Lip-sync is still in development.',footer:'DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to',sceneTitles:['A discovery','A closer look','A new adventure'],sceneDescriptions:['The fox spots a glowing star.','The little star floats nearby.','The fox follows the light.'],sceneLabel:'Scene',ready:'Ready. Your idea stays in this browser unless you export it.',emptyIdea:'Add a story idea first.',created:'Local DRAVEX storyboard created.',saved:'Draft saved in this browser.',storageError:'Browser storage is unavailable; you can still keep this page open.',restored:'Restored draft from this browser.',recording:'Recording a short preview…',exported:'WebM storyboard exported.',unsupported:'WebM recording is not supported by this browser.',exportFailed:'Export failed in this browser. Try Play preview first.'},
 ru:{freeTag:'БЕСПЛАТНО · ЛОКАЛЬНАЯ РАБОТА',previewTag:'РАБОЧЕЕ ПРОСТРАНСТВО МУЛЬТФИЛЬМОВ · РАННИЙ ПРЕДПРОСМОТР',headline:'Преврати идею<br>в историю.',intro:'Создавай раскадровку, генерируй короткие AI-видеосцены через бесплатную очередь Hugging Face ZeroGPU или локальный ComfyUI и собирай WebM с диалогами и локальной музыкой. Бесплатная облачная квота ограничена; профессиональная озвучка и синхронизация губ ещё разрабатываются.',createTitle:'01 · Создание истории',ideaLabel:'Идея истории',ideaPlaceholder:'Любопытный лисёнок находит светящуюся звезду в лесу…',characterLabel:'Главный персонаж',styleLabel:'Визуальный стиль',durationLabel:'Длительность сцены',seconds3:'3 секунды',seconds5:'5 секунд',seconds8:'8 секунд',storyLanguageLabel:'Язык истории',createButton:'Начать работу',qualityLabel:'Качество изображения',qualityNote:'Настройка применяется к дополнительной AI-генерации отдельных изображений сцен. Высокое качество может дольше ожидать в бесплатной очереди.',styleStorybook:'Книжная иллюстрация',styleAnime:'2D-аниме',styleFlat2D:'Плоский 2D',stylePixelArt:'Пиксель-арт',style3DAnimated:'3D-анимация',style3DRealistic:'Реалистичный 3D',styleClay3D:'Пластилиновая 3D-анимация',styleWatercolor:'Акварель',styleManga:'Комикс / манга',stylePaperCutout:'Бумажная аппликация',styleStopMotion:'Покадровая анимация',qualityStandard:'Стандарт · 640×384',qualityHigh:'Высокое · 768×448',qualityUltra:'Максимум · 1024×576',saveButton:'Сохранить черновик',readyStatus:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',previewTitle:'02 · Предпросмотр',playButton:'Воспроизвести',pauseButton:'Пауза',exportButton:'Экспорт WebM с диалогами',previewDisclaimer:'Готовые видеоклипы сцен используются при наличии; для остальных сцен остаётся предпросмотр изображения и холста. WebM объединяет клипы, диалоги по таймлайну и необязательную локальную музыку. Синхронизация губ ещё разрабатывается.',footer:'DRAVEX AI Cartoon Studio · Прототип · Платный API не требуется · Используй только материалы, на которые у тебя есть права',sceneTitles:['Открытие','Поближе','Новое приключение'],sceneDescriptions:['Лисёнок замечает светящуюся звезду.','Маленькая звезда парит рядом.','Лисёнок следует за светом.'],sceneLabel:'Сцена',ready:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',emptyIdea:'Сначала добавь идею истории.',created:'Раскадровка создана локальным движком DRAVEX.',saved:'Черновик сохранён в этом браузере.',storageError:'Хранилище браузера недоступно; можно оставить страницу открытой.',restored:'Черновик восстановлен из этого браузера.',recording:'Записываем короткий предпросмотр…',exported:'Раскадровка экспортирована в WebM.',unsupported:'Этот браузер не поддерживает запись WebM.',exportFailed:'Не удалось экспортировать видео. Сначала попробуй запустить предпросмотр.'}
@@ -1555,6 +1557,7 @@ if(event.total&&event.loaded){const pct=Math.min(100,Math.round(event.loaded/eve
 }});
 status.textContent=(ru?'Локальная модель загружена. Режим: ':'Local model loaded. Backend: ')+result.backend+'. '+(ru?'Текст запросов остаётся на устройстве.':'Prompt text stays on this device.');
 $('runLocalModel').disabled=false;
+$('planUniversalTask').disabled=false;
 }catch(error){status.textContent=(ru?'Не удалось загрузить локальную модель: ':'Local model loading failed: ')+(error?.message||'Unknown error');}
 finally{button.disabled=false;}
 });
@@ -1581,7 +1584,60 @@ output.textContent=JSON.stringify({usedLocalModel:result.usedLocalModel,score:re
 finally{button.disabled=false;}
 });
 
-$('hordeConsent').addEventListener('change',()=>{$('generateSceneImage').disabled=!$('hordeConsent').checked});
+
+$('planUniversalTask').addEventListener('click',async()=>{
+const button=$('planUniversalTask'),cancel=$('cancelUniversalPlan'),status=$('universalPlannerStatus'),output=$('universalTaskPlanOutput'),ru=uiLang==='ru';
+const request=$('idea').value.trim();
+if(!request){status.textContent=ru?'Сначала опиши задачу.':'Describe the task first.';return}
+if(!localTextRuntime.status.loaded){status.textContent=ru?'Сначала загрузи локальную модель.':'Load the local model first.';return}
+if(activeUniversalPlanController)return;
+const controller=new AbortController();
+activeUniversalPlanController=controller;
+button.disabled=true;cancel.disabled=false;output.hidden=true;
+status.textContent=ru?'Универсальный ИИ анализирует запрос и строит план на этом устройстве. Это может занять время…':'Universal AI is analysing the request and building a plan on this device. This may take a while…';
+try{
+const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024});
+if(result.status==='cancelled'){
+status.textContent=ru?'Отмена запрошена. Генерация модели завершилась без применения устаревшего результата.':'Cancellation requested. The model finished inference; its stale result was discarded.';
+return;
+}
+if(!result.ok){
+status.textContent=(ru?'Не удалось построить проверяемый план: ':'Could not create a valid plan: ')+result.reason;
+output.textContent=JSON.stringify({status:result.status,reason:result.reason,modelId:result.modelId||null},null,2);
+output.hidden=false;
+return;
+}
+const plan=result.plan;
+const lines=[
+(ru?'ЦЕЛЬ: ':'GOAL: ')+plan.goal,
+(ru?'РЕЗУЛЬТАТ: ':'DELIVERABLE: ')+plan.deliverable.type+' — '+plan.deliverable.description,
+'',
+ru?'ЭТАПЫ ВЫПОЛНЕНИЯ:':'EXECUTION STEPS:',
+...plan.steps.map((step,index)=>(index+1)+'. '+step.action+'\n   '+(ru?'Зачем: ':'Purpose: ')+step.purpose+(step.dependsOn.length?'\n   '+(ru?'Зависит от: ':'Depends on: ')+step.dependsOn.join(', '):'')+(step.requiredCapabilities.length?'\n   '+(ru?'Возможности: ':'Capabilities: ')+step.requiredCapabilities.join(', '):'')),
+'',
+(ru?'ОГРАНИЧЕНИЯ: ':'CONSTRAINTS: ')+(plan.constraints.join('; ')||'—'),
+(ru?'НЕОБХОДИМЫЕ МАТЕРИАЛЫ: ':'REQUIRED ASSETS: ')+(plan.requiredAssets.join('; ')||'—'),
+(ru?'НУЖНЫ УТОЧНЕНИЯ: ':'OPEN QUESTIONS: ')+(plan.openQuestions.join('; ')||'—'),
+'',
+(ru?'Модель: ':'Model: ')+(result.modelId||'local')+' · '+(result.backend||'local'),
+ru?'Проверена структура плана, но не смысловая правильность. Видео ещё не создавалось.':'Plan structure was validated, not semantic correctness. No video has been generated yet.'
+];
+output.textContent=lines.join('\n');output.hidden=false;
+status.textContent=ru?'План задачи создан. Следующий этап — подключить его этапы к реальным инструментам DRAVEX.':'Task plan created. Next, its steps must be connected to real DRAVEX tools.';
+}catch(error){
+status.textContent=(ru?'Ошибка планировщика: ':'Planner error: ')+(error?.message||'Unknown error');
+}finally{
+if(activeUniversalPlanController===controller)activeUniversalPlanController=null;
+button.disabled=false;cancel.disabled=true;
+}
+});
+$('cancelUniversalPlan').addEventListener('click',()=>{
+if(!activeUniversalPlanController)return;
+activeUniversalPlanController.abort();
+$('cancelUniversalPlan').disabled=true;
+$('universalPlannerStatus').textContent=uiLang==='ru'?'Запрошена отмена. Текущий расчёт модели нельзя прервать мгновенно; результат не будет применён.':'Cancellation requested. The current model inference cannot be interrupted immediately; its result will be discarded.';
+});
+\n$('hordeConsent').addEventListener('change',()=>{$('generateSceneImage').disabled=!$('hordeConsent').checked});
 $('spriteHordeConsent').addEventListener('change',()=>{$('generateCharacterSprites').disabled=!$('spriteHordeConsent').checked});
 $('generateCharacterSprites').addEventListener('click',async()=>{
  const button=$('generateCharacterSprites'),status=$('characterSpriteStatus');
