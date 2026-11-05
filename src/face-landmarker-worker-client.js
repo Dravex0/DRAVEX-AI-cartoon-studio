@@ -31,6 +31,7 @@ export function createFaceLandmarkerWorkerClient({
     clearTimeout(pending.timer);
     const current = pending;
     pending = null;
+    current.resolveSettled();
     return current;
   };
   const failPending = error => {
@@ -58,13 +59,15 @@ export function createFaceLandmarkerWorkerClient({
     if (pending) return Promise.reject(new Error("A face landmark request is already running."));
     const id = nextId++;
     return new Promise((resolve, reject) => {
+      let resolveSettled;
+      const settled = new Promise(resolve => { resolveSettled = resolve; });
       const timer = setTimeout(() => {
         const current = clearPending();
         current?.reject(new Error("Face landmark worker request timed out."));
         worker.terminate();
         disposed = true;
       }, requestTimeoutMs);
-      pending = { id, resolve, reject, timer };
+      pending = { id, resolve, reject, timer, settled, resolveSettled };
       try {
         worker.postMessage({ id, type, ...payload }, transfer);
       } catch (error) {
@@ -85,17 +88,16 @@ export function createFaceLandmarkerWorkerClient({
       }
       if (timestampMs <= lastTimestampMs) return Promise.reject(new RangeError("Frame timestamps must increase monotonically."));
       if (pending) return Promise.reject(new Error("A face landmark request is already running."));
-      lastTimestampMs = timestampMs;
-      return request("process-frame", { frame, timestampMs }, [frame]).catch(error => {
-        lastTimestampMs = -1;
-        throw error;
+      return request("process-frame", { frame, timestampMs }, [frame]).then(result => {
+        lastTimestampMs = timestampMs;
+        return result;
       });
     },
     async dispose() {
       if (disposed) return;
+      if (pending) await pending.settled;
       try {
-        if (pending) failPending(new Error("Face landmark worker client was disposed."));
-        await request("dispose");
+        if (!disposed) await request("dispose");
       } finally {
         disposed = true;
         worker.terminate();
