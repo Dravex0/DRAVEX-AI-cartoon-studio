@@ -23,6 +23,7 @@ export function auditAnimationCompatibility(scenes) {
   let rigTimelineCount = 0;
   let actionTimelineCount = 0;
   let spriteMotionTimelineCount = 0;
+  let voiceCueCount = 0;
 
   source.forEach((rawScene, sceneIndex) => {
     const scene = record(rawScene) ? rawScene : {};
@@ -146,6 +147,63 @@ export function auditAnimationCompatibility(scenes) {
             addIssue(issues, sceneIndex, 'sprite-motion-layer-missing', 'error', 'A sprite motion phase references a character without a sprite layer.', phase.actorId);
           } else if (rigById.has(actorId)) {
             addIssue(issues, sceneIndex, 'rig-suppresses-sprite-motion', 'warning', 'This character has a ready body rig: sprite transform motion is not applied to the rig-rendered body. Use a rig timeline for its body movement.', phase.actorId);
+          }
+        }
+      }
+    }
+
+    const voiceCues = Array.isArray(scene.voiceCues) ? scene.voiceCues : [];
+    voiceCueCount += voiceCues.length;
+    const sceneDurationMs = Number(scene.durationSeconds ?? scene.duration) * 1000;
+    for (const cue of voiceCues) {
+      const speakerId = String(cue?.characterId || cue?.characterName || '').trim();
+      const speakerKey = key(speakerId);
+      if (!speakerKey || !Number.isInteger(cue?.startFrame) || cue.startFrame < 0
+        || !Number.isFinite(cue?.durationMs) || cue.durationMs <= 0) {
+        addIssue(issues, sceneIndex, 'voice-cue-timing-invalid', 'error', 'A dialogue cue needs a character ID/name, a non-negative integer startFrame, and a measured positive durationMs.', speakerId || null);
+        continue;
+      }
+      const cueStartMs = cue.startFrame * (1000 / 24);
+      const cueEndMs = cueStartMs + cue.durationMs;
+      if (Number.isFinite(sceneDurationMs) && sceneDurationMs > 0 && cueEndMs > sceneDurationMs + 2) {
+        addIssue(issues, sceneIndex, 'voice-cue-exceeds-scene', 'warning', 'A dialogue cue extends beyond the scene duration and may be cut off by the final export timeline.', speakerId);
+      }
+      if ((rigById.has(speakerKey) || layerIds.has(speakerKey)) && !facialIds.has(speakerKey)) {
+        addIssue(issues, sceneIndex, 'voice-cue-facial-rig-missing', 'warning', 'This visible character has dialogue but no matching facial rig, so generated visemes cannot animate its mouth.', speakerId);
+      }
+      if (cue.visemeEvents != null) {
+        if (!Array.isArray(cue.visemeEvents) || cue.visemeEvents.length > 2000) {
+          addIssue(issues, sceneIndex, 'voice-viseme-events-invalid', 'error', 'Dialogue viseme events must be an array with at most 2000 entries.', speakerId);
+        } else {
+          let previousStart = -1;
+          for (const event of cue.visemeEvents) {
+            const startMs = Number(event?.startMs);
+            const durationMs = Number(event?.durationMs);
+            if (!['neutral', 'open', 'wide', 'round', 'closed', 'teeth'].includes(String(event?.shape || ''))
+              || !Number.isFinite(startMs) || !Number.isFinite(durationMs) || startMs < 0
+              || durationMs <= 0 || startMs < previousStart || startMs >= cue.durationMs + 50
+              || startMs + durationMs > cue.durationMs + 50) {
+              addIssue(issues, sceneIndex, 'voice-viseme-timing-invalid', 'error', 'A dialogue viseme event has an unsupported mouth shape or timing outside its measured audio cue.', speakerId);
+              break;
+            }
+            previousStart = startMs;
+          }
+        }
+      }
+      if (cue.phonemeChunks != null) {
+        if (!Array.isArray(cue.phonemeChunks) || cue.phonemeChunks.length > 120) {
+          addIssue(issues, sceneIndex, 'voice-phoneme-chunks-invalid', 'error', 'Dialogue phoneme chunks must be an array with at most 120 entries.', speakerId);
+        } else {
+          let previousEnd = 0;
+          for (const chunk of cue.phonemeChunks) {
+            const startMs = Number(chunk?.startMs);
+            const endMs = Number(chunk?.endMs);
+            if (!String(chunk?.phonemes || '').trim() || !Number.isFinite(startMs) || !Number.isFinite(endMs)
+              || startMs < previousEnd - 0.5 || endMs <= startMs || endMs > cue.durationMs + 2) {
+              addIssue(issues, sceneIndex, 'voice-phoneme-timing-invalid', 'error', 'A dialogue phoneme chunk has invalid or overlapping timing relative to its measured audio cue.', speakerId);
+              break;
+            }
+            previousEnd = endMs;
           }
         }
       }
