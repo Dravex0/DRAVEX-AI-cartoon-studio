@@ -99,3 +99,37 @@ test("validates timestamped viseme event ordering, duration and shapes", () => {
     ...base, visemeEvents: [{ shape: "open", startMs: 950, durationMs: 101 }]
   }), /invalid timing/);
 });
+
+
+test("keeps an older viseme active when a newer overlapping event expires", () => {
+  const timeline = buildVisemeTimeline({
+    text: "hello",
+    durationMs: 1000,
+    fps: 10,
+    visemeEvents: [
+      { shape: "open", startMs: 0, durationMs: 800 },
+      { shape: "round", startMs: 200, durationMs: 200 }
+    ]
+  });
+  assert.equal(timeline.frames[0], "open");
+  assert.equal(timeline.frames[2], "round");
+  assert.equal(timeline.frames[4], "open");
+  assert.equal(timeline.frames[8], "neutral");
+});
+
+test("resolves nested overlapping viseme events by latest active start time", () => {
+  const timeline = buildVisemeTimeline({
+    text: "hello",
+    durationMs: 1000,
+    fps: 10,
+    visemeEvents: [
+      { shape: "open", startMs: 0, durationMs: 900 },
+      { shape: "wide", startMs: 100, durationMs: 700 },
+      { shape: "round", startMs: 200, durationMs: 100 }
+    ]
+  });
+  assert.equal(timeline.frames[0], "open");
+  assert.equal(timeline.frames[2], "round");
+  assert.equal(timeline.frames[4], "wide");
+  assert.equal(timeline.frames[8], "open");
+});

@@ -79,18 +79,23 @@ function buildEventGuidedFrames({ visemeEvents, durationMs, fps, frameCount }) {
     events.push({ startMs, endMs: Math.min(durationMs, startMs + eventDurationMs), shape });
   }
   const frames = new Array(frameCount).fill("neutral");
+  // Events are sorted by start time. Keep only a stack of events that have
+  // started; the newest active event wins. Expired events are popped from the
+  // top, revealing an older overlapping event when necessary. Each event is
+  // pushed and popped at most once, avoiding a backwards scan on every frame.
+  const activeEvents = [];
   let cursor = 0;
   for (let frame = 0; frame < frameCount; frame++) {
     const timeMs = (frame + 0.5) * 1000 / fps;
-    while (cursor < events.length && events[cursor].startMs <= timeMs) cursor++;
-    for (let candidate = cursor - 1; candidate >= 0; candidate--) {
-      const event = events[candidate];
-      if (event.endMs <= timeMs) continue;
-      if (timeMs >= event.startMs) {
-        frames[frame] = event.shape;
-        break;
-      }
+    while (cursor < events.length && events[cursor].startMs <= timeMs) {
+      activeEvents.push(events[cursor]);
+      cursor++;
     }
+    while (activeEvents.length && activeEvents[activeEvents.length - 1].endMs <= timeMs) {
+      activeEvents.pop();
+    }
+    const activeEvent = activeEvents[activeEvents.length - 1];
+    if (activeEvent) frames[frame] = activeEvent.shape;
   }
   return frames;
 }
