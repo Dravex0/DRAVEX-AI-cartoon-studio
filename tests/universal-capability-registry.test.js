@@ -120,3 +120,41 @@ test('reports remote capability unavailable until explicit consent is configured
   consented.register({ id: 'remote-video', privacy: 'remote', run: async () => 'video' });
   assert.equal(consented.isAvailable('remote-video'), true);
 });
+
+
+test('allows consent to be granted and revoked at runtime', async () => {
+  const registry = createUniversalCapabilityRegistry();
+  let calls = 0;
+  registry.register({ id: 'remote-video', privacy: 'remote', run: async () => { calls += 1; return 'ok'; } });
+  assert.equal(registry.isAvailable('remote-video'), false);
+  registry.setRemoteConsent(true);
+  assert.equal(registry.isAvailable('remote-video'), true);
+  assert.equal(await registry.createHandlers()['remote-video']({}), 'ok');
+  registry.setRemoteConsent(false);
+  assert.equal(registry.isAvailable('remote-video'), false);
+  await assert.rejects(registry.createHandlers()['remote-video']({}), error => error.code === 'REMOTE_CONSENT_REQUIRED');
+  assert.equal(calls, 1);
+});
+
+test('revoking remote consent aborts an active remote operation', async () => {
+  const registry = createUniversalCapabilityRegistry({ remoteConsent: true });
+  let observedAbort = false;
+  let started;
+  const ready = new Promise(resolve => { started = resolve; });
+  registry.register({
+    id: 'remote-video',
+    privacy: 'remote',
+    run: async ({ signal }) => {
+      signal.addEventListener('abort', () => { observedAbort = true; }, { once: true });
+      started();
+      await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true }));
+      return 'stale';
+    }
+  });
+  const running = registry.createHandlers()['remote-video']({});
+  await ready;
+  registry.setRemoteConsent(false);
+  await assert.rejects(running, error => error.name === 'AbortError');
+  assert.equal(observedAbort, true);
+  assert.deepEqual(registry.status, { busy: false, activeCapability: null });
+});
