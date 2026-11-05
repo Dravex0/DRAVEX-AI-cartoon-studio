@@ -43,6 +43,18 @@ test('generates only missing scene images sequentially and preserves existing im
   assert.equal(current.every(scene => Boolean(scene.generatedImageUrl)), true);
 });
 
+test('allows a no-op resume without AI Horde consent when every target image is already saved', () => {
+  const current = [{ id: 's1', generatedImageUrl: 'https://images.example/ready.png' }];
+  const capability = createUniversalImageGenerationCapability({
+    getScenes: () => current,
+    generateSceneImage: async () => { throw new Error('must not call remote generation'); },
+    onSceneGenerated: async () => {}
+  });
+  const step = { requiredCapabilities: ['image.generate.horde'], inputs: ['allScenes'] };
+  assert.equal(capability.canRunWithoutConsent({ step }), true);
+  assert.equal(capability.canRunWithoutConsent(), false);
+});
+
 test('does not overwrite an existing scene image', async () => {
   const current = [{ id: 's1', title: 'Already ready', generatedImageUrl: 'https://images.example/old.png' }];
   let calls = 0;
