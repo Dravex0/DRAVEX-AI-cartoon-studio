@@ -48,6 +48,8 @@ test('builds a universal prompt without assuming a cartoon-only request', () => 
   const prompt = buildUniversalPlannerPrompt('Analyze a product demo and create subtitles.');
   assert.match(prompt, /Do not assume the request is a cartoon/);
   assert.match(prompt, /Analyze a product demo and create subtitles/);
+  assert.match(prompt, /sceneNumber:N/);
+  assert.match(prompt, /currently selected scene/);
 });
 
 test('accepts a valid model plan wrapped in a Markdown fence', async () => {
