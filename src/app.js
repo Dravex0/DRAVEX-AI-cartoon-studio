@@ -1538,6 +1538,14 @@ async function generateSceneDialoguesForUniversal({plan,step,signal,reportProgre
  return {type:'scene-dialogue',sceneIds:completedSceneIds,lineCount,allScenes:allScenes===true,persistedInDraft,local:true};
 }
 
+function isLocalSceneVoiceEngineLoaded(){
+ try{
+  const selectedTimestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
+  const loadedTimestamped=sceneVoiceEngine?.status.engine==='headtts-timestamped-kokoro';
+  return Boolean(sceneVoiceEngine?.status.loaded&&sceneVoiceEngine.status.locale===storyLanguage()&&selectedTimestamped===loadedTimestamped);
+ }catch{return false}
+}
+
 function sceneDialogueLinesAt(index,locale=storyLanguage(),currentText=$('sceneDialogue').value,currentSceneId=String(sceneMetadata[sceneIndex]?.id||'')){
  const meta=sceneMetadata[index]||{};
  const id=String(meta.id||'');
@@ -1548,9 +1556,7 @@ function sceneDialogueLinesAt(index,locale=storyLanguage(),currentText=$('sceneD
 function isLocalSceneVoiceReady({step}={}){
  try{
   const locale=storyLanguage();
-  const selectedTimestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
-  const loadedTimestamped=sceneVoiceEngine?.status.engine==='headtts-timestamped-kokoro';
-  if(!sceneVoiceEngine?.status.loaded||sceneVoiceEngine.status.locale!==locale||selectedTimestamped!==loadedTimestamped||$('generateSceneVoices').dataset.busy==='true')return false;
+  if(!isLocalSceneVoiceEngineLoaded()||$('generateSceneVoices').dataset.busy==='true')return false;
   if(!step)return sceneMetadata.some((_,index)=>sceneDialogueLinesAt(index,locale).length>0);
   const targets=resolveUniversalVoiceTargets(step,sceneMetadata,sceneIndex);
   if(!targets.ok)return false;
@@ -1880,7 +1886,7 @@ activeUniversalPlanController=controller;
 button.disabled=true;cancel.disabled=false;$('runLocalModel').disabled=true;output.hidden=true;
 status.textContent=ru?'Универсальный ИИ анализирует запрос и строит план на этом устройстве. Это может занять время…':'Universal AI is analysing the request and building a plan on this device. This may take a while…';
 try{
-const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().filter(capability=>capability.available||capability.id==='film.compose').map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
+const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().filter(capability=>capability.available||capability.id==='film.compose'||(capability.id==='voice.generate'&&isLocalSceneVoiceEngineLoaded())).map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
 if(result.status==='cancelled'){
 status.textContent=ru?'Отмена запрошена. Генерация модели завершилась без применения устаревшего результата.':'Cancellation requested. The model finished inference; its stale result was discarded.';
 return;
