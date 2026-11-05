@@ -62,6 +62,7 @@ function validateSteps(rawSteps, availableCapabilities = null) {
       return { ok: false, reason: 'invalid-or-duplicate-step-id' };
     }
     if (!action || !purpose) return { ok: false, reason: 'step-action-or-purpose-missing' };
+    const requiredCapabilities = stringList(raw.requiredCapabilities, 20, 80);
     if (availableCapabilities && requiredCapabilities.some(capability => !availableCapabilities.includes(capability))) {
       return { ok: false, reason: 'unsupported-required-capability' };
     }
@@ -73,7 +74,7 @@ function validateSteps(rawSteps, availableCapabilities = null) {
       inputs: stringList(raw.inputs),
       outputs: stringList(raw.outputs),
       dependsOn: stringList(raw.dependsOn, 24, 48),
-      requiredCapabilities: stringList(raw.requiredCapabilities, 20, 80)
+      requiredCapabilities
     });
   }
 
