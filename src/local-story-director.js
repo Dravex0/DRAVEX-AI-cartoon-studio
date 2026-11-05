@@ -16,7 +16,7 @@ function parseJsonWithTrailingCommaRepair(source) {
     if (inString) {
       output += char;
       if (escaped) escaped = false;
-      else if (char === '\\\\') escaped = true;
+      else if (char === '\\') escaped = true;
       else if (char === '"') inString = false;
       continue;
     }
@@ -27,7 +27,7 @@ function parseJsonWithTrailingCommaRepair(source) {
     }
     if (char === ',') {
       let next = index + 1;
-      while (/\\s/.test(source[next] || '')) next += 1;
+      while (/\s/.test(source[next] || '')) next += 1;
       if (source[next] === '}' || source[next] === ']') continue;
     }
     output += char;
@@ -45,7 +45,7 @@ function extractBalancedJson(source) {
       const char = source[index];
       if (inString) {
         if (escaped) escaped = false;
-        else if (char === '\\\\') escaped = true;
+        else if (char === '\\') escaped = true;
         else if (char === '"') inString = false;
         continue;
       }
@@ -63,8 +63,8 @@ function extractBalancedJson(source) {
 
 function parseModelScenes(text) {
   const source = clean(text, 100_000).trim()
-    .replace(/^\\s*```(?:json)?\\s*/i, '')
-    .replace(/\\s*```\\s*$/i, '')
+    .replace(/^\s*```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
     .trim();
   const parsed = parseJsonWithTrailingCommaRepair(source)
     || parseJsonWithTrailingCommaRepair(extractBalancedJson(source));
