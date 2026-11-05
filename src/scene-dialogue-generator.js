@@ -27,20 +27,43 @@ function extractBalancedJson(source) {
   return '';
 }
 
+function parseJsonWithTrailingCommaRepair(source) {
+  try { return JSON.parse(source); } catch { /* Apply only a string-aware trailing-comma repair. */ }
+  let output = '';
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (inString) {
+      output += char;
+      if (escaped) escaped = false;
+      else if (char === '\\\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') { inString = true; output += char; continue; }
+    if (char === ',') {
+      let next = index + 1;
+      while (/\\s/u.test(source[next] || '')) next += 1;
+      if (source[next] === '}' || source[next] === ']') continue;
+    }
+    output += char;
+  }
+  try { return JSON.parse(output); } catch { return null; }
+}
+
 function parseDialoguePayload(raw) {
   const source = String(raw ?? '').trim()
-    .replace(/^\s*```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/i, '')
+    .replace(/^\\s*```(?:json)?\\s*/i, '')
+    .replace(/\\s*```\\s*$/i, '')
     .trim();
   if (!source) return null;
   const candidates = [source, extractBalancedJson(source)].filter(Boolean);
   for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(candidate);
-      if (Array.isArray(parsed)) return parsed;
-      if (Array.isArray(parsed?.dialogue)) return parsed.dialogue;
-      if (Array.isArray(parsed?.lines)) return parsed.lines;
-    } catch { /* Continue with the next bounded JSON candidate. */ }
+    const parsed = parseJsonWithTrailingCommaRepair(candidate);
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.dialogue)) return parsed.dialogue;
+    if (Array.isArray(parsed?.lines)) return parsed.lines;
   }
   return null;
 }
