@@ -367,7 +367,7 @@ test('passes a source-backed action timeline from the local director into storyb
 
 test('recovers scene JSON wrapped in prose, markdown fences, and trailing commas', async () => {
   const wrapped = await directStoryboardWithLocalAI({
-    runtime: { generate: async () => ({ text: 'Here is the result:\\n```json\\n' + JSON.stringify({ scenes: goodScenes }).replace(/}$/, ',}') + '\\n```' }) },
+    runtime: { generate: async () => ({ text: 'Here is the result:\n```json\n' + JSON.stringify({ scenes: goodScenes }).replace(/}$/, ',}') + '\n```' }) },
     basePlan
   });
   assert.equal(wrapped.usedLocalModel, true);
