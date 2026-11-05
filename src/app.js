@@ -246,6 +246,8 @@ const universalImageGenerationCapability=createUniversalImageGenerationCapabilit
   const meta={...scene,title:scene.title||titles[sceneIndex]||'',description:scene.description||descriptions[sceneIndex]||''};
   meta.imagePrompt=String(meta.imagePrompt||meta.prompt||meta.description||meta.title);
   const prompt=buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value});
+  const photoReferenceNotice=sceneHasSavedCharacterImageReference(meta,characterBible)?'Saved character photo references remain on this device; only text is sent to AI Horde.':'';
+  if(photoReferenceNotice)reportProgress?.(photoReferenceNotice);
   const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);
   const result=await generateImageWithHorde({
    prompt,negativePrompt:meta.negativePrompt||'',...quality,signal,
