@@ -52,6 +52,14 @@ test('allows narrator only as a declared fallback speaker', () => {
   assert.equal(result.dialogue[0].characterId, 'Narrator');
 });
 
+test('repairs a trailing comma without changing quoted dialogue text', () => {
+  const result = validateSceneDialogueResponse('{"dialogue":[{"characterId":"Mira","text":"Look, a key, right?","},]}', {
+    scene, language: 'en'
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.dialogue[0].text, 'Look, a key, right?');
+});
+
 test('rejects unknown speakers rather than adding characters to the film', () => {
   const result = validateSceneDialogueResponse('{"dialogue":[{"characterId":"Unknown stranger","text":"Follow me."}]}', {
     scene, language: 'en'
