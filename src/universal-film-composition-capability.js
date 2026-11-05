@@ -59,6 +59,12 @@ export function createUniversalFilmCompositionCapability({
       reportProgress?.('Validating all ' + before.totalScenes + ' decoded scene videos');
       const result = await composeFilm({ signal, reportProgress, sceneCount: before.totalScenes });
       if (signal?.aborted) throw abortError();
+      const after = report();
+      if (!after || after.complete !== true || after.totalScenes !== before.totalScenes || after.videoScenes !== before.videoScenes) {
+        const error = new Error('Storyboard scene media changed during full-film composition.');
+        error.code = 'FILM_SCENE_SET_CHANGED';
+        throw error;
+      }
       if (!result || result.status !== 'completed' || !clean(result.filename, 180) ||
           !/^video\//i.test(clean(result.mimeType, 80)) || !(Number(result.size) > 0) ||
           result.decoded !== true || Number(result.sceneCount) !== before.totalScenes) {
