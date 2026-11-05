@@ -1723,7 +1723,7 @@ activeUniversalPlanController=controller;
 button.disabled=true;cancel.disabled=false;$('runLocalModel').disabled=true;output.hidden=true;
 status.textContent=ru?'Универсальный ИИ анализирует запрос и строит план на этом устройстве. Это может занять время…':'Universal AI is analysing the request and building a plan on this device. This may take a while…';
 try{
-const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
+const result=await planUniversalTask({runtime:localTextRuntime,request,signal:controller.signal,maxNewTokens:1024,availableCapabilities:universalCapabilityRegistry.list().filter(capability=>capability.available||capability.id==='film.compose').map(({id,name,privacy,requiresConsent})=>({id,name,privacy,requiresConsent}))});
 if(result.status==='cancelled'){
 status.textContent=ru?'Отмена запрошена. Генерация модели завершилась без применения устаревшего результата.':'Cancellation requested. The model finished inference; its stale result was discarded.';
 return;
