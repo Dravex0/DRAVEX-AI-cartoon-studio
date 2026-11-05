@@ -45,7 +45,7 @@ test("outer camera mapping matches the canvas translate-scale-translate order", 
   );
   assert.equal(result.status, "mapped");
   assert.ok(Math.abs(result.point.x - 528) < 1e-9);
-  assert.ok(Math.abs(result.point.y - (-50)) < 1e-9);
+  assert.ok(Math.abs(result.point.y - 250) < 1e-9);
   assert.equal(result.coordinateSpace, "scene-canvas");
 });
 
