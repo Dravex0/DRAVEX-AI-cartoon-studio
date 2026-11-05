@@ -17,7 +17,7 @@ test("interpolates normalized facial anchors between adjacent detected frames", 
   assert.equal(result.status, "face-detected");
   assert.equal(result.interpolated, true);
   assert.equal(result.anchors.mouthCenter.x, 0.4);
-  assert.equal(result.anchors.mouthOpenRatio, 0.3);
+  assert.ok(Math.abs(result.anchors.mouthOpenRatio - 0.3) < 1e-9);
   assert.equal(result.anchors.coordinateSpace, "normalized-image");
 });
 
