@@ -34,13 +34,19 @@ export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}
   const adapters = new Map();
   let active = null;
 
+  function isAvailable(adapter, context) {
+    if (adapter.requiresConsent && remoteConsent !== true) return false;
+    try { return adapter.isAvailable(context) === true; }
+    catch { return false; }
+  }
+
   function assertAvailable(adapter, context) {
     if (adapter.requiresConsent && remoteConsent !== true) {
       const error = new Error('Explicit consent is required before using remote capability "' + adapter.id + '".');
       error.code = 'REMOTE_CONSENT_REQUIRED';
       throw error;
     }
-    if (adapter.isAvailable(context) !== true) {
+    if (!isAvailable(adapter, context)) {
       const error = new Error('Capability "' + adapter.id + '" is not currently available.');
       error.code = 'CAPABILITY_UNAVAILABLE';
       throw error;
@@ -57,12 +63,17 @@ export function createUniversalCapabilityRegistry({ remoteConsent = false } = {}
     has(id) {
       return adapters.has(clean(id, 80));
     },
-    list() {
+    isAvailable(id, context) {
+      const adapter = adapters.get(clean(id, 80));
+      return Boolean(adapter && isAvailable(adapter, context));
+    },
+    list(context) {
       return [...adapters.values()].map(adapter => ({
         id: adapter.id,
         name: adapter.name,
         privacy: adapter.privacy,
-        requiresConsent: adapter.requiresConsent
+        requiresConsent: adapter.requiresConsent,
+        available: isAvailable(adapter, context)
       }));
     },
     get status() {
@@ -126,6 +137,10 @@ export function bindUniversalPlanCapabilities(plan, registry) {
     const capabilityId = clean(required[0], 80);
     if (!registry.has(capabilityId)) {
       bindings.push({ stepId: clean(step.id, 48), status: 'blocked', reason: 'capability-not-registered', capabilities: [capabilityId] });
+      continue;
+    }
+    if (typeof registry.isAvailable === 'function' && !registry.isAvailable(capabilityId, { plan, step })) {
+      bindings.push({ stepId: clean(step.id, 48), status: 'blocked', reason: 'capability-unavailable', capabilities: [capabilityId] });
       continue;
     }
     bindings.push({ stepId: clean(step.id, 48), status: 'ready', capabilityId });
