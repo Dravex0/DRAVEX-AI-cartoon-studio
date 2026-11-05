@@ -602,6 +602,10 @@ function updateFaceAnalysisControls(){
  const interval=Number($('faceAnalysisInterval')?.value)||500;
  const checkpoint=available?readFaceAnalysisCheckpoint(sceneMetadata[sceneIndex]?.id,entry,interval):null;
  resume.disabled=!available||running||!checkpoint;
+ const overlayToggle=$('showFaceLandmarkOverlay');
+ const reportMatches=Boolean(lastFaceAnalysisExport&&entry&&lastFaceAnalysisExport.sceneId===String(sceneMetadata[sceneIndex]?.id||'')&&lastFaceAnalysisExport.videoFilename===String(entry.filename||'')&&Array.isArray(lastFaceAnalysisExport.faceSamples)&&lastFaceAnalysisExport.faceSamples.some(sample=>sample.status==='face-detected'&&sample.anchors));
+ if(overlayToggle)overlayToggle.disabled=!reportMatches;
+ if(!reportMatches)hideFaceLandmarkPreviewOverlay(uiLang==='ru'?'Сначала проанализируй текущее видео, чтобы включить рамку.':'Analyze the current clip before enabling the overlay.');
 }
 function downloadFaceAnalysisReport(){
  if(!lastFaceAnalysisExport)return;
@@ -727,6 +731,7 @@ $('resumeFaceVideo')?.addEventListener('click',()=>void runFaceAnalysis({resume:
 $('cancelFaceVideo')?.addEventListener('click',()=>activeFaceAnalysisController?.abort());
 $('downloadFaceAnalysis')?.addEventListener('click',downloadFaceAnalysisReport);
 $('faceAnalysisInterval')?.addEventListener('change',updateFaceAnalysisControls);
+$('showFaceLandmarkOverlay')?.addEventListener('change',()=>{faceLandmarkOverlayLastTimeBucket=-1;if(!playing)draw();});
 function releaseSceneVideo(meta,index){
  const key=sceneVideoKey(index,meta);
  disposeSceneVideoEntry(sceneVideoCache.get(key));
@@ -831,12 +836,14 @@ function draw(){const animationTimeMs=animationClock.advance(performance.now(),p
 const generatedVideo=sceneVideoCache.get(String(currentSceneData.id||('scene-index-'+sceneIndex)));
 const hasGeneratedVideo=Boolean(generatedVideo&&generatedVideo.readyState>=2&&generatedVideo.videoWidth>0);
 const hasGeneratedMedia=hasGeneratedVideo||Boolean(generatedFrame);
-if(hasGeneratedVideo){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedVideo,w,h,motionTransform)}
-else if(generatedFrame){const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
+const mediaMotionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);
+if(hasGeneratedVideo){drawImageCover(ctx,generatedVideo,w,h,mediaMotionTransform)}
+else if(generatedFrame){drawImageCover(ctx,generatedFrame,w,h,mediaMotionTransform)}
 const sampledRigPoses=currentSceneData.characterRigTimeline?.keyframes?.length
  ? sampleCharacterRigTimeline(currentSceneData.characterRigTimeline,rigAnimationProgress)
  : currentSceneData.characterRigPoses;
 drawSceneProps(ctx,currentSceneData,currentSceneData.characterLayers,sceneMotionProgress,w,h,t,{characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);ctx.restore();
+updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGeneratedVideo,motionTransform:mediaMotionTransform,viewportWidth:w,viewportHeight:h,cameraPlan,focusX,focusY});
 try {
  captureCharacterMotionAuditFrame({
   currentSceneData,
