@@ -1,5 +1,5 @@
 const isRecord = value => Boolean(value && typeof value === "object" && !Array.isArray(value));
-const finite = value => Number.isFinite(Number(value));
+const finite = value => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 
 function interpolateValue(left, right, amount) {
   if (finite(left) && finite(right)) {
