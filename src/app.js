@@ -50,6 +50,7 @@ import { buildCompositedCharacterRegions, sampleCanvasRegion, analyzeCharacterRe
 import { buildBackgroundControlRegions, classifyCharacterBackgroundMotion } from "./scene-motion-separation.js";
 import { buildCharacterBodyPartRegions } from "./character-rig-body-regions.js";
 import { createCharacterBodyPartContactSheet } from "./character-motion-evidence.js";
+import { auditAnimationCompatibility } from './animation-compatibility-audit.js';
 import { summarizeSceneMotionResults } from "./scene-motion-results.js";
 import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
@@ -2198,6 +2199,37 @@ $('downloadCharacterMotionEvidence').onclick=async()=>{
   },1800);
  }
 };
+$('auditAllAnimations').addEventListener('click',()=>{
+ const button=$('auditAllAnimations');
+ const status=$('animationCompatibilityStatus');
+ button.disabled=true;
+ status.textContent=uiLang==='ru'?'Проверяем совместимость анимаций во всех сценах…':'Checking animation compatibility across all scenes…';
+ try{
+  const report=auditAnimationCompatibility(sceneMetadata);
+  const label=report.status==='compatible'
+   ?(uiLang==='ru'?'Совместимость подтверждена':'Compatibility passed')
+   :report.status==='compatible-with-warnings'
+    ?(uiLang==='ru'?'Совместимо с предупреждениями':'Compatible with warnings')
+    :(uiLang==='ru'?'Обнаружены несовместимости':'Compatibility issues found');
+  const details=report.issues.slice(0,12).map(item=>
+   'Scene '+(item.sceneIndex+1)+' · '+item.severity+' · '+item.code+': '+item.message
+  );
+  status.textContent=label+'. '+(uiLang==='ru'
+   ?'Сцен: ':'Scenes: ')+report.sceneCount+' · '+(uiLang==='ru'?'скелетов: ':'body rigs: ')+report.rigCount
+   +' · '+(uiLang==='ru'?'лицевых ригов: ':'facial rigs: ')+report.facialRigCount
+   +' · '+(uiLang==='ru'?'проверок пресетов: ':'preset checks: ')+report.presetCount
+   +' · '+(uiLang==='ru'?'ошибок: ':'errors: ')+report.errorCount
+   +' · '+(uiLang==='ru'?'предупреждений: ':'warnings: ')+report.warningCount
+   +(details.length?'\n'+details.join('\n'):'')
+   +'\n'+(uiLang==='ru'
+    ?'Проверены связи персонажей, костей, лицевых ригов и временные шкалы. Визуальное качество кадров этой проверкой не подтверждается.'
+    :'Character, bone, facial-rig and timeline references were checked. This does not certify visual frame quality.');
+ }catch(error){
+  status.textContent=(uiLang==='ru'?'Ошибка глобальной проверки: ':'Global audit failed: ')+String(error?.message||error);
+ }finally{
+  button.disabled=false;
+ }
+});
 $('analyzeCharacterMotion').onclick=()=>{
  if(characterMotionAudit){
   characterMotionAudit=null;
