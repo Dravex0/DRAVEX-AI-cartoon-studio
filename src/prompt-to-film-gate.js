@@ -1,4 +1,4 @@
-const VIDEO_MODES = new Set(['huggingface', 'comfyui']);
+const VIDEO_MODES = new Set(['huggingface', 'comfyui', 'local-canvas']);
 
 const count = value => Number.isFinite(Number(value))
   ? Math.max(0, Math.floor(Number(value)))
@@ -28,8 +28,8 @@ export function evaluatePromptToFilmStart({
   if (selectedMode === 'huggingface' && remoteVideoConsent !== true) {
     blockers.push('remote-video-consent-required');
   }
-  if (videoProviderReady !== true) blockers.push('video-provider-not-ready');
-  if (missingImages > 0 && imagePromptConsent !== true) {
+  if (selectedMode !== 'local-canvas' && videoProviderReady !== true) blockers.push('video-provider-not-ready');
+  if (selectedMode !== 'local-canvas' && missingImages > 0 && imagePromptConsent !== true) {
     blockers.push('image-prompt-consent-required');
   }
 

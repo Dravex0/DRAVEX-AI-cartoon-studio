@@ -2005,9 +2005,9 @@ $('language').addEventListener('change',()=>{
 $('voiceNonCommercialConsent').addEventListener('change',refreshSceneVoiceControls);
 $('make').addEventListener('click',()=>createStoryboard());
 
-$('makeFilm').addEventListener('click',()=>{
- if(fullFilmAbortController){
-  $('status').textContent=uiLang==='ru'?'Создание мультфильма уже выполняется. Дождись завершения или нажми «Отменить».':'A film is already being generated. Wait for it to finish or cancel the current run.';
+$('makeFilm').addEventListener('click',async()=>{
+ if(fullFilmAbortController||$('export').disabled){
+  $('status').textContent=uiLang==='ru'?'Создание или экспорт уже выполняется. Дождись завершения или нажми «Отменить».':'A film generation or export is already running. Wait for it to finish or cancel the current run.';
   return;
  }
  const request=$('idea').value.trim();
@@ -2033,9 +2033,9 @@ $('makeFilm').addEventListener('click',()=>{
  const gate=evaluatePromptToFilmStart({
   mode,
   sceneCount:sceneMetadata.length,
-  videoProviderReady:mode==='huggingface'
+  videoProviderReady:mode==='local-canvas'?true:mode==='huggingface'
    ?hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'
-   :comfyConnected&&!!comfyWorkflow,
+   :mode==='comfyui'&&comfyConnected&&!!comfyWorkflow,
   remoteVideoConsent:$('hfVideoConsent').checked===true,
   missingImageCount,
   imagePromptConsent:$('hordeConsent').checked===true,
@@ -2059,6 +2059,45 @@ $('makeFilm').addEventListener('click',()=>{
    const consent=$('hordeConsent');
    consent.closest('details')?.setAttribute('open','');
    consent.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+  return;
+ }
+ if(mode==='local-canvas'){
+  const controller=new AbortController();
+  const button=$('makeFilm');
+  const cancel=$('cancelFullFilmComfy');
+  fullFilmAbortController=controller;
+  button.disabled=true;
+  cancel.hidden=false;
+  $('fullFilmProgressPanel').hidden=false;
+  filmProgressTracking=true;
+  setFilmProgress(5,uiLang==='ru'?'Локальный рендер':'Local render',uiLang==='ru'
+   ?'Используем существующий предпросмотр, движения камеры, объекты и подключённые риги. Облачная генерация не запускается.'
+   :'Rendering the existing canvas preview, camera motion, props, and attached rigs. No cloud generation is started.');
+  $('status').textContent=uiLang==='ru'
+   ?'Создаём локальное видео из раскадровки. Это WebM-анимация холста, не AI text-to-video.'
+   :'Rendering a local storyboard video. This is canvas-based WebM animation, not AI text-to-video.';
+  try{
+   const result=await exportFilm({signal:controller.signal,download:true});
+   if(result?.status!=='completed'){
+    const cancelled=result?.status==='cancelled'||controller.signal.aborted;
+    const message=cancelled
+     ?(uiLang==='ru'?'Локальный экспорт отменён.':'Local export was cancelled.')
+     :(uiLang==='ru'?'Локальный экспорт не завершён: ':'Local export did not complete: ')+(result?.reason||result?.status||'unknown error');
+    $('status').textContent=message;
+    if(filmProgressTracking)setFilmProgress($('fullFilmProgress').value,uiLang==='ru'?'Экспорт остановлен':'Export stopped',message);
+    filmProgressTracking=false;
+   }
+  }catch(error){
+   const message=(uiLang==='ru'?'Ошибка локального экспорта: ':'Local export error: ')+(error?.message||'Unknown error');
+   $('status').textContent=message;
+   if(filmProgressTracking)setFilmProgress($('fullFilmProgress').value,uiLang==='ru'?'Ошибка':'Error',message);
+   filmProgressTracking=false;
+  }finally{
+   if(fullFilmAbortController===controller)fullFilmAbortController=null;
+   cancel.hidden=true;
+   button.disabled=false;
+   updateComfyAnimateAvailability();
   }
   return;
  }
@@ -2721,7 +2760,7 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
 function setComfyStatus(message){$('comfyStatus').textContent=message}
-function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow;const mode=$('videoGenerationMode')?.value||'huggingface';const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:comfyConnected&&!!comfyWorkflow;$('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController}
+function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow;const mode=$('videoGenerationMode')?.value||'huggingface';const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:mode==='comfyui'&&comfyConnected&&!!comfyWorkflow;$('generateFullFilmComfy').hidden=mode==='local-canvas';$('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController}
 ['comfyCharacterReference1','comfyCharacterReference2'].forEach((id,index)=>{
  $(id).addEventListener('change',()=>{
   const file=$(id).files?.[0]||null;
