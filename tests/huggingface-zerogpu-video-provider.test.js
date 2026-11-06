@@ -35,6 +35,7 @@ test("submits an image-to-video job with the Wan 2.2 fast profile and downloads 
     prompt: "Anime hero raises a glowing hand",
     negativePrompt: "flicker",
     durationSeconds: 5,
+    seed: 987654321,
     image
   }, { onProgress: value => progress.push(value) });
 
@@ -43,6 +44,7 @@ test("submits an image-to-video job with the Wan 2.2 fast profile and downloads 
   assert.equal(calls[0][1][1], "Anime hero raises a glowing hand");
   assert.equal(calls[0][1][2], 4);
   assert.equal(calls[0][1][4], 5);
+  assert.equal(calls[0][1][7], 987654321);
   assert.equal(result.status, "completed");
   assert.equal(result.video.type, "video/mp4");
   assert.equal(result.taskId, "wan-job-1");
