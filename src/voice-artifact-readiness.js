@@ -17,7 +17,7 @@ function isUsableVoiceArtifact(record, hash, cue) {
   if (record.byteSize != null && Number(record.byteSize) !== Number(blob.size)) return false;
 
   const mimeType = String(record.mimeType || blob.type || "").toLowerCase().split(";")[0].trim();
-  if (mimeType && !WAV_MIME_TYPES.has(mimeType)) return false;
+  if (!mimeType || !WAV_MIME_TYPES.has(mimeType)) return false;
 
   if (!durationMatches(record.durationMs, cue?.durationMs)) return false;
   return true;
