@@ -53,6 +53,7 @@ import { createAnimationClock } from "./animation-clock.js";
 import { getPromptCameraTransform } from "./prompt-camera-motion.js";
 import { detectSceneActionForScene } from "./scene-action.js";
 import { buildExportTimeline } from "./export-timeline.js";
+import { captureFilmSceneSnapshot, matchesFilmSceneSnapshot } from "./film-scene-snapshot.js";
 import { buildAudioMouthEnvelope, sampleAudioMouthEnvelope } from "./audio-mouth-envelope.js";
 import { sampleCharacterFacialLipSync, sceneHasFacialRigForSpeaker } from "./facial-lipsync-runtime.js";
 import { createFaceLandmarkerWorkerClient } from "./face-landmarker-worker-client.js";
@@ -3436,14 +3437,6 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Нет сцен для экспорта','No scenes to export'),$('status').textContent);filmProgressTracking=false;}
     return {status:'failed',reason:'There are no storyboard scenes to export.'};
   }
-  if(requireAllVideos){
-    const missing=timeline.segments.filter(segment=>{
-      const meta=sceneMetadata[segment.sceneIndex]||{};
-      const entry=sceneVideoCache.get(String(meta.id||('scene-index-'+segment.sceneIndex)));
-      return !isSceneVideoDecoded(entry?.video);
-    }).map(segment=>segment.sceneIndex+1);
-    if(missing.length)return {status:'blocked',reason:'Every scene must have a decoded video clip. Missing scene(s): '+missing.join(', ')+'.'};
-  }
   button.disabled=true;
   $('audioFile').disabled=true;
   $('audioVolume').disabled=true;
@@ -3453,10 +3446,22 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
   let stream=null,recorder=null,stopTimer=null,cleaned=false,recorderFailed=false,audioSession=null,exportProgressTimer=null,exportStartedAtMs=null;
   const chunks=[];
   let audioScheduledStartAtMs=null;
+  let requiredSceneSnapshot=null;
   let resolveCompletion,rejectCompletion,completionSettled=false;
   const completion=new Promise((resolve,reject)=>{resolveCompletion=resolve;rejectCompletion=reject;});
   const settleCompletion=(handler,value)=>{if(completionSettled)return;completionSettled=true;handler(value);};
   const checkAbort=()=>{if(signal?.aborted){const error=new Error('Full-film composition was cancelled.');error.name='AbortError';throw error;}};
+  const exportSceneMetadata=()=>timeline.segments.map(segment=>sceneMetadata[segment.sceneIndex]||{});
+  const getExportSceneVideo=(meta,index)=>{
+    const sceneIndex=timeline.segments[index]?.sceneIndex??index;
+    const key=String(meta?.id||('scene-index-'+sceneIndex));
+    return sceneVideoCache.get(key)?.video||null;
+  };
+  const assertRequiredSceneSnapshot=()=>{
+    if(requireAllVideos&&(!requiredSceneSnapshot||!matchesFilmSceneSnapshot(requiredSceneSnapshot,exportSceneMetadata(),getExportSceneVideo,isSceneVideoDecoded))){
+      throw new Error('Scene videos or scene order changed during film export. Restore the original clips and try again.');
+    }
+  };
   const onSignalAbort=()=>{if(recorder&&recorder.state!=='inactive'){recorderFailed=true;try{recorder.stop();}catch{}}};
   signal?.addEventListener('abort',onSignalAbort,{once:true});
   let lipSyncSkippedTracks=0;
@@ -3488,6 +3493,10 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     checkAbort();
     await sceneVideoRestorePromise;
     checkAbort();
+    if(requireAllVideos){
+      requiredSceneSnapshot=captureFilmSceneSnapshot(exportSceneMetadata(),getExportSceneVideo);
+      assertRequiredSceneSnapshot();
+    }
     // Freeze preview while export assets/audio are prepared. Otherwise async setup
     // time advances the scene clock before the recorder has even started.
     playing=false;
@@ -3516,6 +3525,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     }
     await Promise.all(readinessTasks);
     checkAbort();
+    assertRequiredSceneSnapshot();
     sceneIndex=timeline.segments[0].sceneIndex;
     sceneMotionSceneIndex=-1;
     stream=canvas.captureStream(24);
@@ -3593,10 +3603,12 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
       try{
         if(signal?.aborted){const error=new Error('Full-film composition was cancelled.');error.name='AbortError';throw error;}
         if(recorderFailed)throw new Error('MediaRecorder failed before producing a complete video.');
+        assertRequiredSceneSnapshot();
         const blob=new Blob(chunks,{type:recorder.mimeType||'video/webm'});
         if(!blob.size)throw new Error('Recorder produced an empty file');
         const decoded=await waitForExportVideoReady(blob);
         if(signal?.aborted){const error=new Error('Full-film composition was cancelled.');error.name='AbortError';throw error;}
+        assertRequiredSceneSnapshot();
         const url=URL.createObjectURL(blob);
         if(finalFilmObjectUrl)URL.revokeObjectURL(finalFilmObjectUrl);
         finalFilmObjectUrl=url;
@@ -3638,6 +3650,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     if(raf)cancelAnimationFrame(raf);
     raf=0;
     draw();
+    assertRequiredSceneSnapshot();
     recorder.start(250);
     exportMouthOriginTimeMs=performance.now();
     if(audioScheduledStartAtMs!==null){
