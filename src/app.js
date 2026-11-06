@@ -748,28 +748,38 @@ $('faceAnalysisInterval')?.addEventListener('change',updateFaceAnalysisControls)
 $('showFaceLandmarkOverlay')?.addEventListener('change',()=>{faceLandmarkOverlayLastTimeBucket=-1;if(!playing)draw();});
 function releaseSceneVideo(meta,index){
  const key=sceneVideoKey(index,meta);
+ sceneGenerationGuard.invalidate(meta.id);
+ const invalidationStorageRevision=sceneGenerationGuard.storageRevision(meta.id);
  disposeSceneVideoEntry(sceneVideoCache.get(key));
  sceneVideoCache.delete(key);
- void sceneVideoStorage.delete(key).catch(error=>console.warn("Could not delete persisted scene video:",error));
+ void sceneVideoStorage.deleteOlderThanRevision(key,invalidationStorageRevision).catch(error=>console.warn("Could not delete superseded persisted scene video:",error));
 }
 async function restorePersistedSceneVideos(){
  let restored=0,discarded=0;
  for(let index=0;index<sceneMetadata.length;index++){
   const meta=sceneMetadata[index];
+  const restoreToken=sceneGenerationGuard.capture(meta.id);
   try{
    const record=await sceneVideoStorage.get(meta.id);
    if(!record)continue;
+   sceneGenerationGuard.observeStorageRevision(meta.id,record.generationRevision||0);
    if(!(record.blob instanceof Blob)||record.blob.size===0){
-    await sceneVideoStorage.delete(meta.id);discarded++;continue;
+    await sceneVideoStorage.deleteIfRevision(meta.id,record.generationRevision||0);discarded++;continue;
    }
+   if(!sceneGenerationGuard.isCurrent(restoreToken))continue;
    const entry=attachSceneVideo(index,meta,record.blob,record.filename||("dravex-scene-"+(index+1)+".webm"));
    try{
     await waitForSceneVideoReady(entry.video,{timeoutMs:20000});
+    if(!sceneGenerationGuard.isCurrent(restoreToken)){
+     if(sceneVideoCache.get(sceneVideoKey(index,meta))===entry)sceneVideoCache.delete(sceneVideoKey(index,meta));
+     disposeSceneVideoEntry(entry);
+     continue;
+    }
     restored++;
    }catch(decodeError){
     if(sceneVideoCache.get(sceneVideoKey(index,meta))===entry)sceneVideoCache.delete(sceneVideoKey(index,meta));
     disposeSceneVideoEntry(entry);
-    await sceneVideoStorage.delete(meta.id);
+    await sceneVideoStorage.deleteIfRevision(meta.id,record.generationRevision||0);
     discarded++;
     console.warn("Discarded persisted scene video that cannot be decoded:",decodeError);
    }
@@ -777,12 +787,6 @@ async function restorePersistedSceneVideos(){
  }
  if(restored){renderComfySceneVideo();if(!playing)draw();}
  renderScenes();
- if(restored||discarded){
-  const message=uiLang==='ru'
-   ?'Восстановлено видео сцен: '+restored+'.'+(discarded?' Удалено повреждённых файлов: '+discarded+'.':'')
-   :'Restored scene videos: '+restored+'.'+(discarded?' Removed invalid files: '+discarded+'.':'');
-  $('status').textContent=message;
- }
 }
 function getLoadedSceneImage(url){
 const key=String(url||'').trim();
@@ -1396,7 +1400,7 @@ function invalidateCurrentSceneVideoForEdit(){
  const meta=sceneMetadata[sceneIndex];
  const key=meta?.id?String(meta.id):'';
  if(!key)return;
- sceneGenerationGuard.invalidate(key);
+ const invalidationRevision=sceneGenerationGuard.invalidate(key);const invalidationStorageRevision=sceneGenerationGuard.storageRevision(key);
  const entry=sceneVideoCache.get(key);
  if(entry){
   sceneVideoCache.delete(key);
@@ -1419,7 +1423,7 @@ function invalidateCurrentSceneVideoForEdit(){
    updateFaceAnalysisControls();
    if(!playing)draw();
   }
-  await sceneVideoStorage.delete(key);
+  await sceneVideoStorage.deleteOlderThanRevision(key,invalidationStorageRevision);
  })().catch(error=>console.warn('Could not invalidate the previous scene video:',error))
    .finally(()=>pendingSceneVideoInvalidations.delete(key));
  pendingSceneVideoInvalidations.set(key,pending);
@@ -2903,8 +2907,8 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const entry=attachSceneVideo(index,motionScene,result.video,filename);
  try{await waitForSceneVideoReady(entry.video,{timeoutMs:20000,signal});assertGenerationCurrent();}
  catch(error){if(sceneVideoCache.get(key)===entry)sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);throw new Error('Wan 2.2 returned a clip the browser could not decode or the scene changed: '+(error.message||'decode error'));}
- const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
- if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.delete(key);if(sceneVideoCache.get(key)===entry){sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);}throw new Error('Scene settings changed while the clip was being saved. The stale clip was discarded.');}
+ const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename,{generationRevision:generationToken.storageRevision});
+ if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.deleteIfRevision(key,generationToken.storageRevision);if(sceneVideoCache.get(key)===entry){sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);}throw new Error('Scene settings changed while the clip was being saved. The stale clip was discarded.');}
  if(sceneIndex===index){renderComfySceneVideo();renderScenes();if(!playing)draw();}
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
@@ -2973,8 +2977,8 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
   disposeSceneVideoEntry(entry);
   throw new Error('Полученный клип не удалось декодировать или сцена изменилась: '+(error.message||'ошибка декодирования'));
  }
- const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
- if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.delete(key);if(sceneVideoCache.get(key)===entry){sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);}throw new Error('Настройки сцены изменились во время сохранения. Устаревший клип удалён.');}
+ const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename,{generationRevision:generationToken.storageRevision});
+ if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.deleteIfRevision(key,generationToken.storageRevision);if(sceneVideoCache.get(key)===entry){sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);}throw new Error('Настройки сцены изменились во время сохранения. Устаревший клип удалён.');}
  if(sceneIndex===index){renderComfySceneVideo();renderScenes();if(!playing)draw();}
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
@@ -3068,8 +3072,8 @@ $('animateSceneComfy').addEventListener('click',async()=>{
    disposeSceneVideoEntry(videoEntry);
    throw new Error('Сцена '+(index+1)+' вернула видео, которое браузер не смог декодировать: '+(readinessError.message||'unknown decode error'));
   }
-  const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
-  if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.delete(key);if(sceneVideoCache.get(key)===videoEntry){sceneVideoCache.delete(key);disposeSceneVideoEntry(videoEntry);}throw new Error('Scene settings changed while saving. The stale clip was discarded.');}
+  const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename,{generationRevision:generationToken.storageRevision});
+  if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.deleteIfRevision(key,generationToken.storageRevision);if(sceneVideoCache.get(key)===videoEntry){sceneVideoCache.delete(key);disposeSceneVideoEntry(videoEntry);}throw new Error('Scene settings changed while saving. The stale clip was discarded.');}
   const persistenceNote=persistence.persisted?'':(uiLang==='ru'
    ?' Видео доступно в этой вкладке, но не сохранено для следующего запуска: '+(persistence.error||'ошибка хранилища')
    :' The video is available in this tab but could not be saved for the next visit: '+(persistence.error||'storage error'));
@@ -3336,8 +3340,8 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      disposeSceneVideoEntry(videoEntry);
      throw new Error('Сцена '+(index+1)+' вернула видео, которое браузер не смог декодировать: '+(readinessError.message||'unknown decode error'));
     }
-    const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
-    if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.delete(key);if(sceneVideoCache.get(key)===videoEntry){sceneVideoCache.delete(key);disposeSceneVideoEntry(videoEntry);}throw new Error('Параметры сцены изменились во время сохранения. Устаревший клип удалён.');}
+    const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename,{generationRevision:generationToken.storageRevision});
+    if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.deleteIfRevision(key,generationToken.storageRevision);if(sceneVideoCache.get(key)===videoEntry){sceneVideoCache.delete(key);disposeSceneVideoEntry(videoEntry);}throw new Error('Параметры сцены изменились во время сохранения. Устаревший клип удалён.');}
     if(!persistence.persisted)console.warn('Generated scene video is kept in memory but could not be saved for reload:',persistence.error);
     if(sceneIndex===index)renderComfySceneVideo();
     renderScenes();

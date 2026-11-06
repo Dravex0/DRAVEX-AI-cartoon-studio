@@ -79,7 +79,7 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
   }
 
   return {
-    async put(sceneId, blob, filename = "scene-video.webm") {
+    async put(sceneId, blob, filename = "scene-video.webm", { generationRevision = 0 } = {}) {
       const key = String(sceneId || "").trim();
       if (!key) throw new TypeError("A stable scene ID is required.");
       if (!(typeof Blob !== "undefined" && blob instanceof Blob)) {
@@ -88,10 +88,27 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
       if (blob.size === 0) throw new TypeError("Scene video Blob must not be empty.");
       const mimeType = String(blob.type || "").split(";")[0].trim().toLowerCase();
       if (!mimeType.startsWith("video/")) throw new TypeError("Scene video Blob must have a video MIME type.");
+      if (!Number.isSafeInteger(generationRevision) || generationRevision < 0) {
+        throw new RangeError("generationRevision must be a non-negative integer.");
+      }
       const safeFilename = String(filename || "scene-video.webm").slice(0, 180);
-      const record = { sceneId: key, blob, filename: safeFilename, updatedAt: Date.now() };
-      await run(store => requestResult(store.put(record)), "readwrite");
-      return record;
+      const record = { sceneId: key, blob, filename: safeFilename, generationRevision, updatedAt: Date.now() };
+      const written = await run(store => new Promise((resolve, reject) => {
+        const read = store.get(key);
+        read.onerror = () => reject(read.error || new Error("Could not check the current scene video revision."));
+        read.onsuccess = () => {
+          const currentRevision = Number.isInteger(read.result?.generationRevision)
+            ? read.result.generationRevision : 0;
+          if (currentRevision > generationRevision) {
+            resolve(false);
+            return;
+          }
+          const write = store.put(record);
+          write.onsuccess = () => resolve(true);
+          write.onerror = () => reject(write.error || new Error("Could not save the scene video."));
+        };
+      }), "readwrite");
+      return { ...record, superseded: !written };
     },
 
     async get(sceneId) {
@@ -104,6 +121,52 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
       const key = String(sceneId || "").trim();
       if (!key) return;
       await run(store => requestResult(store.delete(key)), "readwrite");
+    },
+
+    async deleteIfRevision(sceneId, generationRevision) {
+      const key = String(sceneId || "").trim();
+      if (!key) return false;
+      if (!Number.isSafeInteger(generationRevision) || generationRevision < 0) {
+        throw new RangeError("generationRevision must be a non-negative integer.");
+      }
+      return run(store => new Promise((resolve, reject) => {
+        const read = store.get(key);
+        read.onerror = () => reject(read.error || new Error("Could not check the scene video before deletion."));
+        read.onsuccess = () => {
+          const currentRevision = Number.isInteger(read.result?.generationRevision)
+            ? read.result.generationRevision : 0;
+          if (!read.result || currentRevision !== generationRevision) {
+            resolve(false);
+            return;
+          }
+          const removal = store.delete(key);
+          removal.onsuccess = () => resolve(true);
+          removal.onerror = () => reject(removal.error || new Error("Could not delete the stale scene video."));
+        };
+      }), "readwrite");
+    },
+
+    async deleteOlderThanRevision(sceneId, generationRevision) {
+      const key = String(sceneId || "").trim();
+      if (!key) return false;
+      if (!Number.isSafeInteger(generationRevision) || generationRevision < 0) {
+        throw new RangeError("generationRevision must be a non-negative integer.");
+      }
+      return run(store => new Promise((resolve, reject) => {
+        const read = store.get(key);
+        read.onerror = () => reject(read.error || new Error("Could not check the scene video before invalidation."));
+        read.onsuccess = () => {
+          const currentRevision = Number.isInteger(read.result?.generationRevision)
+            ? read.result.generationRevision : 0;
+          if (!read.result || currentRevision >= generationRevision) {
+            resolve(false);
+            return;
+          }
+          const removal = store.delete(key);
+          removal.onsuccess = () => resolve(true);
+          removal.onerror = () => reject(removal.error || new Error("Could not remove the previous scene video."));
+        };
+      }), "readwrite");
     }
   };
 }
@@ -113,12 +176,17 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
  * The in-memory video remains usable for preview/export when IndexedDB is blocked,
  * full, or unavailable; callers can surface the returned warning to the user.
  */
-export async function persistSceneVideoBestEffort(storage, sceneId, blob, filename) {
+export async function persistSceneVideoBestEffort(storage, sceneId, blob, filename, options = {}) {
   if (!storage || typeof storage.put !== "function") {
     return { persisted: false, error: "Scene video storage is unavailable." };
   }
   try {
-    await storage.put(sceneId, blob, filename);
+    const record = options && Object.keys(options).length
+      ? await storage.put(sceneId, blob, filename, options)
+      : await storage.put(sceneId, blob, filename);
+    if (record?.superseded) {
+      return { persisted: false, error: "A newer scene generation already replaced this clip." };
+    }
     return { persisted: true, error: "" };
   } catch (error) {
     return {
