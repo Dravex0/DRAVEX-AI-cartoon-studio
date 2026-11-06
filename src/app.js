@@ -3091,9 +3091,21 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
    &&selectScenesMissingDialogue(sceneMetadata).length>0;
   if(needsDialogue){
    if(!localTextRuntime.status.loaded){
-    throw new Error(uiLang==='ru'
-     ?'В запросе нужна речь, но локальная текстовая модель не загружена. Открой «Дополнительный локальный ИИ», загрузи модель и повтори создание.'
-     :'Your request needs dialogue, but the local text model is not loaded. Open Optional local AI tools, load the model, and start again.');
+    if(!$('localModelConsent')?.checked){
+     throw new Error(uiLang==='ru'
+      ?'Для создания реплик нужно разрешить загрузку локальной текстовой модели (~117 МБ). Отметь согласие в разделе «Дополнительный локальный ИИ» и запусти создание снова.'
+      :'Dialogue generation needs the local text model (~117 MB). Confirm its download in Optional local AI tools, then start creation again.');
+    }
+    status.textContent=uiLang==='ru'?'Загружаем локальную текстовую модель…':'Loading the local text model…';
+    setFilmProgress(1,filmProgressText('Загрузка локального ИИ','Loading local AI'),filmProgressText('Модель загружается на устройство. Текст запроса не отправляется в облачный inference API.','The model is downloading to this device. Your prompt is not sent to a cloud inference API.'));
+    await localTextRuntime.load({
+     backend:'auto',
+     signal:controller.signal,
+     onProgress:event=>{
+      const percent=Number.isFinite(event?.progress)?' '+Math.round(event.progress*100)+'%':'';
+      status.textContent=uiLang==='ru'?'Загрузка локального ИИ: '+String(event?.status||'загрузка')+percent:'Local AI download: '+String(event?.status||'loading')+percent;
+     }
+    });
    }
    status.textContent=uiLang==='ru'?'Создаём реплики для всех сцен…':'Writing dialogue for all scenes…';
    setFilmProgress(1,filmProgressText('Создание реплик','Writing dialogue'),filmProgressText('Локальная модель обрабатывает сцены по очереди.','The local model is processing scenes sequentially.'));
