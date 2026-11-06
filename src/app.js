@@ -2905,7 +2905,8 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  reportProgress?.('Submitting scene to local ComfyUI');
  const result=await generateVideoWithProvider(registry,provider.id,{
   taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,
-  durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages
+  durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,
+  seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages
  },{signal,onProgress:job=>{
   const percent=readVideoProgressPercent(job);
   reportProgress?.('ComfyUI '+String(job.stage||'processing')+(percent===null?'':' '+percent+'%'));
