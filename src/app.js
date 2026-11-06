@@ -2082,7 +2082,13 @@ $('makeFilm').addEventListener('click',async()=>{
  if(!created)return;
  if(localTextRuntime.status.loaded&&created.automaticDirectionApplied!==true){
   const ru=uiLang==='ru';
-  $('status').textContent=ru?'Локальный AI-режиссёр проверяет и улучшает сцены перед рендером…':'Local AI director is reviewing and improving scenes before rendering…';
+  const directionController=new AbortController();
+  const directionButton=$('makeFilm');
+  const cancelButton=$('cancelFullFilmComfy');
+  fullFilmAbortController=directionController;
+  directionButton.disabled=true;
+  cancelButton.hidden=false;
+  $('status').textContent=ru?'Локальный AI-режиссёр проверяет сцены. Можно отменить операцию…':'Local AI director is reviewing scenes. You can cancel this operation…';
   try{
    const languageName={ru:'Russian',uk:'Ukrainian',en:'English',es:'Spanish'}[language]||'English';
    const directed=await directStoryboardForFilm({
@@ -2091,8 +2097,13 @@ $('makeFilm').addEventListener('click',async()=>{
     storyText:request,
     language:languageName,
     character:requestedCharacter,
-    characterBible
+    characterBible,
+    signal:directionController.signal
    });
+   if(directed.status==='cancelled'||directionController.signal.aborted){
+    $('status').textContent=ru?'Подготовка раскадровки отменена. Рендер не запускался.':'Storyboard direction cancelled. Rendering was not started.';
+    return;
+   }
    if(directed.usedLocalModel){
     const directedScenes=ensureSceneIds(directed.scenes.map(scene=>({...scene,characters:Array.isArray(scene.characters)&&scene.characters.length?scene.characters:[requestedCharacter]})));
     sceneMetadata=directedScenes;
@@ -2109,12 +2120,21 @@ $('makeFilm').addEventListener('click',async()=>{
     updateStoryQA();
     $('status').textContent=ru?'AI-режиссёр улучшил раскадровку. Проверка качества пройдена; запускаем рендер.':'AI director improved the storyboard. Quality gate passed; starting render.';
    }else{
-    currentStoryboardPlan={...created,automaticDirectionApplied:true};
+    const retryable=String(directed.fallbackReason||'').startsWith('local-inference-failed:');
+    currentStoryboardPlan={...created,automaticDirectionApplied:!retryable};
     $('status').textContent=ru?'AI-режиссёр не изменил раскадровку: '+(directed.fallbackReason||'резервный сценарий')+'. Используем проверенный локальный вариант.':'AI director kept the deterministic storyboard: '+(directed.fallbackReason||'fallback')+'. Using the verified local version.';
    }
   }catch(error){
-   currentStoryboardPlan={...created,automaticDirectionApplied:true};
+   if(directionController.signal.aborted){
+    $('status').textContent=ru?'Подготовка раскадровки отменена. Рендер не запускался.':'Storyboard direction cancelled. Rendering was not started.';
+    return;
+   }
+   currentStoryboardPlan={...created,automaticDirectionApplied:false};
    $('status').textContent=(ru?'AI-режиссёр недоступен, используем базовую раскадровку: ':'AI director unavailable; using baseline storyboard: ')+(error?.message||'Unknown error');
+  }finally{
+   if(fullFilmAbortController===directionController)fullFilmAbortController=null;
+   cancelButton.hidden=true;
+   directionButton.disabled=false;
   }
  }else if(!localTextRuntime.status.loaded){
   $('status').textContent=uiLang==='ru'?'Локальная модель не загружена. Используем раскадровку DRAVEX; AI-режиссёр можно включить после загрузки модели.':'Local model is not loaded. Using the DRAVEX storyboard; load the model to enable AI direction.';
