@@ -57,3 +57,16 @@ test('rejects unknown provider modes and normalizes negative image counts', () =
   assert.ok(result.blockers.includes('video-mode-invalid'));
   assert.equal(result.missingImageCount, 0);
 });
+
+test('local canvas mode needs no video provider or remote image consent', () => {
+  const result = evaluatePromptToFilmStart({
+    mode: 'local-canvas',
+    sceneCount: 4,
+    videoProviderReady: false,
+    remoteVideoConsent: false,
+    missingImageCount: 4,
+    imagePromptConsent: false
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.blockers, []);
+});
