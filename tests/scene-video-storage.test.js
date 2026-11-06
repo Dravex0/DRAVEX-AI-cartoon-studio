@@ -114,3 +114,41 @@ test("reports unavailable scene video storage without throwing", async () => {
   assert.equal(result.persisted, false);
   assert.match(result.error, /unavailable/);
 });
+
+
+test("a late older generation cannot overwrite a newer persisted clip", async () => {
+  const storage = createSceneVideoStorage({ indexedDBRef: createMemoryIndexedDB() });
+  const newer = new Blob(["new"], { type: "video/webm" });
+  const older = new Blob(["old"], { type: "video/webm" });
+  await storage.put("scene-race", newer, "new.webm", { generationRevision: 2 });
+  const staleWrite = await storage.put("scene-race", older, "old.webm", { generationRevision: 1 });
+  assert.equal(staleWrite.superseded, true);
+  const restored = await storage.get("scene-race");
+  assert.equal(await restored.blob.text(), "new");
+  assert.equal(restored.generationRevision, 2);
+});
+
+test("stale cleanup only deletes the revision it owns", async () => {
+  const storage = createSceneVideoStorage({ indexedDBRef: createMemoryIndexedDB() });
+  await storage.put("scene-cleanup", new Blob(["new"], { type: "video/webm" }), "new.webm", { generationRevision: 3 });
+  assert.equal(await storage.deleteIfRevision("scene-cleanup", 2), false);
+  assert.equal(await (await storage.get("scene-cleanup")).blob.text(), "new");
+  assert.equal(await storage.deleteIfRevision("scene-cleanup", 3), true);
+  assert.equal(await storage.get("scene-cleanup"), undefined);
+});
+
+test("scene edits remove only older persisted revisions", async () => {
+  const storage = createSceneVideoStorage({ indexedDBRef: createMemoryIndexedDB() });
+  await storage.put("scene-edit", new Blob(["old"], { type: "video/webm" }), "old.webm", { generationRevision: 0 });
+  assert.equal(await storage.deleteOlderThanRevision("scene-edit", 1), true);
+  await storage.put("scene-edit", new Blob(["fresh"], { type: "video/webm" }), "fresh.webm", { generationRevision: 1 });
+  assert.equal(await storage.deleteOlderThanRevision("scene-edit", 1), false);
+  assert.equal(await (await storage.get("scene-edit")).blob.text(), "fresh");
+});
+
+test("rejects invalid generation revisions", async () => {
+  const storage = createSceneVideoStorage({ indexedDBRef: createMemoryIndexedDB() });
+  await assert.rejects(storage.put("scene-invalid", new Blob(["x"], { type: "video/webm" }), "x.webm", { generationRevision: -1 }), /non-negative integer/);
+  await assert.rejects(storage.deleteIfRevision("scene-invalid", 1.5), /non-negative integer/);
+  await assert.rejects(storage.deleteOlderThanRevision("scene-invalid", -1), /non-negative integer/);
+});
