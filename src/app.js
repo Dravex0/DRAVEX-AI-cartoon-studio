@@ -3052,6 +3052,48 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
    :createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
   const scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
+  // Prepare requested dialogue and speech before spending time/quota on video generation.
+  // Existing user dialogue and matching voice artifacts are preserved by the workflow.
+  const speechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata});
+  const needsDialogue=(speechTasks.dialogueRequested||speechTasks.voiceRequested)
+   &&selectScenesMissingDialogue(sceneMetadata).length>0;
+  if(needsDialogue){
+   if(!localTextRuntime.status.loaded){
+    throw new Error(uiLang==='ru'
+     ?'В запросе нужна речь, но локальная текстовая модель не загружена. Открой «Дополнительный локальный ИИ», загрузи модель и повтори создание.'
+     :'Your request needs dialogue, but the local text model is not loaded. Open Optional local AI tools, load the model, and start again.');
+   }
+   status.textContent=uiLang==='ru'?'Создаём реплики для всех сцен…':'Writing dialogue for all scenes…';
+   setFilmProgress(1,filmProgressText('Создание реплик','Writing dialogue'),filmProgressText('Локальная модель обрабатывает сцены по очереди.','The local model is processing scenes sequentially.'));
+   const handlers=universalCapabilityRegistry.createHandlers();
+   await handlers['dialogue.generate']({
+    plan:{sourceRequest:$('idea').value},
+    step:{id:'prompt-film-dialogue',action:'Write dialogue for all scenes',purpose:'Prepare requested spoken lines',inputs:['allScenes'],outputs:['scene-dialogue'],dependsOn:[],requiredCapabilities:['dialogue.generate']},
+    signal:controller.signal,
+    reportProgress:detail=>{status.textContent=String(detail||'Writing scene dialogue…');}
+   });
+  }
+  const refreshedSpeechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata});
+  if(refreshedSpeechTasks.voiceRequested&&refreshedSpeechTasks.scenesMissingVoice.length){
+   if(!isLocalSceneVoiceEngineLoaded()){
+    throw new Error(uiLang==='ru'
+     ?'Речь подготовлена, но локальная модель голоса не загружена. Открой диалог сцены, нажми «Загрузить локальную модель голоса» и повтори создание.'
+     :'Dialogue is ready, but the local voice model is not loaded. Open Scene dialogue, load the local voice model, and start again.');
+   }
+   const voiceStep={id:'prompt-film-voice',action:'Generate voices for all scenes',purpose:'Synthesize requested spoken dialogue',inputs:['allScenes'],outputs:['voice-audio'],dependsOn:['prompt-film-dialogue'],requiredCapabilities:['voice.generate']};
+   if(!isLocalSceneVoiceReady({step:voiceStep}))throw new Error(uiLang==='ru'
+    ?'Не все сцены готовы к озвучке. Проверь реплики и выбранный язык.'
+    :'Not all scenes are ready for voice synthesis. Check dialogue and the selected language.');
+   status.textContent=uiLang==='ru'?'Создаём голоса для всех сцен…':'Generating voices for all scenes…';
+   setFilmProgress(3,filmProgressText('Озвучивание','Generating voices'),filmProgressText('Озвучка выполняется локально на устройстве.','Voice synthesis runs locally on this device.'));
+   const handlers=universalCapabilityRegistry.createHandlers();
+   await handlers['voice.generate']({
+    plan:{sourceRequest:$('idea').value},
+    step:voiceStep,
+    signal:controller.signal,
+    reportProgress:detail=>{status.textContent=String(detail||'Generating scene voices…');}
+   });
+  }
   if(mode==='huggingface'){
    const tooShortIndex=scenes.findIndex(scene=>{
     const seconds=Number(scene.durationSeconds??scene.duration??$('duration').value)||3;
