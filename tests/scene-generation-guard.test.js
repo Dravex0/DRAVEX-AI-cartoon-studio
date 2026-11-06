@@ -6,7 +6,9 @@ test('keeps a generation token current until the scene is edited', () => {
   const guard = createSceneGenerationGuard();
   const token = guard.capture('scene-1');
   assert.equal(guard.isCurrent(token), true);
-  assert.equal(guard.isCurrent(guard.capture('scene-1')), true);
+  const newer = guard.capture('scene-1');
+  assert.equal(guard.isCurrent(newer), true);
+  assert.equal(guard.isCurrent(token), false);
 });
 
 test('invalidating a scene makes all earlier in-flight tokens stale', () => {
@@ -40,10 +42,11 @@ test('storage revisions are stable for a generation and advance on edit', () => 
   const guard = createSceneGenerationGuard();
   const first = guard.capture('scene-storage');
   const repeated = guard.capture('scene-storage');
-  assert.equal(first.storageRevision, repeated.storageRevision);
+  assert.ok(repeated.storageRevision > first.storageRevision);
+  assert.equal(guard.isCurrent(first), false);
   guard.invalidate('scene-storage');
   const next = guard.capture('scene-storage');
-  assert.ok(next.storageRevision > first.storageRevision);
+  assert.ok(next.storageRevision > repeated.storageRevision);
   assert.equal(guard.storageRevision('scene-storage'), next.storageRevision);
 });
 
