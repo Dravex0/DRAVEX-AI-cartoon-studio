@@ -2,6 +2,7 @@ import { validateCharacterActionTimeline } from './character-action-timeline.js'
 import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 import { createCharacterRigMotionPreset } from './character-rig-motion-presets.js';
 import { sampleCharacterRigTimeline, validateCharacterRigTimeline } from './character-rig-timeline.js';
+import { compileDoodleSceneMotion } from './doodle-rig-adapter.js';
 
 const clean = value => String(value ?? '').trim();
 const key = value => clean(value).toLocaleLowerCase();
@@ -14,6 +15,17 @@ function presetForDescription(description) {
   if (intent.intent === 'defend') return 'defend';
   const action = detectSceneAction(description);
   return PRESET_BY_ACTION[action] || null;
+}
+
+function doodleActionForDescription(description) {
+  const text = clean(description).normalize('NFKC').toLocaleLowerCase();
+  const intent = inferSceneActionIntent(text);
+  if (intent.motionCue === 'talk' || detectSceneAction(text) === 'talk') return 'talk';
+  const action = detectSceneAction(text);
+  if (action === 'sad' && /scared|afraid|fearful|terrified|боится|испуган|страшится|зляка|налякан|asustad|temeros|tiene miedo/i.test(text)) {
+    return 'scared';
+  }
+  return null;
 }
 
 /**
@@ -37,7 +49,8 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
   for (const phase of scene.actionTimeline.phases) {
     const actorId = clean(phase.actorId);
     const preset = presetForDescription(phase.description);
-    if (!preset) {
+    const doodleAction = preset ? null : doodleActionForDescription(phase.description);
+    if (!preset && !doodleAction) {
       skipped.push({ actorId, phase: phase.phase, reason: 'unsupported-or-ambiguous-action' });
       continue;
     }
@@ -46,12 +59,21 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
       skipped.push({ actorId, phase: phase.phase, reason: 'actor-rig-missing' });
       continue;
     }
-    const result = createCharacterRigMotionPreset(rig, preset);
-    if (result.status !== 'ready') {
+    const result = preset
+      ? createCharacterRigMotionPreset(rig, preset)
+      : compileDoodleSceneMotion({ characters: [actorId], action: doodleAction }, [rig]);
+    if (result.status !== 'ready' || !result.timeline) {
       skipped.push({ actorId, phase: phase.phase, reason: 'invalid-rig-or-preset', issues: result.issues || [] });
       continue;
     }
-    segments.push({ actorId: rig.characterId, start: phase.start, end: phase.end, preset, timeline: result.timeline });
+    segments.push({
+      actorId: rig.characterId,
+      start: phase.start,
+      end: phase.end,
+      preset: preset || result.actions?.[0]?.preset || 'idle',
+      doodleAction,
+      timeline: result.timeline
+    });
   }
 
   const byActor = new Map();
@@ -107,6 +129,8 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     timeline: report.timeline,
     generatedCount: accepted.length,
     skipped,
-    mappedActions: accepted.map(({ actorId, preset, start, end }) => ({ actorId, preset, start, end }))
+    mappedActions: accepted.map(({ actorId, preset, doodleAction, start, end }) => ({
+      actorId, preset, start, end, ...(doodleAction ? { doodleAction } : {})
+    }))
   };
 }
