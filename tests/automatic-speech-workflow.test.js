@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findScenesWithMissingVoiceAudio, resolveAutomaticSpeechTasks } from '../src/automatic-speech-workflow.js';
+import { resolveAutomaticSpeechTasks } from '../src/automatic-speech-workflow.js';
+import { findScenesWithMissingVoiceAudio } from '../src/voice-artifact-readiness.js';
 
 const hash = 'a'.repeat(64);
 
