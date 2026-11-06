@@ -52,7 +52,7 @@ import { getPromptCameraTransform } from "./prompt-camera-motion.js";
 import { detectSceneActionForScene } from "./scene-action.js";
 import { buildExportTimeline } from "./export-timeline.js";
 import { buildAudioMouthEnvelope, sampleAudioMouthEnvelope } from "./audio-mouth-envelope.js";
-import { sampleCharacterFacialLipSync } from "./facial-lipsync-runtime.js";
+import { sampleCharacterFacialLipSync, sceneHasFacialRigForSpeaker } from "./facial-lipsync-runtime.js";
 import { createFaceLandmarkerWorkerClient } from "./face-landmarker-worker-client.js";
 import { sampleFaceLandmarkTimeline } from "./face-landmark-timeline.js";
 import { projectFaceLandmarkOverlay } from "./face-landmark-overlay.js";
@@ -3448,7 +3448,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     exportMouthTracks=[];
     if(voiceTracks.length){
       const mainCharacterKey=String($("character").value||"").trim().toLowerCase();
-      const mainCharacterVoiceTracks=voiceTracks.filter(track=>{const meta=sceneMetadata[track.sceneIndex]||{};const speakerKey=String(track.characterId||track.characterName||"").trim().toLowerCase();const hasFacialRig=Array.isArray(meta.characterFacialRigs)&&meta.characterFacialRigs.some(rig=>Boolean(speakerKey)&&[rig?.characterId,track.characterName].some(value=>String(value||"").trim().toLowerCase()===String(rig?.characterId||"").trim().toLowerCase()));return track.characterName.trim().toLowerCase()===mainCharacterKey||hasFacialRig;});
+      const mainCharacterVoiceTracks=voiceTracks.filter(track=>{const meta=sceneMetadata[track.sceneIndex]||{};const speakerKey=String(track.characterId||track.characterName||"").trim().toLowerCase();const hasFacialRig=sceneHasFacialRigForSpeaker(meta.characterFacialRigs,track.characterId,track.characterName);return track.characterName.trim().toLowerCase()===mainCharacterKey||hasFacialRig;});
       // Generated images/videos are valid lip-sync backgrounds too. The facial
       // rig compositor overlays mouth parts on top of the scene during canvas export.
       const lipSyncRenderableTracks=mainCharacterVoiceTracks;
