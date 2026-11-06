@@ -1,4 +1,5 @@
 const clean = value => String(value ?? '').trim();
+const hashPattern = /^[a-f0-9]{64}$/i;
 
 function hasDialogue(scene) {
   return Array.isArray(scene?.dialogue) && scene.dialogue.some(line =>
