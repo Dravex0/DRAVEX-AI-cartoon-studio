@@ -54,6 +54,7 @@ import { getPromptCameraTransform } from "./prompt-camera-motion.js";
 import { detectSceneActionForScene } from "./scene-action.js";
 import { buildExportTimeline } from "./export-timeline.js";
 import { captureFilmSceneSnapshot, matchesFilmSceneSnapshot } from "./film-scene-snapshot.js";
+import { createSceneGenerationGuard } from "./scene-generation-guard.js";
 import { buildAudioMouthEnvelope, sampleAudioMouthEnvelope } from "./audio-mouth-envelope.js";
 import { sampleCharacterFacialLipSync, sceneHasFacialRigForSpeaker } from "./facial-lipsync-runtime.js";
 import { createFaceLandmarkerWorkerClient } from "./face-landmarker-worker-client.js";
@@ -1389,10 +1390,12 @@ refreshSceneVoiceControls();
 syncFacialRigEditor();
 }
 const pendingSceneVideoInvalidations=new Map();
+const sceneGenerationGuard=createSceneGenerationGuard();
 function invalidateCurrentSceneVideoForEdit(){
  const meta=sceneMetadata[sceneIndex];
  const key=meta?.id?String(meta.id):'';
  if(!key)return;
+ sceneGenerationGuard.invalidate(key);
  const entry=sceneVideoCache.get(key);
  if(entry){
   sceneVideoCache.delete(key);
@@ -2863,6 +2866,10 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const target=resolveRemoteScene(step);
  if(!target.ok)throw new Error('Cannot resolve the requested scene: '+target.reason);
  const index=target.index,originalMeta=target.scene,sceneId=String(originalMeta.id||'');
+ const generationToken=sceneGenerationGuard.capture(sceneId);
+ const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Scene settings changed while video generation was running. The stale clip was discarded; generate the updated scene again.');};
+ const generationToken=sceneGenerationGuard.capture(sceneId);
+ const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Scene settings changed while video generation was running. The stale clip was discarded; generate the updated scene again.');};
  const isCurrent=index===sceneIndex;
  const readField=(id,key)=>isCurrent?$(id).value.trim():String(originalMeta[key]||'').trim();
  const motionText=readField('sceneMotionPrompt','motionPrompt')||String(originalMeta.visibleAction||'');
@@ -2888,14 +2895,16 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages:[]},{signal,onProgress:job=>reportProgress?.('Wan 2.2 '+String(job.stage||'processing')+(Number.isFinite(job.queuePosition)?' · queue '+job.queuePosition:''))});
  assertConsent();
  if(result.status!=='completed'||!result.video)throw new Error(result.error||'Hugging Face Wan 2.2 did not return a completed video.');
+ assertGenerationCurrent();
  if(String(sceneMetadata[index]?.id||'')!==sceneId)throw new Error('The selected scene changed during remote generation; the clip was not attached elsewhere.');
  const key=sceneVideoKey(index,motionScene);
  const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
  const filename='dravex-scene-'+(index+1)+'-wan22'+extension;
  const entry=attachSceneVideo(index,motionScene,result.video,filename);
- try{await waitForSceneVideoReady(entry.video,{timeoutMs:20000,signal});}
- catch(error){if(sceneVideoCache.get(key)===entry)sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);throw new Error('Wan 2.2 returned a clip the browser could not decode: '+(error.message||'decode error'));}
+ try{await waitForSceneVideoReady(entry.video,{timeoutMs:20000,signal});assertGenerationCurrent();}
+ catch(error){if(sceneVideoCache.get(key)===entry)sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);throw new Error('Wan 2.2 returned a clip the browser could not decode or the scene changed: '+(error.message||'decode error'));}
  const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
+ if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.delete(key);if(sceneVideoCache.get(key)===entry){sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);}throw new Error('Scene settings changed while the clip was being saved. The stale clip was discarded.');}
  if(sceneIndex===index){renderComfySceneVideo();renderScenes();if(!playing)draw();}
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
@@ -2949,18 +2958,20 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  }});
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
  if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI не вернул готовое видео.');
+ assertGenerationCurrent();
  if(String(sceneMetadata[index]?.id||'')!==sceneId)throw new Error('Выбранная сцена изменилась во время генерации. Результат не прикреплён к другой сцене.');
  const key=sceneVideoKey(index,motionScene);
  const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
  const filename='dravex-scene-'+(index+1)+extension;
  const entry=attachSceneVideo(index,motionScene,result.video,filename);
- try{await waitForSceneVideoReady(entry.video,{timeoutMs:20000,signal});}
+ try{await waitForSceneVideoReady(entry.video,{timeoutMs:20000,signal});assertGenerationCurrent();}
  catch(error){
   if(sceneVideoCache.get(key)===entry)sceneVideoCache.delete(key);
   disposeSceneVideoEntry(entry);
-  throw new Error('Полученный клип не удалось декодировать в браузере: '+(error.message||'ошибка декодирования'));
+  throw new Error('Полученный клип не удалось декодировать или сцена изменилась: '+(error.message||'ошибка декодирования'));
  }
  const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
+ if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.delete(key);if(sceneVideoCache.get(key)===entry){sceneVideoCache.delete(key);disposeSceneVideoEntry(entry);}throw new Error('Настройки сцены изменились во время сохранения. Устаревший клип удалён.');}
  if(sceneIndex===index){renderComfySceneVideo();renderScenes();if(!playing)draw();}
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
@@ -3011,6 +3022,8 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  const button=$('animateSceneComfy'),status=$('comfyStatus');
  if(button.disabled)return;
  const index=sceneIndex,meta=sceneMetadata[index]||{},imageUrl=String(meta.generatedImageUrl||'').trim();
+ const generationToken=sceneGenerationGuard.capture(String(meta.id||''));
+ const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Scene settings changed during generation. The stale clip was discarded; generate this scene again.');};
  if(!imageUrl){setComfyStatus(uiLang==='ru'?'Сначала создай или загрузи изображение этой сцены.':'Generate or load a still image for this scene first.');return}
  const motionScene={...meta,title:$('sceneTitle').value.trim()||titles[index],description:$('sceneDescription').value.trim()||descriptions[index],motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters)};
  const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
@@ -3024,6 +3037,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
    if(!imageResponse.ok)throw new Error('Cannot read the scene image (HTTP '+imageResponse.status+'). Select a local image instead if the image host blocks browser CORS.');
    imageBlob=await imageResponse.blob();
   }
+  assertGenerationCurrent();
   if(!imageBlob?.size)throw new Error('The scene image is empty.');
   const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
@@ -3035,18 +3049,21 @@ $('animateSceneComfy').addEventListener('click',async()=>{
    status.textContent='ComfyUI · '+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'')+(referenceWarning?' · Внимание: '+referenceWarning:'');
   }});
   if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI did not return a completed video.');
+  assertGenerationCurrent();
   const key=sceneVideoKey(index,motionScene);
   const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
   const filename='dravex-scene-'+(index+1)+extension;
   const videoEntry=attachSceneVideo(index,motionScene,result.video,filename);
   try{
    await waitForSceneVideoReady(videoEntry.video,{timeoutMs:20000});
+   assertGenerationCurrent();
   }catch(readinessError){
    if(sceneVideoCache.get(key)===videoEntry)sceneVideoCache.delete(key);
    disposeSceneVideoEntry(videoEntry);
    throw new Error('Сцена '+(index+1)+' вернула видео, которое браузер не смог декодировать: '+(readinessError.message||'unknown decode error'));
   }
   const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
+  if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.delete(key);if(sceneVideoCache.get(key)===videoEntry){sceneVideoCache.delete(key);disposeSceneVideoEntry(videoEntry);}throw new Error('Scene settings changed while saving. The stale clip was discarded.');}
   const persistenceNote=persistence.persisted?'':(uiLang==='ru'
    ?' Видео доступно в этой вкладке, но не сохранено для следующего запуска: '+(persistence.error||'ошибка хранилища')
    :' The video is available in this tab but could not be saved for the next visit: '+(persistence.error||'storage error'));
@@ -3237,6 +3254,9 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     status.textContent=stage+current+' · '+finished+'/'+state.total;
    },
    generateScene:async(scene,index,{signal})=>{
+    const generationSceneId=String(scene.id||sceneMetadata[index]?.id||('scene_'+(index+1)));
+    const generationToken=sceneGenerationGuard.capture(generationSceneId);
+    const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Параметры сцены изменились во время генерации. Устаревший результат отброшен — запусти создание этой сцены повторно.');};
     const meta={...scene,id:String(scene.id||sceneMetadata[index]?.id||('scene_'+(index+1)))};
     meta.imagePrompt=String(meta.imagePrompt||meta.prompt||meta.description||descriptions[index]||meta.title);
     meta.motionPrompt=String(meta.motionPrompt||meta.visibleAction||meta.description||descriptions[index]||meta.title);
@@ -3255,6 +3275,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
       updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Очередь AI Horde','AI Horde queue')});
       status.textContent=referenceNotice+'AI Horde · сцена '+(index+1)+' · очередь '+(queue.queuePosition===null?'?':queue.queuePosition);
      }});
+     assertGenerationCurrent();
      meta.generatedImageUrl=imageResult.imageUrl;meta.generatedImageSeed=imageResult.seed;meta.generatedImageModel=imageResult.model;meta.generatedImageWorker=imageResult.workerName;
      sceneMetadata[index]={...sceneMetadata[index],...meta};
      if(sceneIndex===index)renderGeneratedSceneImage();
@@ -3292,18 +3313,21 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      status.textContent=(mode==='huggingface'?'Hugging Face · ':'ComfyUI · ')+'сцена '+(index+1)+'/'+scenes.length+' · '+providerStage+(providerPercent===null?'': ' · '+providerPercent+'%')+(Number.isFinite(job.etaSeconds)?' · ETA '+Math.round(job.etaSeconds)+' сек.':'')+(Number.isFinite(job.queuePosition)?' · очередь '+job.queuePosition:'')+(referenceWarning?' · Внимание: '+referenceWarning:'');
     }});
     if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI не вернул готовый видеофайл.');
+    assertGenerationCurrent();
     const key=sceneVideoKey(index,meta);
     const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
     const filename='dravex-scene-'+(index+1)+extension;
     const videoEntry=attachSceneVideo(index,meta,result.video,filename);
     try{
      await waitForSceneVideoReady(videoEntry.video,{timeoutMs:20000,signal});
+     assertGenerationCurrent();
     }catch(readinessError){
      sceneVideoCache.delete(key);
      disposeSceneVideoEntry(videoEntry);
      throw new Error('Сцена '+(index+1)+' вернула видео, которое браузер не смог декодировать: '+(readinessError.message||'unknown decode error'));
     }
     const persistence=await persistSceneVideoBestEffort(sceneVideoStorage,key,result.video,filename);
+    if(!sceneGenerationGuard.isCurrent(generationToken)){await sceneVideoStorage.delete(key);if(sceneVideoCache.get(key)===videoEntry){sceneVideoCache.delete(key);disposeSceneVideoEntry(videoEntry);}throw new Error('Параметры сцены изменились во время сохранения. Устаревший клип удалён.');}
     if(!persistence.persisted)console.warn('Generated scene video is kept in memory but could not be saved for reload:',persistence.error);
     if(sceneIndex===index)renderComfySceneVideo();
     renderScenes();
