@@ -19,12 +19,11 @@ export function createSceneGenerationGuard() {
     capture(sceneId) {
       const key = keyOf(sceneId);
       if (!key) throw new TypeError('A stable scene ID is required.');
-      if (!storageRevisions.has(key)) storageRevisions.set(key, nextStorageRevision(0));
-      return Object.freeze({
-        sceneId: key,
-        revision: revisions.get(key) || 0,
-        storageRevision: storageRevisions.get(key)
-      });
+      const revision = (revisions.get(key) || 0) + 1;
+      revisions.set(key, revision);
+      const storageRevision = nextStorageRevision(storageRevisions.get(key) || 0);
+      storageRevisions.set(key, storageRevision);
+      return Object.freeze({ sceneId: key, revision, storageRevision });
     },
     invalidate(sceneId) {
       const key = keyOf(sceneId);
