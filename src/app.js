@@ -2868,8 +2868,6 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const index=target.index,originalMeta=target.scene,sceneId=String(originalMeta.id||'');
  const generationToken=sceneGenerationGuard.capture(sceneId);
  const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Scene settings changed while video generation was running. The stale clip was discarded; generate the updated scene again.');};
- const generationToken=sceneGenerationGuard.capture(sceneId);
- const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Scene settings changed while video generation was running. The stale clip was discarded; generate the updated scene again.');};
  const isCurrent=index===sceneIndex;
  const readField=(id,key)=>isCurrent?$(id).value.trim():String(originalMeta[key]||'').trim();
  const motionText=readField('sceneMotionPrompt','motionPrompt')||String(originalMeta.visibleAction||'');
@@ -2914,6 +2912,8 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  const target=resolveRemoteScene(step);
  if(!target.ok)throw new Error('Cannot resolve the requested scene: '+target.reason);
  const index=target.index,originalMeta=target.scene,sceneId=String(originalMeta.id||'');
+ const generationToken=sceneGenerationGuard.capture(sceneId);
+ const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Scene settings changed while video generation was running. The stale clip was discarded; generate the updated scene again.');};
  const isCurrent=index===sceneIndex;
  const readField=(id,key)=>isCurrent?$(id).value.trim():String(originalMeta[key]||'').trim();
  const motionText=readField('sceneMotionPrompt','motionPrompt')||String(originalMeta.visibleAction||'');
@@ -3043,7 +3043,10 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
   let referenceWarning='';
-  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages:(await loadCharacterReferenceImagesForScene(motionScene)).concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2)},{onProgress:progress=>{
+  const profileReferences=await loadCharacterReferenceImagesForScene(motionScene);
+  assertGenerationCurrent();
+  const referenceImages=profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2);
+  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages},{onProgress:progress=>{
    if(progress.stage==='warning'&&progress.message){referenceWarning=String(progress.message);status.textContent='ComfyUI · Внимание: '+referenceWarning;return;}
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
    status.textContent='ComfyUI · '+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'')+(referenceWarning?' · Внимание: '+referenceWarning:'');
@@ -3257,6 +3260,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const generationSceneId=String(scene.id||sceneMetadata[index]?.id||('scene_'+(index+1)));
     const generationToken=sceneGenerationGuard.capture(generationSceneId);
     const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Параметры сцены изменились во время генерации. Устаревший результат отброшен — запусти создание этой сцены повторно.');};
+    const assertSceneIdentityCurrent=()=>{assertGenerationCurrent();if(String(sceneMetadata[index]?.id||'')!==generationSceneId)throw new Error('Состав раскадровки изменился во время генерации. Устаревшая сцена отброшена.');};
     const meta={...scene,id:String(scene.id||sceneMetadata[index]?.id||('scene_'+(index+1)))};
     meta.imagePrompt=String(meta.imagePrompt||meta.prompt||meta.description||descriptions[index]||meta.title);
     meta.motionPrompt=String(meta.motionPrompt||meta.visibleAction||meta.description||descriptions[index]||meta.title);
@@ -3275,13 +3279,14 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
       updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Очередь AI Horde','AI Horde queue')});
       status.textContent=referenceNotice+'AI Horde · сцена '+(index+1)+' · очередь '+(queue.queuePosition===null?'?':queue.queuePosition);
      }});
-     assertGenerationCurrent();
+     assertSceneIdentityCurrent();
      meta.generatedImageUrl=imageResult.imageUrl;meta.generatedImageSeed=imageResult.seed;meta.generatedImageModel=imageResult.model;meta.generatedImageWorker=imageResult.workerName;
      sceneMetadata[index]={...sceneMetadata[index],...meta};
      if(sceneIndex===index)renderGeneratedSceneImage();
      updateStoryQA();
     }
     if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
+    assertSceneIdentityCurrent();
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Подготовка к анимации','Preparing animation')});
     status.textContent='Подготавливаем изображение сцены '+(index+1)+' для анимации…';
     let imageInput=meta.generatedImageUrl;
@@ -3291,6 +3296,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      imageInput=await imageResponse.blob();
      if(!imageInput.size)throw new Error('Изображение сцены пустое.');
     }
+    assertSceneIdentityCurrent();
     const prompt=buildMotionGenerationPrompt(meta,characterBible);
     const requestedDuration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
@@ -3298,6 +3304,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Отправка в видеодвижок','Submitting to video engine')});
     const profileReferenceImages=mode==='comfyui'?await loadCharacterReferenceImagesForScene(meta):[];
     const referenceImages=mode==='comfyui'?profileReferenceImages.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2):[];
+    assertSceneIdentityCurrent();
     let referenceWarning='';
     const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput,seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),referenceImages},{signal,onProgress:job=>{
      const providerPercent=readVideoProgressPercent(job);
@@ -3313,14 +3320,14 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      status.textContent=(mode==='huggingface'?'Hugging Face · ':'ComfyUI · ')+'сцена '+(index+1)+'/'+scenes.length+' · '+providerStage+(providerPercent===null?'': ' · '+providerPercent+'%')+(Number.isFinite(job.etaSeconds)?' · ETA '+Math.round(job.etaSeconds)+' сек.':'')+(Number.isFinite(job.queuePosition)?' · очередь '+job.queuePosition:'')+(referenceWarning?' · Внимание: '+referenceWarning:'');
     }});
     if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI не вернул готовый видеофайл.');
-    assertGenerationCurrent();
+    assertSceneIdentityCurrent();
     const key=sceneVideoKey(index,meta);
     const extension=result.video.type.includes('webm')?'.webm':result.video.type.includes('quicktime')?'.mov':'.mp4';
     const filename='dravex-scene-'+(index+1)+extension;
     const videoEntry=attachSceneVideo(index,meta,result.video,filename);
     try{
      await waitForSceneVideoReady(videoEntry.video,{timeoutMs:20000,signal});
-     assertGenerationCurrent();
+     assertSceneIdentityCurrent();
     }catch(readinessError){
      sceneVideoCache.delete(key);
      disposeSceneVideoEntry(videoEntry);
