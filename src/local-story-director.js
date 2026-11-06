@@ -6,72 +6,89 @@ import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-sta
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
 const isRecord = value => value && typeof value === 'object' && !Array.isArray(value);
 
-function parseJsonWithTrailingCommaRepair(source) {
-  try { return JSON.parse(source); } catch { /* Try a conservative JSON-only repair below. */ }
-  let output = '';
-  let inString = false;
-  let escaped = false;
+function stripJsonComments(source) {
+  if (typeof source !== 'string') return '';
+  let output = ''; let inString = false; let escaped = false; let lineComment = false; let blockComment = false;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]; const next = source[index + 1] || '';
+    if (lineComment) { if (char === '\n' || char === '\r') { lineComment = false; output += char; } continue; }
+    if (blockComment) { if (char === '*' && next === '/') { blockComment = false; index += 1; } else if (char === '\n' || char === '\r') output += char; continue; }
+    if (inString) { output += char; if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') inString = false; continue; }
+    if (char === '"') { inString = true; output += char; }
+    else if (char === '/' && next === '/') { lineComment = true; index += 1; }
+    else if (char === '/' && next === '*') { blockComment = true; index += 1; }
+    else output += char;
+  }
+  return blockComment ? '' : output;
+}
+
+function removeTrailingCommas(source) {
+  let output = ''; let inString = false; let escaped = false;
   for (let index = 0; index < source.length; index += 1) {
     const char = source[index];
-    if (inString) {
-      output += char;
-      if (escaped) escaped = false;
-      else if (char === '\\') escaped = true;
-      else if (char === '"') inString = false;
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-      output += char;
-      continue;
-    }
-    if (char === ',') {
-      let next = index + 1;
-      while (/\s/.test(source[next] || '')) next += 1;
-      if (source[next] === '}' || source[next] === ']') continue;
-    }
+    if (inString) { output += char; if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') inString = false; continue; }
+    if (char === '"') { inString = true; output += char; continue; }
+    if (char === ',') { let next = index + 1; while (next < source.length && /\s/.test(source[next])) next += 1; if (source[next] === '}' || source[next] === ']') continue; }
     output += char;
   }
-  try { return JSON.parse(output); } catch { return null; }
+  return output;
+}
+
+/** Closes incomplete containers only; an unterminated string is rejected as lossy. */
+function repairTruncatedJson(source) {
+  if (typeof source !== 'string' || !source.trim()) return null;
+  let text = source.trim(); const stack = []; let inString = false; let escaped = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) { if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') inString = false; continue; }
+    if (char === '"') inString = true;
+    else if (char === '{' || char === '[') stack.push(char);
+    else if (char === '}' || char === ']') { const opening = stack.pop(); if ((char === '}' && opening !== '{') || (char === ']' && opening !== '[')) return null; }
+  }
+  if (inString || escaped) return null;
+  text = text.replace(/,\s*$/, '');
+  while (stack.length) { const opening = stack.pop(); text += opening === '{' ? '}' : ']'; }
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+function parseJsonWithTrailingCommaRepair(source) {
+  if (typeof source !== 'string' || !source.trim()) return null;
+  const cleaned = stripJsonComments(source.replace(/^\uFEFF/, '')).trim();
+  if (!cleaned) return null;
+  try { return JSON.parse(cleaned); } catch { /* Continue with safe repairs. */ }
+  const repaired = removeTrailingCommas(cleaned);
+  try { return JSON.parse(repaired); } catch { /* Try truncated-container recovery. */ }
+  return repairTruncatedJson(repaired);
 }
 
 function extractBalancedJson(source) {
+  if (typeof source !== 'string') return '';
   for (let start = 0; start < source.length; start += 1) {
     if (source[start] !== '{' && source[start] !== '[') continue;
-    const stack = [];
-    let inString = false;
-    let escaped = false;
+    const stack = []; let inString = false; let escaped = false;
     for (let index = start; index < source.length; index += 1) {
       const char = source[index];
-      if (inString) {
-        if (escaped) escaped = false;
-        else if (char === '\\') escaped = true;
-        else if (char === '"') inString = false;
-        continue;
-      }
+      if (inString) { if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') inString = false; continue; }
       if (char === '"') { inString = true; continue; }
       if (char === '{' || char === '[') stack.push(char);
-      else if (char === '}' || char === ']') {
-        const opening = stack.pop();
-        if ((char === '}' && opening !== '{') || (char === ']' && opening !== '[')) break;
-        if (!stack.length) return source.slice(start, index + 1);
-      }
+      else if (char === '}' || char === ']') { const opening = stack.pop(); if ((char === '}' && opening !== '{') || (char === ']' && opening !== '[')) break; if (!stack.length) return source.slice(start, index + 1); }
     }
   }
   return '';
 }
 
 function parseModelScenes(text) {
-  const source = clean(text, 100_000).trim()
-    .replace(/^\s*```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/i, '')
-    .trim();
-  const parsed = parseJsonWithTrailingCommaRepair(source)
-    || parseJsonWithTrailingCommaRepair(extractBalancedJson(source));
+  if (typeof text !== 'string' || text.length > 100_000) return null;
+  const source = text.replace(/^\uFEFF/, '').trim().replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  if (!source) return null;
+  const direct = parseJsonWithTrailingCommaRepair(source);
+  const balanced = direct === null ? parseJsonWithTrailingCommaRepair(extractBalancedJson(source)) : null;
+  const start = source.search(/[\[{]/);
+  const truncated = direct === null && balanced === null && start >= 0 ? parseJsonWithTrailingCommaRepair(source.slice(start)) : null;
+  const parsed = direct !== null ? direct : balanced !== null ? balanced : truncated;
   if (Array.isArray(parsed)) return parsed;
-  return Array.isArray(parsed?.scenes) ? parsed.scenes : null;
+  return parsed && Array.isArray(parsed.scenes) ? parsed.scenes : null;
 }
-
 /** Reserve enough output space for a complete multi-scene JSON response. */
 export function estimateDirectorTokenBudget(sceneCount) {
   const count = Number.isFinite(Number(sceneCount)) ? Math.max(1, Math.min(8, Math.round(Number(sceneCount)))) : 5;
@@ -79,63 +96,51 @@ export function estimateDirectorTokenBudget(sceneCount) {
 }
 
 function buildStructuredStateMemory(modelScenes, baselineScenes) {
-  const supplied = modelScenes.some(scene =>
+  if (!Array.isArray(modelScenes) || !Array.isArray(baselineScenes) || modelScenes.length !== baselineScenes.length) {
+    return { supplied: false, report: null };
+  }
+  const supplied = modelScenes.some(scene => isRecord(scene) && (
     Object.prototype.hasOwnProperty.call(scene, 'startStateData')
     || Object.prototype.hasOwnProperty.call(scene, 'endStateData')
-  );
+  ));
   if (!supplied) return { supplied: false, report: null };
-
-  const scenes = modelScenes.map((scene, index) => {
-    if (!Object.prototype.hasOwnProperty.call(scene, 'startStateData')
-        || !Object.prototype.hasOwnProperty.call(scene, 'endStateData')) {
-      return null;
-    }
-    const base = baselineScenes[index];
-    const stateChanges = (base.stateChanges || []).flatMap(change => {
-      const entityType = change.entityType === 'prop' ? 'object'
-        : change.entityType === 'character' ? 'character' : null;
-      const property = change.property === 'holder' ? 'owner'
-        : change.property === 'openState' ? 'state' : change.property;
-      if (!entityType || change.value === null || !change.entityId || !property) return [];
-      return [{
-        entity: change.entityId,
-        property,
-        previousValue: change.previousValue,
-        value: change.value,
-        actorId: change.actorId,
-        evidence: change.evidence
-      }];
+  try {
+    const scenes = modelScenes.map((scene, index) => {
+      if (!isRecord(scene) || !Object.prototype.hasOwnProperty.call(scene, 'startStateData') || !Object.prototype.hasOwnProperty.call(scene, 'endStateData')) return null;
+      const base = baselineScenes[index];
+      if (!isRecord(base)) return null;
+      const changes = Array.isArray(base.stateChanges) ? base.stateChanges : [];
+      const stateChanges = changes.flatMap(change => {
+        if (!isRecord(change)) return [];
+        const entityType = change.entityType === 'prop' ? 'object' : change.entityType === 'character' ? 'character' : null;
+        const property = change.property === 'holder' ? 'owner' : change.property === 'openState' ? 'state' : change.property;
+        if (!entityType || change.value === null || change.value === undefined || !change.entityId || !property) return [];
+        return [{ entity: change.entityId, property, previousValue: change.previousValue, value: change.value, actorId: change.actorId, evidence: change.evidence }];
+      });
+      return {
+        id: base.id,
+        characters: Array.isArray(base.characters) ? base.characters : [],
+        storyDetail: base.storyDetail || '',
+        visibleAction: base.visibleAction || '',
+        sourceEvents: Array.isArray(base.sourceEvents) ? base.sourceEvents : [],
+        startState: scene.startStateData,
+        endState: scene.endStateData,
+        stateChanges
+      };
     });
-    return {
-      id: base.id,
-      characters: base.characters || [],
-      storyDetail: base.storyDetail || '',
-      visibleAction: base.visibleAction || '',
-      sourceEvents: Array.isArray(base.sourceEvents) ? base.sourceEvents : [],
-      startState: scene.startStateData,
-      endState: scene.endStateData,
-      stateChanges
-    };
-  });
-
-  if (scenes.some(scene => scene === null)) {
-    return {
-      supplied: true,
-      report: { passed: false, checkedTransitions: 0,
-        issues: [{ code: 'structured-state-memory-incomplete', severity: 'error' }] }
-    };
+    if (scenes.some(scene => scene === null)) {
+      return { supplied: true, report: { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-memory-incomplete', severity: 'error' }] } };
+    }
+    const memory = buildSceneStateMemory(scenes);
+    if (!memory) {
+      return { supplied: true, report: { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-memory-invalid', severity: 'error' }] } };
+    }
+    const report = validateSceneStateContinuity(memory);
+    return { supplied: true, report: isRecord(report) && Array.isArray(report.issues) ? report : { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-validation-invalid', severity: 'error' }] } };
+  } catch {
+    return { supplied: true, report: { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-memory-error', severity: 'error' }] } };
   }
-  const memory = buildSceneStateMemory(scenes);
-  if (!memory) {
-    return {
-      supplied: true,
-      report: { passed: false, checkedTransitions: 0,
-        issues: [{ code: 'structured-state-memory-invalid', severity: 'error' }] }
-    };
-  }
-  return { supplied: true, report: validateSceneStateContinuity(memory) };
 }
-
 function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null }) {
   const requiredDetails = basePlan.scenes.map((scene, index) => ({
     scene: index + 1,
@@ -270,6 +275,7 @@ export async function directStoryboardWithLocalAI({
   if (structuredStateMemory.supplied) {
     evaluation.structuredStateMemoryReport = structuredStateMemory.report;
     if (!structuredStateMemory.report?.passed) {
+      if (!Array.isArray(evaluation.issues)) evaluation.issues = [];
       evaluation.issues.push({
         skill: 'structured-state-memory',
         code: 'structured-state-continuity-failed',
