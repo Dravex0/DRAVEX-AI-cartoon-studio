@@ -68,3 +68,19 @@ test("counts a scene clip as decoded only with frame dimensions and finite durat
   assert.equal(isSceneVideoDecoded({ readyState: 2, videoWidth: 640, videoHeight: 360, duration: 0 }), false);
   assert.equal(isSceneVideoDecoded(null), false);
 });
+
+test("does not resolve readiness without finite duration and decoded height", async () => {
+  const missingDuration = new FakeVideo({ readyState: 2, videoWidth: 640 });
+  missingDuration.duration = Infinity;
+  await assert.rejects(
+    waitForSceneVideoReady(missingDuration, { timeoutMs: 5 }),
+    /Timed out waiting for a decoded frame/
+  );
+
+  const missingHeight = new FakeVideo({ readyState: 2, videoWidth: 640 });
+  missingHeight.videoHeight = 0;
+  await assert.rejects(
+    waitForSceneVideoReady(missingHeight, { timeoutMs: 5 }),
+    /Timed out waiting for a decoded frame/
+  );
+});
