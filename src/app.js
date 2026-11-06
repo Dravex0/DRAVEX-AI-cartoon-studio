@@ -748,9 +748,11 @@ $('faceAnalysisInterval')?.addEventListener('change',updateFaceAnalysisControls)
 $('showFaceLandmarkOverlay')?.addEventListener('change',()=>{faceLandmarkOverlayLastTimeBucket=-1;if(!playing)draw();});
 function releaseSceneVideo(meta,index){
  const key=sceneVideoKey(index,meta);
+ sceneGenerationGuard.invalidate(meta.id);
+ const invalidationStorageRevision=sceneGenerationGuard.storageRevision(meta.id);
  disposeSceneVideoEntry(sceneVideoCache.get(key));
  sceneVideoCache.delete(key);
- void sceneVideoStorage.delete(key).catch(error=>console.warn("Could not delete persisted scene video:",error));
+ void sceneVideoStorage.deleteOlderThanRevision(key,invalidationStorageRevision).catch(error=>console.warn("Could not delete superseded persisted scene video:",error));
 }
 async function restorePersistedSceneVideos(){
  let restored=0,discarded=0;
