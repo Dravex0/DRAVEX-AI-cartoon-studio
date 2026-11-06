@@ -118,7 +118,12 @@ export async function persistSceneVideoBestEffort(storage, sceneId, blob, filena
     return { persisted: false, error: "Scene video storage is unavailable." };
   }
   try {
-    await storage.put(sceneId, blob, filename);
+    const record = options && Object.keys(options).length
+      ? await storage.put(sceneId, blob, filename, options)
+      : await storage.put(sceneId, blob, filename);
+    if (record?.superseded) {
+      return { persisted: false, error: "A newer scene generation already replaced this clip." };
+    }
     return { persisted: true, error: "" };
   } catch (error) {
     return {
