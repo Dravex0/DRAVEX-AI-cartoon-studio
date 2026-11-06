@@ -2008,10 +2008,10 @@ $('voiceNonCommercialConsent').addEventListener('change',refreshSceneVoiceContro
 $('make').addEventListener('click',()=>createStoryboard());
 
 function runAutomaticDialogueAndVoice(request,signal){
- const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata});
- if(!speechPlan.dialogueRequested&&!speechPlan.voiceRequested)return {skipped:true,reason:'speech-not-requested'};
  const locale=storyLanguage();
  persistCurrentSceneDialogueToMetadata(locale);
+ const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata});
+ if(!speechPlan.dialogueRequested&&!speechPlan.voiceRequested)return {skipped:true,reason:'speech-not-requested'};
  const report=detail=>{$('status').textContent=detail;};
  const handlers=universalCapabilityRegistry.createHandlers();
  const plan={sourceRequest:request};
@@ -2087,7 +2087,6 @@ $('makeFilm').addEventListener('click',async()=>{
   $('status').textContent=(uiLang==='ru'?'Не удалось подготовить диалоги/озвучку: ':'Could not prepare dialogue/voice: ')+(error?.message||'Unknown error');
   return;
  }
- const motionPreparation=prepareAutomaticCharacterMotion();
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
   const hasImage=Boolean(String(scene?.generatedImageUrl||'').trim());
@@ -2126,6 +2125,27 @@ $('makeFilm').addEventListener('click',async()=>{
   }
   return;
  }
+ const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata});
+ if(speechPlan.dialogueRequested||speechPlan.voiceRequested){
+  const speechController=new AbortController();
+  const createButton=$('makeFilm');
+  const cancelButton=$('cancelFullFilmComfy');
+  fullFilmAbortController=speechController;
+  createButton.disabled=true;
+  cancelButton.hidden=false;
+  try{
+   await runAutomaticDialogueAndVoice(request,speechController.signal);
+  }catch(error){
+   $('status').textContent=(uiLang==='ru'?'Не удалось подготовить диалоги/озвучку: ':'Could not prepare dialogue/voice: ')+(error?.message||'Unknown error');
+   return;
+  }finally{
+   if(fullFilmAbortController===speechController)fullFilmAbortController=null;
+   createButton.disabled=false;
+   cancelButton.hidden=true;
+  }
+  if(speechController.signal.aborted)return;
+ }
+ const motionPreparation=prepareAutomaticCharacterMotion();
  if(mode==='local-canvas'){
   const controller=new AbortController();
   const button=$('makeFilm');
