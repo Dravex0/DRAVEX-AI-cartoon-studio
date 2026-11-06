@@ -188,7 +188,8 @@ export async function directStoryboardWithLocalAI({
   language = 'English',
   character = 'Main character',
   characterBible = [],
-  maxNewTokens = null
+  maxNewTokens = null,
+  signal = null
 } = {}) {
   const fallback = Array.isArray(basePlan?.scenes) ? basePlan.scenes : [];
   const tokenBudget = maxNewTokens == null
@@ -204,6 +205,7 @@ export async function directStoryboardWithLocalAI({
     eventChain
   });
 
+  if (signal?.aborted) return fallbackResult('cancelled');
   if (!runtime || typeof runtime.generate !== 'function') return fallbackResult('local-runtime-unavailable');
   if (!fallback.length) return fallbackResult('baseline-storyboard-empty');
 
@@ -211,11 +213,14 @@ export async function directStoryboardWithLocalAI({
   try {
     generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain }), {
       maxNewTokens: tokenBudget,
-      temperature: 0.15
+      temperature: 0.15,
+      signal
     });
   } catch (error) {
+    if (signal?.aborted || error?.name === 'AbortError') return fallbackResult('cancelled');
     return fallbackResult('local-inference-failed: ' + clean(error?.message, 300));
   }
+  if (signal?.aborted) return fallbackResult('cancelled');
 
   const modelScenes = parseModelScenes(generated?.text);
   if (!modelScenes || modelScenes.length !== fallback.length || modelScenes.some(scene => !isRecord(scene))) {

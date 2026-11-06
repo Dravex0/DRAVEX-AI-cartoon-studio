@@ -64,3 +64,39 @@ test('rejects low-quality AI output and returns the original scenes', async () =
   assert.equal(result.fallbackReason, 'candidate-failed-story-quality-gate');
   assert.deepEqual(result.scenes, plan.scenes);
 });
+
+test('returns a cancelled result when cancellation is requested before direction starts', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let generated = false;
+  const result = await directStoryboardForFilm({
+    runtime: { status: { loaded: true }, generate: async () => { generated = true; return { text: '[]' }; } },
+    basePlan,
+    signal: controller.signal
+  });
+  assert.equal(result.status, 'cancelled');
+  assert.equal(generated, false);
+  assert.deepEqual(result.scenes, basePlan.scenes);
+});
+
+test('discards a local model result when cancellation occurs during inference', async () => {
+  const controller = new AbortController();
+  const resultPromise = directStoryboardForFilm({
+    runtime: {
+      status: { loaded: true },
+      generate: async (_prompt, options) => {
+        assert.equal(options.signal, controller.signal);
+        controller.abort();
+        const error = new Error('cancelled');
+        error.name = 'AbortError';
+        throw error;
+      }
+    },
+    basePlan,
+    signal: controller.signal
+  });
+  const result = await resultPromise;
+  assert.equal(result.status, 'cancelled');
+  assert.equal(result.usedLocalModel, false);
+  assert.deepEqual(result.scenes, basePlan.scenes);
+});

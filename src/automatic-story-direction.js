@@ -10,9 +10,13 @@ export async function directStoryboardForFilm({
   storyText = '',
   language = 'English',
   character = 'Main character',
-  characterBible = []
+  characterBible = [],
+  signal = null
 } = {}) {
   const fallbackScenes = Array.isArray(basePlan?.scenes) ? basePlan.scenes : [];
+  if (signal?.aborted) {
+    return { status: 'cancelled', usedLocalModel: false, scenes: fallbackScenes, fallbackReason: 'cancelled' };
+  }
   if (!fallbackScenes.length) {
     return { usedLocalModel: false, scenes: fallbackScenes, fallbackReason: 'storyboard-empty' };
   }
@@ -26,8 +30,12 @@ export async function directStoryboardForFilm({
     storyText,
     language,
     character,
-    characterBible
+    characterBible,
+    signal
   });
+  if (signal?.aborted || result.fallbackReason === 'cancelled') {
+    return { ...result, status: 'cancelled', scenes: fallbackScenes, usedLocalModel: false };
+  }
   if (!result.usedLocalModel) {
     return {
       ...result,
