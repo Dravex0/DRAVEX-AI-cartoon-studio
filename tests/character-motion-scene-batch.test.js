@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateCharacterMotionTimelinesForScenes } from '../src/character-motion-scene-batch.js';
+import { planCharacterMotionFromActionTimeline } from '../src/character-motion-planner.js';
 
 const timeline = { schemaVersion: 1, phases: [{
   phase: 'action', actorId: 'Foxy', start: 0.2, end: 0.8,
@@ -75,4 +76,31 @@ test('rejects a missing factory and handles non-array scenes safely', () => {
     scenesWithoutSprites: 0, scenesWithoutActions: 0,
     preservedTimelines: 0, skipped: []
   });
+});
+
+test('runs the real grounded sprite motion planner across a scene batch', () => {
+  const scene = {
+    id: 'walk-scene',
+    characters: ['Foxy'],
+    characterCastProvided: true,
+    storyDetail: 'Foxy walks to the right.',
+    characterLayers: [{ characterId: 'Foxy', x: 0.25, y: 0.7 }],
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0.2, end: 0.8,
+        actorId: 'Foxy', targetId: null,
+        description: 'Foxy walks to the right.',
+        evidence: 'Foxy walks to the right.'
+      }]
+    }
+  };
+  const result = generateCharacterMotionTimelinesForScenes(
+    [scene],
+    planCharacterMotionFromActionTimeline
+  );
+  assert.equal(result.generatedScenes, 1);
+  assert.equal(result.generatedActions, 1);
+  assert.equal(result.scenes[0].characterMotionTimeline.phases.length, 1);
+  assert.equal(result.scenes[0].characterMotionTimeline.phases[0].motion.to.x, 0.39);
 });
