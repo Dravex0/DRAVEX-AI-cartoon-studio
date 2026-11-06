@@ -3055,8 +3055,8 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   // Prepare requested dialogue and speech before spending time/quota on video generation.
   // Existing user dialogue and matching voice artifacts are preserved by the workflow.
   const speechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata});
-  const needsDialogue=speechTasks.dialogueRequested
-   ||(speechTasks.voiceRequested&&selectScenesMissingDialogue(sceneMetadata).length>0);
+  const needsDialogue=(speechTasks.dialogueRequested||speechTasks.voiceRequested)
+   &&selectScenesMissingDialogue(sceneMetadata).length>0;
   if(needsDialogue){
    if(!localTextRuntime.status.loaded){
     throw new Error(uiLang==='ru'
