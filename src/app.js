@@ -8,6 +8,7 @@ import { calculateCinematicShot } from "./director-engine.js";
 import { detectDeviceCapabilities } from "./device-capabilities.js";
 import { createLocalTransformersRuntime } from "./transformers-local-runtime.js";
 import { directStoryboardWithLocalAI } from "./local-story-director.js";
+import { directStoryboardForFilm } from './automatic-story-direction.js';
 import { planUniversalTask } from "./universal-task-planner.js";
 import { createUniversalCapabilityRegistry, bindUniversalPlanCapabilities } from "./universal-capability-registry.js";
 import { executeUniversalTaskPlan } from "./universal-task-executor.js";
@@ -2079,6 +2080,45 @@ $('makeFilm').addEventListener('click',async()=>{
  );
  const created=canReuseStoryboard?currentStoryboardPlan:createStoryboard();
  if(!created)return;
+ if(localTextRuntime.status.loaded&&created.automaticDirectionApplied!==true){
+  const ru=uiLang==='ru';
+  $('status').textContent=ru?'Локальный AI-режиссёр проверяет и улучшает сцены перед рендером…':'Local AI director is reviewing and improving scenes before rendering…';
+  try{
+   const languageName={ru:'Russian',uk:'Ukrainian',en:'English',es:'Spanish'}[language]||'English';
+   const directed=await directStoryboardForFilm({
+    runtime:localTextRuntime,
+    basePlan:{...created,scenes:sceneMetadata},
+    storyText:request,
+    language:languageName,
+    character:requestedCharacter,
+    characterBible
+   });
+   if(directed.usedLocalModel){
+    const directedScenes=ensureSceneIds(directed.scenes.map(scene=>({...scene,characters:Array.isArray(scene.characters)&&scene.characters.length?scene.characters:[requestedCharacter]})));
+    sceneMetadata=directedScenes;
+    currentStoryboardPlan={...created,...directed,eventChain:directed.eventChain||buildStoryEventChain(directedScenes),sourceText:request,sourceLanguage:language,sourceCharacter:requestedCharacter,scenes:directedScenes,titles:directedScenes.map(scene=>scene.title),descriptions:directedScenes.map(scene=>scene.visibleAction),automaticDirectionApplied:true};
+    titles=currentStoryboardPlan.titles;
+    descriptions=currentStoryboardPlan.descriptions;
+    sceneIndex=0;
+    ensureMainCharacterReference(requestedCharacter);
+    $('bibleCharacterId').value=requestedCharacter;
+    $('bibleCharacterId').dataset.loaded='';
+    $('sceneLabel').textContent=(storyLabels[language]||'Scene')+' 1 · '+titles[0];
+    renderScenes();
+    syncSceneEditor();
+    updateStoryQA();
+    $('status').textContent=ru?'AI-режиссёр улучшил раскадровку. Проверка качества пройдена; запускаем рендер.':'AI director improved the storyboard. Quality gate passed; starting render.';
+   }else{
+    currentStoryboardPlan={...created,automaticDirectionApplied:true};
+    $('status').textContent=ru?'AI-режиссёр не изменил раскадровку: '+(directed.fallbackReason||'резервный сценарий')+'. Используем проверенный локальный вариант.':'AI director kept the deterministic storyboard: '+(directed.fallbackReason||'fallback')+'. Using the verified local version.';
+   }
+  }catch(error){
+   currentStoryboardPlan={...created,automaticDirectionApplied:true};
+   $('status').textContent=(ru?'AI-режиссёр недоступен, используем базовую раскадровку: ':'AI director unavailable; using baseline storyboard: ')+(error?.message||'Unknown error');
+  }
+ }else if(!localTextRuntime.status.loaded){
+  $('status').textContent=uiLang==='ru'?'Локальная модель не загружена. Используем раскадровку DRAVEX; AI-режиссёр можно включить после загрузки модели.':'Local model is not loaded. Using the DRAVEX storyboard; load the model to enable AI direction.';
+ }
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
   const hasImage=Boolean(String(scene?.generatedImageUrl||'').trim());
