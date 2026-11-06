@@ -40,6 +40,7 @@ import { createBrowserLocalTtsEngine } from "./browser-local-tts-engine.js";
 import { createTimestampedKokoroEngine } from "./timestamped-kokoro-engine.js";
 import { createVoiceAudioStorage } from "./voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./scene-voice-workflow.js";
+import { createVoiceGenerationCheckpoint, restoreVoiceGenerationCheckpoint } from "./voice-generation-checkpoint.js";
 import { createSceneVideoStorage, persistSceneVideoBestEffort } from "./scene-video-storage.js";
 import { createFacialAssetStorage } from "./facial-asset-storage.js";
 import { createCharacterReferenceImageStorage } from "./character-reference-image-storage.js";
@@ -1835,15 +1836,34 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
   });
   savedMap={...assignments};
   writeLocalStorage('dravex-character-voice-map',JSON.stringify(savedMap));
-  const artifacts=[];
+  const voiceIds=dialogue.map(line=>assignments[normalizeSpeakerKey(line.characterId)]||null);
+  const checkpointKey='dravex-voice-checkpoint:'+encodeURIComponent(targetId);
+  let savedCheckpoint=null;
+  try{const raw=readLocalStorage(checkpointKey);if(raw)savedCheckpoint=JSON.parse(raw)}catch{}
+  const artifacts=await restoreVoiceGenerationCheckpoint({
+   checkpoint:savedCheckpoint,sceneId:targetId,locale,engine:engine.status.engine,
+   modelId:engine.status.modelId,dialogue,voiceIds,storage:sceneVoiceStorage
+  });
   for(let index=0;index<dialogue.length;index++){
    if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
    const line=dialogue[index];
-   const voiceId=assignments[normalizeSpeakerKey(line.characterId)]||undefined;
+   const voiceId=voiceIds[index]||undefined;
+   if(artifacts[index]){
+    overallIndex++;
+    onProgress({phase:'reused',sceneIndex:targetIndex,index:index+1,total:dialogue.length,overallIndex,overallTotal,characterId:line.characterId});
+    continue;
+   }
    if(sceneIndex===targetIndex)$('sceneVoiceStatus').textContent=voiceText('Создаём голос сцены '+(targetIndex+1)+': '+(index+1)+' из '+dialogue.length+'…','Generating scene '+(targetIndex+1)+' voice '+(index+1)+' of '+dialogue.length+'…');
    onProgress({phase:'generating',sceneIndex:targetIndex,index:index+1,total:dialogue.length,overallIndex:overallIndex+1,overallTotal,characterId:line.characterId});
    const result=await engine.synthesize({text:line.text,voiceId,filename:'scene-'+targetId+'-line-'+(index+1)+'.wav',signal});
-   artifacts.push({audioHash:result.audioHash,durationMs:result.durationMs,voiceId:voiceId||null,...(Array.isArray(result.visemeEvents)?{visemeEvents:result.visemeEvents}:{})});
+   artifacts[index]={audioHash:result.audioHash,durationMs:result.durationMs,voiceId:voiceId||null,
+    ...(Array.isArray(result.visemeEvents)?{visemeEvents:result.visemeEvents}:{}),
+    ...(Array.isArray(result.phonemeChunks)?{phonemeChunks:result.phonemeChunks}:{})};
+   const checkpoint=createVoiceGenerationCheckpoint({
+    sceneId:targetId,locale,engine:engine.status.engine,modelId:engine.status.modelId,
+    dialogue,voiceIds,artifacts
+   });
+   writeLocalStorage(checkpointKey,JSON.stringify(checkpoint));
    overallIndex++;
   }
   if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
@@ -1859,6 +1879,7 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
    language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
   }));
   persistedInDraft=persistedInDraft&&saved;
+  if(saved){try{window.localStorage.removeItem(checkpointKey)}catch{}}
   lineCount+=scheduled.cues.length;
   totalDurationMs+=scheduled.timeline.totalDurationMs;
   sceneIds.push(targetId);
