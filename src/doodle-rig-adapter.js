@@ -34,6 +34,8 @@ export function compileDoodleSceneMotion(sceneInput, rigInputs) {
     ? [...new Set(scene.characters.map(id => clean(id)).filter(Boolean))]
     : [];
   const characterActions = isRecord(scene.characterActions) ? scene.characterActions : {};
+  const actionByCharacter = new Map(Object.entries(characterActions)
+    .map(([id, action]) => [clean(id).toLocaleLowerCase(), action]));
   const warnings = [];
   const prepared = [];
 
@@ -47,7 +49,7 @@ export function compileDoodleSceneMotion(sceneInput, rigInputs) {
   }
 
   for (const characterId of characters.slice(0, 20)) {
-    const rawAction = characterActions[characterId] ?? scene.action;
+    const rawAction = actionByCharacter.get(characterId.toLocaleLowerCase()) ?? scene.action;
     const action = normalizeAction(rawAction);
     const preset = ACTION_PRESETS[action];
     if (!preset) {
@@ -64,7 +66,7 @@ export function compileDoodleSceneMotion(sceneInput, rigInputs) {
       warnings.push(`Could not compile ${action} for ${characterId}: ${result.issues?.map(issue => issue.code).join(', ') || result.status}.`);
       continue;
     }
-    prepared.push({ characterId: result.timeline.keyframes[0]?.poses ? result.timeline.keyframes[0].poses : {}, timeline: result.timeline, actorId: rig.characterId, action });
+    prepared.push({ timeline: result.timeline, actorId: rig.characterId, action });
     for (const warning of result.warnings || []) warnings.push(`${characterId}: ${warning}`);
     if (action === 'talk') {
       warnings.push(`${characterId}: body motion uses idle; dialogue mouth movement remains controlled by the existing audio/viseme LipSync timeline.`);
@@ -83,7 +85,8 @@ export function compileDoodleSceneMotion(sceneInput, rigInputs) {
     const poses = {};
     for (const item of prepared) {
       const sampled = sampleCharacterRigTimeline(item.timeline, time);
-      const characterPose = sampled[item.actorId] || sampled[Object.keys(sampled)[0]];
+      const sampledId = Object.keys(sampled).find(id => id.toLocaleLowerCase() === item.actorId.toLocaleLowerCase());
+      const characterPose = sampled[item.actorId] || (sampledId ? sampled[sampledId] : null);
       if (characterPose && Object.keys(characterPose).length) poses[item.actorId] = characterPose;
     }
     return { time, easing: 'linear', poses };
