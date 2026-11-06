@@ -96,63 +96,51 @@ export function estimateDirectorTokenBudget(sceneCount) {
 }
 
 function buildStructuredStateMemory(modelScenes, baselineScenes) {
-  const supplied = modelScenes.some(scene =>
+  if (!Array.isArray(modelScenes) || !Array.isArray(baselineScenes) || modelScenes.length !== baselineScenes.length) {
+    return { supplied: false, report: null };
+  }
+  const supplied = modelScenes.some(scene => isRecord(scene) && (
     Object.prototype.hasOwnProperty.call(scene, 'startStateData')
     || Object.prototype.hasOwnProperty.call(scene, 'endStateData')
-  );
+  ));
   if (!supplied) return { supplied: false, report: null };
-
-  const scenes = modelScenes.map((scene, index) => {
-    if (!Object.prototype.hasOwnProperty.call(scene, 'startStateData')
-        || !Object.prototype.hasOwnProperty.call(scene, 'endStateData')) {
-      return null;
-    }
-    const base = baselineScenes[index];
-    const stateChanges = (base.stateChanges || []).flatMap(change => {
-      const entityType = change.entityType === 'prop' ? 'object'
-        : change.entityType === 'character' ? 'character' : null;
-      const property = change.property === 'holder' ? 'owner'
-        : change.property === 'openState' ? 'state' : change.property;
-      if (!entityType || change.value === null || !change.entityId || !property) return [];
-      return [{
-        entity: change.entityId,
-        property,
-        previousValue: change.previousValue,
-        value: change.value,
-        actorId: change.actorId,
-        evidence: change.evidence
-      }];
+  try {
+    const scenes = modelScenes.map((scene, index) => {
+      if (!isRecord(scene) || !Object.prototype.hasOwnProperty.call(scene, 'startStateData') || !Object.prototype.hasOwnProperty.call(scene, 'endStateData')) return null;
+      const base = baselineScenes[index];
+      if (!isRecord(base)) return null;
+      const changes = Array.isArray(base.stateChanges) ? base.stateChanges : [];
+      const stateChanges = changes.flatMap(change => {
+        if (!isRecord(change)) return [];
+        const entityType = change.entityType === 'prop' ? 'object' : change.entityType === 'character' ? 'character' : null;
+        const property = change.property === 'holder' ? 'owner' : change.property === 'openState' ? 'state' : change.property;
+        if (!entityType || change.value === null || change.value === undefined || !change.entityId || !property) return [];
+        return [{ entity: change.entityId, property, previousValue: change.previousValue, value: change.value, actorId: change.actorId, evidence: change.evidence }];
+      });
+      return {
+        id: base.id,
+        characters: Array.isArray(base.characters) ? base.characters : [],
+        storyDetail: base.storyDetail || '',
+        visibleAction: base.visibleAction || '',
+        sourceEvents: Array.isArray(base.sourceEvents) ? base.sourceEvents : [],
+        startState: scene.startStateData,
+        endState: scene.endStateData,
+        stateChanges
+      };
     });
-    return {
-      id: base.id,
-      characters: base.characters || [],
-      storyDetail: base.storyDetail || '',
-      visibleAction: base.visibleAction || '',
-      sourceEvents: Array.isArray(base.sourceEvents) ? base.sourceEvents : [],
-      startState: scene.startStateData,
-      endState: scene.endStateData,
-      stateChanges
-    };
-  });
-
-  if (scenes.some(scene => scene === null)) {
-    return {
-      supplied: true,
-      report: { passed: false, checkedTransitions: 0,
-        issues: [{ code: 'structured-state-memory-incomplete', severity: 'error' }] }
-    };
+    if (scenes.some(scene => scene === null)) {
+      return { supplied: true, report: { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-memory-incomplete', severity: 'error' }] } };
+    }
+    const memory = buildSceneStateMemory(scenes);
+    if (!memory) {
+      return { supplied: true, report: { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-memory-invalid', severity: 'error' }] } };
+    }
+    const report = validateSceneStateContinuity(memory);
+    return { supplied: true, report: isRecord(report) && Array.isArray(report.issues) ? report : { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-validation-invalid', severity: 'error' }] } };
+  } catch {
+    return { supplied: true, report: { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-memory-error', severity: 'error' }] } };
   }
-  const memory = buildSceneStateMemory(scenes);
-  if (!memory) {
-    return {
-      supplied: true,
-      report: { passed: false, checkedTransitions: 0,
-        issues: [{ code: 'structured-state-memory-invalid', severity: 'error' }] }
-    };
-  }
-  return { supplied: true, report: validateSceneStateContinuity(memory) };
 }
-
 function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null }) {
   const requiredDetails = basePlan.scenes.map((scene, index) => ({
     scene: index + 1,
@@ -287,6 +275,7 @@ export async function directStoryboardWithLocalAI({
   if (structuredStateMemory.supplied) {
     evaluation.structuredStateMemoryReport = structuredStateMemory.report;
     if (!structuredStateMemory.report?.passed) {
+      if (!Array.isArray(evaluation.issues)) evaluation.issues = [];
       evaluation.issues.push({
         skill: 'structured-state-memory',
         code: 'structured-state-continuity-failed',
