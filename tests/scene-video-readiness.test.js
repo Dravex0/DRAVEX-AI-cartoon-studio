@@ -7,11 +7,15 @@ class FakeVideo extends EventTarget {
     super();
     this.readyState = readyState;
     this.videoWidth = videoWidth;
+    this.videoHeight = videoWidth > 0 ? 360 : 0;
+    this.duration = readyState >= 2 && videoWidth > 0 ? 5 : NaN;
     this.error = error;
   }
   becomeReady() {
     this.readyState = 2;
     this.videoWidth = 640;
+    this.videoHeight = 360;
+    this.duration = 5;
     this.dispatchEvent(new Event("loadeddata"));
   }
 }
