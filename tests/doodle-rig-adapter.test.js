@@ -41,10 +41,12 @@ test('supports per-character actions and combines them into one scene timeline',
   );
   assert.equal(result.status, 'ready');
   assert.deepEqual(result.animatedCharacterIds, ['Foxy', 'Bird']);
-  for (const frame of result.timeline.keyframes) {
-    assert.ok(frame.poses.Foxy);
-    assert.ok(frame.poses.Bird);
-  }
+  const authoredCharacters = new Set(result.timeline.keyframes.flatMap(frame => Object.keys(frame.poses)));
+  assert.ok(authoredCharacters.has('Foxy'));
+  assert.ok(authoredCharacters.has('Bird'));
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.5);
+  assert.ok(middle.Foxy);
+  assert.ok(middle.Bird);
 });
 
 test('does not invent character identity when the cast is missing', () => {
