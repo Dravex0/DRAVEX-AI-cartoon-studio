@@ -20,8 +20,11 @@ export async function waitForExportVideoReady(blob, {
   if (!(blob instanceof Blob) || blob.size === 0) throw new TypeError("A non-empty exported video Blob is required.");
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new RangeError("timeoutMs must be a positive finite number.");
   const url = createObjectURL(blob);
-  const video = createVideoElement();
+  let video = null;
   try {
+    // Keep player creation inside the protected lifetime so the object URL is
+    // released even when the browser cannot allocate a temporary video element.
+    video = createVideoElement();
     video.preload = "auto";
     video.muted = true;
     video.playsInline = true;
@@ -49,9 +52,10 @@ export async function waitForExportVideoReady(blob, {
     });
     return { width: video.videoWidth, height: video.videoHeight, readyState: video.readyState };
   } finally {
-    video.pause?.();
-    video.removeAttribute?.("src");
-    video.load?.();
-    revokeObjectURL(url);
+    // Cleanup is best-effort, but every release step is attempted independently.
+    try { video?.pause?.(); } catch {}
+    try { video?.removeAttribute?.("src"); } catch {}
+    try { video?.load?.(); } catch {}
+    try { revokeObjectURL(url); } catch {}
   }
 }
