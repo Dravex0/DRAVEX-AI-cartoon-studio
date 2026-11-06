@@ -2013,7 +2013,11 @@ $('makeFilm').addEventListener('click',()=>{
  const created=createStoryboard();
  if(!created)return;
  const mode=$('videoGenerationMode').value;
- const missingImageCount=sceneMetadata.filter(scene=>!String(scene?.generatedImageUrl||'').trim()).length;
+ const missingImageCount=sceneMetadata.filter((scene,index)=>{
+  const hasImage=Boolean(String(scene?.generatedImageUrl||'').trim());
+  const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
+  return !hasImage&&!cachedVideo?.video;
+ }).length;
  const gate=evaluatePromptToFilmStart({
   mode,
   sceneCount:sceneMetadata.length,
