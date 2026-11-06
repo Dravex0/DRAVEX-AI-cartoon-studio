@@ -123,6 +123,47 @@ test('localizes style and quality options and restores the saved creative setup'
   await expect(page.locator('#imageQuality')).toHaveValue('ultra');
 });
 
+test('local canvas mode exports a playable WebM without contacting cloud video or image providers', async ({ page }) => {
+  const pageErrors = [];
+  const providerRequests = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  page.on('request', request => {
+    if (/huggingface|aihorde|horde\.live/i.test(request.url())) providerRequests.push(request.url());
+  });
+
+  await page.goto('/');
+  await page.locator('#generationTools > summary').click();
+  await page.locator('#videoGenerationMode').selectOption('local-canvas');
+  await expect(page.locator('#generateFullFilmComfy')).toBeHidden();
+  await page.locator('#idea').fill(
+    'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\nDuration: 0.25 seconds'
+  );
+  await page.locator('#makeFilm').click();
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
+
+  const video = await page.locator('#finalFilmPlayer').evaluate(async element => {
+    const response = await fetch(element.currentSrc);
+    const blob = await response.blob();
+    return {
+      mimeType: blob.type,
+      byteLength: blob.size,
+      duration: element.duration,
+      width: element.videoWidth,
+      height: element.videoHeight,
+      readyState: element.readyState
+    };
+  });
+  expect(video.mimeType).toMatch(/^video\/webm/i);
+  expect(video.byteLength).toBeGreaterThan(1024);
+  expect(video.duration).toBeGreaterThan(0);
+  expect(video.width).toBe(1280);
+  expect(video.height).toBe(720);
+  expect(video.readyState).toBeGreaterThanOrEqual(2);
+  expect(providerRequests).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+
 test('one-click film creation builds the storyboard and clearly blocks until providers and consent are ready', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
