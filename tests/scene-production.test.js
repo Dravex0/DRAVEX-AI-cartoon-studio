@@ -51,6 +51,17 @@ test('motion prompt builder separates temporal action and preserves continuity',
   assert.match(prompt, /do not introduce new objects/i);
 });
 
+test('motion prompt adds temporal stability and controlled camera constraints', () => {
+  const prompt = buildMotionGenerationPrompt({
+    visibleAction: 'The fox slowly waves.',
+    characters: ['foxy']
+  }, bible);
+  assert.match(prompt, /temporal coherence/i);
+  assert.match(prompt, /avoid flicker, morphing, wobble/i);
+  assert.match(prompt, /Keep the camera fixed when no camera movement is specified/i);
+  assert.match(prompt, /smoothly/i);
+});
+
 test('prompt builders handle missing optional metadata without throwing', () => {
   assert.match(buildImageGenerationPrompt({ imagePrompt: 'A bird lands.' }), /A bird lands/);
   assert.match(buildMotionGenerationPrompt({ visibleAction: 'A bird lands.' }), /A bird lands/);
