@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sampleCharacterFacialLipSync } from "../src/facial-lipsync-runtime.js";
+import { sampleCharacterFacialLipSync, sceneHasFacialRigForSpeaker } from "../src/facial-lipsync-runtime.js";
 
 function track(characterId, sceneIndex, startMs, shapes, openness) {
   return {
@@ -63,4 +63,22 @@ test("preserves timestamped visemes when the dialogue waveform is audible", () =
   ], 0, 150);
   assert.equal(result.facialVisemes.Foxy, "round");
   assert.equal(result.facialMouthOpenness.Foxy, 0.04);
+});
+
+
+test("matches facial rigs only to the corresponding dialogue speaker", () => {
+  const rigs = [
+    { characterId: "Foxy", parts: [{ id: "mouth" }] },
+    { characterId: "Owl", characterName: "Old Owl", parts: [{ id: "beak" }] }
+  ];
+  assert.equal(sceneHasFacialRigForSpeaker(rigs, "Foxy", "Foxy"), true);
+  assert.equal(sceneHasFacialRigForSpeaker(rigs, "Owl", "Old Owl"), true);
+  assert.equal(sceneHasFacialRigForSpeaker(rigs, "Rabbit", "Rabbit"), false);
+  assert.equal(sceneHasFacialRigForSpeaker([], "Foxy", "Foxy"), false);
+  assert.equal(sceneHasFacialRigForSpeaker(rigs, "", ""), false);
+});
+
+test("does not treat the existence of an unrelated rig as a speaker match", () => {
+  const rigs = [{ characterId: "Foxy", parts: [{ id: "mouth" }] }];
+  assert.equal(sceneHasFacialRigForSpeaker(rigs, "Owl", "Owl"), false);
 });
