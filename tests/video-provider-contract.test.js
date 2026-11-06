@@ -107,11 +107,12 @@ test('requires output media for completed jobs and accepts completed video blobs
   registry.register({
     id: 'good-output',
     taskTypes: ['image-to-video'],
-    generate: async () => ({ status: 'completed', video: { type: 'video/webm' } })
+    generate: async () => ({ status: 'completed', video: new Blob(['video'], { type: 'video/webm' }) })
   });
   const result = await generateVideoWithProvider(registry, 'good-output', validRequest);
   assert.equal(result.status, 'completed');
   assert.equal(result.video.type, 'video/webm');
+  assert.equal(result.video.size, 5);
 });
 
 test('supports cancellation before invoking the provider', async () => {
@@ -204,4 +205,25 @@ test('rejects malformed or excessive character reference image inputs', () => {
   });
   assert.equal(excessive.valid, false);
   assert.ok(excessive.issues.some(issue => issue.code === 'too-many-reference-images'));
+});
+
+test('rejects empty, non-Blob, non-video and URL-only completed artifacts', async () => {
+  const cases = [
+    { video: new Blob([], { type: 'video/webm' }), pattern: /non-empty video Blob/ },
+    { video: { size: 5, type: 'video/webm' }, pattern: /non-empty video Blob/ },
+    { video: new Blob(['not video'], { type: 'text/plain' }), pattern: /video MIME type/ },
+    { url: 'https://example.test/clip.mp4', pattern: /non-empty video Blob/ }
+  ];
+  for (const [index, item] of cases.entries()) {
+    const registry = createVideoProviderRegistry();
+    registry.register({
+      id: `invalid-output-${index}`,
+      taskTypes: ['image-to-video'],
+      generate: async () => ({ status: 'completed', ...item })
+    });
+    await assert.rejects(
+      generateVideoWithProvider(registry, `invalid-output-${index}`, validRequest),
+      item.pattern
+    );
+  }
 });

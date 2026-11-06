@@ -129,12 +129,18 @@ export async function generateVideoWithProvider(registry, providerId, input, con
   }
   const result = await provider.generate(validation.value, context);
   if (!result || typeof result !== 'object') throw new Error('Video provider returned an invalid result.');
-  const status = text(result.status, 30) || (result.video || result.url ? 'completed' : 'pending');
+  const status = text(result.status, 30) || (result.video ? 'completed' : 'pending');
   if (!['queued', 'processing', 'pending', 'completed', 'failed'].includes(status)) {
     throw new Error('Video provider returned an unsupported job status.');
   }
-  if (status === 'completed' && !result.video && !result.url) {
-    throw new Error('Completed video provider result must include a video Blob or URL.');
+  if (status === 'completed') {
+    if (!(typeof Blob !== 'undefined' && result.video instanceof Blob) || result.video.size <= 0) {
+      throw new Error('Completed video provider result must include a non-empty video Blob.');
+    }
+    const mimeType = text(result.video.type, 120).split(';')[0].toLowerCase();
+    if (!mimeType.startsWith('video/')) {
+      throw new Error('Completed video provider Blob must have a video MIME type.');
+    }
   }
   return {
     providerId: provider.id,
