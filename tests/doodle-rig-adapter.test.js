@@ -44,7 +44,7 @@ test('supports per-character actions and combines them into one scene timeline',
   const authoredCharacters = new Set(result.timeline.keyframes.flatMap(frame => Object.keys(frame.poses)));
   assert.ok(authoredCharacters.has('Foxy'));
   assert.ok(authoredCharacters.has('Bird'));
-  const middle = sampleCharacterRigTimeline(result.timeline, 0.5);
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.375);
   assert.ok(middle.Foxy);
   assert.ok(middle.Bird);
 });
