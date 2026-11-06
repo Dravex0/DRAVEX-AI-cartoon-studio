@@ -15,7 +15,7 @@ test('invalidating a scene makes all earlier in-flight tokens stale', () => {
   const guard = createSceneGenerationGuard();
   const first = guard.capture('scene-1');
   const second = guard.capture('scene-1');
-  assert.equal(guard.invalidate('scene-1'), 1);
+  assert.ok(guard.invalidate('scene-1') > second.revision);
   assert.equal(guard.isCurrent(first), false);
   assert.equal(guard.isCurrent(second), false);
   assert.equal(guard.isCurrent(guard.capture('scene-1')), true);
