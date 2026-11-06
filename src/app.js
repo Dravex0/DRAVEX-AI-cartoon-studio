@@ -756,21 +756,28 @@ async function restorePersistedSceneVideos(){
  let restored=0,discarded=0;
  for(let index=0;index<sceneMetadata.length;index++){
   const meta=sceneMetadata[index];
+  const restoreToken=sceneGenerationGuard.capture(meta.id);
   try{
    const record=await sceneVideoStorage.get(meta.id);
    if(!record)continue;
    sceneGenerationGuard.observeStorageRevision(meta.id,record.generationRevision||0);
    if(!(record.blob instanceof Blob)||record.blob.size===0){
-    await sceneVideoStorage.delete(meta.id);discarded++;continue;
+    await sceneVideoStorage.deleteIfRevision(meta.id,record.generationRevision||0);discarded++;continue;
    }
+   if(!sceneGenerationGuard.isCurrent(restoreToken))continue;
    const entry=attachSceneVideo(index,meta,record.blob,record.filename||("dravex-scene-"+(index+1)+".webm"));
    try{
     await waitForSceneVideoReady(entry.video,{timeoutMs:20000});
+    if(!sceneGenerationGuard.isCurrent(restoreToken)){
+     if(sceneVideoCache.get(sceneVideoKey(index,meta))===entry)sceneVideoCache.delete(sceneVideoKey(index,meta));
+     disposeSceneVideoEntry(entry);
+     continue;
+    }
     restored++;
    }catch(decodeError){
     if(sceneVideoCache.get(sceneVideoKey(index,meta))===entry)sceneVideoCache.delete(sceneVideoKey(index,meta));
     disposeSceneVideoEntry(entry);
-    await sceneVideoStorage.delete(meta.id);
+    await sceneVideoStorage.deleteIfRevision(meta.id,record.generationRevision||0);
     discarded++;
     console.warn("Discarded persisted scene video that cannot be decoded:",decodeError);
    }
@@ -778,12 +785,6 @@ async function restorePersistedSceneVideos(){
  }
  if(restored){renderComfySceneVideo();if(!playing)draw();}
  renderScenes();
- if(restored||discarded){
-  const message=uiLang==='ru'
-   ?'Восстановлено видео сцен: '+restored+'.'+(discarded?' Удалено повреждённых файлов: '+discarded+'.':'')
-   :'Restored scene videos: '+restored+'.'+(discarded?' Removed invalid files: '+discarded+'.':'');
-  $('status').textContent=message;
- }
 }
 function getLoadedSceneImage(url){
 const key=String(url||'').trim();
