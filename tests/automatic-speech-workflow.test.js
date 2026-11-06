@@ -57,3 +57,19 @@ test('handles invalid scene collections without throwing', () => {
   assert.deepEqual(result.scenesMissingDialogue, []);
   assert.deepEqual(result.scenesMissingVoice, []);
 });
+
+test('does not mistake speech bubbles or a music soundtrack for spoken voice audio', () => {
+  const bubbles = resolveAutomaticSpeechTasks({
+    request: 'Create speech bubbles and animated captions for the characters.',
+    scenes: [{ id: 's1' }]
+  });
+  assert.equal(bubbles.dialogueRequested, false);
+  assert.equal(bubbles.voiceRequested, false);
+
+  const soundtrack = resolveAutomaticSpeechTasks({
+    request: 'Add background music and audio effects to the film.',
+    scenes: [{ id: 's1' }]
+  });
+  assert.equal(soundtrack.dialogueRequested, false);
+  assert.equal(soundtrack.voiceRequested, false);
+});
