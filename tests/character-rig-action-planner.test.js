@@ -165,3 +165,22 @@ test('maps grounded Ukrainian dance action to the dance preset', () => {
   assert.equal(result.status, 'generated');
   assert.equal(result.mappedActions[0].preset, 'dance');
 });
+
+test('maps grounded dialogue phases through the Doodle adapter to idle body motion', () => {
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('whispers a warning to the traveler'), [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 1);
+  assert.equal(result.mappedActions[0].doodleAction, 'talk');
+  assert.equal(result.mappedActions[0].preset, 'idle');
+  assert.ok(sampleCharacterRigTimeline(result.timeline, 0.35).Foxy);
+});
+
+test('maps explicit fear reactions through the Doodle adapter to the existing defend rig preset', () => {
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('is scared by the sudden thunder'), [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.mappedActions[0].doodleAction, 'scared');
+  assert.equal(result.mappedActions[0].preset, 'defend');
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+  assert.ok(Math.abs(middle.leftArm.rotation) > 0.4);
+  assert.ok(Math.abs(middle.rightArm.rotation) > 0.4);
+});
