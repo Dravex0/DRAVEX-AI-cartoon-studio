@@ -80,3 +80,13 @@ test('does not mutate scene or rig inputs', () => {
   assert.deepEqual(scene, beforeScene);
   assert.deepEqual(sourceRig, beforeRig);
 });
+
+test('matches per-character action keys without case sensitivity', () => {
+  const result = compileDoodleSceneMotion(
+    { characters: ['Foxy'], characterActions: { fOxY: 'wave' } },
+    [rig('Foxy')]
+  );
+  assert.equal(result.status, 'ready');
+  assert.equal(result.actions[0].action, 'wave');
+  assert.deepEqual(result.animatedCharacterIds, ['Foxy']);
+});
