@@ -25,12 +25,12 @@ function makeCanvasFactory(video, moving) {
 test("flags a decoded clip with no sampled pixel changes as likely static",async()=>{
   const video=new FakeVideo();
   const report=await analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,false)});
-  assert.equal(report.status,"likely-static");assert.equal(report.sampleCount,5);assert.equal(report.meanPixelChange,0);
+  assert.equal(report.status,"likely-static");assert.equal(report.sampleCount,5);assert.equal(report.meanPixelChange,0);assert.equal(report.spatialMotion.pattern,"no-change");
 });
 test("detects pixel changes in a moving test clip",async()=>{
   const video=new FakeVideo();
   const report=await analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,true)});
-  assert.equal(report.status,"visible-change");assert.ok(report.meanPixelChange>0);
+  assert.equal(report.status,"visible-change");assert.ok(report.meanPixelChange>0);assert.equal(report.spatialMotion.pattern,"distributed-change");
 });
 test("restores the original playback position and paused state",async()=>{
   const video=new FakeVideo();video.currentTime=1.25;video.paused=false;

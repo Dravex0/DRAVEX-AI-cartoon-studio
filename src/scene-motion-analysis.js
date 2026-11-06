@@ -1,3 +1,4 @@
+import { analyzeSpatialPixelChange } from "./scene-motion-spatial.js";
 /**
  * Browser-local motion check for a decoded scene video.
  * Pixel-change heuristic only; it does not recognize semantic actions or quality.
@@ -94,11 +95,19 @@ export async function analyzeSceneVideoMotion(video, {
   const meanPixelChange = comparisons ? totalChange / comparisons : 0;
   const changedPixelRatio = comparisons ? changedPixels / comparisons : 0;
   const isLikelyStatic = meanPixelChange < staticMotionThreshold && changedPixelRatio < changedPixelThreshold;
+  const spatialMotion = analyzeSpatialPixelChange(frames, {
+    width,
+    height,
+    pixelDeltaThreshold,
+    activeRegionThreshold: staticMotionThreshold,
+    changedPixelThreshold
+  });
   return {
     status: isLikelyStatic ? "likely-static" : "visible-change",
     sampleCount: frames.length,
     meanPixelChange: Number(meanPixelChange.toFixed(5)),
     changedPixelRatio: Number(changedPixelRatio.toFixed(4)),
+    spatialMotion,
     message: isLikelyStatic ? "Very little pixel change was detected between sampled frames." : "Pixel changes were detected between sampled frames."
   };
 }
