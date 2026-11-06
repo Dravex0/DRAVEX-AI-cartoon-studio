@@ -92,7 +92,7 @@ test('WebM export derives built-in character mouth movement from scheduled local
   assert.match(html, /buildAudioMouthEnvelope, sampleAudioMouthEnvelope/);
   assert.match(html, /getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)/);
   assert.match(html, /decodeContext\.decodeAudioData\(await track\.blob\.arrayBuffer\(\)\)/);
-  assert.match(html, /exportMouthTracks\.push\(\{sceneIndex:track\.sceneIndex,characterId:track\.characterId,characterName:track\.characterName,startMs:track\.startMs,envelope,visemes\}\)/);
+  assert.match(html, /exportMouthTracks\.push\(\{cueId:track\.cueId,sceneIndex:track\.sceneIndex,characterId:track\.characterId,characterName:track\.characterName,startMs:track\.startMs,envelope,visemes\}\)/);
   assert.match(html, /mouthClockOrigin=exportMouthOriginTimeMs!==null\?exportMouthOriginTimeMs:previewMouthOriginTimeMs/);
   assert.match(html, /performance\.now\(\)-mouthClockOrigin/);
   assert.match(html, /exportElapsedMs>=track\.startMs/);
@@ -104,9 +104,10 @@ test('WebM export derives built-in character mouth movement from scheduled local
   assert.match(html, /hasFacialRig=sceneHasFacialRigForSpeaker\(meta\.characterFacialRigs,track\.characterId,track\.characterName\)/);
   assert.match(html, /lipSyncSkippedTracks\+\+/);
   assert.match(html, /lipSyncSkippedTracks=lipSyncRenderableTracks\.length/);
-  assert.match(html, /Lip-sync analysis was skipped for /);
-  assert.match(html, /Анализ синхронизации губ пропущен для /);
+  assert.match(html, /Audio analysis was skipped for /);
+  assert.match(html, /Анализ аудио пропущен для /);
   assert.match(html, /const lipSyncRenderableTracks=mainCharacterVoiceTracks;/);
+  assert.match(html, /buildLipSyncQualityReport\(\{voiceTracks,eligibleTrackCount:lipSyncEligibleTrackCount,analyzedTracks:exportMouthTracks,skippedTracks:lipSyncSkippedTracks\}\)/);
   assert.doesNotMatch(html, /lipSyncGeneratedMediaTracks/);
   assert.doesNotMatch(html, /Mouth animation is not composited into AI-generated scene media for /);
 });
