@@ -1918,7 +1918,7 @@ function refreshSceneVoiceControls(){
  if(timestamped&&locale!=='en'){
   $('sceneVoiceStatus').textContent=voiceText('Экспериментальный timestamped Kokoro поддерживает только английский. Выбери стандартный движок для этого языка.','Experimental timestamped Kokoro currently supports English only. Choose the standard engine for this language.');
  }else if(!loaded&&!sceneVoiceEngine?.status.loaded&&!$('sceneVoiceStatus').dataset.touched){
-  $('sceneVoiceStatus').textContent=voiceText('Модель не загружена. Загрузка начнётся только после нажатия кнопки.','No voice model loaded. Download starts only after you press Load.');
+  $('sceneVoiceStatus').textContent=voiceText('Модель не загружена. После согласия загрузка начнётся при нажатии Load или запуске мультфильма с диалогами.','No voice model loaded. After consent, download starts when you press Load or create a film that needs speech.');
  }else if(!loaded&&sceneVoiceEngine?.status.loaded){
   $('sceneVoiceStatus').textContent=voiceText('Загружен другой движок или язык. Нажми Load, чтобы переключить модель.','A different engine or language is loaded. Press Load to switch.');
  }
