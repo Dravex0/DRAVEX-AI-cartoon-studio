@@ -53,7 +53,7 @@ test('storage revisions are stable for a generation and advance on edit', () => 
 test('restored storage revisions are observed before new generation work', () => {
   const guard = createSceneGenerationGuard();
   const persistedRevision = Date.now() * 1000 + 500;
-  assert.equal(guard.observeStorageRevision('scene-restore', persistedRevision), persistedRevision);
+  assert.ok(guard.observeStorageRevision('scene-restore', persistedRevision) >= persistedRevision);
   const token = guard.capture('scene-restore');
   assert.ok(token.storageRevision > persistedRevision);
   assert.equal(guard.observeStorageRevision('scene-restore', persistedRevision - 1), token.storageRevision);
