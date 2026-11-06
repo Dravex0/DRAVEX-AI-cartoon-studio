@@ -6,6 +6,22 @@ const MIN_VISEME_ACTIVITY = 0.025;
 const cleanId = value => String(value ?? "").trim().slice(0, 120);
 const isRecord = value => Boolean(value && typeof value === "object" && !Array.isArray(value));
 
+/** Return true only when a speaker identifier/name matches an actual facial rig. */
+export function sceneHasFacialRigForSpeaker(facialRigs, characterId, characterName = "") {
+  if (!Array.isArray(facialRigs)) return false;
+  const speakerKeys = new Set([characterId, characterName]
+    .map(value => cleanId(value).toLowerCase())
+    .filter(Boolean));
+  if (!speakerKeys.size) return false;
+  return facialRigs.some(rig => {
+    if (!isRecord(rig)) return false;
+    const rigKeys = [rig.characterId, rig.characterName]
+      .map(value => cleanId(value).toLowerCase())
+      .filter(Boolean);
+    return rigKeys.some(key => speakerKeys.has(key));
+  });
+}
+
 /**
  * Resolve active export dialogue tracks into per-character facial controls.
  * elapsedMs and track.startMs share the export timeline clock.
