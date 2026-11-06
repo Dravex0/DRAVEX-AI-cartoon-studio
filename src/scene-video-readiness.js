@@ -1,4 +1,14 @@
 /**
+ * Return true only when a scene clip has a decoded frame and finite media dimensions/duration.
+ * This stricter predicate is used by media coverage reports and full-film preflight.
+ */
+export function isSceneVideoDecoded(video) {
+  return Boolean(video && Number(video.readyState) >= 2 &&
+    Number(video.videoWidth) > 0 && Number(video.videoHeight) > 0 &&
+    Number.isFinite(Number(video.duration)) && Number(video.duration) > 0);
+}
+
+/**
  * Wait until a scene video has decoded enough media to draw a real frame.
  * A loaded metadata header alone is not sufficient: videoWidth must be non-zero
  * and readyState must indicate that current frame data is available.
