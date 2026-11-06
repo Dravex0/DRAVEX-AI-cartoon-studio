@@ -172,3 +172,16 @@ test("forwards generation revisions and reports superseded persistence", async (
   );
   assert.deepEqual(stale, { persisted: false, error: "A newer scene generation already replaced this clip." });
 });
+
+
+test("stale restore cleanup cannot delete a newer generation", async () => {
+  const storage = createSceneVideoStorage({ indexedDBRef: createMemoryIndexedDB() });
+  const oldBlob = new Blob(["old"], { type: "video/webm" });
+  const newBlob = new Blob(["new"], { type: "video/webm" });
+  await storage.put("scene-restore-race", oldBlob, "old.webm", { generationRevision: 10 });
+  await storage.put("scene-restore-race", newBlob, "new.webm", { generationRevision: 11 });
+  assert.equal(await storage.deleteIfRevision("scene-restore-race", 10), false);
+  const restored = await storage.get("scene-restore-race");
+  assert.equal(await restored.blob.text(), "new");
+  assert.equal(restored.generationRevision, 11);
+});
