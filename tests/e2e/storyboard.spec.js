@@ -123,6 +123,26 @@ test('localizes style and quality options and restores the saved creative setup'
   await expect(page.locator('#imageQuality')).toHaveValue('ultra');
 });
 
+test('one-click film creation builds the storyboard and clearly blocks until providers and consent are ready', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#idea').fill(
+    'A young fox finds a glowing key in an old forest, follows its light to a hidden gate, and discovers a peaceful garden.'
+  );
+  await page.locator('#makeFilm').click();
+
+  await expect(page.locator('#scenes button.scene').first()).toBeVisible();
+  await expect(page.locator('#status')).toContainText(/connect hugging face/i);
+  await expect(page.locator('#hfVideoPanel')).toHaveAttribute('open', '');
+  await expect(page.locator('#generateFullFilmComfy')).toBeDisabled();
+  await expect(page.locator('#hordeConsent')).not.toBeChecked();
+
+  expect(pageErrors, 'the one-click action should not throw or start a remote job without consent').toEqual([]);
+});
+
+
 test('creates a storyboard from a story prompt without remote AI services', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
