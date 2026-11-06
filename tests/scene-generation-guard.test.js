@@ -34,3 +34,24 @@ test('rejects missing IDs and malformed tokens', () => {
   assert.equal(guard.isCurrent(null), false);
   assert.equal(guard.isCurrent({ sceneId: 'scene-1', revision: '0' }), false);
 });
+
+
+test('storage revisions are stable for a generation and advance on edit', () => {
+  const guard = createSceneGenerationGuard();
+  const first = guard.capture('scene-storage');
+  const repeated = guard.capture('scene-storage');
+  assert.equal(first.storageRevision, repeated.storageRevision);
+  guard.invalidate('scene-storage');
+  const next = guard.capture('scene-storage');
+  assert.ok(next.storageRevision > first.storageRevision);
+  assert.equal(guard.storageRevision('scene-storage'), next.storageRevision);
+});
+
+test('restored storage revisions are observed before new generation work', () => {
+  const guard = createSceneGenerationGuard();
+  const persistedRevision = Date.now() * 1000 + 500;
+  assert.equal(guard.observeStorageRevision('scene-restore', persistedRevision), persistedRevision);
+  const token = guard.capture('scene-restore');
+  assert.equal(token.storageRevision, persistedRevision);
+  assert.equal(guard.observeStorageRevision('scene-restore', persistedRevision - 1), persistedRevision);
+});
