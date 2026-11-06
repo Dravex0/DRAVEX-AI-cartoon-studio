@@ -30,7 +30,7 @@ export function resolveAutomaticSpeechTasks({ request = '', scenes = [], languag
   const source = clean(request).toLocaleLowerCase();
   const speechSource = source.replace(/\bspeech\s+bubbles?\b/giu, '');
   const dialogueRequested = /dialogue|spoken|speech|voice.?over|narrat|script|talking|speak|реплик|диалог|голос|озвуч|говор|разговор|реч|диктор|закадр|діалог|розмов|мовлен|реплік|dialogo|diálogo|conversacion|conversación|hablar|hablando/iu.test(speechSource);
-  const voiceRequested = /voice|spoken|speech|voice.?over|narrat|talking|speak|озвуч|голос|реч|говор|диктор|закадр|звук|озвуч|голос|мовлен|voz|locucion|locución|narracion|narración|hablar|hablando/iu.test(speechSource);
+  const voiceRequested = /voice|spoken|speech|voice.?over|narrat|talking|speak|озвуч|голос|реч|говор|диктор|закадр|звук|озвуч|голос|мовлен|voz|voces|locucion|locución|narracion|narración|hablar|hablando/iu.test(speechSource);
   const list = Array.isArray(scenes) ? scenes : [];
   const scenesMissingDialogue = dialogueRequested
     ? list.map((scene, index) => ({ scene, index })).filter(item => !hasDialogue(item.scene))
