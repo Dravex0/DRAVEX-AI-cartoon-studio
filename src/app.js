@@ -2989,7 +2989,8 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   }
   setFilmProgress(85,filmProgressText('Сцены готовы · сборка WebM','Scenes ready · assembling WebM'),filmProgressText('Все видеосцены созданы. Начинается запись итогового мультфильма.','All scene videos are ready. Final film recording is starting.'));
   status.textContent='Все '+report.total+' видеосцен готовы. Собираем итоговый мультфильм…'+persistenceNote;
-  $('export').click();
+  const exportResult=await exportFilm({signal:controller.signal,requireAllVideos:true,download:true});
+  if(exportResult?.status!=='completed')throw new Error(exportResult?.reason||'Final WebM export did not complete.');
  }catch(error){
   filmProgressTracking=false;
   setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка генерации','Generation failed'),error.message||'Неизвестная ошибка');
