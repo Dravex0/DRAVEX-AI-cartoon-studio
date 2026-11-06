@@ -3584,12 +3584,14 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
       }
     }
     exportMouthTracks=[];
+    let lipSyncEligibleTrackCount=0;
     if(voiceTracks.length){
       const mainCharacterKey=String($("character").value||"").trim().toLowerCase();
       const mainCharacterVoiceTracks=voiceTracks.filter(track=>{const meta=sceneMetadata[track.sceneIndex]||{};const hasFacialRig=sceneHasFacialRigForSpeaker(meta.characterFacialRigs,track.characterId,track.characterName);return track.characterName.trim().toLowerCase()===mainCharacterKey||hasFacialRig;});
       // Generated images/videos are valid lip-sync backgrounds too. The facial
       // rig compositor overlays mouth parts on top of the scene during canvas export.
       const lipSyncRenderableTracks=mainCharacterVoiceTracks;
+      lipSyncEligibleTrackCount=lipSyncRenderableTracks.length;
       const AudioContextClass=window.AudioContext||window.webkitAudioContext;
       if(AudioContextClass&&lipSyncRenderableTracks.length){
         const decodeContext=new AudioContextClass();
@@ -3651,7 +3653,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
         anchor.href=url;
         anchor.download=$('finalFilmDownload').download||'dravex-cartoon-film.webm';
         if(download){document.body.appendChild(anchor);anchor.click();anchor.remove();}
-        const lipSyncReport=buildLipSyncQualityReport({voiceTracks,analyzedTracks:exportMouthTracks,skippedTracks:lipSyncSkippedTracks});
+        const lipSyncReport=buildLipSyncQualityReport({voiceTracks,eligibleTrackCount:lipSyncEligibleTrackCount,analyzedTracks:exportMouthTracks,skippedTracks:lipSyncSkippedTracks});
         const lipSyncWarnings=[];
         if(lipSyncReport.skippedTrackCount)lipSyncWarnings.push(uiLang==='ru'
           ?'Анализ аудио пропущен для '+lipSyncReport.skippedTrackCount+' реплик.'
@@ -3659,9 +3661,9 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
         if(lipSyncReport.approximateTrackCount)lipSyncWarnings.push(uiLang==='ru'
           ?'Приблизительная синхронизация по тексту: '+lipSyncReport.approximateTrackCount+' реплик.'
           :'Approximate text-based lip-sync: '+lipSyncReport.approximateTrackCount+' dialogue line(s).');
-        if(lipSyncReport.withoutFacialRigTrackCount)lipSyncWarnings.push(uiLang==='ru'
-          ?'Для '+lipSyncReport.withoutFacialRigTrackCount+' реплик нет подтверждённого лицевого рига персонажа.'
-          :'No matching facial rig was confirmed for '+lipSyncReport.withoutFacialRigTrackCount+' dialogue line(s).');
+        if(lipSyncReport.notSelectedTrackCount)lipSyncWarnings.push(uiLang==='ru'
+          ?'Липсинк не анализировался для '+lipSyncReport.notSelectedTrackCount+' реплик: персонажи не входят в текущую область обработки.'
+          :'Lip-sync was not analyzed for '+lipSyncReport.notSelectedTrackCount+' dialogue line(s): those speakers are outside the current processing scope.');
         const lipSyncWarning=lipSyncWarnings.length?' · '+lipSyncWarnings.join(' '):'';
         $('status').textContent=uiLang==='ru'
           ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+lipSyncWarning
