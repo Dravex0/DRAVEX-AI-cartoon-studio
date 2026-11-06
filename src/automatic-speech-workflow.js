@@ -27,8 +27,9 @@ function voiceArtifactsMatchDialogue(scene) {
  */
 export function resolveAutomaticSpeechTasks({ request = '', scenes = [] } = {}) {
   const source = clean(request).toLocaleLowerCase();
-  const dialogueRequested = /dialogue|spoken|speech|voice.?over|narrat|script|talking|speak|реплик|диалог|голос|озвуч|текст|говор|разговор|реч|диктор|закадр/iu.test(source);
-  const voiceRequested = /voice|audio|spoken|speech|voice.?over|narrat|talking|speak|озвуч|голос|реч|говор|диктор|закадр|звук/iu.test(source);
+  const speechSource = source.replace(/\\bspeech\\s+bubbles?\\b/giu, '');
+  const dialogueRequested = /dialogue|spoken|speech|voice.?over|narrat|script|talking|speak|реплик|диалог|голос|озвуч|говор|разговор|реч|диктор|закадр/iu.test(speechSource);
+  const voiceRequested = /voice|spoken|speech|voice.?over|narrat|talking|speak|озвуч|голос|реч|говор|диктор|закадр|звук/iu.test(speechSource);
   const list = Array.isArray(scenes) ? scenes : [];
   const scenesMissingDialogue = dialogueRequested
     ? list.map((scene, index) => ({ scene, index })).filter(item => !hasDialogue(item.scene))
