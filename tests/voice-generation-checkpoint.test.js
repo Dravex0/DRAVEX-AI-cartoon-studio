@@ -56,7 +56,7 @@ test("does not reuse artifacts whose IndexedDB WAV was evicted or empty", async 
 });
 
 test("rejects malformed checkpoint construction", () => {
-  assert.throws(() => createVoiceGenerationCheckpoint({ ...context, dialogue, voiceIds: ["one"], artifacts }), /matching arrays/);
+  assert.throws(() => createVoiceGenerationCheckpoint({ ...context, dialogue, voiceIds: ["one"], artifacts }), /voice ID slot/);
   assert.throws(() => createVoiceGenerationCheckpoint({
     ...context, dialogue: [dialogue[0]], voiceIds: ["one"],
     artifacts: [{ audioHash: "bad", durationMs: 1 }]
