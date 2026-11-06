@@ -27,7 +27,7 @@ export function waitForSceneVideoReady(video, { timeoutMs = 12000, signal } = {}
     return Promise.reject(error);
   }
 
-  const ready = () => video.readyState >= 2 && Number(video.videoWidth) > 0;
+  const ready = () => isSceneVideoDecoded(video);
   if (ready()) return Promise.resolve(video);
   if (video.error) {
     return Promise.reject(new Error(video.error.message || "Scene video failed to load."));
