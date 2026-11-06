@@ -10,6 +10,7 @@ function createMemoryIndexedDB() {
     createObjectStore(name) { names.add(name); return {}; },
     transaction() {
       const transaction = {
+        pendingRequests: 0,
         objectStore() {
           return {
             put(record) { return request(() => { records.set(record.sceneId, record); return record; }, transaction); },
@@ -23,15 +24,18 @@ function createMemoryIndexedDB() {
   };
   function request(operation, transaction) {
     const result = {};
+    transaction.pendingRequests += 1;
     queueMicrotask(() => {
       try {
         result.result = operation();
         result.onsuccess?.();
-        transaction.oncomplete?.();
       } catch (error) {
         result.error = error;
         result.onerror?.();
         transaction.onerror?.();
+      } finally {
+        transaction.pendingRequests -= 1;
+        if (transaction.pendingRequests === 0) queueMicrotask(() => transaction.oncomplete?.());
       }
     });
     return result;
@@ -151,4 +155,20 @@ test("rejects invalid generation revisions", async () => {
   await assert.rejects(storage.put("scene-invalid", new Blob(["x"], { type: "video/webm" }), "x.webm", { generationRevision: -1 }), /non-negative integer/);
   await assert.rejects(storage.deleteIfRevision("scene-invalid", 1.5), /non-negative integer/);
   await assert.rejects(storage.deleteOlderThanRevision("scene-invalid", -1), /non-negative integer/);
+});
+
+
+test("forwards generation revisions and reports superseded persistence", async () => {
+  const calls = [];
+  const blob = new Blob(["video-data"], { type: "video/webm" });
+  const options = { generationRevision: 4 };
+  const storage = { put: async (...args) => { calls.push(args); return { superseded: false }; } };
+  const saved = await persistSceneVideoBestEffort(storage, "scene-4", blob, "scene-4.webm", options);
+  assert.deepEqual(saved, { persisted: true, error: "" });
+  assert.deepEqual(calls, [["scene-4", blob, "scene-4.webm", options]]);
+
+  const stale = await persistSceneVideoBestEffort(
+    { put: async () => ({ superseded: true }) }, "scene-4", blob, "old.webm", options
+  );
+  assert.deepEqual(stale, { persisted: false, error: "A newer scene generation already replaced this clip." });
 });
