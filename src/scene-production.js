@@ -43,6 +43,27 @@ function characterDetails(scene, characterBible) {
     });
 }
 
+
+/**
+ * Return a stable image-generation seed for the same cast and visual style.
+ * Scene action, location, camera, and dialogue are intentionally excluded so
+ * separate shots can vary while the identity anchor stays stable. A seed is
+ * only a reproducibility hint; it cannot guarantee identical rendered faces.
+ */
+export function buildSceneIdentitySeed(scene = {}, characterBible = [], visualStyle = '') {
+  const identities = characterDetails(scene, characterBible)
+    .map(details => details.toLocaleLowerCase())
+    .sort();
+  if (!identities.length) return undefined;
+  const source = identities.join('||') + '|style:' + safe(visualStyle, 80).toLocaleLowerCase();
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
 /** Return true when a scene cast has locally saved character photos that AI Horde cannot consume. */
 export function sceneHasSavedCharacterImageReference(scene = {}, characterBible = []) {
   const hasExplicitCast = Array.isArray(scene?.characters);
