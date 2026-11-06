@@ -65,6 +65,7 @@ import { createVideoFrameCapture } from "./video-frame-capture.js";
 import { getAudioTimelineOffsetMs, getScheduledAudioStartAtMs } from "./audio-clock-alignment.js";
 import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js";
 import { createAudioExportSession } from "./audio-export.js";
+import { buildLipSyncQualityReport } from "./lip-sync-quality-report.js";
 import { waitForExportVideoReady, validateExportTracks } from "./film-export-readiness.js";
 import { buildSceneMediaReport } from "./scene-media-report.js";
 import { analyzeSceneVideoMotion, captureSceneVideoFrameSamples } from "./scene-motion-analysis.js";
@@ -3600,7 +3601,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
               const channels=Array.from({length:decoded.numberOfChannels},(_,channel)=>decoded.getChannelData(channel));
               const envelope=buildAudioMouthEnvelope({channels,sampleRate:decoded.sampleRate,fps:24});
               const visemes=buildVisemeTimeline({text:track.text,durationMs:envelope.durationMs,language:track.language,fps:24,phonemeChunks:track.phonemeChunks,visemeEvents:track.visemeEvents});
-              exportMouthTracks.push({sceneIndex:track.sceneIndex,characterId:track.characterId,characterName:track.characterName,startMs:track.startMs,envelope,visemes});
+              exportMouthTracks.push({cueId:track.cueId,sceneIndex:track.sceneIndex,characterId:track.characterId,characterName:track.characterName,startMs:track.startMs,envelope,visemes});
             }catch(decodeError){lipSyncSkippedTracks++;console.warn("DRAVEX lip-sync analysis skipped a dialogue track:",decodeError);}
           }
         }finally{await decodeContext.close().catch(()=>{});}
@@ -3650,10 +3651,17 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
         anchor.href=url;
         anchor.download=$('finalFilmDownload').download||'dravex-cartoon-film.webm';
         if(download){document.body.appendChild(anchor);anchor.click();anchor.remove();}
+        const lipSyncReport=buildLipSyncQualityReport({voiceTracks,analyzedTracks:exportMouthTracks,skippedTracks:lipSyncSkippedTracks});
         const lipSyncWarnings=[];
-        if(lipSyncSkippedTracks)lipSyncWarnings.push(uiLang==='ru'
-          ?'Анализ синхронизации губ пропущен для '+lipSyncSkippedTracks+' реплик.'
-          :'Lip-sync analysis was skipped for '+lipSyncSkippedTracks+' dialogue line(s).');
+        if(lipSyncReport.skippedTrackCount)lipSyncWarnings.push(uiLang==='ru'
+          ?'Анализ аудио пропущен для '+lipSyncReport.skippedTrackCount+' реплик.'
+          :'Audio analysis was skipped for '+lipSyncReport.skippedTrackCount+' dialogue line(s).');
+        if(lipSyncReport.approximateTrackCount)lipSyncWarnings.push(uiLang==='ru'
+          ?'Приблизительная синхронизация по тексту: '+lipSyncReport.approximateTrackCount+' реплик.'
+          :'Approximate text-based lip-sync: '+lipSyncReport.approximateTrackCount+' dialogue line(s).');
+        if(lipSyncReport.withoutFacialRigTrackCount)lipSyncWarnings.push(uiLang==='ru'
+          ?'Для '+lipSyncReport.withoutFacialRigTrackCount+' реплик нет подтверждённого лицевого рига персонажа.'
+          :'No matching facial rig was confirmed for '+lipSyncReport.withoutFacialRigTrackCount+' dialogue line(s).');
         const lipSyncWarning=lipSyncWarnings.length?' · '+lipSyncWarnings.join(' '):'';
         $('status').textContent=uiLang==='ru'
           ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+lipSyncWarning
