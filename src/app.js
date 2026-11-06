@@ -2883,6 +2883,7 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
   if(!response.ok)throw new Error('Cannot read the selected scene image (HTTP '+response.status+').');
   imageBlob=await response.blob();
  }
+ assertGenerationCurrent();
  if(!imageBlob?.size)throw new Error('The selected scene image is empty.');
  assertConsent();
  const provider=createHuggingFaceZeroGPUVideoProvider({client:hfVideoClient,handleFile:hfHandleFile});
@@ -2946,6 +2947,7 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  const registry=createVideoProviderRegistry();registry.register(provider);
  const duration=Math.max(0.25,Math.min(30,Number(originalMeta.durationSeconds??originalMeta.duration??$('duration').value)||3));
  const profileReferences=await loadCharacterReferenceImagesForScene(motionScene);
+ assertGenerationCurrent();
  const referenceImages=profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2);
  reportProgress?.('Submitting scene to local ComfyUI');
  const result=await generateVideoWithProvider(registry,provider.id,{
@@ -3329,7 +3331,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      await waitForSceneVideoReady(videoEntry.video,{timeoutMs:20000,signal});
      assertSceneIdentityCurrent();
     }catch(readinessError){
-     sceneVideoCache.delete(key);
+     if(sceneVideoCache.get(key)===videoEntry)sceneVideoCache.delete(key);
      disposeSceneVideoEntry(videoEntry);
      throw new Error('Сцена '+(index+1)+' вернула видео, которое браузер не смог декодировать: '+(readinessError.message||'unknown decode error'));
     }
