@@ -2010,7 +2010,19 @@ $('makeFilm').addEventListener('click',()=>{
   $('status').textContent=uiLang==='ru'?'Создание мультфильма уже выполняется. Дождись завершения или нажми «Отменить».':'A film is already being generated. Wait for it to finish or cancel the current run.';
   return;
  }
- const created=createStoryboard();
+ const request=$('idea').value.trim();
+ const language=storyLanguage();
+ const requestedCharacter=resolveStoryProtagonist(request,$('character').value.trim(),language);
+ const canReuseStoryboard=Boolean(
+  request&&currentStoryboardPlan&&
+  currentStoryboardPlan.sourceText===request&&
+  currentStoryboardPlan.sourceLanguage===language&&
+  currentStoryboardPlan.sourceCharacter===requestedCharacter&&
+  Array.isArray(currentStoryboardPlan.scenes)&&
+  currentStoryboardPlan.scenes.length===sceneMetadata.length&&
+  sceneMetadata.length>0
+ );
+ const created=canReuseStoryboard?currentStoryboardPlan:createStoryboard();
  if(!created)return;
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
