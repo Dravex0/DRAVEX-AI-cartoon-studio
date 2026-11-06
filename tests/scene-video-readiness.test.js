@@ -52,3 +52,15 @@ test("supports cancellation and validates timeout values", async () => {
   await assert.rejects(pending, error => error.name === "AbortError");
   await assert.rejects(waitForSceneVideoReady(video, { timeoutMs: 0 }), /positive finite number/);
 });
+
+
+test("counts a scene clip as decoded only with frame dimensions and finite duration", async () => {
+  const { isSceneVideoDecoded } = await import("../src/scene-video-readiness.js");
+  assert.equal(isSceneVideoDecoded({ readyState: 2, videoWidth: 640, videoHeight: 360, duration: 5 }), true);
+  assert.equal(isSceneVideoDecoded({ readyState: 1, videoWidth: 640, videoHeight: 360, duration: 5 }), false);
+  assert.equal(isSceneVideoDecoded({ readyState: 2, videoWidth: 0, videoHeight: 360, duration: 5 }), false);
+  assert.equal(isSceneVideoDecoded({ readyState: 2, videoWidth: 640, videoHeight: 0, duration: 5 }), false);
+  assert.equal(isSceneVideoDecoded({ readyState: 2, videoWidth: 640, videoHeight: 360, duration: Infinity }), false);
+  assert.equal(isSceneVideoDecoded({ readyState: 2, videoWidth: 640, videoHeight: 360, duration: 0 }), false);
+  assert.equal(isSceneVideoDecoded(null), false);
+});
