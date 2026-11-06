@@ -66,10 +66,10 @@ test("rejects cues without measured positive durations and mismatched cue counts
   const invalidDuration = makeScene({
     voiceCues: [{ cueId: "scene-1:line-1", audioHash: HASH, durationMs: 0 }]
   });
-  const mismatchedCount = makeScene({ voiceCues: [] });
+  const mismatchedCount = makeScene({ id: "scene-2", voiceCues: [\n    { cueId: "scene-2:line-1", audioHash: HASH, durationMs: 1000 },\n    { cueId: "scene-2:line-2", audioHash: HASH, durationMs: 1000 }\n  ] });
   assert.deepEqual(
     await findScenesWithMissingVoiceAudio([invalidDuration, mismatchedCount], storageFor(makeRecord())),
-    [{ sceneId: "scene-1", index: 0 }, { sceneId: "scene-1", index: 1 }]
+    [{ sceneId: "scene-1", index: 0 }, { sceneId: "scene-2", index: 1 }]
   );
 });
 
