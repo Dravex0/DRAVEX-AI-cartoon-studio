@@ -86,6 +86,8 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
         throw new TypeError("Scene video data must be a Blob.");
       }
       if (blob.size === 0) throw new TypeError("Scene video Blob must not be empty.");
+      const mimeType = String(blob.type || "").split(";")[0].trim().toLowerCase();
+      if (!mimeType.startsWith("video/")) throw new TypeError("Scene video Blob must have a video MIME type.");
       const safeFilename = String(filename || "scene-video.webm").slice(0, 180);
       const record = { sceneId: key, blob, filename: safeFilename, updatedAt: Date.now() };
       await run(store => requestResult(store.put(record)), "readwrite");
