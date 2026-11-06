@@ -79,10 +79,11 @@ test('keeps selected local music as an audible audio track in the exported WebM'
         await new Promise(resolve => setTimeout(resolve, 60));
       }
       source.disconnect();
+      const audioTrackState = tracks[0].readyState;
       stream.getTracks().forEach(track => track.stop());
       return {
         audioTrackCount: tracks.length,
-        audioTrackState: tracks[0].readyState,
+        audioTrackState,
         peakRms
       };
     } finally {
