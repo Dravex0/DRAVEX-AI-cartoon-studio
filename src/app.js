@@ -2793,7 +2793,7 @@ function comfyText(id){return $(id).value.trim()}
 function comfyBindings(){
  const binding=(nodeId,input)=>nodeId&&input?{nodeId,input}:null;
  const result={prompt:binding(comfyText('comfyPromptNode'),comfyText('comfyPromptInput')),image:binding(comfyText('comfyImageNode'),comfyText('comfyImageInput'))};
- const optional={negativePrompt:['comfyNegativeNode','comfyNegativeInput'],frameCount:['comfyFramesNode','comfyFramesInput'],fps:['comfyFpsNode','comfyFpsInput'],referenceImage1:['comfyReference1Node','comfyReference1Input'],referenceImage2:['comfyReference2Node','comfyReference2Input']};
+ const optional={negativePrompt:['comfyNegativeNode','comfyNegativeInput'],frameCount:['comfyFramesNode','comfyFramesInput'],fps:['comfyFpsNode','comfyFpsInput'],seed:['comfySeedNode','comfySeedInput'],referenceImage1:['comfyReference1Node','comfyReference1Input'],referenceImage2:['comfyReference2Node','comfyReference2Input']};
  Object.entries(optional).forEach(([key,ids])=>{const value=binding(comfyText(ids[0]),comfyText(ids[1]));if(value)result[key]=value});
  return result;
 }
@@ -2849,7 +2849,7 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const duration=Math.max(0.5,Math.min(5,Number(originalMeta.durationSeconds??originalMeta.duration??$('duration').value)||3));
  reportProgress?.('Submitting the selected scene to Hugging Face Wan 2.2 (0.5–5 seconds)');
  assertConsent();
- const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages:[]},{signal,onProgress:job=>reportProgress?.('Wan 2.2 '+String(job.stage||'processing')+(Number.isFinite(job.queuePosition)?' · queue '+job.queuePosition:''))});
+ const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages:[]},{signal,onProgress:job=>reportProgress?.('Wan 2.2 '+String(job.stage||'processing')+(Number.isFinite(job.queuePosition)?' · queue '+job.queuePosition:''))});
  assertConsent();
  if(result.status!=='completed'||!result.video)throw new Error(result.error||'Hugging Face Wan 2.2 did not return a completed video.');
  if(String(sceneMetadata[index]?.id||'')!==sceneId)throw new Error('The selected scene changed during remote generation; the clip was not attached elsewhere.');
@@ -2905,7 +2905,8 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  reportProgress?.('Submitting scene to local ComfyUI');
  const result=await generateVideoWithProvider(registry,provider.id,{
   taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,
-  durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages
+  durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,
+  seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages
  },{signal,onProgress:job=>{
   const percent=readVideoProgressPercent(job);
   reportProgress?.('ComfyUI '+String(job.stage||'processing')+(percent===null?'':' '+percent+'%'));
@@ -2992,7 +2993,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
   let referenceWarning='';
-  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,referenceImages:(await loadCharacterReferenceImagesForScene(motionScene)).concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2)},{onProgress:progress=>{
+  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages:(await loadCharacterReferenceImagesForScene(motionScene)).concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2)},{onProgress:progress=>{
    if(progress.stage==='warning'&&progress.message){referenceWarning=String(progress.message);status.textContent='ComfyUI · Внимание: '+referenceWarning;return;}
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
    status.textContent='ComfyUI · '+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'')+(referenceWarning?' · Внимание: '+referenceWarning:'');
@@ -3241,7 +3242,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const profileReferenceImages=mode==='comfyui'?await loadCharacterReferenceImagesForScene(meta):[];
     const referenceImages=mode==='comfyui'?profileReferenceImages.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2):[];
     let referenceWarning='';
-    const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput,referenceImages},{signal,onProgress:job=>{
+    const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput,seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),referenceImages},{signal,onProgress:job=>{
      const providerPercent=readVideoProgressPercent(job);
      const providerStage=String(job.stage||'processing');
      if(providerStage==='warning'&&job.message){

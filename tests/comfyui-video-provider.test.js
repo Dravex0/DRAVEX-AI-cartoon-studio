@@ -175,6 +175,39 @@ test('uploads and binds only explicitly configured character reference images', 
   assert.equal(submittedWorkflow['22'].inputs.image, 'refs/upload-3.png');
 });
 
+test('passes a stable identity seed into an explicitly configured ComfyUI seed input', async () => {
+  let submittedWorkflow;
+  const seededWorkflow = {
+    ...workflow,
+    '40': { class_type: 'KSampler', inputs: { seed: 0 } }
+  };
+  const seededBindings = {
+    ...nodeBindings,
+    seed: { nodeId: '40', input: 'seed' }
+  };
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).endsWith('/upload/image')) return jsonResponse({ name: 'source.png', type: 'input' });
+    if (String(url).endsWith('/prompt')) {
+      submittedWorkflow = JSON.parse(options.body).prompt;
+      return jsonResponse({ prompt_id: 'seed-job' });
+    }
+    if (String(url).endsWith('/history/seed-job')) {
+      return jsonResponse({ 'seed-job': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '90': { videos: [{ filename: 'seeded.mp4', type: 'output' }] } }
+      }});
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188', workflow: seededWorkflow,
+    nodeBindings: seededBindings, outputNodeIds: ['90'], fetchImpl, pollIntervalMs: 250
+  });
+  await provider.generate({ ...request, seed: 246813579 });
+  assert.equal(submittedWorkflow['40'].inputs.seed, 246813579);
+});
+
 test('does not upload unbound character reference images', async () => {
   let uploadCount = 0;
   const fetchImpl = async (url, options = {}) => {
