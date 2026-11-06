@@ -56,5 +56,5 @@ test('restored storage revisions are observed before new generation work', () =>
   assert.equal(guard.observeStorageRevision('scene-restore', persistedRevision), persistedRevision);
   const token = guard.capture('scene-restore');
   assert.ok(token.storageRevision > persistedRevision);
-  assert.equal(guard.observeStorageRevision('scene-restore', persistedRevision - 1), persistedRevision);
+  assert.equal(guard.observeStorageRevision('scene-restore', persistedRevision - 1), token.storageRevision);
 });
