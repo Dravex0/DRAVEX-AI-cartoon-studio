@@ -68,7 +68,9 @@ test("rejects writes without a stable scene ID or Blob", async () => {
   const storage = createSceneVideoStorage({ indexedDBRef: createMemoryIndexedDB() });
   await assert.rejects(storage.put("", new Blob(["x"])), /stable scene ID/);
   await assert.rejects(storage.put("scene-1", "not-a-blob"), /must be a Blob/);
-  await assert.rejects(storage.put("scene-1", new Blob([])), /must not be empty/);
+  await assert.rejects(storage.put("scene-1", new Blob([],{type:"video/webm"})), /must not be empty/);
+  await assert.rejects(storage.put("scene-1", new Blob(["not video"],{type:"text/plain"})), /video MIME type/);
+  await assert.rejects(storage.put("scene-1", new Blob(["unknown mime"])), /video MIME type/);
 });
 
 test("reports when IndexedDB is unavailable", async () => {
