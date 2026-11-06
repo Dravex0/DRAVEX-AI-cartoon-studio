@@ -6,6 +6,19 @@ function abortError() {
   return error;
 }
 
+function sameSceneSnapshot(before, after) {
+  if (!Array.isArray(before?.items) || !Array.isArray(after?.items) ||
+      before.items.length !== after.items.length) return false;
+  return before.items.every((scene, index) => {
+    const next = after.items[index];
+    return Boolean(next) &&
+      Number(scene.index) === index && Number(next.index) === index &&
+      String(scene.id ?? '') === String(next.id ?? '') &&
+      String(scene.title ?? '') === String(next.title ?? '') &&
+      scene.mediaType === next.mediaType;
+  });
+}
+
 /**
  * Expose the existing, app-owned WebM film exporter as a universal capability.
  * Composition is intentionally blocked until every storyboard scene has a
@@ -60,7 +73,7 @@ export function createUniversalFilmCompositionCapability({
       const result = await composeFilm({ signal, reportProgress, sceneCount: before.totalScenes });
       if (signal?.aborted) throw abortError();
       const after = report();
-      if (!after || after.complete !== true || after.totalScenes !== before.totalScenes || after.videoScenes !== before.videoScenes) {
+      if (!after || after.complete !== true || after.totalScenes !== before.totalScenes || after.videoScenes !== before.videoScenes || !sameSceneSnapshot(before, after)) {
         const error = new Error('Storyboard scene media changed during full-film composition.');
         error.code = 'FILM_SCENE_SET_CHANGED';
         throw error;
