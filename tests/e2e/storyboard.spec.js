@@ -125,10 +125,13 @@ test('localizes style and quality options and restores the saved creative setup'
 
 test('local canvas mode exports a playable WebM without contacting cloud video or image providers', async ({ page }) => {
   const pageErrors = [];
-  const providerRequests = [];
+  const remoteProviderRequests = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   page.on('request', request => {
-    if (/huggingface|aihorde|horde\.live/i.test(request.url())) providerRequests.push(request.url());
+    const url = new URL(request.url());
+    if (/^(?:.*\.)?(?:huggingface\.co|hf\.co|aihorde\.net|horde\.live|koboldai\.net)$/i.test(url.hostname)) {
+      remoteProviderRequests.push(url.href);
+    }
   });
 
   await page.goto('/');
@@ -159,7 +162,7 @@ test('local canvas mode exports a playable WebM without contacting cloud video o
   expect(video.width).toBe(1280);
   expect(video.height).toBe(720);
   expect(video.readyState).toBeGreaterThanOrEqual(2);
-  expect(providerRequests).toEqual([]);
+  expect(remoteProviderRequests).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
 
