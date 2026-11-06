@@ -129,6 +129,9 @@ export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
     safe(scene.negativePrompt) && `Avoid: ${safe(scene.negativePrompt, 2000)}`,
     'Use the supplied source image as the visual anchor and opening-frame reference. Keep the same character identities, face and muzzle shape, species, body proportions, silhouette, fur/skin colors, clothing, accessories, and relative positions throughout the clip.',
     'Do not redesign, replace, duplicate, merge, or add characters. Do not change costumes, colors, age, anatomy, or art style between frames. Preserve the source image composition unless the requested camera movement or action requires a controlled change.',
+    'Maintain temporal coherence from the first frame to the last: preserve stable facial features, limb count, body shape, clothing details, object geometry, and background layout; avoid flicker, morphing, wobble, texture crawling, and unintended identity changes.',
+    'Use smooth, physically plausible motion with consistent speed and clear anticipation, action, and settling. Avoid sudden pose resets, teleporting, frame jumps, or abrupt camera changes unless explicitly requested.',
+    'Keep the camera fixed when no camera movement is specified. When camera movement is specified, execute only that movement smoothly and keep the subject readable in frame.',
     'Animate only the described action. Preserve scene continuity and do not introduce new objects or characters.'
   ].filter(Boolean).join('\n\n');
 }
