@@ -46,6 +46,28 @@ test("rejects decode errors and releases the temporary URL", async () => {
   assert.equal(revoked, true);
 });
 
+test("releases the temporary URL when video element creation fails", async () => {
+  let revoked = false;
+  await assert.rejects(waitForExportVideoReady(new Blob(["webm"]), {
+    createVideoElement: () => { throw new Error("video element unavailable"); },
+    createObjectURL: () => "blob:test",
+    revokeObjectURL: () => { revoked = true; }
+  }), /video element unavailable/);
+  assert.equal(revoked, true);
+});
+
+test("attempts URL release even if player cleanup throws", async () => {
+  const video = new FakeVideo(); let revoked = false;
+  video.pause = () => { throw new Error("pause failed"); };
+  const pending = waitForExportVideoReady(new Blob(["webm"]), {
+    createVideoElement: () => video, createObjectURL: () => "blob:test",
+    revokeObjectURL: () => { revoked = true; }, timeoutMs: 100
+  });
+  video.becomeReady();
+  assert.deepEqual(await pending, { width: 1280, height: 720, readyState: 2 });
+  assert.equal(revoked, true);
+});
+
 test("rejects empty blobs and invalid timeouts", async () => {
   await assert.rejects(waitForExportVideoReady(new Blob()), /non-empty/);
   await assert.rejects(waitForExportVideoReady(new Blob(["x"]), { timeoutMs: 0 }), /positive finite/);
