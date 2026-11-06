@@ -6,7 +6,7 @@ const plan = { sourceRequest: 'Create a complete video film' };
 const step = { requiredCapabilities: ['film.compose'] };
 const complete = {
   totalScenes: 2, videoScenes: 2, stillScenes: 0, complete: true,
-  items: [{ index: 0, mediaType: 'video' }, { index: 1, mediaType: 'video' }]
+  items: [{ id: 'scene-a', index: 0, title: 'Opening', mediaType: 'video' }, { id: 'scene-b', index: 1, title: 'Ending', mediaType: 'video' }]
 };
 const validArtifact = () => ({
   status: 'completed', filename: 'dravex-cartoon-film.webm',
@@ -58,6 +58,30 @@ test('returns only verified local film metadata', async () => {
     type: 'full-film', filename: 'dravex-cartoon-film.webm', mimeType: 'video/webm',
     size: 4096, sceneCount: 2, durationMs: 6000, decoded: true, local: true
   });
+});
+
+test('rejects a reordered scene list even when video coverage stays complete', async () => {
+  let current = complete;
+  const capability = createUniversalFilmCompositionCapability({
+    getSceneReport: () => current,
+    composeFilm: async () => {
+      current = { ...complete, items: [...complete.items].reverse().map((item, index) => ({ ...item, index })) };
+      return validArtifact();
+    }
+  });
+  await assert.rejects(capability.run({ plan, step }), { code: 'FILM_SCENE_SET_CHANGED' });
+});
+
+test('rejects replacement of a scene during composition with the same scene count', async () => {
+  let current = complete;
+  const capability = createUniversalFilmCompositionCapability({
+    getSceneReport: () => current,
+    composeFilm: async () => {
+      current = { ...complete, items: [complete.items[0], { ...complete.items[1], id: 'replacement-scene' }] };
+      return validArtifact();
+    }
+  });
+  await assert.rejects(capability.run({ plan, step }), { code: 'FILM_SCENE_SET_CHANGED' });
 });
 
 test('rejects an empty or non-decoded export', async () => {
