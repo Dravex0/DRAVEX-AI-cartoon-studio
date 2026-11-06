@@ -2,6 +2,7 @@ import { drawProceduralSceneEnvironment } from './procedural-scene-environment.j
 import { drawSceneProps } from './scene-prop-renderer.js';
 import { validateStoryScenes } from "./story-qa.js";
 import { buildStoryboardFromText } from "./storyboard-generator.js";
+import { evaluatePromptToFilmStart } from "./prompt-to-film-gate.js";
 import { resolveStoryProtagonist } from "./story-protagonist.js";
 import { calculateCinematicShot } from "./director-engine.js";
 import { detectDeviceCapabilities } from "./device-capabilities.js";
@@ -2003,6 +2004,57 @@ $('language').addEventListener('change',()=>{
 });
 $('voiceNonCommercialConsent').addEventListener('change',refreshSceneVoiceControls);
 $('make').addEventListener('click',()=>createStoryboard());
+
+$('makeFilm').addEventListener('click',()=>{
+ if(fullFilmAbortController){
+  $('status').textContent=uiLang==='ru'?'Создание мультфильма уже выполняется. Дождись завершения или нажми «Отменить».':'A film is already being generated. Wait for it to finish or cancel the current run.';
+  return;
+ }
+ const created=createStoryboard();
+ if(!created)return;
+ const mode=$('videoGenerationMode').value;
+ const missingImageCount=sceneMetadata.filter(scene=>!String(scene?.generatedImageUrl||'').trim()).length;
+ const gate=evaluatePromptToFilmStart({
+  mode,
+  sceneCount:sceneMetadata.length,
+  videoProviderReady:mode==='huggingface'
+   ?hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'
+   :comfyConnected&&!!comfyWorkflow,
+  remoteVideoConsent:$('hfVideoConsent').checked===true,
+  missingImageCount,
+  imagePromptConsent:$('hordeConsent').checked===true,
+  running:Boolean(fullFilmAbortController)
+ });
+ if(!gate.ok){
+  const ru=uiLang==='ru';
+  const messages=[];
+  if(gate.blockers.includes('video-mode-invalid'))messages.push(ru?'Выбран неизвестный видеодвижок.':'The selected video engine is not recognized.');
+  if(gate.blockers.includes('remote-video-consent-required'))messages.push(ru?'Подтверди отправку изображений и промптов в Hugging Face.':'Explicitly allow scene images and prompts to be sent to Hugging Face.');
+  if(gate.blockers.includes('video-provider-not-ready'))messages.push(mode==='huggingface'
+   ?(ru?'Подключи Hugging Face: открой настройки анимации и добавь токен.':'Connect Hugging Face in the animation settings using your access token.')
+   :(ru?'Подключи локальный ComfyUI и выбери API workflow.':'Connect local ComfyUI and select its API workflow.'));
+  if(gate.blockers.includes('image-prompt-consent-required'))messages.push(ru
+   ?'Для '+gate.missingImageCount+' сцен ещё нет изображений. Отдельно подтверди отправку только текстовых промптов в AI Horde либо добавь изображения вручную.'
+   :' '+gate.missingImageCount+' scene image(s) are missing. Separately allow sending text prompts to AI Horde, or add scene images manually.');
+  $('status').textContent=messages.join(' ');
+  if(mode==='huggingface')$('hfVideoPanel').open=true;
+  if(mode==='comfyui')$('comfyPanel').open=true;
+  if(gate.blockers.includes('image-prompt-consent-required')){
+   const consent=$('hordeConsent');
+   consent.closest('details')?.setAttribute('open','');
+   consent.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+  return;
+ }
+ const generateButton=$('generateFullFilmComfy');
+ if(generateButton.disabled){
+  $('status').textContent=uiLang==='ru'?'Видеодвижок пока недоступен. Проверь подключение и согласие.':'The video engine is not ready. Check its connection and consent settings.';
+  return;
+ }
+ $('status').textContent=uiLang==='ru'?'Запускаем полный цикл: изображения сцен → AI-видеосцены → итоговый WebM…':'Starting the full workflow: scene images → AI video clips → final WebM…';
+ generateButton.click();
+});
+
 function createStoryboard(ideaOverride, {throwOnError=false}={}){
  const status=$('status');
  const idea=(typeof ideaOverride==='string'?ideaOverride:$('idea').value).trim();
