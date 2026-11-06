@@ -6,72 +6,89 @@ import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-sta
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
 const isRecord = value => value && typeof value === 'object' && !Array.isArray(value);
 
-function parseJsonWithTrailingCommaRepair(source) {
-  try { return JSON.parse(source); } catch { /* Try a conservative JSON-only repair below. */ }
-  let output = '';
-  let inString = false;
-  let escaped = false;
+function stripJsonComments(source) {
+  if (typeof source !== 'string') return '';
+  let output = ''; let inString = false; let escaped = false; let lineComment = false; let blockComment = false;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]; const next = source[index + 1] || '';
+    if (lineComment) { if (char === '\n' || char === '\r') { lineComment = false; output += char; } continue; }
+    if (blockComment) { if (char === '*' && next === '/') { blockComment = false; index += 1; } else if (char === '\n' || char === '\r') output += char; continue; }
+    if (inString) { output += char; if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') inString = false; continue; }
+    if (char === '"') { inString = true; output += char; }
+    else if (char === '/' && next === '/') { lineComment = true; index += 1; }
+    else if (char === '/' && next === '*') { blockComment = true; index += 1; }
+    else output += char;
+  }
+  return blockComment ? '' : output;
+}
+
+function removeTrailingCommas(source) {
+  let output = ''; let inString = false; let escaped = false;
   for (let index = 0; index < source.length; index += 1) {
     const char = source[index];
-    if (inString) {
-      output += char;
-      if (escaped) escaped = false;
-      else if (char === '\\') escaped = true;
-      else if (char === '"') inString = false;
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-      output += char;
-      continue;
-    }
-    if (char === ',') {
-      let next = index + 1;
-      while (/\s/.test(source[next] || '')) next += 1;
-      if (source[next] === '}' || source[next] === ']') continue;
-    }
+    if (inString) { output += char; if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') inString = false; continue; }
+    if (char === '"') { inString = true; output += char; continue; }
+    if (char === ',') { let next = index + 1; while (next < source.length && /\s/.test(source[next])) next += 1; if (source[next] === '}' || source[next] === ']') continue; }
     output += char;
   }
-  try { return JSON.parse(output); } catch { return null; }
+  return output;
+}
+
+/** Closes incomplete containers only; an unterminated string is rejected as lossy. */
+function repairTruncatedJson(source) {
+  if (typeof source !== 'string' || !source.trim()) return null;
+  let text = source.trim(); const stack = []; let inString = false; let escaped = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) { if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') inString = false; continue; }
+    if (char === '"') inString = true;
+    else if (char === '{' || char === '[') stack.push(char);
+    else if (char === '}' || char === ']') { const opening = stack.pop(); if ((char === '}' && opening !== '{') || (char === ']' && opening !== '[')) return null; }
+  }
+  if (inString || escaped) return null;
+  text = text.replace(/,\s*$/, '');
+  while (stack.length) { const opening = stack.pop(); text += opening === '{' ? '}' : ']'; }
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+function parseJsonWithTrailingCommaRepair(source) {
+  if (typeof source !== 'string' || !source.trim()) return null;
+  const cleaned = stripJsonComments(source.replace(/^\uFEFF/, '')).trim();
+  if (!cleaned) return null;
+  try { return JSON.parse(cleaned); } catch { /* Continue with safe repairs. */ }
+  const repaired = removeTrailingCommas(cleaned);
+  try { return JSON.parse(repaired); } catch { /* Try truncated-container recovery. */ }
+  return repairTruncatedJson(repaired);
 }
 
 function extractBalancedJson(source) {
+  if (typeof source !== 'string') return '';
   for (let start = 0; start < source.length; start += 1) {
     if (source[start] !== '{' && source[start] !== '[') continue;
-    const stack = [];
-    let inString = false;
-    let escaped = false;
+    const stack = []; let inString = false; let escaped = false;
     for (let index = start; index < source.length; index += 1) {
       const char = source[index];
-      if (inString) {
-        if (escaped) escaped = false;
-        else if (char === '\\') escaped = true;
-        else if (char === '"') inString = false;
-        continue;
-      }
+      if (inString) { if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') inString = false; continue; }
       if (char === '"') { inString = true; continue; }
       if (char === '{' || char === '[') stack.push(char);
-      else if (char === '}' || char === ']') {
-        const opening = stack.pop();
-        if ((char === '}' && opening !== '{') || (char === ']' && opening !== '[')) break;
-        if (!stack.length) return source.slice(start, index + 1);
-      }
+      else if (char === '}' || char === ']') { const opening = stack.pop(); if ((char === '}' && opening !== '{') || (char === ']' && opening !== '[')) break; if (!stack.length) return source.slice(start, index + 1); }
     }
   }
   return '';
 }
 
 function parseModelScenes(text) {
-  const source = clean(text, 100_000).trim()
-    .replace(/^\s*```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/i, '')
-    .trim();
-  const parsed = parseJsonWithTrailingCommaRepair(source)
-    || parseJsonWithTrailingCommaRepair(extractBalancedJson(source));
+  if (typeof text !== 'string' || text.length > 100_000) return null;
+  const source = text.replace(/^\uFEFF/, '').trim().replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  if (!source) return null;
+  const direct = parseJsonWithTrailingCommaRepair(source);
+  const balanced = direct === null ? parseJsonWithTrailingCommaRepair(extractBalancedJson(source)) : null;
+  const start = source.search(/[\[{]/);
+  const truncated = direct === null && balanced === null && start >= 0 ? parseJsonWithTrailingCommaRepair(source.slice(start)) : null;
+  const parsed = direct !== null ? direct : balanced !== null ? balanced : truncated;
   if (Array.isArray(parsed)) return parsed;
-  return Array.isArray(parsed?.scenes) ? parsed.scenes : null;
+  return parsed && Array.isArray(parsed.scenes) ? parsed.scenes : null;
 }
-
 /** Reserve enough output space for a complete multi-scene JSON response. */
 export function estimateDirectorTokenBudget(sceneCount) {
   const count = Number.isFinite(Number(sceneCount)) ? Math.max(1, Math.min(8, Math.round(Number(sceneCount)))) : 5;
