@@ -55,11 +55,11 @@ test('does not invent character identity when the cast is missing', () => {
 
 test('skips unsupported actions and missing rigs without fabricating motion', () => {
   const result = compileDoodleSceneMotion(
-    { characters: ['Foxy', 'Bird'], characterActions: { Foxy: 'teleport', Bird: 'walk' } },
+    { characters: ['Foxy', 'Wolf'], characterActions: { Foxy: 'teleport', Wolf: 'walk' } },
     [rig('Bird')]
   );
-  assert.equal(result.status, 'ready');
-  assert.deepEqual(result.animatedCharacterIds, ['Bird']);
+  assert.equal(result.status, 'no-compatible-rigs');
+  assert.deepEqual(result.animatedCharacterIds, []);
   assert.equal(result.warnings.length, 2);
 });
 
