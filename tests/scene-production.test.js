@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildProductionScene, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from '../src/scene-production.js';
+import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildProductionScene, buildSceneIdentitySeed, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from '../src/scene-production.js';
 
 const scene = {
   title: 'The key turns',
@@ -370,4 +370,23 @@ test('uses all saved photo references only when a legacy scene has no explicit c
   assert.equal(sceneHasSavedCharacterImageReference({ characters: [] }, [
     { characterId: 'Foxy', referenceImageAssetId: 'refimg_foxy123' }
   ]), false);
+});
+
+test('uses a stable scene-image seed for the same character identity and style across different actions', () => {
+  const first = buildSceneIdentitySeed({ characters: ['foxy'], visibleAction: 'Foxy waves.', location: 'Forest' }, bible, '3D animated');
+  const second = buildSceneIdentitySeed({ characters: ['FOXY'], visibleAction: 'Foxy runs.', location: 'Castle' }, bible, '3D animated');
+  assert.equal(first, second);
+  assert.ok(Number.isInteger(first) && first >= 0 && first <= 0xffffffff);
+});
+
+test('changes the scene-image seed when the canonical character design or visual style changes', () => {
+  const original = buildSceneIdentitySeed(scene, bible, '3D animated');
+  const redesigned = buildSceneIdentitySeed(scene, [{ ...bible[0], clothing: 'Green coat' }], '3D animated');
+  const restyled = buildSceneIdentitySeed(scene, bible, 'Watercolor');
+  assert.notEqual(original, redesigned);
+  assert.notEqual(original, restyled);
+});
+
+test('does not force a seed when a scene has no saved character identity', () => {
+  assert.equal(buildSceneIdentitySeed({ characters: ['unknown'] }, []), undefined);
 });

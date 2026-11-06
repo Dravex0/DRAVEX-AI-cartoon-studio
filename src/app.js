@@ -77,7 +77,7 @@ import { createVoicePreviewSession } from "./audio-preview.js";
 import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from "./character-facial-editor.js";
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
 import { createVideoProviderRegistry, generateVideoWithProvider } from "./video-provider-contract.js";
-import { buildImageGenerationPrompt, buildMotionGenerationPrompt, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from "./scene-production.js";
+import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildSceneIdentitySeed, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from "./scene-production.js";
 import { buildCharacterSpriteAssetPlan } from "./character-sprite-asset-plan.js";
 import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
@@ -2716,7 +2716,7 @@ const referenceNotice=hasSavedPhotoReference?(uiLang==='ru'?'Фото-рефер
 renderScenes();
 button.disabled=true;status.textContent=referenceNotice+(uiLang==='ru'?'Отправляем текстовый промпт в бесплатную очередь AI Horde…':'Submitting the text prompt to the free AI Horde queue…');
 try{
-const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);const result=await generateImageWithHorde({prompt,negativePrompt:scene.negativePrompt,...quality,onProgress:progress=>{
+const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);const result=await generateImageWithHorde({prompt,negativePrompt:scene.negativePrompt,...quality,seed:buildSceneIdentitySeed(scene,characterBible,$('style').value),onProgress:progress=>{
 const position=progress.queuePosition===null?'?':progress.queuePosition;
 status.textContent=referenceNotice+(uiLang==='ru'?'Очередь AI Horde · позиция: '+position+' · ожидают: '+progress.waiting+' · обрабатываются: '+progress.processing:'AI Horde queue · position: '+position+' · waiting: '+progress.waiting+' · processing: '+progress.processing);
 }});
@@ -3214,7 +3214,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      const imagePrompt=buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value});
      const referenceNotice=sceneHasSavedCharacterImageReference(meta,characterBible)?(uiLang==='ru'?'Фото-референсы не отправляются; AI Horde использует текстовые описания. ':'Photo references are not uploaded; AI Horde uses text descriptions only. '):'';
      status.textContent=referenceNotice+'Создаём изображение сцены '+(index+1)+' из '+scenes.length+' в AI Horde…';
-     const imageResult=await generateImageWithHorde({prompt:imagePrompt,negativePrompt:meta.negativePrompt||'',...quality,signal,onProgress:queue=>{
+     const imageResult=await generateImageWithHorde({prompt:imagePrompt,negativePrompt:meta.negativePrompt||'',...quality,seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),signal,onProgress:queue=>{
       updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Очередь AI Horde','AI Horde queue')});
       status.textContent=referenceNotice+'AI Horde · сцена '+(index+1)+' · очередь '+(queue.queuePosition===null?'?':queue.queuePosition);
      }});
