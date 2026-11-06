@@ -2013,6 +2013,8 @@ function prepareAutomaticCharacterMotion(){
  if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata};
  $('characterRigStatus').textContent='Automatic rig preparation: '+rigBatch.generatedActions+' action(s) across '+rigBatch.generatedScenes+' scene(s); '+rigBatch.scenesWithoutRig+' scene(s) have no segmented rig; '+rigBatch.preservedTimelines+' existing timeline(s) preserved.';
  $('characterMotionStatus').textContent='Automatic sprite motion: '+spriteBatch.generatedActions+' phase(s) across '+spriteBatch.generatedScenes+' scene(s); '+spriteBatch.scenesWithoutSprites+' scene(s) have no sprite layers; '+spriteBatch.preservedTimelines+' existing timeline(s) preserved.';
+ syncCharacterRigEditor();
+ syncCharacterMotionEditor();
  sceneMotionSceneIndex=-1;
  if(!playing)draw();
  return {rigBatch,spriteBatch};
