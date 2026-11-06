@@ -18,6 +18,7 @@ import { createUniversalFilmCompositionCapability } from "./universal-film-compo
 import { resolveUniversalSceneTarget } from "./universal-scene-target.js";
 import { resolveUniversalVoiceTargets } from "./universal-voice-target.js";
 import { resolveAutomaticSpeechTasks } from "./automatic-speech-workflow.js";
+import { findScenesWithMissingVoiceAudio } from "./voice-artifact-readiness.js";
 import { generateSceneDialogue, selectScenesMissingDialogue } from "./scene-dialogue-generator.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
@@ -2011,7 +2012,7 @@ $('make').addEventListener('click',()=>createStoryboard());
 function runAutomaticDialogueAndVoice(request,signal){
  const locale=storyLanguage();
  persistCurrentSceneDialogueToMetadata(locale);
- const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata});
+ const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata,language:storyLanguage()});
  if(!speechPlan.dialogueRequested&&!speechPlan.voiceRequested)return {skipped:true,reason:'speech-not-requested'};
  const report=detail=>{$('status').textContent=detail;};
  const handlers=universalCapabilityRegistry.createHandlers();
@@ -2031,8 +2032,17 @@ function runAutomaticDialogueAndVoice(request,signal){
 }
 
 async function runAutomaticVoiceForMissingScenes(request,signal,handlers,report,dialogueResult){
- const current=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata});
- const targets=current.scenesMissingVoice;
+ const current=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata,language:storyLanguage()});
+ const targets=[...current.scenesMissingVoice];
+ // Metadata alone is not proof that the generated WAV still exists on this device.
+ // Browser storage can be evicted independently from the saved storyboard draft.
+ if(sceneMetadata.some(scene=>Array.isArray(scene?.voiceCues)&&scene.voiceCues.length)){
+  if(!sceneVoiceStorage)sceneVoiceStorage=createVoiceAudioStorage();
+  const missingAudio=await findScenesWithMissingVoiceAudio(sceneMetadata,sceneVoiceStorage);
+  for(const missing of missingAudio){
+   if(!targets.some(target=>target.sceneId===missing.sceneId))targets.push(missing);
+  }
+ }
  if(!targets.length)return {dialogue:dialogueResult,voice:{skipped:true,reason:'voice-already-generated'}};
  if(!isLocalSceneVoiceEngineLoaded())throw new Error(voiceText('В запросе нужна озвучка, но локальная модель голоса не загружена. Загрузи её в разделе «Голоса», подтверди необходимые условия использования и нажми «Создать готовое видео» ещё раз.','Voice audio was requested, but the local voice model is not loaded. Load it in the Voices section, confirm any required usage terms, then press Create film again.'));
  const results=[];
@@ -2177,7 +2187,7 @@ $('makeFilm').addEventListener('click',async()=>{
   }
   return;
  }
- const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata});
+ const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata,language:storyLanguage()});
  if(speechPlan.dialogueRequested||speechPlan.voiceRequested){
   const speechController=new AbortController();
   const createButton=$('makeFilm');

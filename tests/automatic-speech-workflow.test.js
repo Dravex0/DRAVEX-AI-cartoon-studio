@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveAutomaticSpeechTasks } from '../src/automatic-speech-workflow.js';
+import { findScenesWithMissingVoiceAudio } from '../src/voice-artifact-readiness.js';
 
 const hash = 'a'.repeat(64);
 
@@ -72,4 +73,54 @@ test('does not mistake speech bubbles or a music soundtrack for spoken voice aud
   });
   assert.equal(soundtrack.dialogueRequested, false);
   assert.equal(soundtrack.voiceRequested, false);
+});
+
+
+test('requires voice artifacts to match the active story language', () => {
+  const scenes = [{
+    id: 's1',
+    dialogue: [{ characterId: 'Fox', text: 'Hello' }],
+    voiceCues: [{ characterId: 'Fox', text: 'Hello', language: 'en', audioHash: hash, durationMs: 1200 }]
+  }];
+  assert.deepEqual(
+    resolveAutomaticSpeechTasks({ request: 'Voice audio please.', scenes, language: 'ru' }).scenesMissingVoice,
+    [{ sceneId: 's1', index: 0 }]
+  );
+  assert.deepEqual(
+    resolveAutomaticSpeechTasks({ request: 'Voice audio please.', scenes, language: 'en' }).scenesMissingVoice,
+    []
+  );
+});
+
+test('detects voice WAVs evicted from local storage even when draft cues remain', async () => {
+  const scenes = [
+    {
+      id: 'available',
+      dialogue: [{ characterId: 'Fox', text: 'Hello' }],
+      voiceCues: [{ characterId: 'Fox', text: 'Hello', audioHash: hash, durationMs: 1200 }]
+    },
+    {
+      id: 'evicted',
+      dialogue: [{ characterId: 'Bird', text: 'Hi' }],
+      voiceCues: [{ characterId: 'Bird', text: 'Hi', audioHash: 'b'.repeat(64), durationMs: 900 }]
+    }
+  ];
+  const storage = {
+    async get(audioHash) {
+      return audioHash === hash ? { blob: new Blob(['voice']) } : undefined;
+    }
+  };
+  assert.deepEqual(await findScenesWithMissingVoiceAudio(scenes, storage), [{ sceneId: 'evicted', index: 1 }]);
+});
+
+test('does not claim voice storage is healthy when a cue points to an empty blob', async () => {
+  const scenes = [{
+    id: 'empty',
+    dialogue: [{ characterId: 'Fox', text: 'Hello' }],
+    voiceCues: [{ characterId: 'Fox', text: 'Hello', audioHash: hash, durationMs: 1200 }]
+  }];
+  assert.deepEqual(
+    await findScenesWithMissingVoiceAudio(scenes, { get: async () => ({ blob: new Blob([]) }) }),
+    [{ sceneId: 'empty', index: 0 }]
+  );
 });

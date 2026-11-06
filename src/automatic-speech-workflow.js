@@ -7,7 +7,7 @@ function hasDialogue(scene) {
   );
 }
 
-function voiceArtifactsMatchDialogue(scene) {
+function voiceArtifactsMatchDialogue(scene, language = null) {
   const dialogue = Array.isArray(scene?.dialogue) ? scene.dialogue : [];
   const cues = Array.isArray(scene?.voiceCues) ? scene.voiceCues : [];
   if (!dialogue.length || cues.length !== dialogue.length) return false;
@@ -15,6 +15,7 @@ function voiceArtifactsMatchDialogue(scene) {
     const cue = cues[index];
     return clean(cue?.text) === clean(line?.text)
       && clean(cue?.characterId) === clean(line?.characterId)
+      && (!language || clean(cue?.language) === clean(language))
       && hashPattern.test(clean(cue?.audioHash))
       && Number.isFinite(Number(cue?.durationMs))
       && Number(cue.durationMs) > 0;
@@ -25,7 +26,7 @@ function voiceArtifactsMatchDialogue(scene) {
  * Detect speech work only when the user's prompt explicitly requests it.
  * Existing dialogue and matching generated voice artifacts are preserved.
  */
-export function resolveAutomaticSpeechTasks({ request = '', scenes = [] } = {}) {
+export function resolveAutomaticSpeechTasks({ request = '', scenes = [], language = null } = {}) {
   const source = clean(request).toLocaleLowerCase();
   const speechSource = source.replace(/\bspeech\s+bubbles?\b/giu, '');
   const dialogueRequested = /dialogue|spoken|speech|voice.?over|narrat|script|talking|speak|реплик|диалог|голос|озвуч|говор|разговор|реч|диктор|закадр/iu.test(speechSource);
@@ -36,7 +37,7 @@ export function resolveAutomaticSpeechTasks({ request = '', scenes = [] } = {}) 
     : [];
   const scenesMissingVoice = voiceRequested
     ? list.map((scene, index) => ({ scene, index }))
-      .filter(item => hasDialogue(item.scene) && !voiceArtifactsMatchDialogue(item.scene))
+      .filter(item => hasDialogue(item.scene) && !voiceArtifactsMatchDialogue(item.scene, language))
       .map(item => ({ sceneId: clean(item.scene?.id), index: item.index }))
       .filter(item => item.sceneId)
     : [];
