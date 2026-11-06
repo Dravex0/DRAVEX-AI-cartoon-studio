@@ -88,7 +88,7 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
       if (blob.size === 0) throw new TypeError("Scene video Blob must not be empty.");
       const mimeType = String(blob.type || "").split(";")[0].trim().toLowerCase();
       if (!mimeType.startsWith("video/")) throw new TypeError("Scene video Blob must have a video MIME type.");
-      if (!Number.isInteger(generationRevision) || generationRevision < 0) {
+      if (!Number.isSafeInteger(generationRevision) || generationRevision < 0) {
         throw new RangeError("generationRevision must be a non-negative integer.");
       }
       const safeFilename = String(filename || "scene-video.webm").slice(0, 180);
@@ -126,7 +126,7 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
     async deleteIfRevision(sceneId, generationRevision) {
       const key = String(sceneId || "").trim();
       if (!key) return false;
-      if (!Number.isInteger(generationRevision) || generationRevision < 0) {
+      if (!Number.isSafeInteger(generationRevision) || generationRevision < 0) {
         throw new RangeError("generationRevision must be a non-negative integer.");
       }
       return run(store => new Promise((resolve, reject) => {
@@ -149,7 +149,7 @@ export function createSceneVideoStorage({ indexedDBRef = globalThis.indexedDB } 
     async deleteOlderThanRevision(sceneId, generationRevision) {
       const key = String(sceneId || "").trim();
       if (!key) return false;
-      if (!Number.isInteger(generationRevision) || generationRevision < 0) {
+      if (!Number.isSafeInteger(generationRevision) || generationRevision < 0) {
         throw new RangeError("generationRevision must be a non-negative integer.");
       }
       return run(store => new Promise((resolve, reject) => {
