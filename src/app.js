@@ -16,6 +16,7 @@ import { createUniversalRemoteVideoCapability } from "./universal-remote-video-c
 import { createUniversalFilmCompositionCapability } from "./universal-film-composition-capability.js";
 import { resolveUniversalSceneTarget } from "./universal-scene-target.js";
 import { resolveUniversalVoiceTargets } from "./universal-voice-target.js";
+import { resolveAutomaticSpeechTasks } from "./automatic-speech-workflow.js";
 import { generateSceneDialogue, selectScenesMissingDialogue } from "./scene-dialogue-generator.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
@@ -2006,6 +2007,45 @@ $('language').addEventListener('change',()=>{
 $('voiceNonCommercialConsent').addEventListener('change',refreshSceneVoiceControls);
 $('make').addEventListener('click',()=>createStoryboard());
 
+function runAutomaticDialogueAndVoice(request,signal){
+ const locale=storyLanguage();
+ persistCurrentSceneDialogueToMetadata(locale);
+ const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata});
+ if(!speechPlan.dialogueRequested&&!speechPlan.voiceRequested)return {skipped:true,reason:'speech-not-requested'};
+ const report=detail=>{$('status').textContent=detail;};
+ const handlers=universalCapabilityRegistry.createHandlers();
+ const plan={sourceRequest:request};
+ if(speechPlan.dialogueRequested&&speechPlan.scenesMissingDialogue.length){
+  if(!localTextRuntime.status.loaded)throw new Error(voiceText('В запросе есть диалоги, но локальная текстовая модель не загружена. Сначала нажми «Загрузить локальную модель ИИ», затем повтори создание.','Dialogue was requested, but the local text model is not loaded. Load the local AI model, then start creation again.'));
+  const step={id:'automatic-dialogue',action:'Write dialogue for every scene',purpose:'Create source-grounded dialogue from the storyboard',inputs:['allScenes'],outputs:['dialogue'],dependsOn:[],requiredCapabilities:['dialogue.generate']};
+  report(voiceText('Создаём диалоги для всех сцен…','Writing dialogue for all scenes…'));
+  return handlers['dialogue.generate']({plan,step,signal,reportProgress:report}).then(async dialogueResult=>{
+   syncSceneEditor();renderScenes();
+   if(!speechPlan.voiceRequested)return {dialogue:dialogueResult,voice:null};
+   return runAutomaticVoiceForMissingScenes(request,signal,handlers,report,dialogueResult);
+  });
+ }
+ if(speechPlan.voiceRequested)return runAutomaticVoiceForMissingScenes(request,signal,handlers,report,null);
+ return {dialogue:null,voice:null};
+}
+
+async function runAutomaticVoiceForMissingScenes(request,signal,handlers,report,dialogueResult){
+ const current=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata});
+ const targets=current.scenesMissingVoice;
+ if(!targets.length)return {dialogue:dialogueResult,voice:{skipped:true,reason:'voice-already-generated'}};
+ if(!isLocalSceneVoiceEngineLoaded())throw new Error(voiceText('В запросе нужна озвучка, но локальная модель голоса не загружена. Загрузи её в разделе «Голоса», подтверди необходимые условия использования и нажми «Создать готовое видео» ещё раз.','Voice audio was requested, but the local voice model is not loaded. Load it in the Voices section, confirm any required usage terms, then press Create film again.'));
+ const results=[];
+ for(let i=0;i<targets.length;i++){
+  if(signal?.aborted)throw new DOMException('Automatic voice generation was cancelled.','AbortError');
+  const sceneId=targets[i].sceneId;
+  const step={id:'automatic-voice-'+(i+1),action:'Generate local voices for scene '+(i+1),purpose:'Synthesize the requested dialogue for this scene',inputs:['sceneId:'+sceneId],outputs:['voice-audio'],dependsOn:[],requiredCapabilities:['voice.generate']};
+  report((uiLang==='ru'?'Озвучиваем сцену ':'Generating voice for scene ')+(i+1)+' / '+targets.length);
+  results.push(await handlers['voice.generate']({plan:{sourceRequest:request},step,signal,reportProgress:report}));
+ }
+ syncSceneEditor();renderScenes();
+ return {dialogue:dialogueResult,voice:{scenes:results.length,results}};
+}
+
 function prepareAutomaticCharacterMotion(){
  const rigBatch=generateCharacterRigTimelinesForScenes(sceneMetadata,createCharacterRigTimelineFromActionTimeline);
  const spriteBatch=generateCharacterMotionTimelinesForScenes(rigBatch.scenes,planCharacterMotionFromActionTimeline);
@@ -2039,7 +2079,6 @@ $('makeFilm').addEventListener('click',async()=>{
  );
  const created=canReuseStoryboard?currentStoryboardPlan:createStoryboard();
  if(!created)return;
- const motionPreparation=prepareAutomaticCharacterMotion();
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
   const hasImage=Boolean(String(scene?.generatedImageUrl||'').trim());
@@ -2078,6 +2117,27 @@ $('makeFilm').addEventListener('click',async()=>{
   }
   return;
  }
+ const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata});
+ if(speechPlan.dialogueRequested||speechPlan.voiceRequested){
+  const speechController=new AbortController();
+  const createButton=$('makeFilm');
+  const cancelButton=$('cancelFullFilmComfy');
+  fullFilmAbortController=speechController;
+  createButton.disabled=true;
+  cancelButton.hidden=false;
+  try{
+   await runAutomaticDialogueAndVoice(request,speechController.signal);
+  }catch(error){
+   $('status').textContent=(uiLang==='ru'?'Не удалось подготовить диалоги/озвучку: ':'Could not prepare dialogue/voice: ')+(error?.message||'Unknown error');
+   return;
+  }finally{
+   if(fullFilmAbortController===speechController)fullFilmAbortController=null;
+   createButton.disabled=false;
+   cancelButton.hidden=true;
+  }
+  if(speechController.signal.aborted)return;
+ }
+ const motionPreparation=prepareAutomaticCharacterMotion();
  if(mode==='local-canvas'){
   const controller=new AbortController();
   const button=$('makeFilm');
