@@ -41,6 +41,7 @@ import { createTimestampedKokoroEngine } from "./timestamped-kokoro-engine.js";
 import { createVoiceAudioStorage } from "./voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./scene-voice-workflow.js";
 import { createVoiceGenerationCheckpoint, restoreVoiceGenerationCheckpoint } from "./voice-generation-checkpoint.js";
+import { resolvePromptVoiceModelLoad } from "./prompt-voice-model-load.js";
 import { createSceneVideoStorage, persistSceneVideoBestEffort } from "./scene-video-storage.js";
 import { createFacialAssetStorage } from "./facial-asset-storage.js";
 import { createCharacterReferenceImageStorage } from "./character-reference-image-storage.js";
@@ -1917,7 +1918,7 @@ function refreshSceneVoiceControls(){
  if(timestamped&&locale!=='en'){
   $('sceneVoiceStatus').textContent=voiceText('Экспериментальный timestamped Kokoro поддерживает только английский. Выбери стандартный движок для этого языка.','Experimental timestamped Kokoro currently supports English only. Choose the standard engine for this language.');
  }else if(!loaded&&!sceneVoiceEngine?.status.loaded&&!$('sceneVoiceStatus').dataset.touched){
-  $('sceneVoiceStatus').textContent=voiceText('Модель не загружена. Загрузка начнётся только после нажатия кнопки.','No voice model loaded. Download starts only after you press Load.');
+  $('sceneVoiceStatus').textContent=voiceText('Модель не загружена. После согласия загрузка начнётся при нажатии Load или запуске мультфильма с диалогами.','No voice model loaded. After consent, download starts when you press Load or create a film that needs speech.');
  }else if(!loaded&&sceneVoiceEngine?.status.loaded){
   $('sceneVoiceStatus').textContent=voiceText('Загружен другой движок или язык. Нажми Load, чтобы переключить модель.','A different engine or language is loaded. Press Load to switch.');
  }
@@ -3090,9 +3091,21 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
    &&selectScenesMissingDialogue(sceneMetadata).length>0;
   if(needsDialogue){
    if(!localTextRuntime.status.loaded){
-    throw new Error(uiLang==='ru'
-     ?'В запросе нужна речь, но локальная текстовая модель не загружена. Открой «Дополнительный локальный ИИ», загрузи модель и повтори создание.'
-     :'Your request needs dialogue, but the local text model is not loaded. Open Optional local AI tools, load the model, and start again.');
+    if(!$('localModelConsent')?.checked){
+     throw new Error(uiLang==='ru'
+      ?'Для создания реплик нужно разрешить загрузку локальной текстовой модели (~117 МБ). Отметь согласие в разделе «Дополнительный локальный ИИ» и запусти создание снова.'
+      :'Dialogue generation needs the local text model (~117 MB). Confirm its download in Optional local AI tools, then start creation again.');
+    }
+    status.textContent=uiLang==='ru'?'Загружаем локальную текстовую модель…':'Loading the local text model…';
+    setFilmProgress(1,filmProgressText('Загрузка локального ИИ','Loading local AI'),filmProgressText('Модель загружается на устройство. Текст запроса не отправляется в облачный inference API.','The model is downloading to this device. Your prompt is not sent to a cloud inference API.'));
+    await localTextRuntime.load({
+     backend:'auto',
+     signal:controller.signal,
+     onProgress:event=>{
+      const percent=Number.isFinite(event?.progress)?' '+Math.round(event.progress*100)+'%':'';
+      status.textContent=uiLang==='ru'?'Загрузка локального ИИ: '+String(event?.status||'загрузка')+percent:'Local AI download: '+String(event?.status||'loading')+percent;
+     }
+    });
    }
    status.textContent=uiLang==='ru'?'Создаём реплики для всех сцен…':'Writing dialogue for all scenes…';
    setFilmProgress(1,filmProgressText('Создание реплик','Writing dialogue'),filmProgressText('Локальная модель обрабатывает сцены по очереди.','The local model is processing scenes sequentially.'));
@@ -3106,12 +3119,36 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   }
   const refreshedSpeechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata});
   if(refreshedSpeechTasks.voiceRequested&&refreshedSpeechTasks.scenesMissingVoice.length){
-   if(!isLocalSceneVoiceEngineLoaded()){
-    throw new Error(uiLang==='ru'
-     ?'Речь подготовлена, но локальная модель голоса не загружена. Открой диалог сцены, нажми «Загрузить локальную модель голоса» и повтори создание.'
-     :'Dialogue is ready, but the local voice model is not loaded. Open Scene dialogue, load the local voice model, and start again.');
-   }
    const voiceStep={id:'prompt-film-voice',action:'Generate voices for all scenes',purpose:'Synthesize requested spoken dialogue',inputs:['allScenes'],outputs:['voice-audio'],dependsOn:['prompt-film-dialogue'],requiredCapabilities:['voice.generate']};
+   if(!isLocalSceneVoiceEngineLoaded()){
+    const loadPlan=resolvePromptVoiceModelLoad({
+     locale:storyLanguage(),
+     engineChoice:$('sceneVoiceEngineChoice')?.value||'standard',
+     nonCommercialConsent:$('voiceNonCommercialConsent')?.checked===true
+    });
+    if(!loadPlan.ok){
+     const reason=loadPlan.reason==='non-commercial-consent-required'
+      ?(uiLang==='ru'?'Для выбранного языка отметь подтверждение некоммерческого использования локальной модели голоса в разделе «Диалоги».':'Confirm non-commercial use of the local voice model in the Dialogue section before continuing.')
+      :loadPlan.reason==='timestamped-english-only'
+       ?(uiLang==='ru'?'Timestamped Kokoro поддерживает только английский. Выбери стандартный движок голоса.':'Timestamped Kokoro supports English only. Choose the standard voice engine.')
+       :(uiLang==='ru'?'Не удалось определить язык или движок локального голоса.':'Could not resolve the local voice language or engine.');
+     throw new Error(reason);
+    }
+    status.textContent=uiLang==='ru'?'Загружаем локальную модель голоса…':'Loading the local voice model…';
+    setFilmProgress(2,filmProgressText('Загрузка модели голоса','Loading voice model'),filmProgressText('Модель загружается на устройство. Обработка речи останется локальной.','The model is downloading to this device. Speech inference stays local.'));
+    const voiceEngine=getSceneVoiceEngine();
+    await voiceEngine.load({
+     locale:loadPlan.locale,
+     allowNonCommercial:loadPlan.allowNonCommercial,
+     backend:loadPlan.backend,
+     signal:controller.signal,
+     onProgress:info=>{
+      const percent=Number.isFinite(info?.progress)?' '+Math.round(info.progress*100)+'%':'';
+      status.textContent=uiLang==='ru'?'Загрузка модели голоса: '+String(info?.status||'обработка')+percent:'Voice model download: '+String(info?.status||'loading')+percent;
+     }
+    });
+    refreshSceneVoiceControls();
+   }
    if(!isLocalSceneVoiceReady({step:voiceStep}))throw new Error(uiLang==='ru'
     ?'Не все сцены готовы к озвучке. Проверь реплики и выбранный язык.'
     :'Not all scenes are ready for voice synthesis. Check dialogue and the selected language.');
