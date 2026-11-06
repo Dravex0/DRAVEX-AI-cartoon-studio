@@ -29,6 +29,7 @@ import { generateCharacterRigTimelinesForScenes } from "./character-rig-scene-ba
 import { validateCharacterRig, normalizeCharacterRigPoses, characterRigPosesFor } from "./character-rig.js";
 import { upsertCharacterMotionPhase } from "./character-motion-editor.js";
 import { planCharacterMotionFromActionTimeline } from "./character-motion-planner.js";
+import { generateCharacterMotionTimelinesForScenes } from "./character-motion-scene-batch.js";
 import { attachCharacterSpriteToSceneLayers } from "./scene-character-layers.js";
 import { createSceneId, ensureSceneIds } from "./scene-identity.js";
 import { formatDialogueLines, parseDialogueLines } from "./dialogue-lines.js";
@@ -2005,6 +2006,20 @@ $('language').addEventListener('change',()=>{
 $('voiceNonCommercialConsent').addEventListener('change',refreshSceneVoiceControls);
 $('make').addEventListener('click',()=>createStoryboard());
 
+function prepareAutomaticCharacterMotion(){
+ const rigBatch=generateCharacterRigTimelinesForScenes(sceneMetadata,createCharacterRigTimelineFromActionTimeline);
+ const spriteBatch=generateCharacterMotionTimelinesForScenes(rigBatch.scenes,planCharacterMotionFromActionTimeline);
+ sceneMetadata=spriteBatch.scenes;
+ if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata};
+ syncCharacterRigEditor();
+ syncCharacterMotionEditor();
+ $('characterRigStatus').textContent='Automatic rig preparation: '+rigBatch.generatedActions+' action(s) across '+rigBatch.generatedScenes+' scene(s); '+rigBatch.scenesWithoutRig+' scene(s) have no segmented rig; '+rigBatch.preservedTimelines+' existing timeline(s) preserved.';
+ $('characterMotionStatus').textContent='Automatic sprite motion: '+spriteBatch.generatedActions+' phase(s) across '+spriteBatch.generatedScenes+' scene(s); '+spriteBatch.scenesWithoutSprites+' scene(s) have no sprite layers; '+spriteBatch.preservedTimelines+' existing timeline(s) preserved.';
+ sceneMotionSceneIndex=-1;
+ if(!playing)draw();
+ return {rigBatch,spriteBatch};
+}
+
 $('makeFilm').addEventListener('click',async()=>{
  if(fullFilmAbortController||$('export').disabled){
   $('status').textContent=uiLang==='ru'?'Создание или экспорт уже выполняется. Дождись завершения или нажми «Отменить».':'A film generation or export is already running. Wait for it to finish or cancel the current run.';
@@ -2024,6 +2039,7 @@ $('makeFilm').addEventListener('click',async()=>{
  );
  const created=canReuseStoryboard?currentStoryboardPlan:createStoryboard();
  if(!created)return;
+ const motionPreparation=prepareAutomaticCharacterMotion();
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
   const hasImage=Boolean(String(scene?.generatedImageUrl||'').trim());
@@ -2075,8 +2091,8 @@ $('makeFilm').addEventListener('click',async()=>{
    ?'Используем существующий предпросмотр, движения камеры, объекты и подключённые риги. Облачная генерация не запускается.'
    :'Rendering the existing canvas preview, camera motion, props, and attached rigs. No cloud generation is started.');
   $('status').textContent=uiLang==='ru'
-   ?'Создаём локальное видео из раскадровки. Это WebM-анимация холста, не AI text-to-video.'
-   :'Rendering a local storyboard video. This is canvas-based WebM animation, not AI text-to-video.';
+   ?'Создаём локальное видео из раскадровки. Это WebM-анимация холста, не AI text-to-video. Подготовлено: '+motionPreparation.rigBatch.generatedActions+' действий рига и '+motionPreparation.spriteBatch.generatedActions+' фаз движения спрайтов.'
+   :'Rendering a local storyboard video. This is canvas-based WebM animation, not AI text-to-video. Prepared '+motionPreparation.rigBatch.generatedActions+' rig actions and '+motionPreparation.spriteBatch.generatedActions+' sprite motion phases.';
   try{
    const result=await exportFilm({signal:controller.signal,download:true});
    if(result?.status!=='completed'){
