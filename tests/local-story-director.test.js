@@ -389,3 +389,66 @@ test('allocates a bounded scene-count-aware token budget for the local director'
   await directStoryboardWithLocalAI({ runtime, basePlan });
   assert.equal(options.maxNewTokens, 980);
 });
+
+
+test('recovers JSON comments and a UTF-8 BOM without corrupting URL strings', async () => {
+  const payload = JSON.stringify({ scenes: goodScenes }).replace(
+    '"imagePrompt":"A cinematic still of Foxy lifting a silver key in moonlight."',
+    '"imagePrompt":"https://example.test/fox // still frame" /* model note */'
+  );
+  const result = await directStoryboardWithLocalAI({
+    runtime: { generate: async () => ({ text: '\uFEFF/* response */\n' + payload }) },
+    basePlan
+  });
+  assert.equal(result.usedLocalModel, true);
+  assert.equal(result.scenes[0].imagePrompt, 'https://example.test/fox // still frame');
+});
+
+test('repairs a structurally truncated JSON container when all strings and values are complete', async () => {
+  const complete = JSON.stringify({ scenes: goodScenes });
+  const truncated = complete.slice(0, -2);
+  const result = await directStoryboardWithLocalAI({
+    runtime: { generate: async () => ({ text: truncated }) },
+    basePlan
+  });
+  assert.equal(result.usedLocalModel, true);
+  assert.equal(result.scenes.length, basePlan.scenes.length);
+});
+
+test('rejects truncation inside a JSON string instead of accepting silently truncated prompt text', async () => {
+  const result = await directStoryboardWithLocalAI({
+    runtime: { generate: async () => ({ text: '{"scenes":[{"imagePrompt":"cut off in the middle' }) },
+    basePlan
+  });
+  assert.equal(result.usedLocalModel, false);
+  assert.equal(result.fallbackReason, 'invalid-model-scene-structure');
+});
+
+test('rejects oversized model output instead of silently slicing it into a different response', async () => {
+  const result = await directStoryboardWithLocalAI({
+    runtime: { generate: async () => ({ text: ' '.repeat(100_001) }) },
+    basePlan
+  });
+  assert.equal(result.usedLocalModel, false);
+  assert.equal(result.fallbackReason, 'invalid-model-scene-structure');
+});
+
+test('structured state memory fails closed without throwing on malformed baseline state changes', async () => {
+  const malformedPlan = {
+    ...basePlan,
+    scenes: basePlan.scenes.map((scene, index) => index === 0
+      ? { ...scene, stateChanges: { unexpected: true } }
+      : scene)
+  };
+  const structured = goodScenes.map(scene => ({
+    ...scene,
+    startStateData: structuredState(),
+    endStateData: structuredState()
+  }));
+  const result = await directStoryboardWithLocalAI({
+    runtime: runtimeReturning(structured),
+    basePlan: malformedPlan
+  });
+  assert.ok(result);
+  assert.equal(result.usedLocalModel, true);
+});
