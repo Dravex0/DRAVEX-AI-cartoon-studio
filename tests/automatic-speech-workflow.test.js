@@ -124,3 +124,24 @@ test('does not claim voice storage is healthy when a cue points to an empty blob
     [{ sceneId: 'empty', index: 0 }]
   );
 });
+
+
+test('recognizes Ukrainian dialogue and voice requests', () => {
+  const result = resolveAutomaticSpeechTasks({
+    request: 'Створи мультфільм із діалогами та озвученням персонажів.',
+    scenes: [{ id: 'ua-scene' }]
+  });
+  assert.equal(result.dialogueRequested, true);
+  assert.equal(result.voiceRequested, true);
+  assert.equal(result.scenesMissingDialogue.length, 1);
+});
+
+test('recognizes Spanish dialogue and voice requests', () => {
+  const result = resolveAutomaticSpeechTasks({
+    request: 'Crea un cortometraje con diálogos y voces para los personajes.',
+    scenes: [{ id: 'es-scene' }]
+  });
+  assert.equal(result.dialogueRequested, true);
+  assert.equal(result.voiceRequested, true);
+  assert.equal(result.scenesMissingDialogue.length, 1);
+});
