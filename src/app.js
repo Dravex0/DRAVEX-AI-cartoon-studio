@@ -2079,14 +2079,6 @@ $('makeFilm').addEventListener('click',async()=>{
  );
  const created=canReuseStoryboard?currentStoryboardPlan:createStoryboard();
  if(!created)return;
- const speechController=new AbortController();
- try{
-  const speechResult=await runAutomaticDialogueAndVoice(request,speechController.signal);
-  if(speechResult?.dialogue||speechResult?.voice)$('status').textContent=uiLang==='ru'?'Диалоги и озвучка подготовлены. Продолжаем создание видео…':'Dialogue and voice are prepared. Continuing video creation…';
- }catch(error){
-  $('status').textContent=(uiLang==='ru'?'Не удалось подготовить диалоги/озвучку: ':'Could not prepare dialogue/voice: ')+(error?.message||'Unknown error');
-  return;
- }
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
   const hasImage=Boolean(String(scene?.generatedImageUrl||'').trim());
