@@ -107,7 +107,7 @@ test('detects voice WAVs evicted from local storage even when draft cues remain'
   ];
   const storage = {
     async get(audioHash) {
-      return audioHash === hash ? { blob: new Blob(['voice']) } : undefined;
+      return audioHash === hash ? {\n        audioHash: hash,\n        blob: new Blob(['voice'], { type: 'audio/wav' }),\n        mimeType: 'audio/wav',\n        durationMs: 1200\n      } : undefined;
     }
   };
   assert.deepEqual(await findScenesWithMissingVoiceAudio(scenes, storage), [{ sceneId: 'evicted', index: 1 }]);
