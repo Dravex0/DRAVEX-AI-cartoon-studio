@@ -45,7 +45,7 @@ import { createCharacterReferenceImageStorage } from "./character-reference-imag
 import { generateStoryboardVideos, readVideoProgressPercent } from "./scene-video-batch.js";
 import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./huggingface-zerogpu-video-provider.js";
 import { fitSceneVideoToDuration, syncSceneVideoPlayback } from "./scene-video-transport.js";
-import { waitForSceneVideoReady, waitForSceneImageReady } from "./scene-video-readiness.js";
+import { waitForSceneVideoReady, waitForSceneImageReady, isSceneVideoDecoded } from "./scene-video-readiness.js";
 import { createAnimationClock } from "./animation-clock.js";
 import { getPromptCameraTransform } from "./prompt-camera-motion.js";
 import { detectSceneActionForScene } from "./scene-action.js";
@@ -253,7 +253,7 @@ universalCapabilityRegistry.register(createUniversalRemoteVideoCapability({
  generateScene:context=>generateRemoteSceneVideoForUniversal(context)
 }));
 universalCapabilityRegistry.register(createUniversalFilmCompositionCapability({
- getSceneReport:()=>buildSceneMediaReport(sceneMetadata,new Set(sceneVideoCache.keys())),
+ getSceneReport:()=>buildSceneMediaReport(sceneMetadata,new Set([...sceneVideoCache].filter(([,entry])=>isSceneVideoDecoded(entry?.video)).map(([key])=>key))),
  composeFilm:async({signal,reportProgress,sceneCount})=>{
   const result=await exportFilm({signal,requireAllVideos:true,download:true,onProgress:detail=>reportProgress?.(detail?.phase==='recording'?'Recording final film: '+detail.percent+'%':detail?.phase==='scene'?'Composing scene '+(detail.sceneIndex+1)+' / '+detail.sceneCount:String(detail||''))});
   if(result?.status!=='completed')throw new Error(result?.reason||'Full-film WebM composition did not complete.');
@@ -1548,7 +1548,7 @@ async function runSceneMotionAnalysis(){
 function renderSceneMediaReport(){
   const target=$('sceneMediaReport');
   if(!target)return;
-  const report=buildSceneMediaReport(sceneMetadata,new Set(sceneVideoCache.keys()));
+  const report=buildSceneMediaReport(sceneMetadata,new Set([...sceneVideoCache].filter(([,entry])=>isSceneVideoDecoded(entry?.video)).map(([key])=>key)));
   const russian=uiLang==='ru';
   const videoLabel=russian?'Готовые видеосцены':'Generated video scenes';
   const stillLabel=russian?'Изображения / холст':'Still-image / canvas scenes';
@@ -3294,7 +3294,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     const missing=timeline.segments.filter(segment=>{
       const meta=sceneMetadata[segment.sceneIndex]||{};
       const entry=sceneVideoCache.get(String(meta.id||('scene-index-'+segment.sceneIndex)));
-      return !entry?.video;
+      return !isSceneVideoDecoded(entry?.video);
     }).map(segment=>segment.sceneIndex+1);
     if(missing.length)return {status:'blocked',reason:'Every scene must have a decoded video clip. Missing scene(s): '+missing.join(', ')+'.'};
   }
