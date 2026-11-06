@@ -1387,7 +1387,42 @@ renderSceneVoiceAudio();
 refreshSceneVoiceControls();
 syncFacialRigEditor();
 }
-['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock','sceneCharacters'].forEach(id=>$(id).addEventListener('input',updateProductionPreview));
+const pendingSceneVideoInvalidations=new Map();
+function invalidateCurrentSceneVideoForEdit(){
+ const meta=sceneMetadata[sceneIndex];
+ const key=meta?.id?String(meta.id):'';
+ if(!key)return;
+ const entry=sceneVideoCache.get(key);
+ if(entry){
+  sceneVideoCache.delete(key);
+  disposeSceneVideoEntry(entry);
+  renderComfySceneVideo();
+  updateFaceAnalysisControls();
+  if(!playing)draw();
+  $('status').textContent=uiLang==='ru'
+   ?'Параметры сцены изменены. Старый видеоклип удалён — создай новый, чтобы он соответствовал изменениям.'
+   :'Scene settings changed. The previous clip was removed; generate a new clip to match the edits.';
+ }
+ if(pendingSceneVideoInvalidations.has(key))return;
+ const pending=(async()=>{
+  await sceneVideoRestorePromise;
+  const restored=sceneVideoCache.get(key);
+  if(restored){
+   sceneVideoCache.delete(key);
+   disposeSceneVideoEntry(restored);
+   renderComfySceneVideo();
+   updateFaceAnalysisControls();
+   if(!playing)draw();
+  }
+  await sceneVideoStorage.delete(key);
+ })().catch(error=>console.warn('Could not invalidate the previous scene video:',error))
+   .finally(()=>pendingSceneVideoInvalidations.delete(key));
+ pendingSceneVideoInvalidations.set(key,pending);
+}
+['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock','sceneCharacters'].forEach(id=>$(id).addEventListener('input',()=>{
+ invalidateCurrentSceneVideoForEdit();
+ updateProductionPreview();
+}));
 $("facialPartSelect").addEventListener("change",syncFacialRigEditor);
 $("facialPartImageFile").addEventListener("change",async event=>{
 const file=event.target.files?.[0];if(!file)return;const status=$("facialAssetUploadStatus");
