@@ -142,7 +142,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
 
   const causalLinks = inferSceneCausalLinks(scenes, locale);
   const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
-  const explicitSubject = String(character ?? '').trim() ? subject : '';
+  const explicitSubject = !explicitScenes.length && String(character ?? '').trim() ? subject : '';
   const knownCharacters = [...new Set([explicitSubject, ...brief.characters].filter(Boolean))];
   const characterMention = (name, sourceText) => {
     const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
