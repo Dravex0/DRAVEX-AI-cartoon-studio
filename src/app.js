@@ -3690,6 +3690,10 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     animationClock.reset(0);
     frame=0;
     playing=true;
+    // Mark export mode before the first draw. draw() must not restart/seek the
+    // active clip after preflight has decoded its first frame, or the snapshot
+    // can become temporarily undecoded and abort an otherwise valid export.
+    exportMouthOriginTimeMs=performance.now();
     syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:true});
     $('play').textContent=tr('pauseButton');
     if(raf)cancelAnimationFrame(raf);
@@ -3697,7 +3701,6 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     draw();
     assertRequiredSceneSnapshot();
     recorder.start(250);
-    exportMouthOriginTimeMs=performance.now();
     if(audioScheduledStartAtMs!==null){
       const mouthStartOffsetMs=getAudioTimelineOffsetMs(audioScheduledStartAtMs,exportMouthOriginTimeMs);
       exportMouthTracks=exportMouthTracks.map(track=>({...track,startMs:track.startMs+mouthStartOffsetMs}));
