@@ -22,6 +22,26 @@ function normalizeProgress(info) {
   };
 }
 
+function abortError() {
+  return Object.assign(new Error("Model loading was cancelled."), { name: "AbortError" });
+}
+
+function disposeHeadTts(engine) {
+  if (!engine) return;
+  if (engine.ww && typeof engine.ww.terminate === "function") {
+    try { engine.ww.terminate(); } catch { /* Best-effort worker cleanup. */ }
+    engine.ww = null;
+  }
+  const audioContext = engine.settings?.audioCtx;
+  if (audioContext && audioContext.state !== "closed" && typeof audioContext.close === "function") {
+    try {
+      const closing = audioContext.close();
+      closing?.catch?.(() => {});
+    } catch { /* Best-effort audio context cleanup. */ }
+  }
+  engine.isConnected = false;
+}
+
 /**
  * Optional English-only timestamped Kokoro engine.
  * Inference runs in a local Web Worker; model/voice assets are fetched only
@@ -58,53 +78,66 @@ export function createTimestampedKokoroEngine({
     },
 
     async load({ backend: requestedBackend = "wasm", onProgress, signal } = {}) {
-      if (signal?.aborted) throw Object.assign(new Error("Model loading was cancelled."), { name: "AbortError" });
+      if (signal?.aborted) throw abortError();
       if (!["wasm", "webgpu"].includes(requestedBackend)) throw new TypeError("backend must be wasm or webgpu.");
       if (instance?.isConnected && backend === requestedBackend) return this.status;
-      if (loading) return loading;
+      if (loading) {
+        if (loading.backend !== requestedBackend) {
+          throw new Error("A different timestamped Kokoro backend is already loading.");
+        }
+        return loading.promise;
+      }
 
-      loading = (async () => {
+      const promise = (async () => {
         if (!environment?.Worker || !environment?.Blob || !environment?.URL?.createObjectURL) {
           throw new Error("Module Web Workers are unavailable in this browser.");
         }
+        let engine = null;
         let reportedError = null;
         const onError = error => { reportedError = error instanceof Error ? error : new Error(String(error)); };
-        const engine = await headTtsFactory({
-          endpoints: [requestedBackend],
-          model: MODEL_ID,
-          transformersModule: TRANSFORMERS_MODULE,
-          dtypeWebgpu: "q8",
-          dtypeWasm: "q4",
-          styleDim: 256,
-          frameRate: 40,
-          audioSampleRate: 24000,
-          languages: ["en-us"],
-          dictionaryURL: null,
-          voiceURL: VOICE_URL,
-          voices: ["af_heart"],
-          splitSentences: false,
-          splitLength: MAX_TEXT_LENGTH + 1,
-          defaultVoice: "af_heart",
-          defaultLanguage: "en-us",
-          defaultAudioEncoding: "wav",
-          deltaStart: -10,
-          deltaEnd: 10
-        }, onError);
-        if (signal?.aborted) throw Object.assign(new Error("Model loading was cancelled."), { name: "AbortError" });
-        await engine.connect(null, info => {
-          try { onProgress?.(normalizeProgress(info)); } catch { /* Progress UI is non-critical. */ }
-        }, onError);
-        if (reportedError) throw reportedError;
-        if (!engine.isConnected) throw new Error("Timestamped Kokoro could not connect to its local worker.");
-        instance = engine;
-        backend = requestedBackend;
-        return this.status;
+        try {
+          engine = await headTtsFactory({
+            endpoints: [requestedBackend],
+            model: MODEL_ID,
+            transformersModule: TRANSFORMERS_MODULE,
+            dtypeWebgpu: "q8",
+            dtypeWasm: "q4",
+            styleDim: 256,
+            frameRate: 40,
+            audioSampleRate: 24000,
+            languages: ["en-us"],
+            dictionaryURL: null,
+            voiceURL: VOICE_URL,
+            voices: ["af_heart"],
+            splitSentences: false,
+            splitLength: MAX_TEXT_LENGTH + 1,
+            defaultVoice: "af_heart",
+            defaultLanguage: "en-us",
+            defaultAudioEncoding: "wav",
+            deltaStart: -10,
+            deltaEnd: 10
+          }, onError);
+          if (signal?.aborted) throw abortError();
+          await engine.connect(null, info => {
+            try { onProgress?.(normalizeProgress(info)); } catch { /* Progress UI is non-critical. */ }
+          }, onError);
+          if (signal?.aborted) throw abortError();
+          if (reportedError) throw reportedError;
+          if (!engine.isConnected) throw new Error("Timestamped Kokoro could not connect to its local worker.");
+          instance = engine;
+          backend = requestedBackend;
+          return this.status;
+        } catch (error) {
+          disposeHeadTts(engine);
+          throw error;
+        }
       })();
 
+      loading = { backend: requestedBackend, promise };
       try {
-        return await loading;
+        return await promise;
       } finally {
-        loading = null;
+        if (loading?.promise === promise) loading = null;
       }
     },
 
@@ -169,14 +202,7 @@ export function createTimestampedKokoroEngine({
     },
 
     dispose() {
-      if (instance?.ww && typeof instance.ww.terminate === "function") {
-        instance.ww.terminate();
-        instance.ww = null;
-      }
-      if (instance?.settings?.audioCtx && instance.settings.audioCtx.state !== "closed") {
-        instance.settings.audioCtx.close().catch(() => {});
-      }
-      if (instance) instance.isConnected = false;
+      disposeHeadTts(instance);
       instance = null;
       backend = null;
     }
