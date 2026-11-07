@@ -47,6 +47,63 @@ button,input,textarea,select{font:inherit}button{border:0;border-radius:13px;pad
 .film-progress__scene--failed .film-progress__scene-state{color:#fca5a5}
 @media(max-width:420px){.film-progress{padding:11px}.film-progress__heading strong{font-size:22px}}
 
+
+/* DRAVEX focused creator workspace — mobile-first visual refresh */
+:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2b;--line:#293650;--text:#f4f7ff;--muted:#9aa9c2;--accent:#8b7cff;--cyan:#63e6df}
+body{background:radial-gradient(ellipse at 50% -18%,#283b65 0,#101a2d 42%,#090e19 100%);color:var(--text)}
+.app{max-width:1180px;padding:clamp(14px,2.6vw,30px) clamp(12px,2vw,24px) 48px}
+.top{padding:10px 0 16px;margin-bottom:14px;border-bottom:1px solid #293650}
+.brand{font-size:16px;letter-spacing:.14em}
+.hero{max-width:760px;padding:clamp(12px,2vw,24px) 0 8px}
+.hero h1{font-size:clamp(30px,5vw,48px);letter-spacing:-.045em;max-width:680px}
+.hero p{max-width:720px;font-size:14px;line-height:1.65}
+.workflow-steps{margin:16px 0 20px;gap:10px}
+.workflow-step{background:#111b2e;border-color:#2c3d5b;border-radius:14px;padding:11px 12px}
+.workflow-step b{background:#302b61;color:#dcd8ff}
+.layout{grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:18px;align-items:start;margin-top:0}
+.panel{background:linear-gradient(155deg,rgba(21,31,51,.98),rgba(14,22,38,.98));border:1px solid #2a3b59;border-radius:20px;padding:clamp(14px,2vw,22px);box-shadow:0 18px 54px #02081766}
+.panel h2{font-size:16px;letter-spacing:.02em;margin-bottom:16px;color:#e4eaff}
+.field{gap:8px;margin:14px 0}
+.field label{font-size:13px;color:#d3ddf2}
+textarea,input,select{background:#0b1425;border:1px solid #30415f;border-radius:12px;color:#f4f7ff;padding:13px}
+textarea{min-height:142px;line-height:1.55}
+textarea:focus,input:focus,select:focus{outline:2px solid #8b7cff;outline-offset:1px;border-color:#8b7cff}
+.quick-hint,.muted{color:#9eacc5}
+button{background:linear-gradient(135deg,#a69aff,#7d72ef);color:#10152a;border-radius:12px;box-shadow:0 7px 20px #6254db35;transition:transform .15s ease,filter .15s ease}
+button:hover{filter:brightness(1.08);transform:translateY(-1px)}
+button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-shadow:none}
+.primary-action{min-height:56px;font-size:16px;font-weight:800;letter-spacing:.01em}
+#makeFilm{background:linear-gradient(110deg,#9b8dff,#66ded9);color:#091321;box-shadow:0 10px 28px #5f71df45}
+#make{background:#1b2942}
+.actions{gap:10px}
+.stage{min-height:280px;background:radial-gradient(ellipse at 50% 40%,#263e61,#101a2c 72%);border:1px solid #344968;border-radius:16px}
+.stage canvas{max-height:440px}
+.hint{background:#08111fbb;padding:5px 9px;border-radius:8px}
+.scenes{gap:9px}
+.scene{background:#0d1729;border-color:#2a3c59;border-radius:11px}
+.simple-options,.production-details,.voice-workflow,.sprite-workflow,.comfy-panel,.audio-panel{background:#0d1729;border-color:#2b3d5a;border-radius:13px}
+.simple-options>summary,.production-details summary{color:#d8d4ff}
+.status{color:#73e4dc}
+.qa-report{border-radius:12px}
+@media(max-width:720px){
+ .app{padding:12px 11px 34px}
+ .top{align-items:flex-start;margin-bottom:8px}
+ .hero{padding-top:12px}
+ .hero h1{font-size:clamp(29px,9vw,39px)}
+ .workflow-steps{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:14px 0}
+ .workflow-step{display:block;text-align:center;padding:9px 5px;font-size:10px;line-height:1.35}
+ .workflow-step b{margin:0 auto 5px}
+ .workflow-step strong{font-size:10px}
+ .layout{grid-template-columns:minmax(0,1fr);gap:12px}
+ .panel{padding:14px;border-radius:17px}
+ .stage{min-height:210px}
+ textarea{min-height:126px}
+ .primary-action{position:relative;min-height:58px}
+ .actions .primary-action{flex-basis:100%}
+}
+@media(prefers-reduced-motion:reduce){button{transition:none}button:hover{transform:none}}
+
 </style>
 </head>
 <body>
