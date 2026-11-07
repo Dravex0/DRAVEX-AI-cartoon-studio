@@ -3690,7 +3690,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     animationClock.reset(0);
     frame=0;
     playing=true;
-    syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:true,restart:true});
+    syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:true});
     $('play').textContent=tr('pauseButton');
     if(raf)cancelAnimationFrame(raf);
     raf=0;
