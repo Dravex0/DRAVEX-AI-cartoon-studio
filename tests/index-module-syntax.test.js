@@ -99,7 +99,9 @@ test('WebM export derives built-in character mouth movement from scheduled local
   assert.match(html, /sampleAudioMouthEnvelope\(activeMouthTrack\.envelope,mouthTrackTimeMs\)/);
   assert.match(html, /sampleCharacterFacialLipSync\(activeMouthTracks,sceneIndex,exportElapsedMs\)/);
   assert.match(html, /facialVisemes:facialLipSync\.facialVisemes,facialMouthOpenness:facialLipSync\.facialMouthOpenness/);
-  assert.match(html, /recorder\.start\(250\);\s*exportMouthOriginTimeMs=performance\.now\(\);\s*if\(audioScheduledStartAtMs!==null\)\{[\s\S]*?getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)[\s\S]*?\}/);
+  assert.match(html, /exportMouthOriginTimeMs=performance\\.now\\(\\);\\s*syncSceneVideoPlayback\\(\\{cache:sceneVideoCache,activeKey:String\\(sceneMetadata\\[sceneIndex\\]/);
+  assert.match(html, /recorder\\.start\\(250\\);/);
+  assert.match(html, /getAudioTimelineOffsetMs\\(audioScheduledStartAtMs,exportMouthOriginTimeMs\\)/);
   assert.match(html, /mainCharacterVoiceTracks=voiceTracks\.filter\(track=>\{/);
   assert.match(html, /hasFacialRig=sceneHasFacialRigForSpeaker\(meta\.characterFacialRigs,track\.characterId,track\.characterName\)/);
   assert.match(html, /lipSyncSkippedTracks\+\+/);
