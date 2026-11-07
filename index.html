@@ -110,7 +110,7 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 .simple-creator-note{display:none!important}
 .workflow-steps,.hero,.top .tag[data-i18n="freeTag"]{display:none!important}
 #character{display:none!important}
-#character:where(*){display:none!important}
+.row>.field:has(#character){display:none!important}
 .layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
 .layout>.panel:first-child>h2{font-size:0;margin-bottom:10px}
 .layout>.panel:first-child>h2:after{content:"Вставь промпт";font-size:19px}
@@ -131,7 +131,7 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 </head>
 <body>
 <main class="app">
-<header class="top"><div class="brand">DRAVEX<span>✦</span> STUDIO</div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end"><label for="uiLanguage" class="tag">INTERFACE / ЯЗЫК</label><select id="uiLanguage" aria-label="Interface language" style="width:auto;max-width:145px;padding:7px 9px"><option value="en">English</option><option value="ru">Русский</option></select><div class="tag" data-i18n="freeTag">FREE · LOCAL-FIRST</div></div></header>
+<header class="top"><div class="brand">DRAVEX<span>✦</span> STUDIO</div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end"><label for="uiLanguage" class="tag">INTERFACE / ЯЗЫК</label><select id="uiLanguage" aria-label="Interface language" style="width:auto;max-width:145px;padding:7px 9px"><option value="en">English</option><option value="ru" selected>Русский</option></select><div class="tag" data-i18n="freeTag">FREE · LOCAL-FIRST</div></div></header>
 <section class="hero"><div class="tag" data-i18n="previewTag">CARTOON WORKSPACE · EARLY PREVIEW</div><h1 data-i18n="headline">Turn your idea<br>into a story.</h1><p data-i18n="intro">Create a storyboard locally, generate scene dialogue with an on-device voice model, and export a WebM with timed dialogue and optional local music. Full AI animation and lip-sync are still in development.</p></section>
 <nav class="workflow-steps" aria-label="Creation steps"><div class="workflow-step"><b>1</b><span><strong>Story / Сценарий</strong>Write your idea</span></div><div class="workflow-step"><b>2</b><span><strong>Style / Стиль</strong>Choose the look</span></div><div class="workflow-step"><b>3</b><span><strong>Scenes / Сцены</strong>Review and edit</span></div></nav>
 <div class="layout">
