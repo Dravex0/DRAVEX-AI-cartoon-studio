@@ -114,3 +114,75 @@ test("requires an explicit local load and enforces bounded dialogue input", asyn
   await assert.rejects(engine.load({ backend: "remote" }), /backend must be wasm or webgpu/);
   assert.throws(() => createTimestampedKokoroEngine({ storage: {} }), /storage adapter/);
 });
+
+test("cancelling while the worker connects terminates it and closes its audio context", async () => {
+  let finishConnect;
+  let terminated = 0;
+  let closed = 0;
+  const fake = {
+    isConnected: false,
+    ww: { terminate() { terminated += 1; } },
+    settings: { audioCtx: { state: "running", async close() { closed += 1; this.state = "closed"; } } },
+    connect() {
+      return new Promise(resolve => {
+        finishConnect = () => { this.isConnected = true; resolve(); };
+      });
+    }
+  };
+  const engine = createTimestampedKokoroEngine({
+    storage: makeStorage(), cryptoRef: webcrypto, environment,
+    headTtsFactory: async () => fake
+  });
+  const controller = new AbortController();
+  const pending = engine.load({ signal: controller.signal });
+  while (!finishConnect) await Promise.resolve();
+  controller.abort();
+  finishConnect();
+  await assert.rejects(pending, error => error?.name === "AbortError");
+  assert.equal(terminated, 1);
+  assert.equal(closed, 1);
+  assert.equal(fake.ww, null);
+  assert.equal(fake.isConnected, false);
+  assert.equal(engine.status.loaded, false);
+});
+
+test("cleans up a worker when connection reports an asynchronous error", async () => {
+  let terminated = 0;
+  let closed = 0;
+  const fake = {
+    isConnected: true,
+    ww: { terminate() { terminated += 1; } },
+    settings: { audioCtx: { state: "running", async close() { closed += 1; } } },
+    async connect(_settings, _progress, onError) {
+      onError(new Error("worker initialization failed"));
+    }
+  };
+  const engine = createTimestampedKokoroEngine({
+    storage: makeStorage(), cryptoRef: webcrypto, environment,
+    headTtsFactory: async () => fake
+  });
+  await assert.rejects(engine.load(), /worker initialization failed/);
+  assert.equal(terminated, 1);
+  assert.equal(closed, 1);
+  assert.equal(engine.status.loaded, false);
+});
+
+test("rejects a conflicting backend while a different backend is loading", async () => {
+  let finishConnect;
+  const fake = {
+    isConnected: false,
+    async connect() {
+      await new Promise(resolve => { finishConnect = resolve; });
+      this.isConnected = true;
+    }
+  };
+  const engine = createTimestampedKokoroEngine({
+    storage: makeStorage(), cryptoRef: webcrypto, environment,
+    headTtsFactory: async () => fake
+  });
+  const pending = engine.load({ backend: "wasm" });
+  while (!finishConnect) await Promise.resolve();
+  await assert.rejects(engine.load({ backend: "webgpu" }), /different timestamped Kokoro backend is already loading/);
+  finishConnect();
+  assert.equal((await pending).backend, "wasm");
+});
