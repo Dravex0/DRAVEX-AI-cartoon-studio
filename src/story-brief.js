@@ -155,7 +155,7 @@ export function parseStoryBrief(input) {
   );
   for (const match of rawText.matchAll(characterDescriptorPattern)) {
     const description = clean(match[1], 120).replace(/[.,!?;:]+$/u, '');
-    if (!description || /\\b(?:named|по имени)\\b/iu.test(match[0])) continue;
+    if (!description || /\b(?:named|по имени)\b/iu.test(match[0])) continue;
     if (characterProfiles.some(profile => profile.characterId.toLocaleLowerCase() === description.toLocaleLowerCase())) continue;
     characterProfiles.push({ characterId: description, visualDescription: description, clothing: '', colors: '', distinctiveFeatures: '' });
     appendDirective(directives, 'characters', description);
