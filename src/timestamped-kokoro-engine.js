@@ -58,6 +58,7 @@ export function createTimestampedKokoroEngine({
   const artifacts = createVerifiedVoiceArtifactStore({ storage, cryptoRef });
   let instance = null;
   let loading = null;
+  let activeLoad = null;
   let backend = null;
 
   return Object.freeze({
@@ -88,6 +89,10 @@ export function createTimestampedKokoroEngine({
         return loading.promise;
       }
 
+      const controller = new AbortController();
+      const operation = { controller, engine: null };
+      activeLoad = operation;
+      const isAborted = () => Boolean(signal?.aborted || controller.signal.aborted);
       const promise = (async () => {
         if (!environment?.Worker || !environment?.Blob || !environment?.URL?.createObjectURL) {
           throw new Error("Module Web Workers are unavailable in this browser.");
@@ -117,11 +122,12 @@ export function createTimestampedKokoroEngine({
             deltaStart: -10,
             deltaEnd: 10
           }, onError);
-          if (signal?.aborted) throw abortError();
+          operation.engine = engine;
+          if (isAborted()) throw abortError();
           await engine.connect(null, info => {
             try { onProgress?.(normalizeProgress(info)); } catch { /* Progress UI is non-critical. */ }
           }, onError);
-          if (signal?.aborted) throw abortError();
+          if (isAborted()) throw abortError();
           if (reportedError) throw reportedError;
           if (!engine.isConnected) throw new Error("Timestamped Kokoro could not connect to its local worker.");
           instance = engine;
@@ -133,11 +139,12 @@ export function createTimestampedKokoroEngine({
         }
       })();
 
-      loading = { backend: requestedBackend, promise };
+      loading = { backend: requestedBackend, promise, controller, operation };
       try {
         return await promise;
       } finally {
         if (loading?.promise === promise) loading = null;
+        if (activeLoad === operation) activeLoad = null;
       }
     },
 
@@ -202,6 +209,10 @@ export function createTimestampedKokoroEngine({
     },
 
     dispose() {
+      if (activeLoad) {
+        activeLoad.controller.abort();
+        disposeHeadTts(activeLoad.engine);
+      }
       disposeHeadTts(instance);
       instance = null;
       backend = null;
