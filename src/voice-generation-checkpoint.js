@@ -59,12 +59,16 @@ function normalizeArtifact(artifact, fallbackVoiceId) {
   if (!HASH_PATTERN.test(audioHash) || !Number.isFinite(durationMs) || durationMs <= 0) {
     throw new TypeError("Checkpoint artifacts require a SHA-256 hash and measured duration.");
   }
+  const artifactVoiceId = clean(artifact.voiceId || fallbackVoiceId);
+  if (clean(fallbackVoiceId) && artifactVoiceId !== clean(fallbackVoiceId)) {
+    throw new TypeError("Checkpoint artifact voice ID does not match its resolved speaker assignment.");
+  }
   const visemeEvents = normalizeVisemeEvents(artifact.visemeEvents, durationMs);
   const phonemeChunks = normalizePhonemeChunks(artifact.phonemeChunks, durationMs);
   return {
     audioHash,
     durationMs,
-    voiceId: clean(artifact.voiceId || fallbackVoiceId) || null,
+    voiceId: artifactVoiceId || null,
     ...(visemeEvents ? { visemeEvents } : {}),
     ...(phonemeChunks ? { phonemeChunks } : {})
   };
