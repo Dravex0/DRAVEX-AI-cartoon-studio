@@ -130,3 +130,60 @@ export function waitForSceneImageReady(image, { timeoutMs = 12000 } = {}) {
     else if (image.complete) onError();
   });
 }
+/**
+ * Rewind a scene clip and wait for the new frame to decode before export.
+ * Setting currentTime can temporarily drop readyState to HAVE_METADATA; callers
+ * must not treat the pre-seek decoded frame as proof that time zero is ready.
+ */
+export async function rewindSceneVideoAndWait(video, { timeoutMs = 12000, signal } = {}) {
+  if (!video || typeof video.addEventListener !== "function" ||
+      typeof video.removeEventListener !== "function") {
+    throw new TypeError("video must be an HTMLVideoElement-like event target.");
+  }
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new RangeError("timeoutMs must be a positive finite number.");
+  }
+  if (signal?.aborted) {
+    const error = new Error("Rewinding scene video was aborted.");
+    error.name = "AbortError";
+    throw error;
+  }
+
+  if (Number.isFinite(Number(video.currentTime)) && Number(video.currentTime) > 0.01) {
+    await new Promise((resolve, reject) => {
+      let timer = null;
+      const cleanup = () => {
+        if (timer !== null) clearTimeout(timer);
+        video.removeEventListener("seeked", onSeeked);
+        video.removeEventListener("error", onError);
+        signal?.removeEventListener("abort", onAbort);
+      };
+      const onSeeked = () => { cleanup(); resolve(); };
+      const onError = () => {
+        cleanup();
+        reject(new Error(video.error?.message || "Scene video failed while seeking to its first frame."));
+      };
+      const onAbort = () => {
+        cleanup();
+        const error = new Error("Rewinding scene video was aborted.");
+        error.name = "AbortError";
+        reject(error);
+      };
+      video.addEventListener("seeked", onSeeked, { once: true });
+      video.addEventListener("error", onError, { once: true });
+      signal?.addEventListener("abort", onAbort, { once: true });
+      timer = setTimeout(() => {
+        cleanup();
+        reject(new Error("Timed out waiting for the scene video to seek to its first frame."));
+      }, timeoutMs);
+      try {
+        video.currentTime = 0;
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    });
+  }
+
+  return waitForSceneVideoReady(video, { timeoutMs, signal });
+}
