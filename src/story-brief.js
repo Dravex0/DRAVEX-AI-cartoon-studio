@@ -145,6 +145,22 @@ export function parseStoryBrief(input) {
     }
   }
 
+  // Extract explicitly described generic characters from ordinary prose.
+  // This keeps prompts such as "a small blue robot meets a little red bird"
+  // from falling back to a generic demo protagonist.
+  const characterNouns = '(?:robot|bird|fox|rabbit|cat|dog|girl|boy|person|knight|dragon|wizard|alien|bear|wolf|princess|prince|машин(?:а|ку)|робот|птиц(?:а|у)|лис(?:а|ёнок|ёнка)|зайц(?:а|а)|кролик|кот(?:а|ёнок)|собак(?:а|у)|девочк(?:а|у)|мальчик|дракон|волк|медвед(?:ь|я)|принцесс(?:а|у)|принц)';
+  const characterDescriptorPattern = new RegExp(
+    '\\b(?:a|an|the)\\s+((?:(?:small|little|tiny|young|cute|brave|friendly|blue|red|green|golden|silver|white|black|orange|маленьк\\w*|крошечн\\w*|ю\\w*|син\\w*|красн\\w*|зелён\\w*|зелен\\w*|рыж\\w*|бел\\w*|чёрн\\w*|черн\\w*)\\s+){0,3}' + characterNouns + ')',
+    'giu'
+  );
+  for (const match of rawText.matchAll(characterDescriptorPattern)) {
+    const description = clean(match[1], 120).replace(/[.,!?;:]+$/u, '');
+    if (!description || /\\b(?:named|по имени)\\b/iu.test(match[0])) continue;
+    if (characterProfiles.some(profile => profile.characterId.toLocaleLowerCase() === description.toLocaleLowerCase())) continue;
+    characterProfiles.push({ characterId: description, visualDescription: description, clothing: '', colors: '', distinctiveFeatures: '' });
+    appendDirective(directives, 'characters', description);
+  }
+
   // Also recognize natural-language introductions such as "лисёнок по имени Рыжик"
   // and "a rabbit named Snowball", so users do not need a separate cast section.
   const namedCharacterPattern = /([^.!?。！？\n]{0,140}?)(?:по имени|на имя|на ім'я|named)\s+([\p{L}][\p{L}'’-]{1,39})/giu;
