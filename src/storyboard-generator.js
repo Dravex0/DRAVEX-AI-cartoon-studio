@@ -142,11 +142,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
 
   const causalLinks = inferSceneCausalLinks(scenes, locale);
   const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
-  // An explicitly supplied protagonist is part of every generated scene; additional cast members
-  // are assigned only to scenes whose source detail mentions them. This prevents a detected
-  // secondary character from replacing the protagonist in the scene cast.
-  const explicitSubject = String(character ?? '').trim() ? subject : '';
-  const knownCharacters = [...new Set([explicitSubject, ...brief.characters].filter(Boolean))];
+  const knownCharacters = brief.characters.length ? brief.characters : [subject];
   const characterMention = (name, sourceText) => {
     const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
     return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
@@ -154,12 +150,9 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   scenes.forEach((scene, index) => {
     scene.causalLink = causalLinks[index];
     scene.stateChanges = stateChanges[index];
-    scene.characters = [...new Set([
-      ...(explicitSubject ? [explicitSubject] : []),
-      ...knownCharacters.filter(name => name !== explicitSubject && (scene.storyDetail
-        ? characterMention(name, scene.storyDetail)
-        : name.toLocaleLowerCase() === subject.toLocaleLowerCase()))
-    ])];
+    scene.characters = knownCharacters.filter(name => scene.storyDetail
+      ? characterMention(name, scene.storyDetail)
+      : name.toLocaleLowerCase() === subject.toLocaleLowerCase());
     // Keep interaction inference source-grounded and limited to characters assigned to this scene.
     scene.interactions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
