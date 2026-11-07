@@ -186,3 +186,64 @@ test("rejects a conflicting backend while a different backend is loading", async
   finishConnect();
   assert.equal((await pending).backend, "wasm");
 });
+
+test("dispose cancels an in-flight worker connection and releases its resources", async () => {
+  let finishConnect;
+  let terminated = 0;
+  let closed = 0;
+  const audioContext = {
+    state: "running",
+    async close() { closed += 1; this.state = "closed"; }
+  };
+  const fake = {
+    isConnected: false,
+    ww: { terminate() { terminated += 1; } },
+    settings: { audioCtx: audioContext },
+    connect() {
+      return new Promise(resolve => {
+        finishConnect = () => { this.isConnected = true; resolve(); };
+      });
+    }
+  };
+  const engine = createTimestampedKokoroEngine({
+    storage: makeStorage(), cryptoRef: webcrypto, environment,
+    headTtsFactory: async () => fake
+  });
+  const pending = engine.load();
+  while (!finishConnect) await Promise.resolve();
+
+  engine.dispose();
+  assert.equal(terminated, 1);
+  assert.equal(closed, 1);
+  assert.equal(fake.ww, null);
+  assert.equal(fake.isConnected, false);
+
+  finishConnect();
+  await assert.rejects(pending, error => error?.name === "AbortError");
+  assert.equal(engine.status.loaded, false);
+  assert.equal(engine.status.backend, null);
+});
+
+test("dispose before worker factory resolves prevents a late connection", async () => {
+  let finishFactory;
+  let connectCalls = 0;
+  let terminated = 0;
+  const fake = {
+    isConnected: false,
+    ww: { terminate() { terminated += 1; } },
+    async connect() { connectCalls += 1; this.isConnected = true; }
+  };
+  const engine = createTimestampedKokoroEngine({
+    storage: makeStorage(), cryptoRef: webcrypto, environment,
+    headTtsFactory: () => new Promise(resolve => { finishFactory = resolve; })
+  });
+  const pending = engine.load();
+  while (!finishFactory) await Promise.resolve();
+
+  engine.dispose();
+  finishFactory(fake);
+  await assert.rejects(pending, error => error?.name === "AbortError");
+  assert.equal(connectCalls, 0);
+  assert.equal(terminated, 1);
+  assert.equal(engine.status.loaded, false);
+});
