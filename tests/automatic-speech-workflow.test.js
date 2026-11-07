@@ -150,3 +150,22 @@ test('recognizes Spanish dialogue and voice requests', () => {
   assert.equal(result.voiceRequested, true);
   assert.equal(result.scenesMissingDialogue.length, 1);
 });
+
+
+test('treats explicit lip-sync requests as requiring dialogue and voice artifacts', () => {
+  for (const request of [
+    'Create a cartoon with lip-sync.',
+    'Add mouth sync to every character.',
+    'Сделай синхронизацию губ персонажей.',
+    'Додай синхронізацію губ персонажам.'
+  ]) {
+    const result = resolveAutomaticSpeechTasks({
+      request,
+      scenes: [{ id: 'lip-sync-scene' }]
+    });
+    assert.equal(result.dialogueRequested, true, request);
+    assert.equal(result.voiceRequested, true, request);
+    assert.equal(result.scenesMissingDialogue.length, 1, request);
+    assert.deepEqual(result.scenesMissingVoice, [], request);
+  }
+});
