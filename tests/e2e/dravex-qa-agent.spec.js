@@ -175,7 +175,7 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
     '    } };',
     '  }',
     '}'
-  ].join('\\n');
+  ].join('\n');
 
   await page.goto('/');
   await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);
@@ -292,7 +292,7 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
   const downloadPath = testInfo.outputPath('dravex-mocked-ai-pipeline.webm');
   await download.saveAs(downloadPath);
   const downloaded = await readFile(downloadPath);
-  expect(download.suggestedFilename()).toMatch(/\\.webm$/i);
+  expect(download.suggestedFilename()).toMatch(/\.webm$/i);
   expect(downloaded.byteLength).toBeGreaterThan(1024);
   expect([...downloaded.subarray(0, 4)]).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
 
@@ -307,7 +307,7 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
   expect(providerEvidence.wanCalls.length).toBe(hordeSubmissions);
   expect(providerEvidence.wanCalls.every(call => call.endpoint === '/generate_video' && call.steps === 4 && String(call.prompt).length > 0)).toBe(true);
   expect(providerEvidence.previewSource.startsWith('blob:')).toBe(true);
-  expect(providerEvidence.sceneReport).toMatch(/Generated video scenes:\\s*\\d+\\/\\d+/);
+  expect(providerEvidence.sceneReport).toMatch(/Generated video scenes:\s*\d+\/\d+/);
 
   const playback = await page.locator('#finalFilmPlayer').evaluate(async video => {
     if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
