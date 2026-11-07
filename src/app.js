@@ -101,7 +101,7 @@ ru:{freeTag:'БЕСПЛАТНО · ЛОКАЛЬНАЯ РАБОТА',previewTag:'
 };
 function readLocalStorage(key){try{return window.localStorage.getItem(key)}catch(error){return null}}
 function writeLocalStorage(key,value){try{window.localStorage.setItem(key,value);return true}catch(error){return false}}
-let uiLang=readLocalStorage('dravex-ui-language')||'en';
+let uiLang=readLocalStorage('dravex-ui-language')||'ru';
 let activeCanvasFormat=normalizeCanvasFormat(readLocalStorage('dravex-canvas-format')||'landscape');
 function tr(key){return translations[uiLang]?.[key]??translations.en[key]??key}
 const $=id=>document.getElementById(id);
