@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { waitForSceneVideoReady } from "../src/scene-video-readiness.js";
+import { waitForSceneVideoReady, rewindSceneVideoAndWait } from "../src/scene-video-readiness.js";
 
 class FakeVideo extends EventTarget {
   constructor({ readyState = 0, videoWidth = 0, error = null } = {}) {
@@ -83,4 +83,35 @@ test("does not resolve readiness without finite duration and decoded height", as
     waitForSceneVideoReady(missingHeight, { timeoutMs: 5 }),
     /Timed out waiting for a decoded frame/
   );
+});
+
+
+class FakeSeekingVideo extends FakeVideo {
+  constructor() {
+    super({ readyState: 2, videoWidth: 640 });
+    this._currentTime = 2;
+  }
+  get currentTime() { return this._currentTime; }
+  set currentTime(value) {
+    this._currentTime = value;
+    this.readyState = 1;
+    queueMicrotask(() => {
+      this.dispatchEvent(new Event("seeked"));
+      queueMicrotask(() => this.becomeReady());
+    });
+  }
+}
+
+test("rewinds a played scene clip and waits for its new first frame to decode", async () => {
+  const video = new FakeSeekingVideo();
+  assert.equal(await rewindSceneVideoAndWait(video, { timeoutMs: 100 }), video);
+  assert.equal(video.currentTime, 0);
+  assert.equal(video.readyState, 2);
+  assert.equal(video.videoWidth, 640);
+});
+
+test("does not rewind a scene clip that is already at its first frame", async () => {
+  const video = new FakeVideo({ readyState: 2, videoWidth: 640 });
+  video.currentTime = 0;
+  assert.equal(await rewindSceneVideoAndWait(video, { timeoutMs: 100 }), video);
 });
