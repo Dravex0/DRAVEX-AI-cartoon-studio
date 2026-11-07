@@ -100,6 +100,15 @@ test("ignores corrupted timeline metadata from a manually edited checkpoint", as
   assert.deepEqual(restored, [null, null]);
 });
 
+test("rejects a voice artifact assigned to a different character voice", () => {
+  assert.throws(() => createVoiceGenerationCheckpoint({
+    ...context,
+    dialogue: [dialogue[0]],
+    voiceIds: [voiceIds[0]],
+    artifacts: [{ ...artifacts[0], voiceId: "af_bella" }]
+  }), /does not match its resolved speaker assignment/);
+});
+
 test("rejects malformed checkpoint construction", () => {
   assert.throws(() => createVoiceGenerationCheckpoint({ ...context, dialogue, voiceIds: ["one"], artifacts }), /voice ID slot/);
   assert.throws(() => createVoiceGenerationCheckpoint({
