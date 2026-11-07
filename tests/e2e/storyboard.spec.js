@@ -135,8 +135,7 @@ test('local canvas mode exports a playable WebM without contacting cloud video o
   });
 
   await page.goto('/');
-  await page.locator('#generationTools > summary').click();
-  await page.locator('#videoGenerationMode').selectOption('local-canvas');
+  await expect(page.locator('#videoGenerationMode')).toHaveValue('local-canvas');
   await expect(page.locator('#generateFullFilmComfy')).toBeHidden();
   await page.locator('#idea').fill(
     'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\nDuration: 0.25 seconds'
@@ -167,11 +166,12 @@ test('local canvas mode exports a playable WebM without contacting cloud video o
 });
 
 
-test('one-click film creation builds the storyboard and clearly blocks until providers and consent are ready', async ({ page }) => {
+test('explicitly selecting Hugging Face still requires provider connection and consent', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
   await page.goto('/');
+  await page.locator('#videoGenerationMode').selectOption('huggingface');
   await page.locator('#idea').fill(
     'A young fox finds a glowing key in an old forest, follows its light to a hidden gate, and discovers a peaceful garden.'
   );
@@ -183,7 +183,7 @@ test('one-click film creation builds the storyboard and clearly blocks until pro
   await expect(page.locator('#generateFullFilmComfy')).toBeDisabled();
   await expect(page.locator('#hordeConsent')).not.toBeChecked();
 
-  expect(pageErrors, 'the one-click action should not throw or start a remote job without consent').toEqual([]);
+  expect(pageErrors, 'an explicitly selected remote mode must not start without provider and consent').toEqual([]);
 });
 
 
