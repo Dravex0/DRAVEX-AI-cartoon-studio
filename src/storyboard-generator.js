@@ -142,7 +142,8 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
 
   const causalLinks = inferSceneCausalLinks(scenes, locale);
   const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
-  const knownCharacters = brief.characters.length ? brief.characters : [subject];
+  const explicitSubject = String(character ?? '').trim() ? subject : '';
+  const knownCharacters = [...new Set([explicitSubject, ...brief.characters].filter(Boolean))];
   const characterMention = (name, sourceText) => {
     const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
     return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
@@ -150,9 +151,12 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   scenes.forEach((scene, index) => {
     scene.causalLink = causalLinks[index];
     scene.stateChanges = stateChanges[index];
-    scene.characters = knownCharacters.filter(name => scene.storyDetail
-      ? characterMention(name, scene.storyDetail)
-      : name.toLocaleLowerCase() === subject.toLocaleLowerCase());
+    scene.characters = [...new Set([
+      ...(explicitSubject ? [explicitSubject] : []),
+      ...knownCharacters.filter(name => name !== explicitSubject && (scene.storyDetail
+        ? characterMention(name, scene.storyDetail)
+        : name.toLocaleLowerCase() === subject.toLocaleLowerCase()))
+    ])];
     // Keep interaction inference source-grounded and limited to characters assigned to this scene.
     scene.interactions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
