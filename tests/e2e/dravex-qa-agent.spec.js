@@ -26,7 +26,7 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
   page.on('request', request => {
     try {
       const url = new URL(request.url());
-      if (/(^|\\.)(huggingface\\.co|hf\\.co|aihorde\\.net|horde\\.live)$/i.test(url.hostname)) {
+      if (/(^|\.)(huggingface\.co|hf\.co|aihorde\.net|horde\.live)$/i.test(url.hostname)) {
         externalVideoRequests.push(url.href);
       }
     } catch {}
@@ -74,7 +74,7 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
     await download.saveAs(downloadPath);
     const file = await readFile(downloadPath);
     downloadedBytes = file.byteLength;
-    expect(downloadName).toMatch(/\\.webm$/i);
+    expect(downloadName).toMatch(/\.webm$/i);
     expect(downloadedBytes).toBeGreaterThan(1024);
     expect([...file.subarray(0, 4)]).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
     report.steps.push({ id: 'webm-downloaded', status: 'passed', filename: downloadName, bytes: downloadedBytes, ebmlSignature: true });
