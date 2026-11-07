@@ -8,7 +8,7 @@ function durationMatches(actualValue, expectedValue) {
   return Math.abs(actual - expected) <= Math.max(50, expected * 0.02);
 }
 
-function isUsableVoiceArtifact(record, hash, cue) {
+export function isUsableVoiceArtifact(record, hash, cue) {
   const blob = record?.blob;
   if (!blob || !Number.isFinite(Number(blob.size)) || Number(blob.size) <= 0) return false;
 
