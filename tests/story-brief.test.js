@@ -57,3 +57,10 @@ test('extracts character profiles from bullet and comma-separated character desc
   assert.deepEqual(brief.characterProfiles.map(profile => profile.characterId), ['Arin', 'Elira', 'Nox']);
   assert.deepEqual(brief.characters.slice(0, 3), ['Arin', 'Elira', 'Nox']);
 });
+
+test('extracts visually described generic characters from a natural-language prompt', () => {
+  const brief = parseStoryBrief('A small blue robot walks through a park, meets a little red bird, waves, and they become friends. Duration: 0.25 seconds.');
+  assert.deepEqual(brief.characters, ['small blue robot', 'little red bird']);
+  assert.equal(brief.characterProfiles[0].visualDescription, 'small blue robot');
+  assert.equal(brief.characterProfiles[1].visualDescription, 'little red bird');
+});
