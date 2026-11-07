@@ -304,6 +304,7 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
   expect(hordeSubmissions).toBeGreaterThan(0);
   expect(hordePrompts.every(prompt => prompt.length > 0)).toBe(true);
   expect(providerEvidence.wanCalls.length).toBeGreaterThan(0);
+  expect(providerEvidence.wanCalls.length).toBe(hordeSubmissions);
   expect(providerEvidence.wanCalls.every(call => call.endpoint === '/generate_video' && call.steps === 4 && String(call.prompt).length > 0)).toBe(true);
   expect(providerEvidence.previewSource.startsWith('blob:')).toBe(true);
   expect(providerEvidence.sceneReport).toMatch(/Generated video scenes:\\s*\\d+\\/\\d+/);
