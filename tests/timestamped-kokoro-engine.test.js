@@ -224,13 +224,15 @@ test("dispose cancels an in-flight worker connection and releases its resources"
   assert.equal(engine.status.backend, null);
 });
 
-test("dispose before worker factory resolves prevents a late connection", async () => {
+test("dispose promptly rejects a pending worker factory and cleans up its late result", async () => {
   let finishFactory;
   let connectCalls = 0;
   let terminated = 0;
+  let closed = 0;
   const fake = {
     isConnected: false,
     ww: { terminate() { terminated += 1; } },
+    settings: { audioCtx: { state: "running", async close() { closed += 1; this.state = "closed"; } } },
     async connect() { connectCalls += 1; this.isConnected = true; }
   };
   const engine = createTimestampedKokoroEngine({
@@ -241,9 +243,13 @@ test("dispose before worker factory resolves prevents a late connection", async 
   while (!finishFactory) await Promise.resolve();
 
   engine.dispose();
-  finishFactory(fake);
   await assert.rejects(pending, error => error?.name === "AbortError");
+  assert.equal(engine.status.loaded, false);
+
+  finishFactory(fake);
+  await Promise.resolve();
   assert.equal(connectCalls, 0);
   assert.equal(terminated, 1);
-  assert.equal(engine.status.loaded, false);
+  assert.equal(closed, 1);
+  assert.equal(fake.ww, null);
 });
