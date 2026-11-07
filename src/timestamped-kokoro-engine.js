@@ -42,6 +42,39 @@ function disposeHeadTts(engine) {
   engine.isConnected = false;
 }
 
+function awaitFactoryOrAbort(factoryPromise, signals, onLateValue) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const activeSignals = signals.filter(Boolean);
+    const cleanup = () => {
+      for (const signal of activeSignals) signal.removeEventListener("abort", abort);
+    };
+    const abort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(abortError());
+    };
+    for (const signal of activeSignals) signal.addEventListener("abort", abort, { once: true });
+    if (activeSignals.some(signal => signal.aborted)) abort();
+
+    Promise.resolve(factoryPromise).then(value => {
+      if (settled) {
+        try { onLateValue?.(value); } catch { /* Late factory cleanup is best-effort. */ }
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve(value);
+    }, error => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    });
+  });
+}
+
 /**
  * Optional English-only timestamped Kokoro engine.
  * Inference runs in a local Web Worker; model/voice assets are fetched only
@@ -101,7 +134,7 @@ export function createTimestampedKokoroEngine({
         let reportedError = null;
         const onError = error => { reportedError = error instanceof Error ? error : new Error(String(error)); };
         try {
-          engine = await headTtsFactory({
+          const factoryPromise = headTtsFactory({
             endpoints: [requestedBackend],
             model: MODEL_ID,
             transformersModule: TRANSFORMERS_MODULE,
@@ -122,6 +155,11 @@ export function createTimestampedKokoroEngine({
             deltaStart: -10,
             deltaEnd: 10
           }, onError);
+          engine = await awaitFactoryOrAbort(
+            factoryPromise,
+            [signal, controller.signal],
+            disposeHeadTts
+          );
           operation.engine = engine;
           if (isAborted()) throw abortError();
           await engine.connect(null, info => {
