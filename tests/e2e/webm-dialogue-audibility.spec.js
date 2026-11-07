@@ -521,7 +521,8 @@ test('exports dialogue produced by the browser-local TTS adapter through Indexed
 
   expect(evidence.size).toBeGreaterThan(0);
   expect(evidence.channels).toBeGreaterThan(0);
-  expect(evidence.duration).toBeGreaterThan(1.5);
+  // The test fixture contains 0.6s of dialogue; the WebM audio track may end with that cue.
+  expect(evidence.duration).toBeGreaterThanOrEqual(generated.expectedDurationSeconds * 0.9);
   expect(evidence.sampleCount).toBeGreaterThan(0);
   expect(evidence.rms).toBeGreaterThan(0.02);
   expect(evidence.expectedPower).toBeGreaterThan(evidence.otherPower * 2);
