@@ -48,7 +48,7 @@ import { createCharacterReferenceImageStorage } from "./character-reference-imag
 import { generateStoryboardVideos, readVideoProgressPercent } from "./scene-video-batch.js";
 import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./huggingface-zerogpu-video-provider.js";
 import { fitSceneVideoToDuration, syncSceneVideoPlayback } from "./scene-video-transport.js";
-import { waitForSceneVideoReady, waitForSceneImageReady, isSceneVideoDecoded } from "./scene-video-readiness.js";
+import { waitForSceneVideoReady, rewindSceneVideoAndWait, waitForSceneImageReady, isSceneVideoDecoded } from "./scene-video-readiness.js";
 import { createAnimationClock } from "./animation-clock.js";
 import { getPromptCameraTransform } from "./prompt-camera-motion.js";
 import { detectSceneActionForScene } from "./scene-action.js";
@@ -3549,9 +3549,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
       const key=String(meta.id||('scene-index-'+segment.sceneIndex));
       const entry=sceneVideoCache.get(key);
       if(entry?.video){
-        readinessTasks.push(waitForSceneVideoReady(entry.video,{timeoutMs:12000,signal}).then(()=>{
-          try{entry.video.currentTime=0;}catch{}
-        }));
+        readinessTasks.push(rewindSceneVideoAndWait(entry.video,{timeoutMs:12000,signal}));
       }
       const imageUrl=String(meta.generatedImageUrl||'').trim();
       if(imageUrl&&!entry?.video){
