@@ -1,5 +1,6 @@
 const VERSION = 1;
 const HASH_PATTERN = /^[a-f0-9]{64}$/i;
+const WAV_MIME_TYPES = new Set(["audio/wav", "audio/x-wav", "audio/wave", "application/octet-stream"]);
 const clean = value => String(value ?? "").trim();
 
 function normalizeLine(line, voiceId) {
@@ -8,6 +9,30 @@ function normalizeLine(line, voiceId) {
     text: clean(line?.text),
     voiceId: clean(voiceId)
   };
+}
+
+function durationMatches(actualValue, expectedValue) {
+  const actual = Number(actualValue);
+  const expected = Number(expectedValue);
+  return Number.isFinite(actual) && actual > 0
+    && Number.isFinite(expected) && expected > 0
+    && Math.abs(actual - expected) <= Math.max(50, expected * 0.02);
+}
+
+function isReusableStoredArtifact(record, audioHash, expectedDurationMs) {
+  const blob = record?.blob;
+  if (!blob || !Number.isFinite(Number(blob.size)) || Number(blob.size) <= 0) return false;
+
+  const storedHash = clean(record.audioHash).toLowerCase();
+  if (storedHash && storedHash !== audioHash) return false;
+  if (record.byteSize != null && Number(record.byteSize) !== Number(blob.size)) return false;
+
+  const mimeTypes = [record.mimeType, blob.type]
+    .map(value => clean(value).toLowerCase().split(";")[0])
+    .filter(Boolean);
+  if (!mimeTypes.length || mimeTypes.some(type => !WAV_MIME_TYPES.has(type))) return false;
+
+  return durationMatches(record.durationMs, expectedDurationMs);
 }
 
 export function createVoiceGenerationCheckpoint({
@@ -50,8 +75,9 @@ export function createVoiceGenerationCheckpoint({
 
 /**
  * Restore only artifacts that match the exact scene, language, model, speaker,
- * dialogue text and voice assignment, and whose actual non-empty WAV still
- * exists in local storage. Invalid or stale lines are returned as null.
+ * dialogue text and voice assignment, and whose stored non-empty WAV metadata
+ * still matches the checkpoint. Invalid or stale lines are returned as null.
+ * Audio bytes are not re-hashed here to avoid expensive work on mobile devices.
  */
 export async function restoreVoiceGenerationCheckpoint({
   checkpoint, sceneId, locale, engine, modelId, dialogue, voiceIds, storage
@@ -82,7 +108,7 @@ export async function restoreVoiceGenerationCheckpoint({
     const durationMs = Number(artifact?.durationMs);
     if (!HASH_PATTERN.test(audioHash) || !Number.isFinite(durationMs) || durationMs <= 0) continue;
     const record = await storage.get(audioHash);
-    if (!record?.blob || Number(record.blob.size) <= 0) continue;
+    if (!isReusableStoredArtifact(record, audioHash, durationMs)) continue;
     restored[index] = {
       audioHash,
       durationMs,
