@@ -527,7 +527,7 @@ test('selects independent text-to-video and image-to-video workflows for mixed f
   assert.equal(calls.filter(url => url.endsWith('/prompt')).length, 2);
 });
 
-test('does not advertise an image-to-video task when only a text workflow is configured', () => {
+test('does not advertise an image-to-video task when only a text workflow is configured', async () => {
   const provider = createComfyUIVideoProvider({
     baseUrl: 'http://127.0.0.1:8188',
     workflows: {
@@ -539,8 +539,8 @@ test('does not advertise an image-to-video task when only a text workflow is con
     }
   });
   assert.deepEqual(provider.taskTypes, ['text-to-video']);
-  assert.throws(
-    () => provider.generate({ taskType: 'image-to-video' }),
+  await assert.rejects(
+    provider.generate({ taskType: 'image-to-video' }),
     error => error.code === 'MISSING_TASK_WORKFLOW'
   );
 });
