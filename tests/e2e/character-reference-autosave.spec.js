@@ -4,6 +4,10 @@ test('character reference photo survives automatic draft save and page reload', 
   await page.goto('/');
   await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);
 
+  // The character reference editor is intentionally collapsed by default.
+  const characterReferenceSection = page.locator('details:has(#bibleCharacterId) > summary');
+  await characterReferenceSection.click();
+  await expect(page.locator('#bibleCharacterId')).toBeVisible();
   await page.locator('#bibleCharacterId').fill('Mira');
   await page.locator('#bibleVisualDescription').fill('Silver-haired anime explorer with violet eyes');
   await page.locator('#bibleReferenceImageFile').setInputFiles({
@@ -49,6 +53,7 @@ test('character reference photo survives automatic draft save and page reload', 
   });
 
   await page.reload();
+  await characterReferenceSection.click();
   await expect(page.locator('#bibleCharacterId')).toHaveValue('Mira');
   const preview = page.locator('#bibleReferenceImagePreview');
   await expect(preview).toBeVisible();
