@@ -3276,7 +3276,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     meta.camera=String(meta.camera||'Cinematic anime composition with clear subject movement');
     meta.characters=normalizeSceneCast('',meta.characters);
     let imageSource=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:meta.generatedImageUrl});
-    if(imageSource.kind==='missing'){
+    if(imageSource.kind==='missing'&&mode!=='comfyui'){
      if(!$('hordeConsent').checked)throw new Error('Для отсутствующего изображения сцены '+(index+1)+' нужно отдельно подтвердить отправку текстового промпта в AI Horde.');
      updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Создание изображения','Creating scene image')});
      updateFilmVideoProgress(null,filmProgressText('Подготовка изображений сцен','Preparing scene images'));
@@ -3298,7 +3298,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
     assertSceneIdentityCurrent();
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Подготовка к анимации','Preparing animation')});
-    status.textContent='Подготавливаем изображение сцены '+(index+1)+' для анимации…';
+    status.textContent=imageSource.kind==='missing'&&mode==='comfyui'?'Подготавливаем генерацию видео из текста для сцены '+(index+1)+'…':'Подготавливаем изображение сцены '+(index+1)+' для анимации…';
     let imageInput=imageSource.kind==='blob'?imageSource.image:imageSource.url;
     if(mode==='comfyui'&&imageSource.kind==='url'){
      const imageResponse=await fetch(imageSource.url,{signal});
@@ -3307,7 +3307,10 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      if(!imageInput.size)throw new Error('Изображение сцены пустое.');
     }
     assertSceneIdentityCurrent();
-    const prompt=buildMotionGenerationPrompt(meta,characterBible);
+    const taskType=imageSource.kind==='missing'&&mode==='comfyui'?'text-to-video':'image-to-video';
+    const prompt=taskType==='text-to-video'
+     ?[buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(meta,characterBible)].filter(Boolean).join('\\n\\nMotion direction: ')
+     :buildMotionGenerationPrompt(meta,characterBible);
     const requestedDuration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
     const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
@@ -3316,7 +3319,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const referenceImages=mode==='comfyui'?profileReferenceImages.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2):[];
     assertSceneIdentityCurrent();
     let referenceWarning='';
-    const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput,seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),referenceImages},{signal,onProgress:job=>{
+    const result=await generateVideoWithProvider(registry,provider.id,{taskType,prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageInput}:{}),seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),referenceImages},{signal,onProgress:job=>{
      const providerPercent=readVideoProgressPercent(job);
      const providerStage=String(job.stage||'processing');
      if(providerStage==='warning'&&job.message){
