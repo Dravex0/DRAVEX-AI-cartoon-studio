@@ -3,6 +3,7 @@ import { drawSceneProps } from './scene-prop-renderer.js';
 import { validateStoryScenes } from "./story-qa.js";
 import { buildStoryboardFromText } from "./storyboard-generator.js";
 import { evaluatePromptToFilmStart } from "./prompt-to-film-gate.js";
+import { resolveSceneVideoTaskType } from "./scene-video-task.js";
 import { resolveStoryProtagonist } from "./story-protagonist.js";
 import { calculateCinematicShot } from "./director-engine.js";
 import { detectDeviceCapabilities } from "./device-capabilities.js";
@@ -3307,9 +3308,9 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      if(!imageInput.size)throw new Error('Изображение сцены пустое.');
     }
     assertSceneIdentityCurrent();
-    const taskType=imageSource.kind==='missing'&&mode==='comfyui'?'text-to-video':'image-to-video';
+    const taskType=resolveSceneVideoTaskType({mode,imageSourceKind:imageSource.kind});
     const prompt=taskType==='text-to-video'
-     ?[buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(meta,characterBible)].filter(Boolean).join('\\n\\nMotion direction: ')
+     ?[buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(meta,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
      :buildMotionGenerationPrompt(meta,characterBible);
     const requestedDuration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
