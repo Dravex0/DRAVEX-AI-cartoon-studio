@@ -2846,9 +2846,8 @@ function comfyBindings(){
 function isLocalVideoGenerationReady({step}={}){
  const target=resolveRemoteScene(step);
  if(!target.ok)return false;
- const imageReady=target.index===sceneIndex?!!comfySourceImage||!!String(target.scene.generatedImageUrl||'').trim():!!String(target.scene.generatedImageUrl||'').trim();
  const motion=target.index===sceneIndex?$('sceneMotionPrompt').value:target.scene.motionPrompt||target.scene.visibleAction;
- return comfyConnected&&!!comfyWorkflow&&!fullFilmAbortController&&imageReady&&!!String(motion||'').trim();
+ return comfyConnected&&!!comfyWorkflow&&!fullFilmAbortController&&!!String(motion||'').trim();
 }
 function resolveRemoteScene(step){return resolveUniversalSceneTarget(step,sceneMetadata,sceneIndex);}
 function isRemoteVideoGenerationReady({step}={}){
@@ -2934,17 +2933,21 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
   continuityLock:readField('sceneContinuityLock','continuityLock'),
   characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])
  };
- const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
- if(!prompt.trim())throw new Error('Добавь описание движения сцены перед генерацией.');
  let imageBlob=isCurrent?comfySourceImage:null;
  if(!imageBlob){
   const imageUrl=String(originalMeta.generatedImageUrl||'').trim();
-  if(!imageUrl)throw new Error('Сначала создай или загрузи изображение выбранной сцены.');
-  const response=await fetch(imageUrl,{signal});
-  if(!response.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+response.status+'). Проверь CORS или выбери локальный файл.');
-  imageBlob=await response.blob();
+  if(imageUrl){
+   const response=await fetch(imageUrl,{signal});
+   if(!response.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+response.status+'). Проверь CORS или выбери локальный файл.');
+   imageBlob=await response.blob();
+  }
  }
- if(!imageBlob?.size)throw new Error('Исходное изображение сцены пустое.');
+ if(imageBlob&&!imageBlob.size)throw new Error('Исходное изображение сцены пустое.');
+ const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:imageBlob?'blob':'missing'});
+ const prompt=taskType==='text-to-video'
+  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\\n\\nMotion direction: ')
+  :buildMotionGenerationPrompt(motionScene,characterBible);
+ if(!prompt.trim())throw new Error('Добавь описание движения сцены перед генерацией.');
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
  const provider=createComfyUIVideoProvider({
   baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),
@@ -2958,8 +2961,8 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  const referenceImages=profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2);
  reportProgress?.('Submitting scene to local ComfyUI');
  const result=await generateVideoWithProvider(registry,provider.id,{
-  taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,
-  durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,
+  taskType,prompt,negativePrompt:motionScene.negativePrompt,
+  durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageBlob}:{}),
   seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages
  },{signal,onProgress:job=>{
   const percent=readVideoProgressPercent(job);
