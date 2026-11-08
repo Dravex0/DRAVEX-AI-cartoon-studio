@@ -19,7 +19,10 @@ test('character reference photo survives automatic draft save and page reload', 
     )
   });
 
-  await expect(page.locator('#bibleReferenceImageStatus')).toContainText(/automatically saved|автоматически сохранён/i);
+  // Match the actual user-facing status: the character profile is saved to the draft automatically.
+  await expect(page.locator('#bibleReferenceImageStatus')).toContainText(
+    /saved to the draft automatically|автоматически сохранён/i
+  );
 
   const savedProfile = await page.evaluate(async () => {
     const draft = JSON.parse(localStorage.getItem('dravex-cartoon-draft') || 'null');
