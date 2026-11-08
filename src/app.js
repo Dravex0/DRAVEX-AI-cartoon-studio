@@ -3003,11 +3003,14 @@ function setComfyStatus(message){$('comfyStatus').textContent=message}
 function updateComfyAnimateAvailability(){
  const configs=comfyWorkflowConfigs();
  const currentMeta=sceneMetadata[sceneIndex]||{};
- const currentHasImage=!!comfySourceImage||!!String(currentMeta.generatedImageUrl||'').trim();
- const currentTask=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:currentHasImage?'url':'missing'});
+ const currentImageSource=resolveSceneImageSource({mode:'comfyui',sceneIndex,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:currentMeta.generatedImageUrl});
+ const currentTask=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:currentImageSource.kind});
  $('animateSceneComfy').disabled=!comfyConnected||!configs[currentTask];
  const mode=$('videoGenerationMode')?.value||'huggingface';
- const neededFilmTasks=new Set(sceneMetadata.map(meta=>resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:String(meta.generatedImageUrl||'').trim()?'url':'missing'})));
+ const neededFilmTasks=new Set(sceneMetadata.map((meta,index)=>{
+  const source=resolveSceneImageSource({mode:'comfyui',sceneIndex:index,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:meta.generatedImageUrl});
+  return resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:source.kind});
+ }));
  const filmWorkflowsReady=[...neededFilmTasks].every(taskType=>!!configs[taskType]);
  const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:mode==='comfyui'&&comfyConnected&&filmWorkflowsReady;
  $('generateFullFilmComfy').hidden=mode==='local-canvas';
