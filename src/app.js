@@ -2861,7 +2861,7 @@ function isLocalVideoGenerationReady({step}={}){
  const target=resolveRemoteScene(step);
  if(!target.ok)return false;
  const motion=target.index===sceneIndex?$('sceneMotionPrompt').value:target.scene.motionPrompt||target.scene.visibleAction;
- return comfyConnected&&!!comfyWorkflow&&!fullFilmAbortController&&!!String(motion||'').trim();
+ return comfyConnected&&Object.keys(comfyWorkflowConfigs()).length>0&&!fullFilmAbortController&&!!String(motion||'').trim();
 }
 function resolveRemoteScene(step){return resolveUniversalSceneTarget(step,sceneMetadata,sceneIndex);}
 function isRemoteVideoGenerationReady({step}={}){
@@ -2963,9 +2963,7 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
   :buildMotionGenerationPrompt(motionScene,characterBible);
  if(!prompt.trim())throw new Error('Добавь описание движения сцены перед генерацией.');
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
- const provider=createComfyUIVideoProvider({
-  baseUrl:comfyText('comfyBaseUrl'),...comfyProviderOptions()
- });
+ const provider=createComfyUIVideoProvider(comfyProviderOptions());
  const registry=createVideoProviderRegistry();registry.register(provider);
  const duration=Math.max(0.25,Math.min(30,Number(originalMeta.durationSeconds??originalMeta.duration??$('duration').value)||3));
  const profileReferences=await loadCharacterReferenceImagesForScene(motionScene);
@@ -3000,7 +2998,7 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
 function setComfyStatus(message){$('comfyStatus').textContent=message}
-function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow;const mode=$('videoGenerationMode')?.value||'huggingface';const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:mode==='comfyui'&&comfyConnected&&!!comfyWorkflow;$('generateFullFilmComfy').hidden=mode==='local-canvas';$('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController}
+function updateComfyAnimateAvailability(){const hasWorkflow=Object.keys(comfyWorkflowConfigs()).length>0;$('animateSceneComfy').disabled=!comfyConnected||!hasWorkflow;const mode=$('videoGenerationMode')?.value||'huggingface';const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:mode==='comfyui'&&comfyConnected&&hasWorkflow;$('generateFullFilmComfy').hidden=mode==='local-canvas';$('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController}
 ['comfyCharacterReference1','comfyCharacterReference2'].forEach((id,index)=>{
  $(id).addEventListener('change',()=>{
   const file=$(id).files?.[0]||null;
@@ -3070,7 +3068,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   }
   assertGenerationCurrent();
   if(taskType==='image-to-video'&&!imageBlob?.size)throw new Error('The scene image is empty.');
-  const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
+  const provider=createComfyUIVideoProvider(comfyProviderOptions());
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
   let referenceWarning='';
