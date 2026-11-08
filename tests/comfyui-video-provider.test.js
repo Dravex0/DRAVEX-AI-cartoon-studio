@@ -544,3 +544,20 @@ test('does not advertise an image-to-video task when only a text workflow is con
     error => error.code === 'MISSING_TASK_WORKFLOW'
   );
 });
+
+
+test('rejects an image-to-video workflow without a source image binding during setup', () => {
+  assert.throws(() => createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflows: {
+      'image-to-video': {
+        workflow: {
+          '1': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+          '9': { class_type: 'SaveVideo', inputs: {} }
+        },
+        nodeBindings: { prompt: { nodeId: '1', input: 'text' } },
+        outputNodeIds: ['9']
+      }
+    }
+  }), error => error.code === 'MISSING_REQUIRED_BINDING' && /source image node input binding/i.test(error.message));
+});
