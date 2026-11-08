@@ -151,8 +151,8 @@ export function createComfyUIVideoProvider({
   const template = cloneWorkflow(workflow);
   const outputs = [...new Set((Array.isArray(outputNodeIds) ? outputNodeIds : []).map(id => clean(id, 100)).filter(Boolean))];
   if (!outputs.length) throw new ComfyUIAdapterError('Select at least one workflow node that produces an MP4, WebM or MOV output.', 'MISSING_OUTPUT_NODE');
-  if (!nodeBindings?.prompt || !nodeBindings?.image) {
-    throw new ComfyUIAdapterError('Workflow bindings must include prompt and image node inputs.', 'MISSING_REQUIRED_BINDING');
+  if (!nodeBindings?.prompt) {
+    throw new ComfyUIAdapterError('Workflow bindings must include a prompt node input.', 'MISSING_REQUIRED_BINDING');
   }
   // Validate every configured mapping at construction time, before any network call.
   for (const [key, binding] of Object.entries(nodeBindings)) applyBinding(cloneWorkflow(template), binding, '__validation__', key);
@@ -164,12 +164,19 @@ export function createComfyUIVideoProvider({
   return Object.freeze({
     id: 'comfyui-local',
     name: 'Local ComfyUI',
-    taskTypes: Object.freeze(['image-to-video']),
+    taskTypes: Object.freeze(['text-to-video', 'image-to-video']),
     local: true,
     requiresUserKey: false,
     async generate(request, context = {}) {
       throwIfAborted(context.signal);
-      if (!request.image || typeof request.image.arrayBuffer !== 'function') {
+      const taskType = clean(request.taskType || 'image-to-video', 40);
+      if (!['text-to-video', 'image-to-video'].includes(taskType)) {
+        throw new ComfyUIAdapterError('ComfyUI supports text-to-video and image-to-video requests only.', 'UNSUPPORTED_TASK_TYPE');
+      }
+      if (taskType === 'image-to-video' && !nodeBindings.image) {
+        throw new ComfyUIAdapterError('Image-to-video requires a configured source image node binding.', 'MISSING_REQUIRED_BINDING');
+      }
+      if (taskType === 'image-to-video' && (!request.image || typeof request.image.arrayBuffer !== 'function')) {
         throw new ComfyUIAdapterError('The source image must be a browser File or Blob.', 'INVALID_SOURCE_IMAGE');
       }
       const uploadImage = async (image, label, fallbackName) => {
@@ -192,7 +199,9 @@ export function createComfyUIVideoProvider({
         if (!uploadedName) throw new ComfyUIAdapterError(`ComfyUI upload response did not contain the ${label} name.`, 'INVALID_UPLOAD_RESPONSE');
         return [clean(uploaded.subfolder, 500), uploadedName].filter(Boolean).join('/');
       };
-      const imagePath = await uploadImage(request.image, 'source image', 'dravex-scene.png');
+      const imagePath = taskType === 'image-to-video'
+        ? await uploadImage(request.image, 'source image', 'dravex-scene.png')
+        : null;
       const referenceValues = {};
       const requestedReferences = Array.isArray(request.referenceImages) ? request.referenceImages : [];
       const references = requestedReferences.slice(0, 4);
@@ -223,13 +232,13 @@ export function createComfyUIVideoProvider({
       const values = {
         prompt: request.prompt,
         negativePrompt: request.negativePrompt || '',
-        image: imagePath,
         durationSeconds: request.durationSeconds,
         fps: request.fps,
         frameCount: frameOffset + Math.max(1, Math.ceil((request.durationSeconds * request.fps - frameOffset) / frameStep)) * frameStep,
         seed: request.seed ?? 0,
         ...referenceValues
       };
+      if (taskType === 'image-to-video') values.image = imagePath;
       for (const [key, binding] of Object.entries(nodeBindings)) {
         if (Object.prototype.hasOwnProperty.call(values, key)) applyBinding(graph, binding, values[key], key);
       }
