@@ -3030,6 +3030,7 @@ $('comfySourceImageFile').addEventListener('change',()=>{
  const file=$('comfySourceImageFile').files?.[0]||null;
  comfySourceImage=file;
  $('comfySourceImageStatus').textContent=file?'Selected local image: '+file.name+' · '+Math.round(file.size/1024)+' KB. It stays in this tab until you start generation.':'No local image selected; the generated scene image will be used if available.';
+ updateComfyAnimateAvailability();
 });
 [
  ['comfyTextWorkflowFile','textToVideo','comfyTextWorkflowStatus'],
@@ -3048,6 +3049,22 @@ $('comfySourceImageFile').addEventListener('change',()=>{
   }catch(error){$(statusId).textContent='Workflow error: '+(error.message||'Invalid JSON');}
  });
 });
+const comfyConfigurationInputIds=[
+ 'comfyBaseUrl',
+ 'comfyTextPromptNode','comfyTextPromptInput','comfyTextNegativeNode','comfyTextNegativeInput',
+ 'comfyTextFramesNode','comfyTextFramesInput','comfyTextFpsNode','comfyTextFpsInput',
+ 'comfyTextSeedNode','comfyTextSeedInput','comfyTextOutputNodes','comfyTextFrameStep',
+ 'comfyPromptNode','comfyPromptInput','comfyImageNode','comfyImageInput',
+ 'comfyNegativeNode','comfyNegativeInput','comfyFramesNode','comfyFramesInput',
+ 'comfyFpsNode','comfyFpsInput','comfySeedNode','comfySeedInput',
+ 'comfyReference1Node','comfyReference1Input','comfyReference2Node','comfyReference2Input',
+ 'comfyOutputNodes','comfyFrameStep'
+];
+comfyConfigurationInputIds.forEach(id=>$(id).addEventListener('input',()=>{
+ comfyConnected=false;
+ setComfyStatus('ComfyUI settings changed. Check the connection again before generating.');
+ updateComfyAnimateAvailability();
+}));
 $('checkComfyConnection').addEventListener('click',async()=>{
  const button=$('checkComfyConnection');button.disabled=true;comfyConnected=false;updateComfyAnimateAvailability();
  try{
