@@ -21,6 +21,7 @@ import { resolveAutomaticSpeechTasks } from "./automatic-speech-workflow.js";
 import { findScenesWithMissingVoiceAudio } from "./voice-artifact-readiness.js";
 import { generateSceneDialogue, selectScenesMissingDialogue } from "./scene-dialogue-generator.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
+import { resolveSceneImageSource } from "./scene-image-source.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
 import { drawImageCover } from "./image-frame.js";
@@ -2217,9 +2218,9 @@ $('makeFilm').addEventListener('click',async()=>{
  }
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
-  const hasImage=Boolean(String(scene?.generatedImageUrl||'').trim());
+  const source=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:scene?.generatedImageUrl});
   const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
-  return !hasImage&&!cachedVideo?.video;
+  return source.kind==='missing'&&!cachedVideo?.video;
  }).length;
  const gate=evaluatePromptToFilmStart({
   mode,
@@ -3274,7 +3275,8 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     meta.visibleAction=String(meta.visibleAction||meta.motionPrompt);
     meta.camera=String(meta.camera||'Cinematic anime composition with clear subject movement');
     meta.characters=normalizeSceneCast('',meta.characters);
-    if(!meta.generatedImageUrl){
+    let imageSource=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:meta.generatedImageUrl});
+    if(imageSource.kind==='missing'){
      if(!$('hordeConsent').checked)throw new Error('Для отсутствующего изображения сцены '+(index+1)+' нужно отдельно подтвердить отправку текстового промпта в AI Horde.');
      updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Создание изображения','Creating scene image')});
      updateFilmVideoProgress(null,filmProgressText('Подготовка изображений сцен','Preparing scene images'));
@@ -3291,14 +3293,15 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      sceneMetadata[index]={...sceneMetadata[index],...meta};
      if(sceneIndex===index)renderGeneratedSceneImage();
      updateStoryQA();
+     imageSource=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:meta.generatedImageUrl});
     }
     if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
     assertSceneIdentityCurrent();
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Подготовка к анимации','Preparing animation')});
     status.textContent='Подготавливаем изображение сцены '+(index+1)+' для анимации…';
-    let imageInput=meta.generatedImageUrl;
-    if(mode==='comfyui'){
-     const imageResponse=await fetch(meta.generatedImageUrl,{signal});
+    let imageInput=imageSource.kind==='blob'?imageSource.image:imageSource.url;
+    if(mode==='comfyui'&&imageSource.kind==='url'){
+     const imageResponse=await fetch(imageSource.url,{signal});
      if(!imageResponse.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+imageResponse.status+'). Проверь CORS или загрузи изображение вручную.');
      imageInput=await imageResponse.blob();
      if(!imageInput.size)throw new Error('Изображение сцены пустое.');
