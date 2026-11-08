@@ -440,3 +440,107 @@ test('supports prompt-only text-to-video workflows without uploading a source im
   assert.equal(submittedWorkflow['30'].inputs.frames, 96);
   assert.equal(calls.filter(url => url.endsWith('/upload/image')).length, 0);
 });
+
+
+test('selects independent text-to-video and image-to-video workflows for mixed films', async () => {
+  const textWorkflow = {
+    '101': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '190': { class_type: 'SaveVideo', inputs: {} }
+  };
+  const imageWorkflow = {
+    '201': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '202': { class_type: 'LoadImage', inputs: { image: '' } },
+    '290': { class_type: 'SaveVideo', inputs: {} }
+  };
+  const calls = [];
+  let nextJob = 0;
+  const fetchImpl = async (url, options = {}) => {
+    const target = String(url);
+    calls.push(target);
+    if (target.endsWith('/upload/image')) {
+      return jsonResponse({ name: 'scene.png', subfolder: 'input', type: 'input' });
+    }
+    if (target.endsWith('/prompt')) {
+      const body = JSON.parse(options.body);
+      const job = `dual-job-${++nextJob}`;
+      if (job === 'dual-job-1') {
+        assert.equal(body.prompt['101'].inputs.text, 'A fox runs through a forest.');
+        assert.equal(body.prompt['202'], undefined);
+      } else {
+        assert.equal(body.prompt['201'].inputs.text, 'A fox looks at the camera.');
+        assert.equal(body.prompt['202'].inputs.image, 'input/scene.png');
+      }
+      return jsonResponse({ prompt_id: job });
+    }
+    if (target.endsWith('/history/dual-job-1')) {
+      return jsonResponse({ 'dual-job-1': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '190': { videos: [{ filename: 'text.mp4', type: 'output' }] } }
+      }});
+    }
+    if (target.endsWith('/history/dual-job-2')) {
+      return jsonResponse({ 'dual-job-2': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '290': { videos: [{ filename: 'image.mp4', type: 'output' }] } }
+      }});
+    }
+    if (target.includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + target);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflows: {
+      'text-to-video': {
+        workflow: textWorkflow,
+        nodeBindings: { prompt: { nodeId: '101', input: 'text' } },
+        outputNodeIds: ['190']
+      },
+      'image-to-video': {
+        workflow: imageWorkflow,
+        nodeBindings: {
+          prompt: { nodeId: '201', input: 'text' },
+          image: { nodeId: '202', input: 'image' }
+        },
+        outputNodeIds: ['290']
+      }
+    },
+    fetchImpl,
+    pollIntervalMs: 250
+  });
+  assert.deepEqual(provider.taskTypes, ['text-to-video', 'image-to-video']);
+  const textResult = await provider.generate({
+    taskType: 'text-to-video',
+    prompt: 'A fox runs through a forest.',
+    durationSeconds: 2,
+    fps: 24
+  });
+  const imageResult = await provider.generate({
+    taskType: 'image-to-video',
+    prompt: 'A fox looks at the camera.',
+    image: new Blob(['scene'], { type: 'image/png' }),
+    durationSeconds: 2,
+    fps: 24
+  });
+  assert.equal(textResult.status, 'completed');
+  assert.equal(imageResult.status, 'completed');
+  assert.equal(calls.filter(url => url.endsWith('/upload/image')).length, 1);
+  assert.equal(calls.filter(url => url.endsWith('/prompt')).length, 2);
+});
+
+test('does not advertise an image-to-video task when only a text workflow is configured', () => {
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflows: {
+      'text-to-video': {
+        workflow: { '1': { class_type: 'CLIPTextEncode', inputs: { text: '' } }, '9': { class_type: 'SaveVideo', inputs: {} } },
+        nodeBindings: { prompt: { nodeId: '1', input: 'text' } },
+        outputNodeIds: ['9']
+      }
+    }
+  });
+  assert.deepEqual(provider.taskTypes, ['text-to-video']);
+  assert.throws(
+    () => provider.generate({ taskType: 'image-to-video' }),
+    error => error.code === 'MISSING_TASK_WORKFLOW'
+  );
+});
