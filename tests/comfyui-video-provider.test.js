@@ -384,3 +384,59 @@ test('warns when requested character references have no configured workflow inpu
   assert.match(warning.message, /not uploaded or used/i);
   assert.equal(uploadCount, 1);
 });
+
+
+test('supports prompt-only text-to-video workflows without uploading a source image', async () => {
+  const textWorkflow = {
+    '10': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '30': { class_type: 'VideoSettings', inputs: { seconds: 0, frame_rate: 0, frames: 0 } },
+    '90': { class_type: 'SaveVideo', inputs: {} }
+  };
+  const textBindings = {
+    prompt: { nodeId: '10', input: 'text' },
+    durationSeconds: { nodeId: '30', input: 'seconds' },
+    fps: { nodeId: '30', input: 'frame_rate' },
+    frameCount: { nodeId: '30', input: 'frames' }
+  };
+  const calls = [];
+  let submittedWorkflow;
+  const fetchImpl = async (url, options = {}) => {
+    calls.push(String(url));
+    if (String(url).endsWith('/upload/image')) throw new Error('Text-to-video must not upload a source image.');
+    if (String(url).endsWith('/prompt')) {
+      submittedWorkflow = JSON.parse(options.body).prompt;
+      return jsonResponse({ prompt_id: 'text-job' });
+    }
+    if (String(url).endsWith('/history/text-job')) {
+      return jsonResponse({ 'text-job': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '90': { videos: [{ filename: 'text-only.mp4', type: 'output' }] } }
+      }});
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow: textWorkflow,
+    nodeBindings: textBindings,
+    outputNodeIds: ['90'],
+    fetchImpl,
+    pollIntervalMs: 250
+  });
+  assert.deepEqual(provider.taskTypes, ['text-to-video', 'image-to-video']);
+  const registry = createVideoProviderRegistry();
+  registry.register(provider);
+  const result = await generateVideoWithProvider(registry, provider.id, {
+    taskType: 'text-to-video',
+    prompt: 'A fox runs through a moonlit forest.',
+    durationSeconds: 4,
+    fps: 24,
+    aspectRatio: '16:9'
+  });
+  assert.equal(result.status, 'completed');
+  assert.equal(result.video.type, 'video/mp4');
+  assert.equal(submittedWorkflow['10'].inputs.text, 'A fox runs through a moonlit forest.');
+  assert.equal(submittedWorkflow['30'].inputs.frames, 96);
+  assert.equal(calls.filter(url => url.endsWith('/upload/image')).length, 0);
+});
