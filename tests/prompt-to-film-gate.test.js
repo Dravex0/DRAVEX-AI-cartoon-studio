@@ -70,3 +70,26 @@ test('local canvas mode needs no video provider or remote image consent', () => 
   assert.equal(result.ok, true);
   assert.deepEqual(result.blockers, []);
 });
+
+
+test('local ComfyUI can generate missing scenes directly from text without AI Horde consent', () => {
+  const result = evaluatePromptToFilmStart({
+    mode: 'comfyui',
+    sceneCount: 3,
+    videoProviderReady: true,
+    remoteVideoConsent: false,
+    missingImageCount: 3,
+    imagePromptConsent: false
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.blockers, []);
+  assert.equal(result.missingImageCount, 3);
+});
+
+test('Hugging Face still requires AI Horde consent when scene images are missing', () => {
+  const result = evaluatePromptToFilmStart({
+    ...ready,
+    imagePromptConsent: false
+  });
+  assert.ok(result.blockers.includes('image-prompt-consent-required'));
+});
