@@ -975,9 +975,13 @@ $('bibleReferenceImageFile').addEventListener('change',async()=>{
       referenceImageAssetId:assetId
     });
     $('bibleCharacterId').dataset.loaded=String(sceneIndex);
+    const draftSaved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
+      idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
+      language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
+    }));
     $('bibleReferenceImageStatus').textContent=uiLang==='ru'
-      ?'Фото сохранено только в этом браузере ('+Math.round(file.size/1024)+' КБ). Для использования в сцене выбери локальный ComfyUI и настрой входы Reference Image 1/2 в workflow.'
-      :'Image saved only in this browser ('+Math.round(file.size/1024)+' KB). To use it in a scene, choose local ComfyUI and configure Reference Image 1/2 workflow inputs.';
+      ?'Фото сохранено на этом устройстве ('+Math.round(file.size/1024)+' КБ). Профиль персонажа '+(draftSaved?'автоматически сохранён в черновике.':'обновлён, но черновик не удалось сохранить — нажми «Сохранить черновик».')+' Для генерации фото передаётся только в локальный ComfyUI при настроенных входах Reference Image 1/2.'
+      :'Image saved on this device ('+Math.round(file.size/1024)+' KB). Character profile '+(draftSaved?'was saved to the draft automatically.':'was updated, but the draft could not be saved — use Save Draft.')+' The image is sent only to local ComfyUI when Reference Image 1/2 inputs are configured.';
     showCharacterReferenceImage(characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase()));
     renderCharacterBible();
   }catch(error){
