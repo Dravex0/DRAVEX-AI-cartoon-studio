@@ -89,3 +89,30 @@ test('returns no photos when the scene has no explicit cast or storage is unavai
     null
   ), []);
 });
+
+
+test('reuses the same saved character photo across multiple scenes and respects each scene cast', async () => {
+  const mira = new Blob(['mira-reference'], { type: 'image/png' });
+  const kai = new Blob(['kai-reference'], { type: 'image/png' });
+  const storage = createStorage(new Map([
+    ['mira-ref', { blob: mira, filename: 'mira.png' }],
+    ['kai-ref', { blob: kai, filename: 'kai.png' }]
+  ]));
+  const bible = [
+    { characterId: 'Mira', referenceImageAssetId: 'mira-ref' },
+    { characterId: 'Kai', referenceImageAssetId: 'kai-ref' }
+  ];
+
+  const openingScene = await loadCharacterReferenceImagesForScene(
+    { characters: ['Mira'] }, bible, storage
+  );
+  const meetingScene = await loadCharacterReferenceImagesForScene(
+    { characters: ['Mira', 'Kai'] }, bible, storage
+  );
+
+  assert.deepEqual(openingScene.map(image => image.name), ['mira.png']);
+  assert.deepEqual(meetingScene.map(image => image.name), ['mira.png', 'kai.png']);
+  assert.equal(openingScene[0].blob, meetingScene[0].blob);
+  assert.equal(meetingScene[1].blob, kai);
+  assert.deepEqual(storage.calls, ['mira-ref', 'mira-ref', 'kai-ref']);
+});
