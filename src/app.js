@@ -2945,7 +2945,7 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  if(imageBlob&&!imageBlob.size)throw new Error('Исходное изображение сцены пустое.');
  const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:imageBlob?'blob':'missing'});
  const prompt=taskType==='text-to-video'
-  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\\n\\nMotion direction: ')
+  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
   :buildMotionGenerationPrompt(motionScene,characterBible);
  if(!prompt.trim())throw new Error('Добавь описание движения сцены перед генерацией.');
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
