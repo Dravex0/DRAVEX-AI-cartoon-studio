@@ -3000,7 +3000,19 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
 function setComfyStatus(message){$('comfyStatus').textContent=message}
-function updateComfyAnimateAvailability(){const hasWorkflow=Object.keys(comfyWorkflowConfigs()).length>0;$('animateSceneComfy').disabled=!comfyConnected||!hasWorkflow;const mode=$('videoGenerationMode')?.value||'huggingface';const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:mode==='comfyui'&&comfyConnected&&hasWorkflow;$('generateFullFilmComfy').hidden=mode==='local-canvas';$('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController}
+function updateComfyAnimateAvailability(){
+ const configs=comfyWorkflowConfigs();
+ const currentMeta=sceneMetadata[sceneIndex]||{};
+ const currentHasImage=!!comfySourceImage||!!String(currentMeta.generatedImageUrl||'').trim();
+ const currentTask=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:currentHasImage?'url':'missing'});
+ $('animateSceneComfy').disabled=!comfyConnected||!configs[currentTask];
+ const mode=$('videoGenerationMode')?.value||'huggingface';
+ const neededFilmTasks=new Set(sceneMetadata.map(meta=>resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:String(meta.generatedImageUrl||'').trim()?'url':'missing'})));
+ const filmWorkflowsReady=[...neededFilmTasks].every(taskType=>!!configs[taskType]);
+ const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:mode==='comfyui'&&comfyConnected&&filmWorkflowsReady;
+ $('generateFullFilmComfy').hidden=mode==='local-canvas';
+ $('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController;
+}
 ['comfyCharacterReference1','comfyCharacterReference2'].forEach((id,index)=>{
  $(id).addEventListener('change',()=>{
   const file=$(id).files?.[0]||null;
