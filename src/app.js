@@ -3040,7 +3040,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  const imageSourceKind=comfySourceImage?'blob':imageUrl?'url':'missing';
  const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind});
  const prompt=taskType==='text-to-video'
-  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\\n\\nMotion direction: ')
+  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
   :buildMotionGenerationPrompt(motionScene,characterBible);
  if(!prompt.trim()){setComfyStatus('This scene has no usable visual or motion prompt. Add a scene description or motion instruction first.');return}
  button.disabled=true;$('checkComfyConnection').disabled=true;
