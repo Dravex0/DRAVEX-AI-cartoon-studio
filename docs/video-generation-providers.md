@@ -16,11 +16,11 @@ DRAVEX uses a provider-neutral contract for optional video-generation engines.
 
 1. Start ComfyUI on the user's computer and enable its HTTP API.
 2. Export a workflow in **API format** (not the ordinary UI workflow JSON).
-3. Configure its prompt and image node input bindings, optional negative-prompt/duration/FPS/frame-count/seed bindings, and the node IDs that produce video output.
+3. Configure its prompt input binding, optional image input binding (required only for image-to-video), optional negative-prompt/duration/FPS/frame-count/seed bindings, and the node IDs that produce video output.
 4. Call `checkComfyUIConnection({ baseUrl })` before registering the provider. The check only reads `/system_stats`; it does not upload a file or submit a prompt.
 5. Register the returned provider with `createVideoProviderRegistry()` and call it through `generateVideoWithProvider()`.
 
-The adapter uploads the selected source image to the local ComfyUI `/upload/image` endpoint, submits the configured graph to `/prompt`, polls `/history/{prompt_id}`, and downloads an MP4/WebM/MOV result from `/view`. The downloaded Blob is used as a same-origin object URL, allowing the canvas preview/export to draw video frames without relying on remote video-host CORS. It does not choose a model or create a workflow automatically. The workflow's nodes, model files, custom nodes and output node must already be installed and working in ComfyUI.
+The adapter supports both prompt-only text-to-video workflows and image-to-video workflows. For image-to-video it uploads the selected source image to the local ComfyUI `/upload/image` endpoint; for text-to-video it does not upload a source image. Both modes submit the configured graph to `/prompt`, poll `/history/{prompt_id}`, and download an MP4/WebM/MOV result from `/view`. The downloaded Blob is used as a same-origin object URL, allowing the canvas preview/export to draw video frames without relying on remote video-host CORS. It does not choose a model or create a workflow automatically. The workflow's nodes, model files, custom nodes and output node must already be installed and working in ComfyUI.
 
 The base URL is restricted to loopback or private-network addresses. A normal GitHub Pages site may still be unable to contact the local server unless the browser accepts the local-network request and ComfyUI is configured to allow the site's origin (CORS). HTTPS pages, browser mixed-content rules, firewall settings and local-network permission prompts can affect this connection. Do not expose ComfyUI's unauthenticated API to the public internet.
 
