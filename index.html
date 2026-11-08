@@ -247,10 +247,27 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 <summary style="cursor:pointer;font-weight:750">Local video animation · ComfyUI / Локальная анимация</summary>
 <p class="muted" style="font-size:12px">Runs only on your configured local/private ComfyUI server. No cloud fallback. First generate or load a still image for this scene. The API workflow JSON is kept in memory and must be selected again after reload.</p>
 <div class="field"><label for="comfyBaseUrl">ComfyUI address / Адрес сервера</label><input id="comfyBaseUrl" type="url" value="http://127.0.0.1:8188" autocomplete="off"></div>
-<div class="field"><label for="comfyWorkflowFile">ComfyUI API workflow JSON / Файл workflow</label><input id="comfyWorkflowFile" type="file" accept=".json,application/json"><small id="comfyWorkflowStatus">No workflow selected. Export API format from ComfyUI.</small></div>
+<div class="field"><label for="comfyTextWorkflowFile">Text-to-video workflow · без исходной картинки</label><input id="comfyTextWorkflowFile" type="file" accept=".json,application/json"><small id="comfyTextWorkflowStatus">Optional. Select a separate API-format T2V workflow for scenes without an image.</small></div>
+<div class="field"><label for="comfyImageWorkflowFile">Image-to-video workflow · с исходной картинкой</label><input id="comfyImageWorkflowFile" type="file" accept=".json,application/json"><small id="comfyImageWorkflowStatus">Select an API-format I2V workflow for scenes with an image.</small></div>
 <div class="field"><label for="comfySourceImageFile">Optional local scene image / Локальное изображение сцены</label><input id="comfySourceImageFile" type="file" accept="image/png,image/jpeg,image/webp"><small id="comfySourceImageStatus">If selected, this image is sent only to your configured local ComfyUI server and takes priority over the generated preview image.</small></div>
 <div class="field"><label for="comfyCharacterReference1">Character reference 1 / Референс персонажа 1</label><input id="comfyCharacterReference1" type="file" accept="image/png,image/jpeg,image/webp"><small>Optional. Uploaded only when you start this scene's ComfyUI generation.</small></div>
 <div class="field"><label for="comfyCharacterReference2">Character reference 2 / Референс персонажа 2</label><input id="comfyCharacterReference2" type="file" accept="image/png,image/jpeg,image/webp"><small>Optional. Supports workflows with a second Load Image input.</small></div>
+<div class="field"><strong>Text-to-video bindings / Настройки T2V</strong><small class="muted">Для сцен без картинки. Node IDs относятся только к T2V workflow.</small></div>
+<div class="comfy-grid">
+<div class="field"><label for="comfyTextPromptNode">T2V prompt node</label><input id="comfyTextPromptNode" value="6"></div>
+<div class="field"><label for="comfyTextPromptInput">T2V prompt input</label><input id="comfyTextPromptInput" value="text"></div>
+<div class="field"><label for="comfyTextNegativeNode">T2V negative node</label><input id="comfyTextNegativeNode" placeholder="Optional"></div>
+<div class="field"><label for="comfyTextNegativeInput">T2V negative input</label><input id="comfyTextNegativeInput" value="text"></div>
+<div class="field"><label for="comfyTextFramesNode">T2V frame count node</label><input id="comfyTextFramesNode" placeholder="Optional"></div>
+<div class="field"><label for="comfyTextFramesInput">T2V frame count input</label><input id="comfyTextFramesInput" value="length"></div>
+<div class="field"><label for="comfyTextFpsNode">T2V FPS node</label><input id="comfyTextFpsNode" placeholder="Optional"></div>
+<div class="field"><label for="comfyTextFpsInput">T2V FPS input</label><input id="comfyTextFpsInput" value="fps"></div>
+<div class="field"><label for="comfyTextSeedNode">T2V seed node</label><input id="comfyTextSeedNode" placeholder="Optional"></div>
+<div class="field"><label for="comfyTextSeedInput">T2V seed input</label><input id="comfyTextSeedInput" value="seed"></div>
+<div class="field"><label for="comfyTextOutputNodes">T2V video output node IDs</label><input id="comfyTextOutputNodes" value="58"></div>
+<div class="field"><label for="comfyTextFrameStep">T2V frame step</label><input id="comfyTextFrameStep" type="number" min="1" max="120" value="8"></div>
+</div>
+<div class="field"><strong>Image-to-video bindings / Настройки I2V</strong><small class="muted">Для сцен с исходной картинкой. Существующие поля ниже относятся только к I2V workflow.</small></div>
 <div class="comfy-grid">
 <div class="field"><label for="comfyPromptNode">Prompt node ID / Узел промпта</label><input id="comfyPromptNode" value="6"></div>
 <div class="field"><label for="comfyPromptInput">Prompt input</label><input id="comfyPromptInput" value="text"></div>
