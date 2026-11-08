@@ -3036,21 +3036,24 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  const index=sceneIndex,meta=sceneMetadata[index]||{},imageUrl=String(meta.generatedImageUrl||'').trim();
  const generationToken=sceneGenerationGuard.capture(String(meta.id||''));
  const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Scene settings changed during generation. The stale clip was discarded; generate this scene again.');};
- if(!imageUrl){setComfyStatus(uiLang==='ru'?'Сначала создай или загрузи изображение этой сцены.':'Generate or load a still image for this scene first.');return}
  const motionScene={...meta,title:$('sceneTitle').value.trim()||titles[index],description:$('sceneDescription').value.trim()||descriptions[index],motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters)};
- const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
- if(!prompt.trim()){setComfyStatus('This scene has no motion instruction. Add a motion prompt first.');return}
+ const imageSourceKind=comfySourceImage?'blob':imageUrl?'url':'missing';
+ const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind});
+ const prompt=taskType==='text-to-video'
+  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\\n\\nMotion direction: ')
+  :buildMotionGenerationPrompt(motionScene,characterBible);
+ if(!prompt.trim()){setComfyStatus('This scene has no usable visual or motion prompt. Add a scene description or motion instruction first.');return}
  button.disabled=true;$('checkComfyConnection').disabled=true;
  try{
   let imageBlob=comfySourceImage;
-  if(!imageBlob){
+  if(!imageBlob&&taskType==='image-to-video'){
    status.textContent=uiLang==='ru'?'Получаем изображение сцены локально…':'Reading the generated scene image…';
    const imageResponse=await fetch(imageUrl);
    if(!imageResponse.ok)throw new Error('Cannot read the scene image (HTTP '+imageResponse.status+'). Select a local image instead if the image host blocks browser CORS.');
    imageBlob=await imageResponse.blob();
   }
   assertGenerationCurrent();
-  if(!imageBlob?.size)throw new Error('The scene image is empty.');
+  if(taskType==='image-to-video'&&!imageBlob?.size)throw new Error('The scene image is empty.');
   const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
@@ -3058,7 +3061,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const profileReferences=await loadCharacterReferenceImagesForScene(motionScene);
   assertGenerationCurrent();
   const referenceImages=profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2);
-  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages},{onProgress:progress=>{
+  const result=await generateVideoWithProvider(registry,provider.id,{taskType,prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageBlob}:{}),seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages},{onProgress:progress=>{
    if(progress.stage==='warning'&&progress.message){referenceWarning=String(progress.message);status.textContent='ComfyUI · Внимание: '+referenceWarning;return;}
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
    status.textContent='ComfyUI · '+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'')+(referenceWarning?' · Внимание: '+referenceWarning:'');
