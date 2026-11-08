@@ -156,6 +156,7 @@ export function createComfyUIVideoProvider({
     const outputs = [...new Set((Array.isArray(config.outputNodeIds) ? config.outputNodeIds : []).map(id => clean(id, 100)).filter(Boolean))];
     if (!outputs.length) throw new ComfyUIAdapterError(`Select at least one video output node for the ${label} workflow.`, 'MISSING_OUTPUT_NODE');
     if (!bindings.prompt) throw new ComfyUIAdapterError(`The ${label} workflow must include a prompt node input binding.`, 'MISSING_REQUIRED_BINDING');
+    if (label === 'image-to-video' && !bindings.image) throw new ComfyUIAdapterError('The image-to-video workflow must include a source image node input binding.', 'MISSING_REQUIRED_BINDING');
     for (const [key, binding] of Object.entries(bindings)) applyBinding(cloneWorkflow(template), binding, '__validation__', key);
     const step = Math.max(1, Math.min(120, Math.round(Number(config.frameCountStep ?? frameCountStep) || 1)));
     const offset = Math.max(0, Math.min(step - 1, Math.round(Number(config.frameCountOffset ?? frameCountOffset) || 0)));
