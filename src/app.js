@@ -2228,7 +2228,7 @@ $('makeFilm').addEventListener('click',async()=>{
   sceneCount:sceneMetadata.length,
   videoProviderReady:mode==='local-canvas'?true:mode==='huggingface'
    ?hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'
-   :mode==='comfyui'&&comfyConnected&&!!comfyWorkflow,
+   :mode==='comfyui'&&comfyConnected&&Object.keys(comfyWorkflowConfigs()).length>0,
   remoteVideoConsent:$('hfVideoConsent').checked===true,
   missingImageCount,
   imagePromptConsent:$('hordeConsent').checked===true,
@@ -2778,7 +2778,7 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 }finally{button.disabled=!$('hordeConsent').checked}
 });
 
-let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
+let comfyWorkflows={textToVideo:null,imageToVideo:null},comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
 let comfyCharacterReferenceFiles=[];
 let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
 let filmProgressTracking=false;
@@ -2843,6 +2843,20 @@ function comfyBindings(){
  Object.entries(optional).forEach(([key,ids])=>{const value=binding(comfyText(ids[0]),comfyText(ids[1]));if(value)result[key]=value});
  return result;
 }
+function comfyTextBindings(){
+ const binding=(nodeId,input)=>nodeId&&input?{nodeId,input}:null;
+ const result={prompt:binding(comfyText('comfyTextPromptNode'),comfyText('comfyTextPromptInput'))};
+ const optional={negativePrompt:['comfyTextNegativeNode','comfyTextNegativeInput'],frameCount:['comfyTextFramesNode','comfyTextFramesInput'],fps:['comfyTextFpsNode','comfyTextFpsInput'],seed:['comfyTextSeedNode','comfyTextSeedInput']};
+ Object.entries(optional).forEach(([key,ids])=>{const value=binding(comfyText(ids[0]),comfyText(ids[1]));if(value)result[key]=value});
+ return result;
+}
+function comfyWorkflowConfigs(){
+ const configs={};
+ if(comfyWorkflows.textToVideo)configs['text-to-video']={workflow:comfyWorkflows.textToVideo,nodeBindings:comfyTextBindings(),outputNodeIds:comfyText('comfyTextOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyTextFrameStep'))||1,frameCountOffset:1};
+ if(comfyWorkflows.imageToVideo)configs['image-to-video']={workflow:comfyWorkflows.imageToVideo,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1};
+ return configs;
+}
+function comfyProviderOptions(){return {baseUrl:comfyText('comfyBaseUrl'),workflows:comfyWorkflowConfigs()};}
 function isLocalVideoGenerationReady({step}={}){
  const target=resolveRemoteScene(step);
  if(!target.ok)return false;
@@ -2950,9 +2964,7 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  if(!prompt.trim())throw new Error('Добавь описание движения сцены перед генерацией.');
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
  const provider=createComfyUIVideoProvider({
-  baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),
-  outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),
-  frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1
+  baseUrl:comfyText('comfyBaseUrl'),...comfyProviderOptions()
  });
  const registry=createVideoProviderRegistry();registry.register(provider);
  const duration=Math.max(0.25,Math.min(30,Number(originalMeta.durationSeconds??originalMeta.duration??$('duration').value)||3));
@@ -3004,30 +3016,34 @@ $('comfySourceImageFile').addEventListener('change',()=>{
  comfySourceImage=file;
  $('comfySourceImageStatus').textContent=file?'Selected local image: '+file.name+' · '+Math.round(file.size/1024)+' KB. It stays in this tab until you start generation.':'No local image selected; the generated scene image will be used if available.';
 });
-$('comfyWorkflowFile').addEventListener('change',async()=>{
- const file=$('comfyWorkflowFile').files?.[0]||null;
- comfyWorkflow=null;comfyConnected=false;updateComfyAnimateAvailability();
- if(!file){$('comfyWorkflowStatus').textContent='No workflow selected.';return}
- try{
-  const parsed=JSON.parse(await file.text());
-  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)||!Object.keys(parsed).length)throw new Error('The JSON is empty or is not an API-format workflow object.');
-  comfyWorkflow=parsed;
-  $('comfyWorkflowStatus').textContent='Loaded '+file.name+' · '+Object.keys(parsed).length+' nodes. Node bindings will be validated when connecting.';
-  setComfyStatus('Workflow loaded in this browser tab. Check the local ComfyUI connection.');
- }catch(error){$('comfyWorkflowStatus').textContent='Workflow error: '+(error.message||'Invalid JSON');}
+[
+ ['comfyTextWorkflowFile','textToVideo','comfyTextWorkflowStatus'],
+ ['comfyImageWorkflowFile','imageToVideo','comfyImageWorkflowStatus']
+].forEach(([inputId,key,statusId])=>{
+ $(inputId).addEventListener('change',async()=>{
+  const file=$(inputId).files?.[0]||null;
+  comfyWorkflows[key]=null;comfyConnected=false;updateComfyAnimateAvailability();
+  if(!file){$(statusId).textContent='No workflow selected.';return}
+  try{
+   const parsed=JSON.parse(await file.text());
+   if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)||!Object.keys(parsed).length)throw new Error('The JSON is empty or is not an API-format workflow object.');
+   comfyWorkflows[key]=parsed;
+   $(statusId).textContent='Loaded '+file.name+' · '+Object.keys(parsed).length+' nodes. Bindings will be validated on connection.';
+   setComfyStatus('Workflow loaded in this browser tab. Check the local ComfyUI connection.');
+  }catch(error){$(statusId).textContent='Workflow error: '+(error.message||'Invalid JSON');}
+ });
 });
 $('checkComfyConnection').addEventListener('click',async()=>{
  const button=$('checkComfyConnection');button.disabled=true;comfyConnected=false;updateComfyAnimateAvailability();
  try{
   const result=await checkComfyUIConnection({baseUrl:comfyText('comfyBaseUrl')});
-  if(comfyWorkflow){
-   const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
+  if(Object.keys(comfyWorkflowConfigs()).length){
+   const provider=createComfyUIVideoProvider(comfyProviderOptions());
    comfyConnected=true;
-   setComfyStatus('Connected to ComfyUI'+(result.system?.system?.comfyui_version?' · '+result.system.system.comfyui_version:'')+'. Workflow bindings validated. No image has been uploaded.');
+   setComfyStatus('Connected to ComfyUI'+(result.system?.system?.comfyui_version?' · '+result.system.system.comfyui_version:'')+'. Validated: '+provider.taskTypes.join(' + ')+'. No image has been uploaded.');
   }else{
-   setComfyStatus('ComfyUI is reachable, but select an API workflow JSON before animation.');
-  }
- }catch(error){setComfyStatus((error.code||'CONNECTION_ERROR')+': '+(error.message||'Connection failed'));}
+   setComfyStatus('ComfyUI is reachable, but select at least one API workflow JSON before animation.');
+  } }catch(error){setComfyStatus((error.code||'CONNECTION_ERROR')+': '+(error.message||'Connection failed'));}
  finally{button.disabled=false;updateComfyAnimateAvailability();}
 });
 $('animateSceneComfy').addEventListener('click',async()=>{
@@ -3142,7 +3158,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
  const mode=$('videoGenerationMode').value;
  if(button.disabled)return;
  if(mode==='huggingface'&&(!hfVideoConnected||!hfVideoClient||!hfHandleFile||!$('hfVideoConsent').checked))return;
- if(mode==='comfyui'&&(!comfyConnected||!comfyWorkflow))return;
+ if(mode==='comfyui'&&(!comfyConnected||!Object.keys(comfyWorkflowConfigs()).length))return;
  const controller=new AbortController();
  fullFilmAbortController=controller;
  button.disabled=true;cancel.hidden=false;progressPanel.hidden=false;progress.value=0;
