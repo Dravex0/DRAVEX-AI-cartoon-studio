@@ -2860,8 +2860,10 @@ function comfyProviderOptions(){return {baseUrl:comfyText('comfyBaseUrl'),workfl
 function isLocalVideoGenerationReady({step}={}){
  const target=resolveRemoteScene(step);
  if(!target.ok)return false;
+ const imageReady=target.index===sceneIndex?!!comfySourceImage||!!String(target.scene.generatedImageUrl||'').trim():!!String(target.scene.generatedImageUrl||'').trim();
+ const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:imageReady?'url':'missing'});
  const motion=target.index===sceneIndex?$('sceneMotionPrompt').value:target.scene.motionPrompt||target.scene.visibleAction;
- return comfyConnected&&Object.keys(comfyWorkflowConfigs()).length>0&&!fullFilmAbortController&&!!String(motion||'').trim();
+ return comfyConnected&&!!comfyWorkflowConfigs()[taskType]&&!fullFilmAbortController&&!!String(motion||'').trim();
 }
 function resolveRemoteScene(step){return resolveUniversalSceneTarget(step,sceneMetadata,sceneIndex);}
 function isRemoteVideoGenerationReady({step}={}){
