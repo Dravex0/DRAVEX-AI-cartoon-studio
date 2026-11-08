@@ -89,6 +89,7 @@ import { verifySpriteTransparency } from "./character-sprite-verification.js";
 import { upsertCharacterReference, mergeCharacterReferences } from "./character-reference.js";
 import { prepareStoryCharacterContext } from "./story-character-context.js";
 import { normalizeSceneCast } from "./scene-cast.js";
+import { loadCharacterReferenceImagesForScene as resolveSceneCharacterReferenceImages } from "./scene-character-references.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
 import { buildStoryEventChain } from "./story-event-chain.js";
 import { shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
@@ -1002,16 +1003,7 @@ $('removeCharacterReferenceImage').addEventListener('click',async()=>{
  }catch(error){$('bibleReferenceImageStatus').textContent=error.message||'Could not remove reference image.';}
 });
 async function loadCharacterReferenceImagesForScene(scene){
-  const cast=normalizeSceneCast('',scene?.characters);
-  const profiles=characterBible.filter(profile=>cast.some(name=>name.toLowerCase()===profile.characterId.toLowerCase()));
-  const images=[];
-  for(const profile of profiles){
-    if(images.length>=2)break;
-    if(!profile.referenceImageAssetId)continue;
-    const record=await characterReferenceImageStorage.get(profile.referenceImageAssetId);
-    if(record?.blob?.size)images.push({name:record.filename||profile.characterId+'.png',blob:record.blob});
-  }
-  return images;
+  return resolveSceneCharacterReferenceImages(scene,characterBible,characterReferenceImageStorage,2);
 }
 function updateProductionPreview(){
 const meta=sceneMetadata[sceneIndex]||{};
