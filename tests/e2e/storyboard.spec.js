@@ -436,7 +436,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
         status: 200,
         contentType: 'video/webm',
         headers: corsHeaders,
-        body: Buffer.from(sceneVideoBase64[Math.max(0, Math.min(4, Number((url.searchParams.get('filename') || '').match(/scene-(\\d+)/)?.[1] || 1) - 1))], 'base64')
+        body: Buffer.from(sceneVideoBase64[Math.max(0, Math.min(4, Number((url.searchParams.get('filename') || '').match(/scene-(\d+)/)?.[1] || 1) - 1))], 'base64')
       });
     }
 
