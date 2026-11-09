@@ -138,6 +138,15 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 #finalFilmDownload{display:inline-block;margin-top:10px;padding:12px 16px;border-radius:12px;background:var(--accent);color:#10152a;font-weight:800;text-decoration:none}
 @media(max-width:720px){.layout{grid-template-columns:minmax(0,1fr)}.layout>.panel:first-child{order:0}.layout>.panel:nth-child(2){order:1}#idea{min-height:160px}}
 
+
+/* Primary creator controls: visible without opening an advanced-settings drawer. */
+.quick-settings{margin:12px 0 14px;padding:12px;border-color:#40557a;background:linear-gradient(145deg,#13223a,#0d1729)}
+.quick-settings>summary{font-size:14px;letter-spacing:.01em;color:#e4eaff}
+.quick-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.quick-settings-grid .field{min-width:0;margin:0}
+.quick-settings-grid .field:first-child{grid-column:1/-1}
+.quick-settings-grid .field small{display:block;font-size:11px;line-height:1.45}
+@media(max-width:720px){.quick-settings-grid{grid-template-columns:minmax(0,1fr)}.quick-settings-grid .field:first-child{grid-column:auto}}
 </style>
 </head>
 <body>
@@ -161,10 +170,13 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 <pre id="universalTaskPlanOutput" hidden style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;padding:10px;border:1px solid var(--line);border-radius:10px;background:#11131e;color:var(--text);font-size:12px"></pre>
 </details>
 <div class="row"><div class="field"><label for="character" data-i18n="characterLabel">Main character</label><input id="character" value="" placeholder="Auto-detect from story / Автоопределение из сценария"></div><div class="field"><label for="style" data-i18n="styleLabel">Visual style</label><select id="style"><option value="Storybook" data-i18n="styleStorybook">Storybook</option><option value="Anime-inspired" data-i18n="styleAnime">Anime-inspired</option><option value="Flat 2D" data-i18n="styleFlat2D">Flat 2D</option><option value="Pixel art" data-i18n="stylePixelArt">Pixel art</option><option value="3D animated" data-i18n="style3DAnimated">3D animated</option><option value="3D realistic" data-i18n="style3DRealistic">Realistic 3D</option><option value="Clay 3D" data-i18n="styleClay3D">Clay 3D</option><option value="Watercolor" data-i18n="styleWatercolor">Watercolor</option><option value="Comic / manga" data-i18n="styleManga">Comic / manga</option><option value="Paper cutout" data-i18n="stylePaperCutout">Paper cutout</option><option value="Stop-motion" data-i18n="styleStopMotion">Stop-motion</option></select></div></div>
-<details class="simple-options"><summary>More settings / Дополнительные настройки</summary>
+<details class="simple-options quick-settings" open>
+<summary>Основные настройки / More settings</summary>
+<div class="quick-settings-grid">
 <div class="field"><label for="canvasFormat">Формат видео / Video format</label><select id="canvasFormat"><option value="landscape">16:9 · горизонтальный / Landscape</option><option value="portrait">9:16 · вертикальный / Portrait</option></select><small class="muted">Формат применяется к предпросмотру и итоговому WebM. / Applies to preview and final WebM.</small></div>
 <div class="field"><label for="imageQuality" data-i18n="qualityLabel">Image quality</label><select id="imageQuality"><option value="standard" data-i18n="qualityStandard">Standard · 640×384</option><option value="high" data-i18n="qualityHigh">High · 768×448</option><option value="ultra" data-i18n="qualityUltra">Maximum · 1024×576</option></select><small class="muted" data-i18n="qualityNote">Applies to optional AI-generated still images. Higher quality takes longer in the free queue.</small></div>
 <div class="field"><label for="duration" data-i18n="durationLabel">Scene duration</label><select id="duration"><option value="3" data-i18n="seconds3">3 seconds</option><option value="5" data-i18n="seconds5">5 seconds</option><option value="8" data-i18n="seconds8">8 seconds</option></select></div>
+</div>
 </details>
 <div class="field"><label for="language" data-i18n="storyLanguageLabel">Story language</label><select id="language"><option value="en">English</option><option value="ru">Русский</option><option value="uk">Українська</option><option value="es">Español</option></select></div>
 <div class="actions"><button type="button" id="makeFilm" class="primary-action">Создать готовое видео / Create finished video</button></div><div class="actions"><button id="make" class="secondary" data-i18n="createButton">Create storyboard</button><button class="secondary" id="save" data-i18n="saveButton">Save draft</button></div><div class="status" id="status" role="status"><span data-i18n="readyStatus">Ready. Your idea stays in this browser unless you export it.</span></div><div id="qaReport" class="muted" role="status" aria-live="polite" style="font-size:12px;margin-top:8px"></div>
