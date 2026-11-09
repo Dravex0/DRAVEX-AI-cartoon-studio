@@ -1774,6 +1774,7 @@ function renderScenes(){
   renderSceneMediaReport();
   updateFaceAnalysisControls();
   syncComfySourceImageStatus();
+  updateComfyAnimateAvailability();
 }
 let sceneVoiceStorage=null;
 let sceneVoiceEngine=null;
