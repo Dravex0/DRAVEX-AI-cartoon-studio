@@ -709,31 +709,47 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   expect(finalVideo.width).toBe(1280);
   expect(finalVideo.height).toBe(720);
   expect(finalVideo.readyState).toBeGreaterThanOrEqual(2);
-  const sampledColors = await page.locator('#finalFilmPlayer').evaluate(async video => {
+  const sceneColorOrder = await page.locator('#finalFilmPlayer').evaluate(async video => {
+    const expectedColors = [[229, 57, 53], [67, 160, 71], [30, 136, 229], [253, 216, 53], [142, 36, 170]];
     const canvas = document.createElement('canvas');
     canvas.width = 32;
     canvas.height = 32;
     const context = canvas.getContext('2d', { willReadFrequently: true });
-    const samples = [];
-    for (let index = 0; index < 5; index += 1) {
-      const targetTime = Math.min(video.duration - 0.04, (index + 0.5) * video.duration / 5);
-      await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Timed out seeking to exported scene ' + (index + 1))), 5000);
-        const onSeeked = () => { clearTimeout(timer); video.removeEventListener('seeked', onSeeked); resolve(); };
-        video.addEventListener('seeked', onSeeked, { once: true });
-        video.currentTime = Math.max(0, targetTime);
+    const detected = [];
+    let lastIndex = -1;
+    const classify = pixel => expectedColors
+      .map((color, index) => ({ index, distance: Math.hypot(pixel[0] - color[0], pixel[1] - color[1], pixel[2] - color[2]) }))
+      .sort((a, b) => a.distance - b.distance)[0];
+    video.pause();
+    video.currentTime = 0;
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Timed out while checking scene order during WebM playback')), 20000);
+      const sampleFrame = () => {
+        if (video.readyState >= 2) {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const pixel = context.getImageData(16, 16, 1, 1).data;
+          const match = classify(pixel);
+          if (match.distance < 100 && match.index !== lastIndex) {
+            detected.push(match);
+            lastIndex = match.index;
+            if (detected.length === expectedColors.length) {
+              clearTimeout(timeout);
+              video.pause();
+              resolve();
+              return;
+            }
+          }
+        }
+        video.requestVideoFrameCallback(sampleFrame);
+      };
+      video.requestVideoFrameCallback(sampleFrame);
+      video.play().catch(error => {
+        clearTimeout(timeout);
+        reject(error);
       });
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const pixel = context.getImageData(16, 16, 1, 1).data;
-      samples.push([pixel[0], pixel[1], pixel[2]]);
-    }
-    return samples;
+    });
+    return detected;
   });
-  const expectedColors = [[229, 57, 53], [67, 160, 71], [30, 136, 229], [253, 216, 53], [142, 36, 170]];
-  const nearestColor = pixel => expectedColors
-    .map((color, index) => ({ index, distance: Math.hypot(pixel[0] - color[0], pixel[1] - color[1], pixel[2] - color[2]) }))
-    .sort((a, b) => a.distance - b.distance)[0];
-  const sceneColorOrder = sampledColors.map(nearestColor);
   expect(sceneColorOrder.map(item => item.index)).toEqual([0, 1, 2, 3, 4]);
   expect(sceneColorOrder.every(item => item.distance < 100)).toBe(true);
   expect(uploadedFilenames).toEqual([
