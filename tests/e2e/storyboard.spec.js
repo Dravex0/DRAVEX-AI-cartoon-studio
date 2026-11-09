@@ -714,3 +714,33 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   expect(submittedImages.every(item => item.prompt.length > 0)).toBe(true);
   expect(pageErrors, 'full-film generation and WebM export must not throw JavaScript errors').toEqual([]);
 });
+
+test('prompt-first creator keeps AI video provider setup reachable on desktop and Pixel 7', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await expect(page.locator('#idea')).toBeVisible();
+  await expect(page.locator('#videoGenerationMode')).toBeVisible();
+  await expect(page.locator('#videoGenerationMode')).toHaveValue('local-canvas');
+  await expect(page.locator('#hfVideoPanel > summary')).toBeVisible();
+  await expect(page.locator('#comfyPanel > summary')).toBeVisible();
+
+  await page.locator('#videoGenerationMode').selectOption('huggingface');
+  await expect(page.locator('#videoGenerationMode')).toHaveValue('huggingface');
+  await expect(page.locator('#hfVideoPanel')).toBeVisible();
+  await expect(page.locator('#hfVideoToken')).toBeHidden();
+  await page.locator('#hfVideoPanel > summary').click();
+  await expect(page.locator('#hfVideoToken')).toBeVisible();
+  await expect(page.locator('#hfVideoConsent')).toBeVisible();
+  await expect(page.locator('#generateFullFilmComfy')).toBeDisabled();
+
+  await page.locator('#videoGenerationMode').selectOption('comfyui');
+  await expect(page.locator('#comfyPanel > summary')).toBeVisible();
+  await page.locator('#comfyPanel > summary').click();
+  await expect(page.locator('#comfyBaseUrl')).toBeVisible();
+  await expect(page.locator('#comfyImageWorkflowFile')).toBeVisible();
+  await expect(page.locator('#comfyTextWorkflowFile')).toBeVisible();
+
+  expect(pageErrors, 'provider setup must remain reachable without JavaScript errors').toEqual([]);
+});
