@@ -640,7 +640,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   });
 
   await page.locator('#idea').fill(
-    'A young fox finds a glowing key in a forest, follows its light to a hidden gate, opens it, and discovers a peaceful garden. Duration: 0.25 seconds'
+    'A young fox finds a glowing key in a forest, follows its light to a hidden gate, opens it, and discovers a peaceful garden. Duration: 1 second'
   );
   await page.locator('#make').click();
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
