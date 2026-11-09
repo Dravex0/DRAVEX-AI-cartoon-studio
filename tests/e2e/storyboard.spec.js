@@ -710,6 +710,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   const observedSceneColors = await page.locator('#finalFilmPlayer').evaluate(async player => {
     const video = document.createElement('video');
     video.muted = true;
+    video.playsInline = true;
     video.src = player.currentSrc;
     await new Promise((resolve, reject) => {
       video.addEventListener('loadedmetadata', resolve, { once: true });
@@ -719,22 +720,22 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     canvas.width = 16;
     canvas.height = 16;
     const context = canvas.getContext('2d', { willReadFrequently: true });
-    const colors = [];
-    for (let scene = 0; scene < 5; scene += 1) {
-      const target = video.duration * ((scene + 0.5) / 5);
-      await new Promise((resolve, reject) => {
-        const onSeeked = () => resolve();
-        video.addEventListener('seeked', onSeeked, { once: true });
-        video.currentTime = target;
-        setTimeout(() => reject(new Error('Timed out sampling scene ' + (scene + 1) + ' from final WebM.')), 5000);
-      });
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const pixel = context.getImageData(8, 8, 1, 1).data;
-      colors.push([pixel[0], pixel[1], pixel[2]].map(value => Math.round(value / 32)).join(','));
+    const colors = new Set();
+    await video.play();
+    const startedAt = performance.now();
+    while (!video.ended && performance.now() - startedAt < 30000) {
+      if (video.readyState >= 2) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const pixel = context.getImageData(1, 1, 1, 1).data;
+        colors.add([pixel[0], pixel[1], pixel[2]].map(value => Math.round(value / 32)).join(','));
+      }
+      await new Promise(resolve => requestAnimationFrame(resolve));
     }
+    if (!video.ended) throw new Error('Timed out playing final WebM during scene-order verification.');
+    video.pause();
     video.removeAttribute('src');
     video.load();
-    return colors;
+    return [...colors];
   });
   expect(new Set(observedSceneColors).size, 'Final WebM should visibly contain all five distinct generated scene clips in order').toBe(5);
   expect(uploadedFilenames).toEqual([
