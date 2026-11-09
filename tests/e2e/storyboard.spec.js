@@ -518,10 +518,6 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   const uploadedFilenames = [];
   const submittedImages = [];
   let jobCount = 0;
-  const pageErrors = [];
-  const uploadedFilenames = [];
-  const submittedImages = [];
-  let jobCount = 0;
 
   const sceneVideoBase64 = await page.evaluate(async () => {
     const results = [];
