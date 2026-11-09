@@ -1,5 +1,6 @@
 import { verifySpriteTransparency } from './character-sprite-verification.js';
 import { validateCharacterRig } from './character-rig.js';
+import { auditCharacterRigJointGeometry } from './character-rig-joint-audit.js';
 
 export const CHARACTER_RIG_REQUIRED_PARTS = Object.freeze([
   'torso', 'head',
@@ -105,10 +106,21 @@ export function assembleApprovedCharacterRig({ characterId, rig, assets, reviews
       rig: report.rig
     };
   }
+  const jointGeometry = auditCharacterRigJointGeometry(report.rig);
+  if (!jointGeometry.passed) {
+    return {
+      status: 'blocked',
+      readyForAnimation: false,
+      issues: jointGeometry.issues.map(issue => issue.code + (issue.jointId ? ':' + issue.jointId : '')),
+      jointGeometry,
+      rig: report.rig
+    };
+  }
   return {
     status: 'approved',
     readyForAnimation: true,
     issues: [],
+    jointGeometry,
     rig: report.rig,
     approvedPartCount: CHARACTER_RIG_REQUIRED_PARTS.length
   };
