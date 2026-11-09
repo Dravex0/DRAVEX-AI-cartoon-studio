@@ -115,6 +115,8 @@ test('localizes style and quality options and restores the saved creative setup'
   await expect(page.locator('#make')).toHaveText('Начать работу');
   await expect(page.locator('#style option[value="3D animated"]')).toHaveText('3D-анимация');
   await expect(page.locator('#imageQuality option[value="ultra"]')).toHaveText('Максимум · 1024×576');
+  await expect(page.locator('label[for="imageQuality"]')).toHaveText('Качество AI-изображений');
+  await expect(page.locator('[data-i18n="qualityNote"]')).toContainText('не меняет разрешение итогового видео');
 
   await page.locator('#style').selectOption('3D animated');
   await page.locator('#imageQuality').selectOption('ultra');
