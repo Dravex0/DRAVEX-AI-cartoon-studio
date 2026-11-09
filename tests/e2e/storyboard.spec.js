@@ -436,7 +436,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
         status: 200,
         contentType: 'video/webm',
         headers: corsHeaders,
-        body: Buffer.from(videoBase64ByScene[Number((url.searchParams.get('filename') || '').match(/scene-(\\d+)/)?.[1]) - 1] || '', 'base64')
+        body: Buffer.from(videoBase64, 'base64')
       });
     }
 
@@ -635,7 +635,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
         status: 200,
         contentType: 'video/webm',
         headers: corsHeaders,
-        body: Buffer.from(videoBase64, 'base64')
+        body: Buffer.from(videoBase64ByScene[Number((url.searchParams.get('filename') || '').match(/scene-(\d+)/)?.[1]) - 1] || '', 'base64')
       });
     }
 
