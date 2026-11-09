@@ -9,7 +9,7 @@ test("generates scenes sequentially and reports real completion counts", async (
     scenes: [{ id: "a" }, { id: "b" }, { id: "c" }],
     generateScene: async scene => {
       order.push(scene.id);
-      return { status: "completed", video: new Blob(["clip"]) };
+      return { status: "completed", video: new Blob(["clip"], { type: "video/webm" }) };
     },
     onProgress: value => progress.push({ stage: value.stage, completed: value.completed })
   });
@@ -28,7 +28,7 @@ test("skips already generated clips without calling the provider", async () => {
     hasVideo: scene => scene.id === "a",
     generateScene: async () => {
       calls += 1;
-      return { status: "completed", video: new Blob(["clip"]) };
+      return { status: "completed", video: new Blob(["clip"], { type: "video/webm" }) };
     }
   });
 
@@ -38,14 +38,14 @@ test("skips already generated clips without calling the provider", async () => {
 });
 
 test("rejects provider completion when the video artifact is missing or empty", async () => {
-  for (const video of [undefined, new Blob([])]) {
+  for (const video of [undefined, new Blob([]), new Blob(["not a video"], { type: "text/plain" })]) {
     const report = await generateStoryboardVideos({
       scenes: [{ id: "invalid" }],
       generateScene: async () => ({ status: "completed", video })
     });
     assert.equal(report.completed, 0);
     assert.equal(report.failed, 1);
-    assert.match(report.results[0].error, /non-empty video artifact/);
+    assert.match(report.results[0].error, /non-empty video artifact|no video MIME type/);
   }
 });
 
@@ -54,7 +54,7 @@ test("continues after a scene failure and reports it", async () => {
     scenes: [{ id: "bad" }, { id: "good" }],
     generateScene: async scene => {
       if (scene.id === "bad") throw new Error("provider unavailable");
-      return { status: "completed", video: new Blob(["clip"]) };
+      return { status: "completed", video: new Blob(["clip"], { type: "video/webm" }) };
     }
   });
 
@@ -104,7 +104,7 @@ test("isolates progress callback errors from scene generation", async () => {
     generateScene: async scene => {
       generated.push(scene.id);
       if (scene.id === "bad") throw new Error("provider unavailable");
-      return { status: "completed", video: new Blob(["clip"]) };
+      return { status: "completed", video: new Blob(["clip"], { type: "video/webm" }) };
     },
     onProgress: state => {
       throw new Error("UI progress failed: " + state.stage);

@@ -112,6 +112,10 @@ export async function generateStoryboardVideos({
       if (!(result.video instanceof Blob) || result.video.size <= 0) {
         throw new Error("Scene provider reported completion without a non-empty video artifact.");
       }
+      const mimeType = String(result.video.type || "").split(";")[0].trim().toLowerCase();
+      if (!mimeType.startsWith("video/")) {
+        throw new Error("Scene provider reported completion with an artifact that has no video MIME type.");
+      }
       report.completed += 1;
       report.results.push({ index, status: "completed", result });
       emitProgress(index, "completed");
