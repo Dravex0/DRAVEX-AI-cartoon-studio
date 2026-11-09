@@ -386,7 +386,7 @@ test('warns when requested character references have no configured workflow inpu
 });
 
 
-test('supports prompt-only text-to-video workflows without uploading a source image', async () => {
+test('advertises only text-to-video for a legacy prompt-only workflow', async () => {
   const textWorkflow = {
     '10': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
     '30': { class_type: 'VideoSettings', inputs: { seconds: 0, frame_rate: 0, frames: 0 } },
@@ -424,7 +424,11 @@ test('supports prompt-only text-to-video workflows without uploading a source im
     fetchImpl,
     pollIntervalMs: 250
   });
-  assert.deepEqual(provider.taskTypes, ['text-to-video', 'image-to-video']);
+  assert.deepEqual(provider.taskTypes, ['text-to-video']);
+  await assert.rejects(
+    provider.generate({ taskType: 'image-to-video' }),
+    error => error.code === 'MISSING_TASK_WORKFLOW'
+  );
   const registry = createVideoProviderRegistry();
   registry.register(provider);
   const result = await generateVideoWithProvider(registry, provider.id, {
