@@ -726,7 +726,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     while (!video.ended && performance.now() - startedAt < 30000) {
       if (video.readyState >= 2) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const pixel = context.getImageData(1, 1, 1, 1).data;
+        const pixel = context.getImageData(8, 8, 1, 1).data;
         colors.add([pixel[0], pixel[1], pixel[2]].map(value => Math.round(value / 32)).join(','));
       }
       await new Promise(resolve => requestAnimationFrame(resolve));
