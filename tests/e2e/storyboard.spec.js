@@ -37,7 +37,6 @@ test('uses a widescreen 16:9 720p canvas for preview and WebM export', async ({ 
   expect(dimensions).toEqual({ width: 1280, height: 720 });
   expect(dimensions.width / dimensions.height).toBeCloseTo(16 / 9, 5);
 
-  await page.getByText(/more settings/i).click();
   await expect(page.locator('#imageQuality option[value="standard"]')).toHaveText('Standard · 640×384');
   await expect(page.locator('#imageQuality option[value="high"]')).toHaveText('High · 768×448');
   await expect(page.locator('#imageQuality option[value="ultra"]')).toHaveText('Maximum · 1024×576');
@@ -83,7 +82,6 @@ test('exports a short storyboard to a non-empty playable WebM', async ({ page })
 
 test('switches to a true 9:16 portrait canvas and persists the format for WebM capture', async ({ page }) => {
   await page.goto('/');
-  await page.getByText(/more settings/i).click();
   await page.locator('#canvasFormat').selectOption('portrait');
 
   const dimensions = await page.locator('#canvas').evaluate(canvas => ({
@@ -198,7 +196,6 @@ test('creates a storyboard from a story prompt without remote AI services', asyn
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await page.goto('/');
-  await page.getByText(/more settings/i).click();
   await page.locator('#language').selectOption('en');
   await page.locator('#idea').fill(
     'A young fox finds a glowing blue key in an old forest, follows its light to a hidden gate, opens it, and discovers a peaceful garden.'
