@@ -457,6 +457,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(imageWorkflow))
   });
+  await expect(page.locator('#comfyImageWorkflowStatus')).toContainText('Loaded scene-image-api.json');
   await page.locator('#checkComfyConnection').click();
   await expect(page.locator('#comfyStatus')).toContainText(/connected to ComfyUI/i);
   await expect(page.locator('#animateSceneComfy')).toBeDisabled();
