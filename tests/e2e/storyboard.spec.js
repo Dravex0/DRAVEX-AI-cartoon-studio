@@ -315,3 +315,72 @@ test('exposes safe universal-plan execution controls without enabling an unplann
   await expect(page.locator('#universalExecutionStatus')).toContainText(/only explicitly registered/i);
   expect(pageErrors).toEqual([]);
 });
+
+
+test('keeps manually selected ComfyUI images isolated when switching storyboard scenes', async ({ page }) => {
+  const pageErrors = [];
+  await page.route('http://127.0.0.1:8188/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ system: { comfyui_version: 'playwright-mock' } })
+  }));
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#idea').fill(
+    'A young fox finds a glowing key in a forest, follows its light to a hidden gate, opens it, and discovers a peaceful garden.'
+  );
+  await page.locator('#make').click();
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await expect(page.locator('#scenes button.scene')).toHaveCount(5);
+
+  await page.locator('#videoGenerationMode').selectOption('comfyui');
+  await page.locator('#comfyPanel > summary').click();
+  const imageWorkflow = {
+    '6': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '56': { class_type: 'LoadImage', inputs: { image: '' } },
+    '58': { class_type: 'SaveVideo', inputs: {} }
+  };
+  await page.locator('#comfyImageWorkflowFile').setInputFiles({
+    name: 'scene-image-api.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(imageWorkflow))
+  });
+  await page.locator('#checkComfyConnection').click();
+  await expect(page.locator('#comfyStatus')).toContainText(/connected to ComfyUI/i);
+  await expect(page.locator('#animateSceneComfy')).toBeDisabled();
+
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pS8AAAAASUVORK5CYII=',
+    'base64'
+  );
+  await page.locator('#comfySourceImageFile').setInputFiles({
+    name: 'fox-forest-scene.png',
+    mimeType: 'image/png',
+    buffer: png
+  });
+  await expect(page.locator('#comfySourceImageStatus')).toContainText('fox-forest-scene.png');
+  await expect(page.locator('#animateSceneComfy')).toBeEnabled();
+
+  await page.locator('#scenes button.scene').nth(1).click();
+  await expect(page.locator('#comfySourceImageStatus')).toContainText(/no local image selected for this scene/i);
+  await expect(page.locator('#animateSceneComfy')).toBeDisabled();
+
+  await page.locator('#comfySourceImageFile').setInputFiles({
+    name: 'fox-garden-scene.png',
+    mimeType: 'image/png',
+    buffer: png
+  });
+  await expect(page.locator('#comfySourceImageStatus')).toContainText('fox-garden-scene.png');
+  await expect(page.locator('#animateSceneComfy')).toBeEnabled();
+
+  await page.locator('#scenes button.scene').first().click();
+  await expect(page.locator('#comfySourceImageStatus')).toContainText('fox-forest-scene.png');
+  await expect(page.locator('#animateSceneComfy')).toBeEnabled();
+
+  await page.locator('#scenes button.scene').nth(1).click();
+  await expect(page.locator('#comfySourceImageStatus')).toContainText('fox-garden-scene.png');
+  await expect(page.locator('#animateSceneComfy')).toBeEnabled();
+
+  expect(pageErrors, 'switching scenes must not throw JavaScript errors').toEqual([]);
+});
