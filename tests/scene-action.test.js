@@ -156,3 +156,19 @@ test('does not infer negated semantic events as positive intent', async () => {
   assert.notEqual(inferSceneActionIntent('Арин не атакует Нокса.').intent, 'attack');
   assert.equal(inferSceneActionIntent('Arin does not defend; he attacks instead.').intent, 'attack');
 });
+
+test('prefers the source-grounded semantic event over later incidental actions in the story detail', async () => {
+  const { detectSceneActionForScene } = await import('../src/scene-action.js');
+  assert.equal(detectSceneActionForScene({
+    semanticActionIntent: { intent: 'reveal', motionCue: 'surprised' },
+    storyDetail: 'Огромный портал открывается, из него появляется теневая сущность. Позже портал исчезает.'
+  }), 'surprised');
+  assert.equal(detectSceneActionForScene({
+    semanticActionIntent: { intent: 'power_up', motionCue: 'magic' },
+    storyDetail: 'Жители внизу убегают, а вокруг героя пробуждается голубая энергия.'
+  }), 'magic');
+  assert.equal(detectSceneActionForScene({
+    semanticActionIntent: { intent: 'dodge', motionCue: 'jump' },
+    storyDetail: 'Герой уклоняется от луча и создаёт энергетический щит.'
+  }), 'jump');
+});
