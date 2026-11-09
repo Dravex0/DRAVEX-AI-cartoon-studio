@@ -690,7 +690,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     };
   });
 
-  expect(finalVideo.mimeType).toMatch(/^video\\/webm/i);
+  expect(finalVideo.mimeType).toMatch(/^video\/webm/i);
   expect(finalVideo.byteLength).toBeGreaterThan(1024);
   expect(finalVideo.duration).toBeGreaterThan(0);
   expect(finalVideo.width).toBe(1280);
