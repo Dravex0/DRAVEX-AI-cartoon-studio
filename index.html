@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -104,11 +104,44 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 }
 @media(prefers-reduced-motion:reduce){button{transition:none}button:hover{transform:none}}
 
+/* Prompt-first creator layout. Keep provider selection visible while hiding
+   unrelated advanced editing controls until the user needs them. */
+.simple-creator-note{display:none!important}
+.workflow-steps,.hero,.top .tag[data-i18n="freeTag"]{display:none!important}
+.layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.layout>.panel:first-child>h2{font-size:0;margin-bottom:10px}
+.layout>.panel:first-child>h2:after{content:"Вставь промпт";font-size:19px}
+#idea{min-height:190px;font-size:16px}
+#idea~.quick-hint,#idea~small,.layout>.panel:first-child>small{display:none!important}
+#qaReport:empty{display:none}
+#applyScene,#addScene,#deleteScene{display:none!important}
+
+/* .editorFields contains both advanced editors and the actual video provider controls. */
+.editorFields{display:grid!important;gap:10px;margin-top:12px}
+.editorFields>*{display:none!important}
+/* Keep collapsed advanced sections reachable; their contents stay closed until requested. */
+.editorFields>#generationTools,
+.editorFields>#characterMotionEditor,
+.editorFields>#hfVideoPanel,
+.editorFields>#comfyPanel,
+.editorFields>.field:has(#videoGenerationMode){display:block!important}
+.editorFields>.field:has(#videoGenerationMode){display:grid!important}
+.editorFields>.actions:has(#generateFullFilmComfy){display:flex!important}
+.editorFields>#fullFilmProgressPanel:not([hidden]),
+.editorFields>#fullFilmStatus,
+.editorFields>#generatedImageWrap:not([hidden]){display:block!important}
+#faceAnalysisPanel,.voice-workflow,.production-grid{display:none!important}
+#fullFilmProgressPanel{margin-top:14px}
+#finalFilmResult{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#0d1729}
+#finalFilmResult video{display:block;max-width:100%;border-radius:10px}
+#finalFilmDownload{display:inline-block;margin-top:10px;padding:12px 16px;border-radius:12px;background:var(--accent);color:#10152a;font-weight:800;text-decoration:none}
+@media(max-width:720px){.layout{grid-template-columns:minmax(0,1fr)}.layout>.panel:first-child{order:0}.layout>.panel:nth-child(2){order:1}#idea{min-height:160px}}
+
 </style>
 </head>
 <body>
 <main class="app">
-<header class="top"><div class="brand">DRAVEX<span>✦</span> STUDIO</div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end"><label for="uiLanguage" class="tag">INTERFACE / ЯЗЫК</label><select id="uiLanguage" aria-label="Interface language" style="width:auto;max-width:145px;padding:7px 9px"><option value="en">English</option><option value="ru">Русский</option></select><div class="tag" data-i18n="freeTag">FREE · LOCAL-FIRST</div></div></header>
+<header class="top"><div class="brand">DRAVEX<span>✦</span> STUDIO</div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end"><label for="uiLanguage" class="tag">INTERFACE / ЯЗЫК</label><select id="uiLanguage" aria-label="Interface language" style="width:auto;max-width:145px;padding:7px 9px"><option value="en">English</option><option value="ru" selected>Русский</option></select><div class="tag" data-i18n="freeTag">FREE · LOCAL-FIRST</div></div></header>
 <section class="hero"><div class="tag" data-i18n="previewTag">CARTOON WORKSPACE · EARLY PREVIEW</div><h1 data-i18n="headline">Turn your idea<br>into a story.</h1><p data-i18n="intro">Create a storyboard, generate short AI scene clips through the optional free Hugging Face ZeroGPU queue or local ComfyUI, and assemble a WebM with timed dialogue and optional local music. Free cloud GPU is quota-limited; production voice and lip-sync are still in development.</p></section>
 <nav class="workflow-steps" aria-label="Creation steps"><div class="workflow-step"><b>1</b><span><strong>Story / Сценарий</strong>Write your idea</span></div><div class="workflow-step"><b>2</b><span><strong>Style / Стиль</strong>Choose the look</span></div><div class="workflow-step"><b>3</b><span><strong>Scenes / Сцены</strong>Review and edit</span></div></nav>
 <div class="layout">
