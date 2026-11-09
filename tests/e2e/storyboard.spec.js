@@ -737,7 +737,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     video.load();
     return [...colors];
   });
-  expect(new Set(observedSceneColors).size, 'Final WebM should visibly contain all five distinct generated scene clips in order').toBe(5);
+  expect(new Set(observedSceneColors).size, 'Final WebM should visibly contain all five distinct generated scene clips in order; observed color buckets: '+JSON.stringify(observedSceneColors)).toBe(5);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
