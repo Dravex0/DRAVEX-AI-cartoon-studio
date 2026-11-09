@@ -506,3 +506,211 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
   expect(submittedImages.every(item => item.prompt.length > 0)).toBe(true);
   expect(pageErrors, 'ComfyUI scene isolation and generation must not throw JavaScript errors').toEqual([]);
 });
+
+test('generates every ComfyUI scene and exports one playable full-film WebM', async ({ page }) => {
+  test.setTimeout(120000);
+  const pageErrors = [];
+  const uploadedFilenames = [];
+  const submittedImages = [];
+  let jobCount = 0;
+  let videoBase64 = '';
+
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.goto('/');
+
+  videoBase64 = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 90;
+    const context = canvas.getContext('2d');
+    const stream = canvas.captureStream(16);
+    const mimeType = ['video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
+    if (!mimeType) throw new Error('No supported WebM MediaRecorder format is available.');
+    const recorder = new MediaRecorder(stream, { mimeType });
+    const chunks = [];
+    recorder.addEventListener('dataavailable', event => {
+      if (event.data?.size) chunks.push(event.data);
+    });
+    const stopped = new Promise(resolve => recorder.addEventListener('stop', resolve, { once: true }));
+    recorder.start();
+    for (let frame = 0; frame < 18; frame += 1) {
+      context.fillStyle = 'hsl(' + (frame * 19) + ', 65%, 45%)';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#ffffff';
+      context.fillRect(frame * 7, 35, 18, 18);
+      await new Promise(resolve => setTimeout(resolve, 45));
+    }
+    recorder.stop();
+    await stopped;
+    stream.getTracks().forEach(track => track.stop());
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = '';
+    for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+    return btoa(binary);
+  });
+  expect(Buffer.from(videoBase64, 'base64').byteLength).toBeGreaterThan(1024);
+
+  await page.route('http://127.0.0.1:8188/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const corsHeaders = {
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-headers': 'Content-Type'
+    };
+
+    if (request.method() === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
+
+    if (url.pathname === '/system_stats') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ system: { comfyui_version: 'playwright-full-film-mock' } })
+      });
+    }
+
+    if (url.pathname === '/upload/image') {
+      const body = request.postDataBuffer()?.toString('latin1') || '';
+      const filename = body.match(/filename="([^"]+)"/)?.[1] || '';
+      uploadedFilenames.push(filename);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ name: 'full-film-upload-' + uploadedFilenames.length + '.png', subfolder: '', type: 'input' })
+      });
+    }
+
+    if (url.pathname === '/prompt') {
+      const requestBody = request.postDataJSON();
+      const workflow = requestBody.prompt;
+      submittedImages.push({
+        prompt: workflow['6']?.inputs?.text || '',
+        image: workflow['56']?.inputs?.image || null
+      });
+      jobCount += 1;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ prompt_id: 'full-film-mock-job-' + jobCount })
+      });
+    }
+
+    if (url.pathname.startsWith('/history/')) {
+      const jobId = url.pathname.split('/').pop();
+      const number = Number(jobId.replace('full-film-mock-job-', ''));
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({
+          [jobId]: {
+            status: { completed: true, status_str: 'success' },
+            outputs: { '58': { videos: [{ filename: 'full-film-scene-' + number + '.webm', type: 'output' }] } }
+          }
+        })
+      });
+    }
+
+    if (url.pathname === '/view') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'video/webm',
+        headers: corsHeaders,
+        body: Buffer.from(videoBase64, 'base64')
+      });
+    }
+
+    return route.fulfill({ status: 404, body: 'Unexpected mocked ComfyUI request: ' + url.pathname });
+  });
+
+  await page.locator('#idea').fill(
+    'A young fox finds a glowing key in a forest, follows its light to a hidden gate, opens it, and discovers a peaceful garden. Duration: 0.25 seconds'
+  );
+  await page.locator('#make').click();
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await expect(page.locator('#scenes button.scene')).toHaveCount(5);
+
+  await page.locator('#videoGenerationMode').selectOption('comfyui');
+  await page.locator('#comfyPanel > summary').click();
+  const imageWorkflow = {
+    '6': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '7': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '55': { class_type: 'VideoSettings', inputs: { length: 0 } },
+    '56': { class_type: 'LoadImage', inputs: { image: '' } },
+    '57': { class_type: 'VideoSettings', inputs: { fps: 0 } },
+    '58': { class_type: 'SaveVideo', inputs: {} }
+  };
+  await page.locator('#comfyImageWorkflowFile').setInputFiles({
+    name: 'full-film-image-api.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(imageWorkflow))
+  });
+  await expect(page.locator('#comfyImageWorkflowStatus')).toContainText('Loaded full-film-image-api.json');
+  await page.locator('#checkComfyConnection').click();
+  await expect(page.locator('#comfyStatus')).toContainText(/connected to ComfyUI/i);
+
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pS8AAAAASUVORK5CYII=',
+    'base64'
+  );
+  for (let index = 0; index < 5; index += 1) {
+    await page.locator('#scenes button.scene').nth(index).click();
+    const filename = 'full-film-scene-' + (index + 1) + '.png';
+    await page.locator('#comfySourceImageFile').setInputFiles({
+      name: filename,
+      mimeType: 'image/png',
+      buffer: png
+    });
+    await expect(page.locator('#comfySourceImageStatus')).toContainText(filename);
+  }
+
+  await expect(page.locator('#generateFullFilmComfy')).toBeVisible();
+  await expect(page.locator('#generateFullFilmComfy')).toBeEnabled();
+  await page.locator('#generateFullFilmComfy').click();
+
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 90000 });
+  await expect(page.locator('#fullFilmProgress')).toHaveValue('100');
+  const finalVideo = await page.locator('#finalFilmPlayer').evaluate(async element => {
+    await element.play().catch(() => {});
+    const response = await fetch(element.currentSrc);
+    const blob = await response.blob();
+    return {
+      mimeType: blob.type,
+      byteLength: blob.size,
+      duration: element.duration,
+      width: element.videoWidth,
+      height: element.videoHeight,
+      readyState: element.readyState
+    };
+  });
+
+  expect(finalVideo.mimeType).toMatch(/^video\\/webm/i);
+  expect(finalVideo.byteLength).toBeGreaterThan(1024);
+  expect(finalVideo.duration).toBeGreaterThan(0);
+  expect(finalVideo.width).toBe(1280);
+  expect(finalVideo.height).toBe(720);
+  expect(finalVideo.readyState).toBeGreaterThanOrEqual(2);
+  expect(uploadedFilenames).toEqual([
+    'full-film-scene-1.png',
+    'full-film-scene-2.png',
+    'full-film-scene-3.png',
+    'full-film-scene-4.png',
+    'full-film-scene-5.png'
+  ]);
+  expect(submittedImages).toHaveLength(5);
+  expect(submittedImages.map(item => item.image)).toEqual([
+    'full-film-upload-1.png',
+    'full-film-upload-2.png',
+    'full-film-upload-3.png',
+    'full-film-upload-4.png',
+    'full-film-upload-5.png'
+  ]);
+  expect(submittedImages.every(item => item.prompt.length > 0)).toBe(true);
+  expect(pageErrors, 'full-film generation and WebM export must not throw JavaScript errors').toEqual([]);
+});
