@@ -449,7 +449,10 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
   await page.locator('#comfyPanel > summary').click();
   const imageWorkflow = {
     '6': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '7': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '55': { class_type: 'VideoSettings', inputs: { length: 0 } },
     '56': { class_type: 'LoadImage', inputs: { image: '' } },
+    '57': { class_type: 'VideoSettings', inputs: { fps: 0 } },
     '58': { class_type: 'SaveVideo', inputs: {} }
   };
   await page.locator('#comfyImageWorkflowFile').setInputFiles({
