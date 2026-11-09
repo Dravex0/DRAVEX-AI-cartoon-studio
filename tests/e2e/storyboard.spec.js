@@ -523,38 +523,46 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
 
-  videoBase64 = await page.evaluate(async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 160;
-    canvas.height = 90;
-    const context = canvas.getContext('2d');
-    const stream = canvas.captureStream(16);
-    const mimeType = ['video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
-    if (!mimeType) throw new Error('No supported WebM MediaRecorder format is available.');
-    const recorder = new MediaRecorder(stream, { mimeType });
-    const chunks = [];
-    recorder.addEventListener('dataavailable', event => {
-      if (event.data?.size) chunks.push(event.data);
-    });
-    const stopped = new Promise(resolve => recorder.addEventListener('stop', resolve, { once: true }));
-    recorder.start();
-    for (let frame = 0; frame < 18; frame += 1) {
-      context.fillStyle = 'hsl(' + (frame * 19) + ', 65%, 45%)';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = '#ffffff';
-      context.fillRect(frame * 7, 35, 18, 18);
-      await new Promise(resolve => setTimeout(resolve, 45));
+  const videoBase64ByScene = await page.evaluate(async () => {
+    const colors = ['#e53935', '#43a047', '#1e88e5', '#fdd835', '#8e24aa'];
+    const encode = bytes => {
+      let binary = '';
+      for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+      return btoa(binary);
+    };
+    const clips = [];
+    for (const color of colors) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 90;
+      const context = canvas.getContext('2d');
+      const stream = canvas.captureStream(16);
+      const mimeType = ['video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) throw new Error('No supported WebM MediaRecorder format is available.');
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks = [];
+      recorder.addEventListener('dataavailable', event => {
+        if (event.data?.size) chunks.push(event.data);
+      });
+      const stopped = new Promise(resolve => recorder.addEventListener('stop', resolve, { once: true }));
+      recorder.start();
+      for (let frame = 0; frame < 18; frame += 1) {
+        context.fillStyle = color;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = '#ffffff';
+        context.fillRect(frame * 7, 4, 5, 5);
+        await new Promise(resolve => setTimeout(resolve, 45));
+      }
+      recorder.stop();
+      await stopped;
+      stream.getTracks().forEach(track => track.stop());
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      clips.push(encode(new Uint8Array(await blob.arrayBuffer())));
     }
-    recorder.stop();
-    await stopped;
-    stream.getTracks().forEach(track => track.stop());
-    const blob = new Blob(chunks, { type: 'video/webm' });
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    let binary = '';
-    for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
-    return btoa(binary);
+    return clips;
   });
-  expect(Buffer.from(videoBase64, 'base64').byteLength).toBeGreaterThan(1024);
+  expect(videoBase64ByScene).toHaveLength(5);
+  expect(videoBase64ByScene.every(value => Buffer.from(value, 'base64').byteLength > 1024)).toBe(true);
 
   await page.route('http://127.0.0.1:8188/**', async route => {
     const request = route.request();
@@ -627,7 +635,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
         status: 200,
         contentType: 'video/webm',
         headers: corsHeaders,
-        body: Buffer.from(videoBase64, 'base64')
+        body: Buffer.from(videoBase64ByScene[Number((url.searchParams.get('filename') || '').match(/scene-(\d+)/)?.[1]) - 1] || '', 'base64')
       });
     }
 
@@ -701,6 +709,73 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   expect(finalVideo.width).toBe(1280);
   expect(finalVideo.height).toBe(720);
   expect(finalVideo.readyState).toBeGreaterThanOrEqual(2);
+  const sceneColorOrder = await page.locator('#finalFilmPlayer').evaluate(async video => {
+    const expectedColors = [[229, 57, 53], [67, 160, 71], [30, 136, 229], [253, 216, 53], [142, 36, 170]];
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const detected = [];
+    let lastIndex = -1;
+    let lastSampledTime = -1;
+    const classify = pixel => expectedColors
+      .map((color, index) => ({ index, distance: Math.hypot(pixel[0] - color[0], pixel[1] - color[1], pixel[2] - color[2]) }))
+      .sort((a, b) => a.distance - b.distance)[0];
+    const sampleColor = () => {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const samples = [5, 11, 16, 21, 27].flatMap(y =>
+        [5, 11, 16, 21, 27].map(x => classify(context.getImageData(x, y, 1, 1).data))
+      );
+      const votes = expectedColors.map((_, index) => samples.filter(sample => sample.index === index && sample.distance < 180).length);
+      const index = votes.indexOf(Math.max(...votes));
+      const matching = samples.filter(sample => sample.index === index);
+      const distance = matching.length ? matching.reduce((sum, sample) => sum + sample.distance, 0) / matching.length : Infinity;
+      return { index, distance, votes: votes[index] };
+    };
+    video.muted = true;
+    video.pause();
+    if (video.currentTime > 0.01) {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timed out seeking the final WebM to its first frame')), 3000);
+        video.addEventListener('seeked', () => { clearTimeout(timeout); resolve(); }, { once: true });
+        video.currentTime = 0;
+      });
+    }
+    await video.play();
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        video.pause();
+        reject(new Error('Timed out while sampling scene colors during final WebM playback'));
+      }, 20000);
+      const sampleFrame = () => {
+        if (video.readyState >= 2 && video.currentTime > lastSampledTime + 0.025) {
+          lastSampledTime = video.currentTime;
+          const match = sampleColor();
+          if (match.votes >= 8 && match.index !== lastIndex) {
+            detected.push(match);
+            lastIndex = match.index;
+            if (detected.length === expectedColors.length) {
+              clearTimeout(timeout);
+              video.pause();
+              resolve();
+              return;
+            }
+          }
+        }
+        if (video.ended) {
+          clearTimeout(timeout);
+          video.pause();
+          reject(new Error('Final WebM ended before all five scene colors were observed: ' + detected.map(item => item.index).join(',')));
+          return;
+        }
+        requestAnimationFrame(sampleFrame);
+      };
+      requestAnimationFrame(sampleFrame);
+    });
+    return detected;
+  });
+  expect(sceneColorOrder.map(item => item.index)).toEqual([0, 1, 2, 3, 4]);
+  expect(sceneColorOrder.every(item => item.votes >= 8)).toBe(true);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
