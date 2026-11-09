@@ -108,20 +108,20 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
    unrelated advanced editing controls until the user needs them. */
 .simple-creator-note{display:none!important}
 .workflow-steps,.hero,.top .tag[data-i18n="freeTag"]{display:none!important}
-#character{display:none!important}
-.row>.field:has(#character){display:none!important}
 .layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
 .layout>.panel:first-child>h2{font-size:0;margin-bottom:10px}
 .layout>.panel:first-child>h2:after{content:"Вставь промпт";font-size:19px}
 #idea{min-height:190px;font-size:16px}
 #idea~.quick-hint,#idea~small,.layout>.panel:first-child>small{display:none!important}
-#save{display:none!important}
 #qaReport:empty{display:none}
 #applyScene,#addScene,#deleteScene{display:none!important}
 
 /* .editorFields contains both advanced editors and the actual video provider controls. */
 .editorFields{display:grid!important;gap:10px;margin-top:12px}
 .editorFields>*{display:none!important}
+/* Keep collapsed advanced sections reachable; their contents stay closed until requested. */
+.editorFields>#generationTools,
+.editorFields>#characterMotionEditor,
 .editorFields>#hfVideoPanel,
 .editorFields>#comfyPanel,
 .editorFields>.field:has(#videoGenerationMode){display:block!important}
