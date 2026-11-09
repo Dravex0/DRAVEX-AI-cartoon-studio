@@ -15,7 +15,7 @@ test('warns without changing the selection when its name is absent', () => {
 
 test('matches multi-word names as complete token sequences', () => {
   assert.equal(getCharacterSelectionWarning('The little fox returns home.', 'little fox'), null);
-  assert.equal(getCharacterSelectionWarning('The little fox returns home.', 'fox hero'), null);
+  assert.equal(getCharacterSelectionWarning('The little fox returns home.', 'fox hero').code, 'selected-character-not-mentioned');
 });
 
 test('does not warn when no character is explicitly selected or story is empty', () => {
