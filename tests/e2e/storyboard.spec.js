@@ -363,11 +363,21 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
   await page.route('http://127.0.0.1:8188/**', async route => {
     const request = route.request();
     const url = new URL(request.url());
+    const corsHeaders = {
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-headers': 'Content-Type'
+    };
+
+    if (request.method() === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
 
     if (url.pathname === '/system_stats') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
+        headers: corsHeaders,
         body: JSON.stringify({ system: { comfyui_version: 'playwright-mock' } })
       });
     }
@@ -379,6 +389,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
+        headers: corsHeaders,
         body: JSON.stringify({ name: 'uploaded-' + uploadedFilenames.length + '.png', subfolder: '', type: 'input' })
       });
     }
@@ -394,6 +405,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
+        headers: corsHeaders,
         body: JSON.stringify({ prompt_id: 'mock-comfy-job-' + jobCount })
       });
     }
@@ -404,6 +416,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
+        headers: corsHeaders,
         body: JSON.stringify({
           [jobId]: {
             status: { completed: true, status_str: 'success' },
@@ -417,6 +430,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
       return route.fulfill({
         status: 200,
         contentType: 'video/webm',
+        headers: corsHeaders,
         body: Buffer.from(videoBase64, 'base64')
       });
     }
