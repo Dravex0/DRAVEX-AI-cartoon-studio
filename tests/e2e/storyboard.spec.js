@@ -315,3 +315,33 @@ test('exposes safe universal-plan execution controls without enabling an unplann
   await expect(page.locator('#universalExecutionStatus')).toContainText(/only explicitly registered/i);
   expect(pageErrors).toEqual([]);
 });
+
+test('prompt-first mode keeps real AI video provider setup reachable on desktop and Pixel 7', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await expect(page.locator('#idea')).toBeVisible();
+  await expect(page.locator('#videoGenerationMode')).toBeVisible();
+  await expect(page.locator('#videoGenerationMode')).toHaveValue('local-canvas');
+  await expect(page.locator('#hfVideoPanel > summary')).toBeVisible();
+  await expect(page.locator('#comfyPanel > summary')).toBeVisible();
+
+  await page.locator('#videoGenerationMode').selectOption('huggingface');
+  await expect(page.locator('#videoGenerationMode')).toHaveValue('huggingface');
+  await expect(page.locator('#hfVideoPanel')).toBeVisible();
+  await expect(page.locator('#hfVideoToken')).toBeHidden();
+  await page.locator('#hfVideoPanel > summary').click();
+  await expect(page.locator('#hfVideoToken')).toBeVisible();
+  await expect(page.locator('#hfVideoConsent')).toBeVisible();
+  await expect(page.locator('#generateFullFilmComfy')).toBeDisabled();
+
+  await page.locator('#videoGenerationMode').selectOption('comfyui');
+  await expect(page.locator('#comfyPanel > summary')).toBeVisible();
+  await page.locator('#comfyPanel > summary').click();
+  await expect(page.locator('#comfyBaseUrl')).toBeVisible();
+  await expect(page.locator('#comfyImageWorkflowFile')).toBeVisible();
+  await expect(page.locator('#comfyTextWorkflowFile')).toBeVisible();
+
+  expect(pageErrors, 'provider setup must remain reachable without JavaScript errors').toEqual([]);
+});
