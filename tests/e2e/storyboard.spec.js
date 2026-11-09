@@ -750,3 +750,24 @@ test('prompt-first creator keeps AI video provider setup reachable on desktop an
 
   expect(pageErrors, 'provider setup must remain reachable without JavaScript errors').toEqual([]);
 });
+
+test('keeps optional voice consent and scene production prompts reachable inside collapsed details', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.goto('/');
+
+  const dialogueDetails = page.locator('details').filter({ has: page.locator('#sceneDialogue') });
+  await expect(dialogueDetails).not.toHaveAttribute('open', '');
+  await dialogueDetails.locator('summary').click();
+  await expect(page.locator('.voice-workflow')).toBeVisible();
+  await expect(page.locator('#voiceNonCommercialConsent')).toBeVisible();
+  await expect(page.locator('#loadSceneVoiceModel')).toBeVisible();
+
+  const productionDetails = page.locator('details').filter({ has: page.locator('#sceneImagePrompt') });
+  await expect(productionDetails).not.toHaveAttribute('open', '');
+  await productionDetails.locator('#productionSummary').click();
+  await expect(page.locator('.production-grid')).toBeVisible();
+  await expect(page.locator('#sceneMotionPrompt')).toBeVisible();
+
+  expect(pageErrors, 'optional voice and production controls should remain reachable without JavaScript errors').toEqual([]);
+});
