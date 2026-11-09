@@ -3,14 +3,19 @@
  * does not appear in the source story. The selection is never changed here.
  */
 export function getCharacterSelectionWarning(storyText, selectedCharacter) {
-  const selected = String(selectedCharacter ?? '').trim().slice(0, 120);
-  const source = String(storyText ?? '').normalize('NFKC').toLocaleLowerCase();
+  const selected = String(selectedCharacter ?? '').normalize('NFKC').trim().slice(0, 120);
+  const source = String(storyText ?? '').normalize('NFKC');
   if (!selected || !source.trim()) return null;
 
-  const escaped = selected.normalize('NFKC').toLocaleLowerCase()
-    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const namePattern = new RegExp('(^|[^\\p{L}\\p{N}_])' + escaped + '($|[^\\p{L}\\p{N}_])', 'iu');
-  if (namePattern.test(source)) return null;
+  const tokenize = value => value.toLocaleLowerCase().match(/[\\p{L}\\p{N}_]+/gu) || [];
+  const selectedTokens = tokenize(selected);
+  const sourceTokens = tokenize(source);
+  if (!selectedTokens.length) return null;
+
+  const appearsInStory = sourceTokens.some((_, index) =>
+    selectedTokens.every((token, offset) => sourceTokens[index + offset] === token)
+  );
+  if (appearsInStory) return null;
 
   return {
     code: 'selected-character-not-mentioned',
