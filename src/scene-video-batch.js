@@ -71,7 +71,21 @@ export async function generateStoryboardVideos({
     completed: 0,
     skipped: 0,
     failed: 0,
-    results: []
+    results: [],
+    progressErrors: []
+  };
+
+  // UI/reporting failures must never cancel otherwise valid provider work.
+  const emitProgress = (index, stage) => {
+    try {
+      onProgress({ ...report, currentIndex: index, stage });
+    } catch (error) {
+      report.progressErrors.push({
+        index,
+        stage,
+        error: String(error?.message || error || "Unknown progress callback error")
+      });
+    }
   };
 
   for (let index = 0; index < scenes.length; index += 1) {
@@ -84,11 +98,11 @@ export async function generateStoryboardVideos({
     if (hasVideo(scene, index)) {
       report.skipped += 1;
       report.results.push({ index, status: "skipped" });
-      onProgress({ ...report, currentIndex: index, stage: "skipped" });
+      emitProgress(index, "skipped");
       continue;
     }
 
-    onProgress({ ...report, currentIndex: index, stage: "starting" });
+    emitProgress(index, "starting");
     try {
       const result = await generateScene(scene, index, { signal });
       if (signal?.aborted) throw abortError();
@@ -100,7 +114,7 @@ export async function generateStoryboardVideos({
       }
       report.completed += 1;
       report.results.push({ index, status: "completed", result });
-      onProgress({ ...report, currentIndex: index, stage: "completed" });
+      emitProgress(index, "completed");
     } catch (error) {
       if (error?.name === "AbortError" || signal?.aborted) {
         report.cancelled = true;
@@ -112,7 +126,7 @@ export async function generateStoryboardVideos({
         status: "failed",
         error: String(error?.message || "Unknown scene generation error")
       });
-      onProgress({ ...report, currentIndex: index, stage: "failed" });
+      emitProgress(index, "failed");
     }
   }
 
