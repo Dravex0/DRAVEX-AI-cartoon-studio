@@ -384,3 +384,184 @@ test('warns when requested character references have no configured workflow inpu
   assert.match(warning.message, /not uploaded or used/i);
   assert.equal(uploadCount, 1);
 });
+
+
+test('advertises only text-to-video for a legacy prompt-only workflow', async () => {
+  const textWorkflow = {
+    '10': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '30': { class_type: 'VideoSettings', inputs: { seconds: 0, frame_rate: 0, frames: 0 } },
+    '90': { class_type: 'SaveVideo', inputs: {} }
+  };
+  const textBindings = {
+    prompt: { nodeId: '10', input: 'text' },
+    durationSeconds: { nodeId: '30', input: 'seconds' },
+    fps: { nodeId: '30', input: 'frame_rate' },
+    frameCount: { nodeId: '30', input: 'frames' }
+  };
+  const calls = [];
+  let submittedWorkflow;
+  const fetchImpl = async (url, options = {}) => {
+    calls.push(String(url));
+    if (String(url).endsWith('/upload/image')) throw new Error('Text-to-video must not upload a source image.');
+    if (String(url).endsWith('/prompt')) {
+      submittedWorkflow = JSON.parse(options.body).prompt;
+      return jsonResponse({ prompt_id: 'text-job' });
+    }
+    if (String(url).endsWith('/history/text-job')) {
+      return jsonResponse({ 'text-job': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '90': { videos: [{ filename: 'text-only.mp4', type: 'output' }] } }
+      }});
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow: textWorkflow,
+    nodeBindings: textBindings,
+    outputNodeIds: ['90'],
+    fetchImpl,
+    pollIntervalMs: 250
+  });
+  assert.deepEqual(provider.taskTypes, ['text-to-video']);
+  await assert.rejects(
+    provider.generate({ taskType: 'image-to-video' }),
+    error => error.code === 'MISSING_TASK_WORKFLOW'
+  );
+  const registry = createVideoProviderRegistry();
+  registry.register(provider);
+  const result = await generateVideoWithProvider(registry, provider.id, {
+    taskType: 'text-to-video',
+    prompt: 'A fox runs through a moonlit forest.',
+    durationSeconds: 4,
+    fps: 24,
+    aspectRatio: '16:9'
+  });
+  assert.equal(result.status, 'completed');
+  assert.equal(result.video.type, 'video/mp4');
+  assert.equal(submittedWorkflow['10'].inputs.text, 'A fox runs through a moonlit forest.');
+  assert.equal(submittedWorkflow['30'].inputs.frames, 96);
+  assert.equal(calls.filter(url => url.endsWith('/upload/image')).length, 0);
+});
+
+
+test('selects independent text-to-video and image-to-video workflows for mixed films', async () => {
+  const textWorkflow = {
+    '101': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '190': { class_type: 'SaveVideo', inputs: {} }
+  };
+  const imageWorkflow = {
+    '201': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '202': { class_type: 'LoadImage', inputs: { image: '' } },
+    '290': { class_type: 'SaveVideo', inputs: {} }
+  };
+  const calls = [];
+  let nextJob = 0;
+  const fetchImpl = async (url, options = {}) => {
+    const target = String(url);
+    calls.push(target);
+    if (target.endsWith('/upload/image')) {
+      return jsonResponse({ name: 'scene.png', subfolder: 'input', type: 'input' });
+    }
+    if (target.endsWith('/prompt')) {
+      const body = JSON.parse(options.body);
+      const job = `dual-job-${++nextJob}`;
+      if (job === 'dual-job-1') {
+        assert.equal(body.prompt['101'].inputs.text, 'A fox runs through a forest.');
+        assert.equal(body.prompt['202'], undefined);
+      } else {
+        assert.equal(body.prompt['201'].inputs.text, 'A fox looks at the camera.');
+        assert.equal(body.prompt['202'].inputs.image, 'input/scene.png');
+      }
+      return jsonResponse({ prompt_id: job });
+    }
+    if (target.endsWith('/history/dual-job-1')) {
+      return jsonResponse({ 'dual-job-1': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '190': { videos: [{ filename: 'text.mp4', type: 'output' }] } }
+      }});
+    }
+    if (target.endsWith('/history/dual-job-2')) {
+      return jsonResponse({ 'dual-job-2': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '290': { videos: [{ filename: 'image.mp4', type: 'output' }] } }
+      }});
+    }
+    if (target.includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + target);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflows: {
+      'text-to-video': {
+        workflow: textWorkflow,
+        nodeBindings: { prompt: { nodeId: '101', input: 'text' } },
+        outputNodeIds: ['190']
+      },
+      'image-to-video': {
+        workflow: imageWorkflow,
+        nodeBindings: {
+          prompt: { nodeId: '201', input: 'text' },
+          image: { nodeId: '202', input: 'image' }
+        },
+        outputNodeIds: ['290']
+      }
+    },
+    fetchImpl,
+    pollIntervalMs: 250
+  });
+  assert.deepEqual(provider.taskTypes, ['text-to-video', 'image-to-video']);
+  const textResult = await provider.generate({
+    taskType: 'text-to-video',
+    prompt: 'A fox runs through a forest.',
+    durationSeconds: 2,
+    fps: 24
+  });
+  const imageResult = await provider.generate({
+    taskType: 'image-to-video',
+    prompt: 'A fox looks at the camera.',
+    image: new Blob(['scene'], { type: 'image/png' }),
+    durationSeconds: 2,
+    fps: 24
+  });
+  assert.equal(textResult.status, 'completed');
+  assert.equal(imageResult.status, 'completed');
+  assert.equal(calls.filter(url => url.endsWith('/upload/image')).length, 1);
+  assert.equal(calls.filter(url => url.endsWith('/prompt')).length, 2);
+});
+
+test('does not advertise an image-to-video task when only a text workflow is configured', async () => {
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflows: {
+      'text-to-video': {
+        workflow: { '1': { class_type: 'CLIPTextEncode', inputs: { text: '' } }, '9': { class_type: 'SaveVideo', inputs: {} } },
+        nodeBindings: { prompt: { nodeId: '1', input: 'text' } },
+        outputNodeIds: ['9']
+      }
+    }
+  });
+  assert.deepEqual(provider.taskTypes, ['text-to-video']);
+  await assert.rejects(
+    provider.generate({ taskType: 'image-to-video' }),
+    error => error.code === 'MISSING_TASK_WORKFLOW'
+  );
+});
+
+
+test('rejects an image-to-video workflow without a source image binding during setup', () => {
+  assert.throws(() => createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflows: {
+      'image-to-video': {
+        workflow: {
+          '1': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+          '9': { class_type: 'SaveVideo', inputs: {} }
+        },
+        nodeBindings: { prompt: { nodeId: '1', input: 'text' } },
+        outputNodeIds: ['9']
+      }
+    }
+  }), error => error.code === 'MISSING_REQUIRED_BINDING' && /source image node input binding/i.test(error.message));
+});

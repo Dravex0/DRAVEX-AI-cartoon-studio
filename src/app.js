@@ -3,6 +3,7 @@ import { drawSceneProps } from './scene-prop-renderer.js';
 import { validateStoryScenes } from "./story-qa.js";
 import { buildStoryboardFromText } from "./storyboard-generator.js";
 import { evaluatePromptToFilmStart } from "./prompt-to-film-gate.js";
+import { resolveSceneVideoTaskType } from "./scene-video-task.js";
 import { resolveStoryProtagonist } from "./story-protagonist.js";
 import { calculateCinematicShot } from "./director-engine.js";
 import { detectDeviceCapabilities } from "./device-capabilities.js";
@@ -21,6 +22,8 @@ import { resolveAutomaticSpeechTasks } from "./automatic-speech-workflow.js";
 import { findScenesWithMissingVoiceAudio } from "./voice-artifact-readiness.js";
 import { generateSceneDialogue, selectScenesMissingDialogue } from "./scene-dialogue-generator.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
+import { resolveSceneImageSource } from "./scene-image-source.js";
+import { createSceneLocalImageStore } from "./scene-local-image-store.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
 import { drawImageCover } from "./image-frame.js";
@@ -1770,6 +1773,8 @@ function renderScenes(){
   });
   renderSceneMediaReport();
   updateFaceAnalysisControls();
+  syncComfySourceImageStatus();
+  updateComfyAnimateAvailability();
 }
 let sceneVoiceStorage=null;
 let sceneVoiceEngine=null;
@@ -2217,16 +2222,16 @@ $('makeFilm').addEventListener('click',async()=>{
  }
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
-  const hasImage=Boolean(String(scene?.generatedImageUrl||'').trim());
+  const source=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:index,localImage:comfySourceImageForScene(index),generatedImageUrl:scene?.generatedImageUrl});
   const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
-  return !hasImage&&!cachedVideo?.video;
+  return source.kind==='missing'&&!cachedVideo?.video;
  }).length;
  const gate=evaluatePromptToFilmStart({
   mode,
   sceneCount:sceneMetadata.length,
   videoProviderReady:mode==='local-canvas'?true:mode==='huggingface'
    ?hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'
-   :mode==='comfyui'&&comfyConnected&&!!comfyWorkflow,
+   :mode==='comfyui'&&comfyConnected&&Object.keys(comfyWorkflowConfigs()).length>0,
   remoteVideoConsent:$('hfVideoConsent').checked===true,
   missingImageCount,
   imagePromptConsent:$('hordeConsent').checked===true,
@@ -2776,7 +2781,19 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 }finally{button.disabled=!$('hordeConsent').checked}
 });
 
-let comfyWorkflow=null,comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
+let comfyWorkflows={textToVideo:null,imageToVideo:null},comfyConnected=false,fullFilmAbortController=null;
+const comfySourceImageStore=createSceneLocalImageStore();
+function comfySourceImageForScene(index=sceneIndex){return comfySourceImageStore.get(sceneMetadata[index]?.id);}
+function syncComfySourceImageStatus({clearInput=true}={}){
+ comfySourceImageStore.retain(sceneMetadata.map(meta=>meta?.id));
+ const file=comfySourceImageForScene(sceneIndex);
+ const input=$('comfySourceImageFile');
+ if(clearInput&&input)input.value='';
+ const status=$('comfySourceImageStatus');
+ if(status)status.textContent=file
+  ?'Selected local image for this scene: '+file.name+' · '+Math.round(file.size/1024)+' KB. It stays in this tab until generation starts.'
+  :'No local image selected for this scene; the generated scene image will be used if available.';
+}
 let comfyCharacterReferenceFiles=[];
 let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
 let filmProgressTracking=false;
@@ -2841,19 +2858,40 @@ function comfyBindings(){
  Object.entries(optional).forEach(([key,ids])=>{const value=binding(comfyText(ids[0]),comfyText(ids[1]));if(value)result[key]=value});
  return result;
 }
+function comfyTextBindings(){
+ const binding=(nodeId,input)=>nodeId&&input?{nodeId,input}:null;
+ const result={prompt:binding(comfyText('comfyTextPromptNode'),comfyText('comfyTextPromptInput'))};
+ const optional={negativePrompt:['comfyTextNegativeNode','comfyTextNegativeInput'],frameCount:['comfyTextFramesNode','comfyTextFramesInput'],fps:['comfyTextFpsNode','comfyTextFpsInput'],seed:['comfyTextSeedNode','comfyTextSeedInput']};
+ Object.entries(optional).forEach(([key,ids])=>{const value=binding(comfyText(ids[0]),comfyText(ids[1]));if(value)result[key]=value});
+ return result;
+}
+function comfyWorkflowConfigs(){
+ const configs={};
+ if(comfyWorkflows.textToVideo)configs['text-to-video']={workflow:comfyWorkflows.textToVideo,nodeBindings:comfyTextBindings(),outputNodeIds:comfyText('comfyTextOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyTextFrameStep'))||1,frameCountOffset:1};
+ if(comfyWorkflows.imageToVideo)configs['image-to-video']={workflow:comfyWorkflows.imageToVideo,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1};
+ return configs;
+}
+function comfyProviderOptions(){return {baseUrl:comfyText('comfyBaseUrl'),workflows:comfyWorkflowConfigs()};}
 function isLocalVideoGenerationReady({step}={}){
  const target=resolveRemoteScene(step);
  if(!target.ok)return false;
- const imageReady=target.index===sceneIndex?!!comfySourceImage||!!String(target.scene.generatedImageUrl||'').trim():!!String(target.scene.generatedImageUrl||'').trim();
+ const source=resolveSceneImageSource({mode:'comfyui',sceneIndex:target.index,activeSceneIndex:target.index,localImage:comfySourceImageForScene(target.index),generatedImageUrl:target.scene.generatedImageUrl});
+ const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:source.kind});
  const motion=target.index===sceneIndex?$('sceneMotionPrompt').value:target.scene.motionPrompt||target.scene.visibleAction;
- return comfyConnected&&!!comfyWorkflow&&!fullFilmAbortController&&imageReady&&!!String(motion||'').trim();
+ return comfyConnected&&!!comfyWorkflowConfigs()[taskType]&&!fullFilmAbortController&&!!String(motion||'').trim();
 }
 function resolveRemoteScene(step){return resolveUniversalSceneTarget(step,sceneMetadata,sceneIndex);}
 function isRemoteVideoGenerationReady({step}={}){
  const target=resolveRemoteScene(step);
  if(!target.ok)return false;
  const meta=target.scene;
- const imageReady=target.index===sceneIndex?!!comfySourceImage||!!String(meta.generatedImageUrl||'').trim():!!String(meta.generatedImageUrl||'').trim();
+ const imageSource=resolveSceneImageSource({
+  mode:'huggingface',
+  sceneIndex:target.index,
+  activeSceneIndex:target.index,
+  generatedImageUrl:meta.generatedImageUrl
+ });
+ const imageReady=imageSource.kind==='url';
  const motion=target.index===sceneIndex?$('sceneMotionPrompt').value:meta.motionPrompt||meta.visibleAction;
  return universalCapabilityRegistry.remoteConsent&&$('hfVideoConsent').checked===true&&
   hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'&&imageReady&&!!String(motion||'').trim();
@@ -2879,15 +2917,17 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const motionScene={...originalMeta,title:readField('sceneTitle','title')||titles[index],description:readField('sceneDescription','description')||descriptions[index],motionPrompt:motionText,visibleAction:motionText,camera:readField('sceneCamera','camera'),startState:readField('sceneStartState','startState'),endState:readField('sceneEndState','endState'),negativePrompt:readField('sceneNegativePrompt','negativePrompt'),continuityLock:readField('sceneContinuityLock','continuityLock'),characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])};
  const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
  if(!prompt.trim())throw new Error('Add a motion instruction before remote video generation.');
- let imageBlob=isCurrent?comfySourceImage:null;
- if(!imageBlob){
-  const imageUrl=String(originalMeta.generatedImageUrl||'').trim();
-  if(!imageUrl)throw new Error('Create or load a still image for the selected scene first.');
-  assertConsent();
-  const response=await fetch(imageUrl,{signal});
-  if(!response.ok)throw new Error('Cannot read the selected scene image (HTTP '+response.status+').');
-  imageBlob=await response.blob();
- }
+ const imageSource=resolveSceneImageSource({
+  mode:'huggingface',
+  sceneIndex:index,
+  activeSceneIndex:index,
+  generatedImageUrl:originalMeta.generatedImageUrl
+ });
+ if(imageSource.kind!=='url')throw new Error('Create or load a generated scene image first. A local ComfyUI-only image is never sent to Hugging Face.');
+ assertConsent();
+ const response=await fetch(imageSource.url,{signal});
+ if(!response.ok)throw new Error('Cannot read the generated scene image (HTTP '+response.status+').');
+ const imageBlob=await response.blob();
  assertGenerationCurrent();
  if(!imageBlob?.size)throw new Error('The selected scene image is empty.');
  assertConsent();
@@ -2932,23 +2972,23 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
   continuityLock:readField('sceneContinuityLock','continuityLock'),
   characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])
  };
- const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
- if(!prompt.trim())throw new Error('Добавь описание движения сцены перед генерацией.');
- let imageBlob=isCurrent?comfySourceImage:null;
+ let imageBlob=comfySourceImageForScene(index);
  if(!imageBlob){
   const imageUrl=String(originalMeta.generatedImageUrl||'').trim();
-  if(!imageUrl)throw new Error('Сначала создай или загрузи изображение выбранной сцены.');
-  const response=await fetch(imageUrl,{signal});
-  if(!response.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+response.status+'). Проверь CORS или выбери локальный файл.');
-  imageBlob=await response.blob();
+  if(imageUrl){
+   const response=await fetch(imageUrl,{signal});
+   if(!response.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+response.status+'). Проверь CORS или выбери локальный файл.');
+   imageBlob=await response.blob();
+  }
  }
- if(!imageBlob?.size)throw new Error('Исходное изображение сцены пустое.');
+ if(imageBlob&&!imageBlob.size)throw new Error('Исходное изображение сцены пустое.');
+ const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:imageBlob?'blob':'missing'});
+ const prompt=taskType==='text-to-video'
+  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
+  :buildMotionGenerationPrompt(motionScene,characterBible);
+ if(!prompt.trim())throw new Error('Добавь описание движения сцены перед генерацией.');
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
- const provider=createComfyUIVideoProvider({
-  baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),
-  outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),
-  frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1
- });
+ const provider=createComfyUIVideoProvider(comfyProviderOptions());
  const registry=createVideoProviderRegistry();registry.register(provider);
  const duration=Math.max(0.25,Math.min(30,Number(originalMeta.durationSeconds??originalMeta.duration??$('duration').value)||3));
  const profileReferences=await loadCharacterReferenceImagesForScene(motionScene);
@@ -2956,8 +2996,8 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  const referenceImages=profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2);
  reportProgress?.('Submitting scene to local ComfyUI');
  const result=await generateVideoWithProvider(registry,provider.id,{
-  taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,
-  durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,
+  taskType,prompt,negativePrompt:motionScene.negativePrompt,
+  durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageBlob}:{}),
   seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages
  },{signal,onProgress:job=>{
   const percent=readVideoProgressPercent(job);
@@ -2983,7 +3023,22 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  return {status:'completed',sceneId:key,filename,mimeType:result.video.type,size:result.video.size,persisted:persistence.persisted};
 }
 function setComfyStatus(message){$('comfyStatus').textContent=message}
-function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfyConnected||!comfyWorkflow;const mode=$('videoGenerationMode')?.value||'huggingface';const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:mode==='comfyui'&&comfyConnected&&!!comfyWorkflow;$('generateFullFilmComfy').hidden=mode==='local-canvas';$('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController}
+function updateComfyAnimateAvailability(){
+ const configs=comfyWorkflowConfigs();
+ const currentMeta=sceneMetadata[sceneIndex]||{};
+ const currentImageSource=resolveSceneImageSource({mode:'comfyui',sceneIndex,activeSceneIndex:sceneIndex,localImage:comfySourceImageForScene(sceneIndex),generatedImageUrl:currentMeta.generatedImageUrl});
+ const currentTask=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:currentImageSource.kind});
+ $('animateSceneComfy').disabled=!comfyConnected||!configs[currentTask];
+ const mode=$('videoGenerationMode')?.value||'huggingface';
+ const neededFilmTasks=new Set(sceneMetadata.map((meta,index)=>{
+  const source=resolveSceneImageSource({mode:'comfyui',sceneIndex:index,activeSceneIndex:index,localImage:comfySourceImageForScene(index),generatedImageUrl:meta.generatedImageUrl});
+  return resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:source.kind});
+ }));
+ const filmWorkflowsReady=[...neededFilmTasks].every(taskType=>!!configs[taskType]);
+ const ready=mode==='huggingface'?hfVideoConnected&&$('hfVideoConsent').checked:mode==='comfyui'&&comfyConnected&&filmWorkflowsReady;
+ $('generateFullFilmComfy').hidden=mode==='local-canvas';
+ $('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController;
+}
 ['comfyCharacterReference1','comfyCharacterReference2'].forEach((id,index)=>{
  $(id).addEventListener('change',()=>{
   const file=$(id).files?.[0]||null;
@@ -2996,33 +3051,54 @@ function updateComfyAnimateAvailability(){$('animateSceneComfy').disabled=!comfy
 });
 $('comfySourceImageFile').addEventListener('change',()=>{
  const file=$('comfySourceImageFile').files?.[0]||null;
- comfySourceImage=file;
- $('comfySourceImageStatus').textContent=file?'Selected local image: '+file.name+' · '+Math.round(file.size/1024)+' KB. It stays in this tab until you start generation.':'No local image selected; the generated scene image will be used if available.';
+ comfySourceImageStore.set(sceneMetadata[sceneIndex]?.id,file);
+ syncComfySourceImageStatus({clearInput:false});
+ updateComfyAnimateAvailability();
 });
-$('comfyWorkflowFile').addEventListener('change',async()=>{
- const file=$('comfyWorkflowFile').files?.[0]||null;
- comfyWorkflow=null;comfyConnected=false;updateComfyAnimateAvailability();
- if(!file){$('comfyWorkflowStatus').textContent='No workflow selected.';return}
- try{
-  const parsed=JSON.parse(await file.text());
-  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)||!Object.keys(parsed).length)throw new Error('The JSON is empty or is not an API-format workflow object.');
-  comfyWorkflow=parsed;
-  $('comfyWorkflowStatus').textContent='Loaded '+file.name+' · '+Object.keys(parsed).length+' nodes. Node bindings will be validated when connecting.';
-  setComfyStatus('Workflow loaded in this browser tab. Check the local ComfyUI connection.');
- }catch(error){$('comfyWorkflowStatus').textContent='Workflow error: '+(error.message||'Invalid JSON');}
+[
+ ['comfyTextWorkflowFile','textToVideo','comfyTextWorkflowStatus'],
+ ['comfyImageWorkflowFile','imageToVideo','comfyImageWorkflowStatus']
+].forEach(([inputId,key,statusId])=>{
+ $(inputId).addEventListener('change',async()=>{
+  const file=$(inputId).files?.[0]||null;
+  comfyWorkflows[key]=null;comfyConnected=false;updateComfyAnimateAvailability();
+  if(!file){$(statusId).textContent='No workflow selected.';return}
+  try{
+   const parsed=JSON.parse(await file.text());
+   if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)||!Object.keys(parsed).length)throw new Error('The JSON is empty or is not an API-format workflow object.');
+   comfyWorkflows[key]=parsed;
+   $(statusId).textContent='Loaded '+file.name+' · '+Object.keys(parsed).length+' nodes. Bindings will be validated on connection.';
+   setComfyStatus('Workflow loaded in this browser tab. Check the local ComfyUI connection.');
+  }catch(error){$(statusId).textContent='Workflow error: '+(error.message||'Invalid JSON');}
+ });
 });
+const comfyConfigurationInputIds=[
+ 'comfyBaseUrl',
+ 'comfyTextPromptNode','comfyTextPromptInput','comfyTextNegativeNode','comfyTextNegativeInput',
+ 'comfyTextFramesNode','comfyTextFramesInput','comfyTextFpsNode','comfyTextFpsInput',
+ 'comfyTextSeedNode','comfyTextSeedInput','comfyTextOutputNodes','comfyTextFrameStep',
+ 'comfyPromptNode','comfyPromptInput','comfyImageNode','comfyImageInput',
+ 'comfyNegativeNode','comfyNegativeInput','comfyFramesNode','comfyFramesInput',
+ 'comfyFpsNode','comfyFpsInput','comfySeedNode','comfySeedInput',
+ 'comfyReference1Node','comfyReference1Input','comfyReference2Node','comfyReference2Input',
+ 'comfyOutputNodes','comfyFrameStep'
+];
+comfyConfigurationInputIds.forEach(id=>$(id).addEventListener('input',()=>{
+ comfyConnected=false;
+ setComfyStatus('ComfyUI settings changed. Check the connection again before generating.');
+ updateComfyAnimateAvailability();
+}));
 $('checkComfyConnection').addEventListener('click',async()=>{
  const button=$('checkComfyConnection');button.disabled=true;comfyConnected=false;updateComfyAnimateAvailability();
  try{
   const result=await checkComfyUIConnection({baseUrl:comfyText('comfyBaseUrl')});
-  if(comfyWorkflow){
-   const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
+  if(Object.keys(comfyWorkflowConfigs()).length){
+   const provider=createComfyUIVideoProvider(comfyProviderOptions());
    comfyConnected=true;
-   setComfyStatus('Connected to ComfyUI'+(result.system?.system?.comfyui_version?' · '+result.system.system.comfyui_version:'')+'. Workflow bindings validated. No image has been uploaded.');
+   setComfyStatus('Connected to ComfyUI'+(result.system?.system?.comfyui_version?' · '+result.system.system.comfyui_version:'')+'. Validated: '+provider.taskTypes.join(' + ')+'. No image has been uploaded.');
   }else{
-   setComfyStatus('ComfyUI is reachable, but select an API workflow JSON before animation.');
-  }
- }catch(error){setComfyStatus((error.code||'CONNECTION_ERROR')+': '+(error.message||'Connection failed'));}
+   setComfyStatus('ComfyUI is reachable, but select at least one API workflow JSON before animation.');
+  } }catch(error){setComfyStatus((error.code||'CONNECTION_ERROR')+': '+(error.message||'Connection failed'));}
  finally{button.disabled=false;updateComfyAnimateAvailability();}
 });
 $('animateSceneComfy').addEventListener('click',async()=>{
@@ -3031,29 +3107,33 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  const index=sceneIndex,meta=sceneMetadata[index]||{},imageUrl=String(meta.generatedImageUrl||'').trim();
  const generationToken=sceneGenerationGuard.capture(String(meta.id||''));
  const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Scene settings changed during generation. The stale clip was discarded; generate this scene again.');};
- if(!imageUrl){setComfyStatus(uiLang==='ru'?'Сначала создай или загрузи изображение этой сцены.':'Generate or load a still image for this scene first.');return}
  const motionScene={...meta,title:$('sceneTitle').value.trim()||titles[index],description:$('sceneDescription').value.trim()||descriptions[index],motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters)};
- const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
- if(!prompt.trim()){setComfyStatus('This scene has no motion instruction. Add a motion prompt first.');return}
+ const selectedSceneImage=comfySourceImageForScene(index);
+ const imageSourceKind=selectedSceneImage?'blob':imageUrl?'url':'missing';
+ const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind});
+ const prompt=taskType==='text-to-video'
+  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
+  :buildMotionGenerationPrompt(motionScene,characterBible);
+ if(!prompt.trim()){setComfyStatus('This scene has no usable visual or motion prompt. Add a scene description or motion instruction first.');return}
  button.disabled=true;$('checkComfyConnection').disabled=true;
  try{
-  let imageBlob=comfySourceImage;
-  if(!imageBlob){
+  let imageBlob=selectedSceneImage;
+  if(!imageBlob&&taskType==='image-to-video'){
    status.textContent=uiLang==='ru'?'Получаем изображение сцены локально…':'Reading the generated scene image…';
    const imageResponse=await fetch(imageUrl);
    if(!imageResponse.ok)throw new Error('Cannot read the scene image (HTTP '+imageResponse.status+'). Select a local image instead if the image host blocks browser CORS.');
    imageBlob=await imageResponse.blob();
   }
   assertGenerationCurrent();
-  if(!imageBlob?.size)throw new Error('The scene image is empty.');
-  const provider=createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
+  if(taskType==='image-to-video'&&!imageBlob?.size)throw new Error('The scene image is empty.');
+  const provider=createComfyUIVideoProvider(comfyProviderOptions());
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
   let referenceWarning='';
   const profileReferences=await loadCharacterReferenceImagesForScene(motionScene);
   assertGenerationCurrent();
   const referenceImages=profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2);
-  const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',image:imageBlob,seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages},{onProgress:progress=>{
+  const result=await generateVideoWithProvider(registry,provider.id,{taskType,prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageBlob}:{}),seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages},{onProgress:progress=>{
    if(progress.stage==='warning'&&progress.message){referenceWarning=String(progress.message);status.textContent='ComfyUI · Внимание: '+referenceWarning;return;}
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
    status.textContent='ComfyUI · '+progress.stage+' · '+elapsed+'s'+(progress.promptId?' · '+progress.promptId:'')+(referenceWarning?' · Внимание: '+referenceWarning:'');
@@ -3134,7 +3214,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
  const mode=$('videoGenerationMode').value;
  if(button.disabled)return;
  if(mode==='huggingface'&&(!hfVideoConnected||!hfVideoClient||!hfHandleFile||!$('hfVideoConsent').checked))return;
- if(mode==='comfyui'&&(!comfyConnected||!comfyWorkflow))return;
+ if(mode==='comfyui'&&(!comfyConnected||!Object.keys(comfyWorkflowConfigs()).length))return;
  const controller=new AbortController();
  fullFilmAbortController=controller;
  button.disabled=true;cancel.hidden=false;progressPanel.hidden=false;progress.value=0;
@@ -3145,7 +3225,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
  try{
   const provider=mode==='huggingface'
    ?createHuggingFaceZeroGPUVideoProvider({client:hfVideoClient,handleFile:hfHandleFile})
-   :createComfyUIVideoProvider({baseUrl:comfyText('comfyBaseUrl'),workflow:comfyWorkflow,nodeBindings:comfyBindings(),outputNodeIds:comfyText('comfyOutputNodes').split(',').map(value=>value.trim()).filter(Boolean),frameCountStep:Number(comfyText('comfyFrameStep'))||1,frameCountOffset:1});
+   :createComfyUIVideoProvider(comfyProviderOptions());
   const registry=createVideoProviderRegistry();registry.register(provider);
   const scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
   // Prepare requested dialogue and speech before spending time/quota on video generation.
@@ -3274,7 +3354,8 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     meta.visibleAction=String(meta.visibleAction||meta.motionPrompt);
     meta.camera=String(meta.camera||'Cinematic anime composition with clear subject movement');
     meta.characters=normalizeSceneCast('',meta.characters);
-    if(!meta.generatedImageUrl){
+    let imageSource=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:index,localImage:comfySourceImageForScene(index),generatedImageUrl:meta.generatedImageUrl});
+    if(imageSource.kind==='missing'&&mode!=='comfyui'){
      if(!$('hordeConsent').checked)throw new Error('Для отсутствующего изображения сцены '+(index+1)+' нужно отдельно подтвердить отправку текстового промпта в AI Horde.');
      updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Создание изображения','Creating scene image')});
      updateFilmVideoProgress(null,filmProgressText('Подготовка изображений сцен','Preparing scene images'));
@@ -3291,20 +3372,24 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      sceneMetadata[index]={...sceneMetadata[index],...meta};
      if(sceneIndex===index)renderGeneratedSceneImage();
      updateStoryQA();
+     imageSource=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:index,localImage:comfySourceImageForScene(index),generatedImageUrl:meta.generatedImageUrl});
     }
     if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
     assertSceneIdentityCurrent();
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Подготовка к анимации','Preparing animation')});
-    status.textContent='Подготавливаем изображение сцены '+(index+1)+' для анимации…';
-    let imageInput=meta.generatedImageUrl;
-    if(mode==='comfyui'){
-     const imageResponse=await fetch(meta.generatedImageUrl,{signal});
+    status.textContent=imageSource.kind==='missing'&&mode==='comfyui'?'Подготавливаем генерацию видео из текста для сцены '+(index+1)+'…':'Подготавливаем изображение сцены '+(index+1)+' для анимации…';
+    let imageInput=imageSource.kind==='blob'?imageSource.image:imageSource.url;
+    if(mode==='comfyui'&&imageSource.kind==='url'){
+     const imageResponse=await fetch(imageSource.url,{signal});
      if(!imageResponse.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+imageResponse.status+'). Проверь CORS или загрузи изображение вручную.');
      imageInput=await imageResponse.blob();
      if(!imageInput.size)throw new Error('Изображение сцены пустое.');
     }
     assertSceneIdentityCurrent();
-    const prompt=buildMotionGenerationPrompt(meta,characterBible);
+    const taskType=resolveSceneVideoTaskType({mode,imageSourceKind:imageSource.kind});
+    const prompt=taskType==='text-to-video'
+     ?[buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(meta,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
+     :buildMotionGenerationPrompt(meta,characterBible);
     const requestedDuration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
     const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
@@ -3313,7 +3398,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const referenceImages=mode==='comfyui'?profileReferenceImages.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2):[];
     assertSceneIdentityCurrent();
     let referenceWarning='';
-    const result=await generateVideoWithProvider(registry,provider.id,{taskType:'image-to-video',prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',image:imageInput,seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),referenceImages},{signal,onProgress:job=>{
+    const result=await generateVideoWithProvider(registry,provider.id,{taskType,prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageInput}:{}),seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),referenceImages},{signal,onProgress:job=>{
      const providerPercent=readVideoProgressPercent(job);
      const providerStage=String(job.stage||'processing');
      if(providerStage==='warning'&&job.message){

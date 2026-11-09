@@ -29,7 +29,7 @@ export function evaluatePromptToFilmStart({
     blockers.push('remote-video-consent-required');
   }
   if (selectedMode !== 'local-canvas' && videoProviderReady !== true) blockers.push('video-provider-not-ready');
-  if (selectedMode !== 'local-canvas' && missingImages > 0 && imagePromptConsent !== true) {
+  if (selectedMode === 'huggingface' && missingImages > 0 && imagePromptConsent !== true) {
     blockers.push('image-prompt-consent-required');
   }
 

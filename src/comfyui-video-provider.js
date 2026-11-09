@@ -138,6 +138,7 @@ export async function checkComfyUIConnection({ baseUrl, fetchImpl = fetch, signa
 export function createComfyUIVideoProvider({
   baseUrl,
   workflow,
+  workflows = null,
   nodeBindings = {},
   outputNodeIds = [],
   fetchImpl = fetch,
@@ -148,28 +149,55 @@ export function createComfyUIVideoProvider({
   clientId = 'dravex-cartoon-studio'
 } = {}) {
   const base = normalizeComfyUIBaseUrl(baseUrl);
-  const template = cloneWorkflow(workflow);
-  const outputs = [...new Set((Array.isArray(outputNodeIds) ? outputNodeIds : []).map(id => clean(id, 100)).filter(Boolean))];
-  if (!outputs.length) throw new ComfyUIAdapterError('Select at least one workflow node that produces an MP4, WebM or MOV output.', 'MISSING_OUTPUT_NODE');
-  if (!nodeBindings?.prompt || !nodeBindings?.image) {
-    throw new ComfyUIAdapterError('Workflow bindings must include prompt and image node inputs.', 'MISSING_REQUIRED_BINDING');
-  }
-  // Validate every configured mapping at construction time, before any network call.
-  for (const [key, binding] of Object.entries(nodeBindings)) applyBinding(cloneWorkflow(template), binding, '__validation__', key);
+  const createTaskConfig = (config, label) => {
+    if (!config) return null;
+    const template = cloneWorkflow(config.workflow);
+    const bindings = config.nodeBindings || {};
+    const outputs = [...new Set((Array.isArray(config.outputNodeIds) ? config.outputNodeIds : []).map(id => clean(id, 100)).filter(Boolean))];
+    if (!outputs.length) throw new ComfyUIAdapterError(`Select at least one video output node for the ${label} workflow.`, 'MISSING_OUTPUT_NODE');
+    if (!bindings.prompt) throw new ComfyUIAdapterError(`The ${label} workflow must include a prompt node input binding.`, 'MISSING_REQUIRED_BINDING');
+    if (label === 'image-to-video' && !bindings.image) throw new ComfyUIAdapterError('The image-to-video workflow must include a source image node input binding.', 'MISSING_REQUIRED_BINDING');
+    for (const [key, binding] of Object.entries(bindings)) applyBinding(cloneWorkflow(template), binding, '__validation__', key);
+    const step = Math.max(1, Math.min(120, Math.round(Number(config.frameCountStep ?? frameCountStep) || 1)));
+    const offset = Math.max(0, Math.min(step - 1, Math.round(Number(config.frameCountOffset ?? frameCountOffset) || 0)));
+    return { template, nodeBindings: bindings, outputNodeIds: outputs, frameCountStep: step, frameCountOffset: offset };
+  };
+  const taskConfigs = workflows
+    ? {
+        'text-to-video': createTaskConfig(workflows['text-to-video'], 'text-to-video'),
+        'image-to-video': createTaskConfig(workflows['image-to-video'], 'image-to-video')
+      }
+    : (() => {
+        const shared = createTaskConfig({ workflow, nodeBindings, outputNodeIds, frameCountStep, frameCountOffset }, 'shared');
+        return {
+          'text-to-video': shared,
+          ...(shared?.nodeBindings?.image ? { 'image-to-video': shared } : {})
+        };
+      })();
+  const supportedTaskTypes = Object.keys(taskConfigs).filter(taskType => taskConfigs[taskType]);
+  if (!supportedTaskTypes.length) throw new ComfyUIAdapterError('Configure at least one ComfyUI workflow.', 'MISSING_WORKFLOW');
   const interval = Math.max(250, Math.min(10000, Number(pollIntervalMs) || 1500));
   const timeout = Math.max(1000, Math.min(1800000, Number(maxWaitMs) || 600000));
-  const frameStep = Math.max(1, Math.min(120, Math.round(Number(frameCountStep) || 1)));
-  const frameOffset = Math.max(0, Math.min(frameStep - 1, Math.round(Number(frameCountOffset) || 0)));
 
   return Object.freeze({
     id: 'comfyui-local',
     name: 'Local ComfyUI',
-    taskTypes: Object.freeze(['image-to-video']),
+    taskTypes: Object.freeze(supportedTaskTypes),
     local: true,
     requiresUserKey: false,
     async generate(request, context = {}) {
       throwIfAborted(context.signal);
-      if (!request.image || typeof request.image.arrayBuffer !== 'function') {
+      const taskType = clean(request.taskType || 'image-to-video', 40);
+      if (!['text-to-video', 'image-to-video'].includes(taskType)) {
+        throw new ComfyUIAdapterError('ComfyUI supports text-to-video and image-to-video requests only.', 'UNSUPPORTED_TASK_TYPE');
+      }
+      const taskConfig = taskConfigs[taskType];
+      if (!taskConfig) throw new ComfyUIAdapterError(`No ComfyUI workflow is configured for ${taskType}.`, 'MISSING_TASK_WORKFLOW');
+      const activeBindings = taskConfig.nodeBindings;
+      if (taskType === 'image-to-video' && !activeBindings.image) {
+        throw new ComfyUIAdapterError('Image-to-video requires a configured source image node binding.', 'MISSING_REQUIRED_BINDING');
+      }
+      if (taskType === 'image-to-video' && (!request.image || typeof request.image.arrayBuffer !== 'function')) {
         throw new ComfyUIAdapterError('The source image must be a browser File or Blob.', 'INVALID_SOURCE_IMAGE');
       }
       const uploadImage = async (image, label, fallbackName) => {
@@ -192,14 +220,16 @@ export function createComfyUIVideoProvider({
         if (!uploadedName) throw new ComfyUIAdapterError(`ComfyUI upload response did not contain the ${label} name.`, 'INVALID_UPLOAD_RESPONSE');
         return [clean(uploaded.subfolder, 500), uploadedName].filter(Boolean).join('/');
       };
-      const imagePath = await uploadImage(request.image, 'source image', 'dravex-scene.png');
+      const imagePath = taskType === 'image-to-video'
+        ? await uploadImage(request.image, 'source image', 'dravex-scene.png')
+        : null;
       const referenceValues = {};
       const requestedReferences = Array.isArray(request.referenceImages) ? request.referenceImages : [];
       const references = requestedReferences.slice(0, 4);
       const skippedReferenceIndexes = requestedReferences
         .map((reference, index) => ({ reference, index }))
         .filter(({ reference, index }) => reference && (
-          index >= 4 || !Object.prototype.hasOwnProperty.call(nodeBindings, `referenceImage${index + 1}`)
+          index >= 4 || !Object.prototype.hasOwnProperty.call(activeBindings, `referenceImage${index + 1}`)
         ))
         .map(({ index }) => index + 1);
       if (skippedReferenceIndexes.length) {
@@ -212,25 +242,25 @@ export function createComfyUIVideoProvider({
       }
       for (let index = 0; index < references.length; index += 1) {
         const key = `referenceImage${index + 1}`;
-        if (!Object.prototype.hasOwnProperty.call(nodeBindings, key)) continue;
+        if (!Object.prototype.hasOwnProperty.call(activeBindings, key)) continue;
         const reference = references[index];
         if (!reference) continue;
         const blob = reference?.blob || reference?.image || reference;
         referenceValues[key] = await uploadImage(blob, `character reference ${index + 1}`, `dravex-character-reference-${index + 1}.png`);
       }
 
-      const graph = cloneWorkflow(template);
+      const graph = cloneWorkflow(taskConfig.template);
       const values = {
         prompt: request.prompt,
         negativePrompt: request.negativePrompt || '',
-        image: imagePath,
         durationSeconds: request.durationSeconds,
         fps: request.fps,
-        frameCount: frameOffset + Math.max(1, Math.ceil((request.durationSeconds * request.fps - frameOffset) / frameStep)) * frameStep,
+        frameCount: taskConfig.frameCountOffset + Math.max(1, Math.ceil((request.durationSeconds * request.fps - taskConfig.frameCountOffset) / taskConfig.frameCountStep)) * taskConfig.frameCountStep,
         seed: request.seed ?? 0,
         ...referenceValues
       };
-      for (const [key, binding] of Object.entries(nodeBindings)) {
+      if (taskType === 'image-to-video') values.image = imagePath;
+      for (const [key, binding] of Object.entries(activeBindings)) {
         if (Object.prototype.hasOwnProperty.call(values, key)) applyBinding(graph, binding, values[key], key);
       }
 
@@ -262,7 +292,7 @@ export function createComfyUIVideoProvider({
         if (history.status?.status_str === 'error' || history.status?.completed === false && history.status?.messages?.some(message => message?.[0] === 'execution_error')) {
           throw new ComfyUIAdapterError('ComfyUI workflow execution failed. Inspect the local ComfyUI console for the node error.', 'WORKFLOW_FAILED', history.status?.messages || null);
         }
-        const item = outputVideo(history, outputs);
+        const item = outputVideo(history, taskConfig.outputNodeIds);
         if (!item) {
           if (history.status?.completed === true) {
             throw new ComfyUIAdapterError('Workflow finished but the selected output nodes did not produce MP4, WebM or MOV video.', 'VIDEO_OUTPUT_NOT_FOUND');
