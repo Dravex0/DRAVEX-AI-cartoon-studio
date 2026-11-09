@@ -23,6 +23,7 @@ import { findScenesWithMissingVoiceAudio } from "./voice-artifact-readiness.js";
 import { generateSceneDialogue, selectScenesMissingDialogue } from "./scene-dialogue-generator.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
 import { resolveSceneImageSource } from "./scene-image-source.js";
+import { createSceneLocalImageStore } from "./scene-local-image-store.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
 import { drawImageCover } from "./image-frame.js";
@@ -1772,6 +1773,7 @@ function renderScenes(){
   });
   renderSceneMediaReport();
   updateFaceAnalysisControls();
+  syncComfySourceImageStatus();
 }
 let sceneVoiceStorage=null;
 let sceneVoiceEngine=null;
@@ -2219,7 +2221,7 @@ $('makeFilm').addEventListener('click',async()=>{
  }
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
-  const source=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:scene?.generatedImageUrl});
+  const source=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:index,localImage:comfySourceImageForScene(index),generatedImageUrl:scene?.generatedImageUrl});
   const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
   return source.kind==='missing'&&!cachedVideo?.video;
  }).length;
@@ -2778,7 +2780,19 @@ status.textContent=(uiLang==='ru'?'Не удалось создать изобр
 }finally{button.disabled=!$('hordeConsent').checked}
 });
 
-let comfyWorkflows={textToVideo:null,imageToVideo:null},comfyConnected=false,comfySourceImage=null,fullFilmAbortController=null;
+let comfyWorkflows={textToVideo:null,imageToVideo:null},comfyConnected=false,fullFilmAbortController=null;
+const comfySourceImageStore=createSceneLocalImageStore();
+function comfySourceImageForScene(index=sceneIndex){return comfySourceImageStore.get(sceneMetadata[index]?.id);}
+function syncComfySourceImageStatus({clearInput=true}={}){
+ comfySourceImageStore.retain(sceneMetadata.map(meta=>meta?.id));
+ const file=comfySourceImageForScene(sceneIndex);
+ const input=$('comfySourceImageFile');
+ if(clearInput&&input)input.value='';
+ const status=$('comfySourceImageStatus');
+ if(status)status.textContent=file
+  ?'Selected local image for this scene: '+file.name+' · '+Math.round(file.size/1024)+' KB. It stays in this tab until generation starts.'
+  :'No local image selected for this scene; the generated scene image will be used if available.';
+}
 let comfyCharacterReferenceFiles=[];
 let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
 let filmProgressTracking=false;
@@ -2860,7 +2874,7 @@ function comfyProviderOptions(){return {baseUrl:comfyText('comfyBaseUrl'),workfl
 function isLocalVideoGenerationReady({step}={}){
  const target=resolveRemoteScene(step);
  if(!target.ok)return false;
- const source=resolveSceneImageSource({mode:'comfyui',sceneIndex:target.index,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:target.scene.generatedImageUrl});
+ const source=resolveSceneImageSource({mode:'comfyui',sceneIndex:target.index,activeSceneIndex:target.index,localImage:comfySourceImageForScene(target.index),generatedImageUrl:target.scene.generatedImageUrl});
  const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:source.kind});
  const motion=target.index===sceneIndex?$('sceneMotionPrompt').value:target.scene.motionPrompt||target.scene.visibleAction;
  return comfyConnected&&!!comfyWorkflowConfigs()[taskType]&&!fullFilmAbortController&&!!String(motion||'').trim();
@@ -2870,7 +2884,7 @@ function isRemoteVideoGenerationReady({step}={}){
  const target=resolveRemoteScene(step);
  if(!target.ok)return false;
  const meta=target.scene;
- const imageReady=target.index===sceneIndex?!!comfySourceImage||!!String(meta.generatedImageUrl||'').trim():!!String(meta.generatedImageUrl||'').trim();
+ const imageReady=!!comfySourceImageForScene(target.index)||!!String(meta.generatedImageUrl||'').trim();
  const motion=target.index===sceneIndex?$('sceneMotionPrompt').value:meta.motionPrompt||meta.visibleAction;
  return universalCapabilityRegistry.remoteConsent&&$('hfVideoConsent').checked===true&&
   hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'&&imageReady&&!!String(motion||'').trim();
@@ -2896,7 +2910,7 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const motionScene={...originalMeta,title:readField('sceneTitle','title')||titles[index],description:readField('sceneDescription','description')||descriptions[index],motionPrompt:motionText,visibleAction:motionText,camera:readField('sceneCamera','camera'),startState:readField('sceneStartState','startState'),endState:readField('sceneEndState','endState'),negativePrompt:readField('sceneNegativePrompt','negativePrompt'),continuityLock:readField('sceneContinuityLock','continuityLock'),characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])};
  const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
  if(!prompt.trim())throw new Error('Add a motion instruction before remote video generation.');
- let imageBlob=isCurrent?comfySourceImage:null;
+ let imageBlob=comfySourceImageForScene(index);
  if(!imageBlob){
   const imageUrl=String(originalMeta.generatedImageUrl||'').trim();
   if(!imageUrl)throw new Error('Create or load a still image for the selected scene first.');
@@ -2949,7 +2963,7 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
   continuityLock:readField('sceneContinuityLock','continuityLock'),
   characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])
  };
- let imageBlob=isCurrent?comfySourceImage:null;
+ let imageBlob=comfySourceImageForScene(index);
  if(!imageBlob){
   const imageUrl=String(originalMeta.generatedImageUrl||'').trim();
   if(imageUrl){
@@ -3003,12 +3017,12 @@ function setComfyStatus(message){$('comfyStatus').textContent=message}
 function updateComfyAnimateAvailability(){
  const configs=comfyWorkflowConfigs();
  const currentMeta=sceneMetadata[sceneIndex]||{};
- const currentImageSource=resolveSceneImageSource({mode:'comfyui',sceneIndex,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:currentMeta.generatedImageUrl});
+ const currentImageSource=resolveSceneImageSource({mode:'comfyui',sceneIndex,activeSceneIndex:sceneIndex,localImage:comfySourceImageForScene(sceneIndex),generatedImageUrl:currentMeta.generatedImageUrl});
  const currentTask=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:currentImageSource.kind});
  $('animateSceneComfy').disabled=!comfyConnected||!configs[currentTask];
  const mode=$('videoGenerationMode')?.value||'huggingface';
  const neededFilmTasks=new Set(sceneMetadata.map((meta,index)=>{
-  const source=resolveSceneImageSource({mode:'comfyui',sceneIndex:index,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:meta.generatedImageUrl});
+  const source=resolveSceneImageSource({mode:'comfyui',sceneIndex:index,activeSceneIndex:index,localImage:comfySourceImageForScene(index),generatedImageUrl:meta.generatedImageUrl});
   return resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:source.kind});
  }));
  const filmWorkflowsReady=[...neededFilmTasks].every(taskType=>!!configs[taskType]);
@@ -3028,8 +3042,8 @@ function updateComfyAnimateAvailability(){
 });
 $('comfySourceImageFile').addEventListener('change',()=>{
  const file=$('comfySourceImageFile').files?.[0]||null;
- comfySourceImage=file;
- $('comfySourceImageStatus').textContent=file?'Selected local image: '+file.name+' · '+Math.round(file.size/1024)+' KB. It stays in this tab until you start generation.':'No local image selected; the generated scene image will be used if available.';
+ comfySourceImageStore.set(sceneMetadata[sceneIndex]?.id,file);
+ syncComfySourceImageStatus({clearInput:false});
  updateComfyAnimateAvailability();
 });
 [
@@ -3085,7 +3099,8 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  const generationToken=sceneGenerationGuard.capture(String(meta.id||''));
  const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Scene settings changed during generation. The stale clip was discarded; generate this scene again.');};
  const motionScene={...meta,title:$('sceneTitle').value.trim()||titles[index],description:$('sceneDescription').value.trim()||descriptions[index],motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters)};
- const imageSourceKind=comfySourceImage?'blob':imageUrl?'url':'missing';
+ const selectedSceneImage=comfySourceImageForScene(index);
+ const imageSourceKind=selectedSceneImage?'blob':imageUrl?'url':'missing';
  const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind});
  const prompt=taskType==='text-to-video'
   ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
@@ -3093,7 +3108,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  if(!prompt.trim()){setComfyStatus('This scene has no usable visual or motion prompt. Add a scene description or motion instruction first.');return}
  button.disabled=true;$('checkComfyConnection').disabled=true;
  try{
-  let imageBlob=comfySourceImage;
+  let imageBlob=selectedSceneImage;
   if(!imageBlob&&taskType==='image-to-video'){
    status.textContent=uiLang==='ru'?'Получаем изображение сцены локально…':'Reading the generated scene image…';
    const imageResponse=await fetch(imageUrl);
@@ -3330,7 +3345,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     meta.visibleAction=String(meta.visibleAction||meta.motionPrompt);
     meta.camera=String(meta.camera||'Cinematic anime composition with clear subject movement');
     meta.characters=normalizeSceneCast('',meta.characters);
-    let imageSource=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:meta.generatedImageUrl});
+    let imageSource=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:index,localImage:comfySourceImageForScene(index),generatedImageUrl:meta.generatedImageUrl});
     if(imageSource.kind==='missing'&&mode!=='comfyui'){
      if(!$('hordeConsent').checked)throw new Error('Для отсутствующего изображения сцены '+(index+1)+' нужно отдельно подтвердить отправку текстового промпта в AI Horde.');
      updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Создание изображения','Creating scene image')});
@@ -3348,7 +3363,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      sceneMetadata[index]={...sceneMetadata[index],...meta};
      if(sceneIndex===index)renderGeneratedSceneImage();
      updateStoryQA();
-     imageSource=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:sceneIndex,localImage:comfySourceImage,generatedImageUrl:meta.generatedImageUrl});
+     imageSource=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:index,localImage:comfySourceImageForScene(index),generatedImageUrl:meta.generatedImageUrl});
     }
     if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
     assertSceneIdentityCurrent();
