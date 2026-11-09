@@ -14,12 +14,13 @@ test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   await expect(page.locator('#play')).toBeVisible();
   await expect(page.locator('#export')).toBeVisible();
   await expect(page.locator('#make')).toBeVisible();
-  await expect(page.locator('#imageQuality')).toBeHidden();
+  await expect(page.locator('#imageQuality')).toBeVisible();
+  await expect(page.locator('#canvasFormat')).toBeVisible();
+  await expect(page.locator('.quick-settings')).toHaveAttribute('open', '');
   await expect(page.locator('#style')).toBeVisible();
   await expect(page.locator('#language')).toBeVisible();
   await expect(page.locator('.workflow-step')).toHaveCount(3);
   await expect(page.locator('#generationTools')).not.toHaveAttribute('open', '');
-  await page.getByText(/more settings/i).click();
   await expect(page.locator('#imageQuality')).toBeVisible();
   await expect(page.locator('#canvas')).toBeVisible();
 
@@ -117,7 +118,6 @@ test('localizes style and quality options and restores the saved creative setup'
   await expect(page.locator('#style option[value="3D animated"]')).toHaveText('3D-анимация');
   await expect(page.locator('#imageQuality option[value="ultra"]')).toHaveText('Максимум · 1024×576');
 
-  await page.getByText(/дополнительные настройки/i).click();
   await page.locator('#style').selectOption('3D animated');
   await page.locator('#imageQuality').selectOption('ultra');
   await page.locator('#save').click();
@@ -770,4 +770,20 @@ test('keeps optional voice consent and scene production prompts reachable inside
   await expect(page.locator('#sceneMotionPrompt')).toBeVisible();
 
   expect(pageErrors, 'optional voice and production controls should remain reachable without JavaScript errors').toEqual([]);
+});
+
+
+test('keeps the essential creator settings visible and usable on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('#idea')).toBeVisible();
+  await expect(page.locator('#style')).toBeVisible();
+  await expect(page.locator('#canvasFormat')).toBeVisible();
+  await expect(page.locator('#imageQuality')).toBeVisible();
+  await expect(page.locator('#makeFilm')).toBeVisible();
+  await page.locator('#canvasFormat').selectOption('portrait');
+  await expect(page.locator('#canvas')).toHaveJSProperty('width', 720);
+  await expect(page.locator('#canvas')).toHaveJSProperty('height', 1280);
+  await page.locator('#imageQuality').selectOption('high');
+  await expect(page.locator('#imageQuality')).toHaveValue('high');
 });
