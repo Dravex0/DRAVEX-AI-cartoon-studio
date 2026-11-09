@@ -542,8 +542,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
       for (let frame = 0; frame < 18; frame += 1) {
         context.fillStyle = ['#e53935', '#43a047', '#1e88e5', '#fdd835', '#8e24aa'][scene];
         context.fillRect(0, 0, canvas.width, canvas.height);
-        context.fillStyle = '#ffffff';
-        context.fillRect(frame * 7, 35, 18, 18);
+        // Keep the sampled center pixel unobstructed so each clip's scene color is measurable.
         await new Promise(resolve => setTimeout(resolve, 45));
       }
       recorder.stop();
