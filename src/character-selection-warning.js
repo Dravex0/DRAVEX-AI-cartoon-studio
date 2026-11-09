@@ -7,7 +7,7 @@ export function getCharacterSelectionWarning(storyText, selectedCharacter) {
   const source = String(storyText ?? '').normalize('NFKC');
   if (!selected || !source.trim()) return null;
 
-  const tokenize = value => value.toLocaleLowerCase().match(/[\\p{L}\\p{N}_]+/gu) || [];
+  const tokenize = value => value.toLocaleLowerCase().match(/[\p{L}\p{N}_]+/gu) || [];
   const selectedTokens = tokenize(selected);
   const sourceTokens = tokenize(source);
   if (!selectedTokens.length) return null;
