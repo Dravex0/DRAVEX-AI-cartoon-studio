@@ -120,6 +120,18 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 #qaReport:empty{display:none}
 #applyScene,#addScene,#deleteScene,#play,#export{display:none!important}
 .editorFields,.audio-panel,#scenes,#sceneMediaReport{display:none!important}
+/* Keep the prompt-first screen, but expose the real video-provider controls.
+   The provider panels and mode selector are direct children of .editorFields. */
+.editorFields{display:grid!important;gap:10px;margin-top:12px}
+.editorFields>*{display:none!important}
+.editorFields>#hfVideoPanel,
+.editorFields>#comfyPanel,
+.editorFields>.field:has(#videoGenerationMode){display:block!important}
+.editorFields>.field:has(#videoGenerationMode){display:grid!important}
+.editorFields>.actions:has(#generateFullFilmComfy){display:flex!important}
+.editorFields>#fullFilmProgressPanel:not([hidden]),
+.editorFields>#fullFilmStatus,
+.editorFields>#generatedImageWrap:not([hidden]){display:block!important}
 #faceAnalysisPanel,.sprite-workflow,.voice-workflow,.production-grid{display:none!important}
 #fullFilmProgressPanel{margin-top:14px}
 #finalFilmResult{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#0d1729}
