@@ -169,7 +169,10 @@ export function createComfyUIVideoProvider({
       }
     : (() => {
         const shared = createTaskConfig({ workflow, nodeBindings, outputNodeIds, frameCountStep, frameCountOffset }, 'shared');
-        return { 'text-to-video': shared, 'image-to-video': shared };
+        return {
+          'text-to-video': shared,
+          ...(shared?.nodeBindings?.image ? { 'image-to-video': shared } : {})
+        };
       })();
   const supportedTaskTypes = Object.keys(taskConfigs).filter(taskType => taskConfigs[taskType]);
   if (!supportedTaskTypes.length) throw new ComfyUIAdapterError('Configure at least one ComfyUI workflow.', 'MISSING_WORKFLOW');
