@@ -95,3 +95,32 @@ test("normalizes provider progress fractions and percentages without inventing p
   assert.equal(readVideoProgressPercent({ progressPercent: 73 }), 73);
   assert.equal(readVideoProgressPercent({ progress: [{ progress: 0.25 }] }), 25);
 });
+
+test("isolates progress callback errors from scene generation", async () => {
+  const generated = [];
+  const report = await generateStoryboardVideos({
+    scenes: [{ id: "cached" }, { id: "bad" }, { id: "good" }],
+    hasVideo: scene => scene.id === "cached",
+    generateScene: async scene => {
+      generated.push(scene.id);
+      if (scene.id === "bad") throw new Error("provider unavailable");
+      return { status: "completed", video: new Blob(["clip"]) };
+    },
+    onProgress: state => {
+      throw new Error("UI progress failed: " + state.stage);
+    }
+  });
+
+  assert.deepEqual(generated, ["bad", "good"]);
+  assert.equal(report.skipped, 1);
+  assert.equal(report.failed, 1);
+  assert.equal(report.completed, 1);
+  assert.deepEqual(report.results.map(result => result.status), ["skipped", "failed", "completed"]);
+  assert.deepEqual(report.progressErrors.map(item => [item.index, item.stage, item.error]), [
+    [0, "skipped", "UI progress failed: skipped"],
+    [1, "starting", "UI progress failed: starting"],
+    [1, "failed", "UI progress failed: failed"],
+    [2, "starting", "UI progress failed: starting"],
+    [2, "completed", "UI progress failed: completed"]
+  ]);
+});
