@@ -7,6 +7,12 @@ test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);
   await expect(page.locator('#idea')).toBeVisible();
+  await expect(page.locator('#makeFilm')).toBeVisible();
+  await expect(page.locator('#make')).toBeVisible();
+  await expect(page.locator('#scenes')).toBeVisible();
+  await expect(page.locator('.audio-panel')).toBeVisible();
+  await expect(page.locator('#play')).toBeVisible();
+  await expect(page.locator('#export')).toBeVisible();
   await expect(page.locator('#make')).toBeVisible();
   await expect(page.locator('#imageQuality')).toBeHidden();
   await expect(page.locator('#style')).toBeVisible();
