@@ -2885,7 +2885,13 @@ function isRemoteVideoGenerationReady({step}={}){
  const target=resolveRemoteScene(step);
  if(!target.ok)return false;
  const meta=target.scene;
- const imageReady=!!comfySourceImageForScene(target.index)||!!String(meta.generatedImageUrl||'').trim();
+ const imageSource=resolveSceneImageSource({
+  mode:'huggingface',
+  sceneIndex:target.index,
+  activeSceneIndex:target.index,
+  generatedImageUrl:meta.generatedImageUrl
+ });
+ const imageReady=imageSource.kind==='url';
  const motion=target.index===sceneIndex?$('sceneMotionPrompt').value:meta.motionPrompt||meta.visibleAction;
  return universalCapabilityRegistry.remoteConsent&&$('hfVideoConsent').checked===true&&
   hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'&&imageReady&&!!String(motion||'').trim();
@@ -2911,15 +2917,17 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const motionScene={...originalMeta,title:readField('sceneTitle','title')||titles[index],description:readField('sceneDescription','description')||descriptions[index],motionPrompt:motionText,visibleAction:motionText,camera:readField('sceneCamera','camera'),startState:readField('sceneStartState','startState'),endState:readField('sceneEndState','endState'),negativePrompt:readField('sceneNegativePrompt','negativePrompt'),continuityLock:readField('sceneContinuityLock','continuityLock'),characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])};
  const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
  if(!prompt.trim())throw new Error('Add a motion instruction before remote video generation.');
- let imageBlob=comfySourceImageForScene(index);
- if(!imageBlob){
-  const imageUrl=String(originalMeta.generatedImageUrl||'').trim();
-  if(!imageUrl)throw new Error('Create or load a still image for the selected scene first.');
-  assertConsent();
-  const response=await fetch(imageUrl,{signal});
-  if(!response.ok)throw new Error('Cannot read the selected scene image (HTTP '+response.status+').');
-  imageBlob=await response.blob();
- }
+ const imageSource=resolveSceneImageSource({
+  mode:'huggingface',
+  sceneIndex:index,
+  activeSceneIndex:index,
+  generatedImageUrl:originalMeta.generatedImageUrl
+ });
+ if(imageSource.kind!=='url')throw new Error('Create or load a generated scene image first. A local ComfyUI-only image is never sent to Hugging Face.');
+ assertConsent();
+ const response=await fetch(imageSource.url,{signal});
+ if(!response.ok)throw new Error('Cannot read the generated scene image (HTTP '+response.status+').');
+ const imageBlob=await response.blob();
  assertGenerationCurrent();
  if(!imageBlob?.size)throw new Error('The selected scene image is empty.');
  assertConsent();
