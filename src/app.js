@@ -3816,6 +3816,14 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     timeline.segments.slice(1).forEach(segment=>{
       const timer=setTimeout(()=>{
         sceneIndex=segment.sceneIndex;
+        // Switch the generated clip at the timeline boundary, rather than
+        // waiting for the next animation frame to notice the scene change.
+        const nextScene=sceneMetadata[segment.sceneIndex]||{};
+        syncSceneVideoPlayback({
+          cache:sceneVideoCache,
+          activeKey:String(nextScene.id||('scene-index-'+segment.sceneIndex)),
+          shouldPlay:true
+        });
         onProgress?.({phase:'scene',sceneIndex:segment.sceneIndex,sceneCount:timeline.segments.length,percent:Math.round(segment.startMs/Math.max(1,timeline.totalDurationMs)*100)});
         $('status').textContent=uiLang==='ru'
           ?'Записываем сцену '+(segment.sceneIndex+1)+' из '+timeline.segments.length+'…'
