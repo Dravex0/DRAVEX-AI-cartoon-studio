@@ -675,7 +675,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   await page.locator('#generateFullFilmComfy').click();
 
   await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 90000 });
-  await expect(page.locator('#fullFilmProgress')).toHaveValue('100');
+  await expect(page.locator('#fullFilmProgress')).toHaveJSProperty('value', 100);
   const finalVideo = await page.locator('#finalFilmPlayer').evaluate(async element => {
     await element.play().catch(() => {});
     const response = await fetch(element.currentSrc);
