@@ -765,7 +765,7 @@ test('keeps optional voice consent and scene production prompts reachable inside
 
   const productionDetails = page.locator('details').filter({ has: page.locator('#sceneImagePrompt') });
   await expect(productionDetails).not.toHaveAttribute('open', '');
-  await productionDetails.locator('summary').click();
+  await productionDetails.locator('#productionSummary').click();
   await expect(page.locator('.production-grid')).toBeVisible();
   await expect(page.locator('#sceneMotionPrompt')).toBeVisible();
 
