@@ -141,6 +141,13 @@ export function inferSceneActionIntent(input) {
  * This is a lexical preview cue, not generative character animation.
  */
 export function detectSceneActionForScene(scene = {}, fallbackTitle = '', fallbackDescription = '') {
+  // A source-grounded semantic event is more reliable than scanning every word in
+  // a long scene description. For example, a portal may disappear after a monster
+  // appears; the main visible action is the reveal, not the later disappearance.
+  const semanticCue = String(scene?.semanticActionIntent?.motionCue ?? '').trim();
+  if (semanticCue && semanticCue !== 'idle' && ACTION_PATTERNS.some(entry => entry.action === semanticCue)) {
+    return semanticCue;
+  }
   const candidates = [
     scene?.motionPrompt,
     scene?.visibleAction,
