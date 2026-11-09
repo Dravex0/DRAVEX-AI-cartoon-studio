@@ -317,16 +317,113 @@ test('exposes safe universal-plan execution controls without enabling an unplann
 });
 
 
-test('keeps manually selected ComfyUI images isolated when switching storyboard scenes', async ({ page }) => {
+test('uploads the correct local image for each ComfyUI storyboard scene', async ({ page }) => {
   const pageErrors = [];
-  await page.route('http://127.0.0.1:8188/**', route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({ system: { comfyui_version: 'playwright-mock' } })
-  }));
-  page.on('pageerror', error => pageErrors.push(error.message));
+  const uploadedFilenames = [];
+  const submittedImages = [];
+  let jobCount = 0;
+  let videoBase64 = '';
 
+  page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
+
+  videoBase64 = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 90;
+    const context = canvas.getContext('2d');
+    const stream = canvas.captureStream(16);
+    const mimeType = ['video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
+    if (!mimeType) throw new Error('No supported WebM MediaRecorder format is available.');
+    const recorder = new MediaRecorder(stream, { mimeType });
+    const chunks = [];
+    recorder.addEventListener('dataavailable', event => {
+      if (event.data?.size) chunks.push(event.data);
+    });
+    const stopped = new Promise(resolve => recorder.addEventListener('stop', resolve, { once: true }));
+    recorder.start();
+    for (let frame = 0; frame < 14; frame += 1) {
+      context.fillStyle = 'hsl(' + (frame * 23) + ', 65%, 45%)';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#ffffff';
+      context.fillRect(frame * 9, 35, 18, 18);
+      await new Promise(resolve => setTimeout(resolve, 55));
+    }
+    recorder.stop();
+    await stopped;
+    stream.getTracks().forEach(track => track.stop());
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = '';
+    for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+    return btoa(binary);
+  });
+  expect(Buffer.from(videoBase64, 'base64').byteLength).toBeGreaterThan(1024);
+
+  await page.route('http://127.0.0.1:8188/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (url.pathname === '/system_stats') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ system: { comfyui_version: 'playwright-mock' } })
+      });
+    }
+
+    if (url.pathname === '/upload/image') {
+      const body = request.postDataBuffer()?.toString('latin1') || '';
+      const filename = body.match(/filename="([^"]+)"/)?.[1] || '';
+      uploadedFilenames.push(filename);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ name: 'uploaded-' + uploadedFilenames.length + '.png', subfolder: '', type: 'input' })
+      });
+    }
+
+    if (url.pathname === '/prompt') {
+      const requestBody = request.postDataJSON();
+      const workflow = requestBody.prompt;
+      submittedImages.push({
+        prompt: workflow['6']?.inputs?.text || '',
+        image: workflow['56']?.inputs?.image || null
+      });
+      jobCount += 1;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ prompt_id: 'mock-comfy-job-' + jobCount })
+      });
+    }
+
+    if (url.pathname.startsWith('/history/')) {
+      const jobId = url.pathname.split('/').pop();
+      const number = Number(jobId.replace('mock-comfy-job-', ''));
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          [jobId]: {
+            status: { completed: true, status_str: 'success' },
+            outputs: { '58': { videos: [{ filename: 'scene-' + number + '.webm', type: 'output' }] } }
+          }
+        })
+      });
+    }
+
+    if (url.pathname === '/view') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'video/webm',
+        body: Buffer.from(videoBase64, 'base64')
+      });
+    }
+
+    return route.fulfill({ status: 404, body: 'Unexpected mocked ComfyUI request: ' + url.pathname });
+  });
+
   await page.locator('#idea').fill(
     'A young fox finds a glowing key in a forest, follows its light to a hidden gate, opens it, and discovers a peaceful garden.'
   );
@@ -361,6 +458,8 @@ test('keeps manually selected ComfyUI images isolated when switching storyboard 
   });
   await expect(page.locator('#comfySourceImageStatus')).toContainText('fox-forest-scene.png');
   await expect(page.locator('#animateSceneComfy')).toBeEnabled();
+  await page.locator('#animateSceneComfy').click();
+  await expect(page.locator('#comfyStatus')).toContainText(/scene video decoded and connected/i, { timeout: 30000 });
 
   await page.locator('#scenes button.scene').nth(1).click();
   await expect(page.locator('#comfySourceImageStatus')).toContainText(/no local image selected for this scene/i);
@@ -373,14 +472,18 @@ test('keeps manually selected ComfyUI images isolated when switching storyboard 
   });
   await expect(page.locator('#comfySourceImageStatus')).toContainText('fox-garden-scene.png');
   await expect(page.locator('#animateSceneComfy')).toBeEnabled();
+  await page.locator('#animateSceneComfy').click();
+  await expect(page.locator('#comfyStatus')).toContainText(/scene video decoded and connected/i, { timeout: 30000 });
 
   await page.locator('#scenes button.scene').first().click();
   await expect(page.locator('#comfySourceImageStatus')).toContainText('fox-forest-scene.png');
   await expect(page.locator('#animateSceneComfy')).toBeEnabled();
-
   await page.locator('#scenes button.scene').nth(1).click();
   await expect(page.locator('#comfySourceImageStatus')).toContainText('fox-garden-scene.png');
-  await expect(page.locator('#animateSceneComfy')).toBeEnabled();
 
-  expect(pageErrors, 'switching scenes must not throw JavaScript errors').toEqual([]);
+  expect(uploadedFilenames).toEqual(['fox-forest-scene.png', 'fox-garden-scene.png']);
+  expect(submittedImages).toHaveLength(2);
+  expect(submittedImages.map(item => item.image)).toEqual(['uploaded-1.png', 'uploaded-2.png']);
+  expect(submittedImages.every(item => item.prompt.length > 0)).toBe(true);
+  expect(pageErrors, 'ComfyUI scene isolation and generation must not throw JavaScript errors').toEqual([]);
 });
