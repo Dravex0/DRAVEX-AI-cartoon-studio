@@ -447,6 +447,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
 
   await page.locator('#videoGenerationMode').selectOption('comfyui');
   await page.locator('#comfyPanel > summary').click();
+  await expect(page.locator('label[for="comfySourceImageFile"]')).toContainText(/Local image for the selected scene/i);
   const imageWorkflow = {
     '6': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
     '7': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
