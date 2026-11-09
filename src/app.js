@@ -5,6 +5,7 @@ import { buildStoryboardFromText } from "./storyboard-generator.js";
 import { evaluatePromptToFilmStart } from "./prompt-to-film-gate.js";
 import { resolveSceneVideoTaskType } from "./scene-video-task.js";
 import { resolveStoryProtagonist } from "./story-protagonist.js";
+import { getCharacterSelectionWarning } from "./character-selection-warning.js";
 import { calculateCinematicShot } from "./director-engine.js";
 import { detectDeviceCapabilities } from "./device-capabilities.js";
 import { createLocalTransformersRuntime } from "./transformers-local-runtime.js";
@@ -2339,6 +2340,7 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
  const lang=storyLanguage();
  const requestedCharacter=$('character').value.trim();
  const character=resolveStoryProtagonist(idea,requestedCharacter,lang);
+ const characterSelectionWarning=getCharacterSelectionWarning(idea,requestedCharacter);
  const proceduralDemoCharacter=!requestedCharacter&&['Главный герой','Головний герой','Main character','Personaje principal'].includes(character);
  $('character').value=character;
  try{
@@ -2349,7 +2351,7 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
   const preparedScenes=storyContext.scenes;
   const stateChanges=inferStoryboardStateChanges(preparedScenes,lang,character);
   sceneMetadata=ensureSceneIds(preparedScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]})));
-  currentStoryboardPlan={...plan,eventChain:buildStoryEventChain(sceneMetadata),sourceText:idea,sourceLanguage:lang,sourceCharacter:character,proceduralDemoCharacter,scenes:sceneMetadata};
+  currentStoryboardPlan={...plan,eventChain:buildStoryEventChain(sceneMetadata),sourceText:idea,sourceLanguage:lang,sourceCharacter:character,characterSelectionWarning,proceduralDemoCharacter,scenes:sceneMetadata};
   titles=plan.titles;
   descriptions=plan.descriptions;
   sceneIndex=0;
@@ -2359,6 +2361,14 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
   renderScenes();
   syncSceneEditor();
   updateStoryQA();
+  if(characterSelectionWarning){
+   const warning=document.createElement('p');
+   warning.className='qa-report__item qa-report__item--warning';
+   warning.textContent=uiLang==='ru'
+    ?'Внимание: выбранный главный персонаж «'+requestedCharacter+'» не упоминается в тексте истории. Проверь выбор. Он не будет изменён автоматически.'
+    :'Warning: selected main character "'+requestedCharacter+'" is not mentioned in the story text. Check the selection; it will not be changed automatically.';
+   $('qaReport').appendChild(warning);
+  }
   status.textContent=uiLang==='ru'?'Раскадровка создана локальным движком DRAVEX.':'Storyboard created by the local DRAVEX engine.';
   status.scrollIntoView({behavior:'smooth',block:'nearest'});
   return currentStoryboardPlan;
