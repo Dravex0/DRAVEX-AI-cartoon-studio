@@ -565,3 +565,86 @@ test('rejects an image-to-video workflow without a source image binding during s
     }
   }), error => error.code === 'MISSING_REQUIRED_BINDING' && /source image node input binding/i.test(error.message));
 });
+
+
+test('reports a clear timeout when a ComfyUI job never appears in history', async () => {
+  const fetchImpl = async url => {
+    if (String(url).endsWith('/upload/image')) return jsonResponse({ name: 'source.png', type: 'input' });
+    if (String(url).endsWith('/prompt')) return jsonResponse({ prompt_id: 'stuck-job' });
+    if (String(url).endsWith('/history/stuck-job')) return jsonResponse({});
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow,
+    nodeBindings,
+    outputNodeIds: ['90'],
+    fetchImpl,
+    pollIntervalMs: 250,
+    maxWaitMs: 1000
+  });
+  await assert.rejects(
+    provider.generate(request),
+    error => error instanceof ComfyUIAdapterError && error.code === 'TIMEOUT'
+      && /timed out/i.test(error.message)
+  );
+});
+
+test('surfaces ComfyUI workflow execution errors instead of waiting for a video', async () => {
+  const fetchImpl = async url => {
+    if (String(url).endsWith('/upload/image')) return jsonResponse({ name: 'source.png', type: 'input' });
+    if (String(url).endsWith('/prompt')) return jsonResponse({ prompt_id: 'failed-job' });
+    if (String(url).endsWith('/history/failed-job')) {
+      return jsonResponse({
+        'failed-job': {
+          status: {
+            completed: false,
+            status_str: 'error',
+            messages: [['execution_error', { node_id: '30', exception_message: 'CUDA out of memory' }]]
+          },
+          outputs: {}
+        }
+      });
+    }
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow,
+    nodeBindings,
+    outputNodeIds: ['90'],
+    fetchImpl,
+    pollIntervalMs: 250
+  });
+  await assert.rejects(
+    provider.generate(request),
+    error => error instanceof ComfyUIAdapterError && error.code === 'WORKFLOW_FAILED'
+  );
+});
+
+test('cancels a ComfyUI job during history polling without downloading an output', async () => {
+  const controller = new AbortController();
+  const calls = [];
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow,
+    nodeBindings,
+    outputNodeIds: ['90'],
+    pollIntervalMs: 250,
+    fetchImpl: async (url, options = {}) => {
+      calls.push(String(url));
+      if (String(url).endsWith('/upload/image')) return jsonResponse({ name: 'source.png', type: 'input' });
+      if (String(url).endsWith('/prompt')) return jsonResponse({ prompt_id: 'cancel-job' });
+      if (String(url).endsWith('/history/cancel-job')) return jsonResponse({});
+      throw new Error('Unexpected URL: ' + url);
+    }
+  });
+  const pending = provider.generate(request, {
+    signal: controller.signal,
+    onProgress: event => {
+      if (event.stage === 'queued') controller.abort();
+    }
+  });
+  await assert.rejects(pending, error => error.name === 'AbortError');
+  assert.equal(calls.some(url => url.includes('/view?')), false);
+});
