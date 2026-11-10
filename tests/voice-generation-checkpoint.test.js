@@ -8,7 +8,13 @@ const dialogue = [
 ];
 const voiceIds = ["af_heart", "af_bella"];
 const artifacts = [
-  { audioHash: "a".repeat(64), durationMs: 1250, voiceId: "af_heart", visemeEvents: [{ shape: "open", startMs: 0, durationMs: 100 }] },
+  {
+    audioHash: "a".repeat(64),
+    durationMs: 1250,
+    voiceId: "af_heart",
+    visemeEvents: [{ shape: "open", startMs: 0, durationMs: 100 }],
+    phonemeChunks: [{ text: "Hello there.", phonemes: "həlˈoʊ", startMs: 0, endMs: 1250 }]
+  },
   null
 ];
 const validRecord = (overrides = {}) => {
@@ -33,6 +39,7 @@ test("restores only completed lines whose WAV metadata matches the checkpoint", 
   assert.equal(restored[0].audioHash, "a".repeat(64));
   assert.equal(restored[0].durationMs, 1250);
   assert.deepEqual(restored[0].visemeEvents, artifacts[0].visemeEvents);
+  assert.deepEqual(restored[0].phonemeChunks, artifacts[0].phonemeChunks);
   assert.equal(restored[1], null);
 });
 
@@ -71,6 +78,7 @@ test("rejects stored artifacts with mismatched hash, MIME, byte size or duration
   const invalidRecords = [
     validRecord({ audioHash: "b".repeat(64) }),
     validRecord({ mimeType: "text/plain" }),
+    validRecord({ blob: new Blob(["wav"], { type: "audio/mpeg" }), mimeType: "audio/wav" }),
     validRecord({ byteSize: 999 }),
     validRecord({ durationMs: 800 })
   ];
@@ -81,6 +89,42 @@ test("rejects stored artifacts with mismatched hash, MIME, byte size or duration
     });
     assert.deepEqual(restored, [null, null]);
   }
+});
+
+test("rejects invalid viseme and phoneme timing when creating checkpoints", () => {
+  assert.throws(() => createVoiceGenerationCheckpoint({
+    ...context, dialogue: [dialogue[0]], voiceIds: [voiceIds[0]],
+    artifacts: [{ ...artifacts[0], visemeEvents: [{ shape: "unknown", startMs: 0, durationMs: 100 }] }]
+  }), /invalid viseme event timing at 1/);
+  assert.throws(() => createVoiceGenerationCheckpoint({
+    ...context, dialogue: [dialogue[0]], voiceIds: [voiceIds[0]],
+    artifacts: [{ ...artifacts[0], phonemeChunks: [{ phonemes: "x", startMs: 100, endMs: 50 }] }]
+  }), /invalid phoneme chunk timing at 1/);
+});
+
+test("does not restore checkpoints with corrupted viseme or phoneme timing", async () => {
+  const invalidVisemes = createVoiceGenerationCheckpoint({ ...context, dialogue, voiceIds, artifacts });
+  invalidVisemes.lines[0].artifact.visemeEvents = [{ shape: "open", startMs: -10, durationMs: 100 }];
+  const invalidVisemeRestore = await restoreVoiceGenerationCheckpoint({
+    checkpoint: invalidVisemes, ...context, dialogue, voiceIds, storage: storage()
+  });
+  assert.deepEqual(invalidVisemeRestore, [null, null]);
+
+  const invalidPhonemes = createVoiceGenerationCheckpoint({ ...context, dialogue, voiceIds, artifacts });
+  invalidPhonemes.lines[0].artifact.phonemeChunks = [{ phonemes: "x", startMs: 100, endMs: 50 }];
+  const invalidPhonemeRestore = await restoreVoiceGenerationCheckpoint({
+    checkpoint: invalidPhonemes, ...context, dialogue, voiceIds, storage: storage()
+  });
+  assert.deepEqual(invalidPhonemeRestore, [null, null]);
+});
+
+test("rejects a checkpoint artifact assigned to a different voice", () => {
+  assert.throws(() => createVoiceGenerationCheckpoint({
+    ...context,
+    dialogue: [dialogue[0]],
+    voiceIds: [voiceIds[0]],
+    artifacts: [{ ...artifacts[0], voiceId: "af_bella" }]
+  }), /does not match its resolved speaker assignment/);
 });
 
 test("rejects malformed checkpoint construction", () => {
