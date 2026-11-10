@@ -86,7 +86,7 @@ test('rejects generated timelines that violate the shared rig timeline schema', 
 
 test('replaces an explicitly supplied invalid timeline instead of preserving it', () => {
   const invalid = { schemaVersion: 2, keyframes: [{ time: 0, poses: {} }] };
-  const valid = { schemaVersion: 1, keyframes: [{ time: 0, poses: {} }, { time: 1, poses: {} }] };
+  const valid = { schemaVersion: 1, keyframes: [{ time: 0, easing: 'linear', poses: {} }, { time: 1, easing: 'linear', poses: {} }] };
   const result = generateCharacterRigTimelinesForScenes([
     { id: 'repair-existing', characterRigs: [{ characterId: 'Foxy' }], characterRigTimeline: invalid }
   ], () => ({ timeline: valid, generatedCount: 1 }));
