@@ -954,6 +954,12 @@ $('saveCharacterReference').addEventListener('click',()=>{
     $('characterReferenceStatus').textContent=error.message;
   }
 });
+function persistCharacterBibleDraft(nextCharacterBible){
+ return writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
+  idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
+  language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible:nextCharacterBible,sceneIndex
+ }));
+}
 $('bibleReferenceImageFile').addEventListener('change',async()=>{
   const file=$('bibleReferenceImageFile').files?.[0]||null;
   if(!file)return;
@@ -963,13 +969,14 @@ $('bibleReferenceImageFile').addEventListener('change',async()=>{
     $('bibleReferenceImageFile').value='';
     return;
   }
+  let stagedAssetId='';
   try{
     const current=characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase())||{};
     const randomPart=window.crypto?.randomUUID?.().replace(/-/g,'')||Date.now().toString(36)+Math.random().toString(36).slice(2);
     const assetId='refimg_'+randomPart;
     await characterReferenceImageStorage.put(assetId,file,file.name);
-    if(current.referenceImageAssetId)await characterReferenceImageStorage.delete(current.referenceImageAssetId);
-    characterBible=upsertCharacterReference(characterBible,{
+    stagedAssetId=assetId;
+    const nextCharacterBible=upsertCharacterReference(characterBible,{
       ...current,
       characterId,
       visualDescription:$('bibleVisualDescription').value,
@@ -978,17 +985,33 @@ $('bibleReferenceImageFile').addEventListener('change',async()=>{
       distinctiveFeatures:$('bibleDistinctiveFeatures').value,
       referenceImageAssetId:assetId
     });
+    const draftSaved=persistCharacterBibleDraft(nextCharacterBible);
+    if(!draftSaved){
+      try{await characterReferenceImageStorage.delete(assetId);stagedAssetId='';}
+      catch(cleanupError){console.warn('Could not remove an uncommitted character reference image:',cleanupError);}
+      $('bibleReferenceImageStatus').textContent=uiLang==='ru'
+        ?'Фото не заменено: не удалось сохранить черновик. Предыдущий референс оставлен.'
+        :'Reference was not replaced because the draft could not be saved. The previous image was kept.';
+      return;
+    }
+    characterBible=nextCharacterBible;
+    stagedAssetId='';
+    let oldAssetCleanupFailed=false;
+    if(current.referenceImageAssetId){
+      try{await characterReferenceImageStorage.delete(current.referenceImageAssetId);}
+      catch(cleanupError){oldAssetCleanupFailed=true;console.warn('Could not clean up the previous character reference image:',cleanupError);}
+    }
     $('bibleCharacterId').dataset.loaded=String(sceneIndex);
-    const draftSaved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
-      idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
-      language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
-    }));
     $('bibleReferenceImageStatus').textContent=uiLang==='ru'
-      ?'Фото сохранено на этом устройстве ('+Math.round(file.size/1024)+' КБ). Профиль персонажа '+(draftSaved?'автоматически сохранён в черновике.':'обновлён, но черновик не удалось сохранить — нажми «Сохранить черновик».')+' Фото передаётся только в локальный ComfyUI при настроенных входах Reference Image 1/2.'
-      :'Image saved on this device ('+Math.round(file.size/1024)+' KB). Character profile '+(draftSaved?'was saved to the draft automatically.':'was updated, but the draft could not be saved — use Save Draft.')+' The image is sent only to local ComfyUI when Reference Image 1/2 inputs are configured.';
+      ?'Фото сохранено на этом устройстве ('+Math.round(file.size/1024)+' КБ). Профиль автоматически сохранён в черновике.'+(oldAssetCleanupFailed?' Старый файл не удалось очистить.':'')+' Фото передаётся только в локальный ComfyUI при настроенных входах Reference Image 1/2.'
+      :'Image saved on this device ('+Math.round(file.size/1024)+' KB). The profile was saved to the draft automatically.'+(oldAssetCleanupFailed?' The previous file could not be cleaned up.':'')+' The image is sent only to local ComfyUI when Reference Image 1/2 inputs are configured.';
     showCharacterReferenceImage(characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase()));
     renderCharacterBible();
   }catch(error){
+    if(stagedAssetId){
+      try{await characterReferenceImageStorage.delete(stagedAssetId);}
+      catch(cleanupError){console.warn('Could not clean up an uncommitted character reference image:',cleanupError);}
+    }
     $('bibleReferenceImageStatus').textContent=error.message||'Could not save character reference image.';
   }
 });
@@ -996,12 +1019,24 @@ $('removeCharacterReferenceImage').addEventListener('click',async()=>{
  const characterId=$('bibleCharacterId').value.trim();
  const profile=characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase());
  if(!profile?.referenceImageAssetId)return;
+ const previousAssetId=profile.referenceImageAssetId;
  try{
-  await characterReferenceImageStorage.delete(profile.referenceImageAssetId);
-  characterBible=upsertCharacterReference(characterBible,{...profile,referenceImageAssetId:''});
-  const draftSaved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
+  const nextCharacterBible=upsertCharacterReference(characterBible,{...profile,referenceImageAssetId:''});
+  const draftSaved=persistCharacterBibleDraft(nextCharacterBible);
+  if(!draftSaved){
+   $('bibleReferenceImageStatus').textContent=uiLang==='ru'
+    ?'Фото не удалено: не удалось сохранить черновик. Предыдущий референс оставлен.'
+    :'Reference was not removed because the draft could not be saved. The previous image was kept.';
+   return;
+  }
+  characterBible=nextCharacterBible;
+  let cleanupFailed=false;
+  try{await characterReferenceImageStorage.delete(previousAssetId);}
+  catch(cleanupError){cleanupFailed=true;console.warn('Could not clean up the removed character reference image:',cleanupError);}
   $('bibleReferenceImageFile').value='';
-  $('bibleReferenceImageStatus').textContent=uiLang==='ru'?'Фото удалено. Изменение '+(draftSaved?'автоматически сохранено в черновике.':'обновлено, но черновик не удалось сохранить.'):'Photo removed. Change '+(draftSaved?'was automatically saved to the draft.':'was updated, but the draft could not be saved.');
+  $('bibleReferenceImageStatus').textContent=uiLang==='ru'
+   ?'Фото удалено из профиля и черновик сохранён.'+(cleanupFailed?' Старый файл не удалось очистить.':'')
+   :'The image was removed from the profile and the draft was saved.'+(cleanupFailed?' The old file could not be cleaned up.':'');
   showCharacterReferenceImage(null);
   renderCharacterBible();
  }catch(error){$('bibleReferenceImageStatus').textContent=error.message||'Could not remove reference image.';}
