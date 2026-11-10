@@ -706,6 +706,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   expect(finalVideo.width).toBe(1280);
   expect(finalVideo.height).toBe(720);
   expect(finalVideo.readyState).toBeGreaterThanOrEqual(2);
+  const expectedSceneColorBuckets = ['7,2,2', '2,5,2', '1,4,7', '8,7,2', '4,1,5'];
   const observedSceneColors = await page.locator('#finalFilmPlayer').evaluate(async player => {
     const video = document.createElement('video');
     video.muted = true;
@@ -747,7 +748,9 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     video.load();
     return { colors: [...colors], samples };
   });
-  expect(new Set(observedSceneColors.colors).size, 'Final WebM should visibly contain all five distinct generated scene clips in order; observed color buckets: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toBe(5);
+  const expectedColorBuckets = [...expectedSceneColorBuckets].sort();
+  const observedColorBuckets = [...new Set(observedSceneColors.colors)].sort();
+  expect(observedColorBuckets, 'Final WebM should visibly contain all five generated scene colors in order; expected buckets: '+JSON.stringify(expectedColorBuckets)+'; observed color buckets: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedColorBuckets);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
