@@ -518,43 +518,46 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   const uploadedFilenames = [];
   const submittedImages = [];
   let jobCount = 0;
-  let videoBase64 = '';
 
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
 
-  videoBase64 = await page.evaluate(async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 160;
-    canvas.height = 90;
-    const context = canvas.getContext('2d');
-    const stream = canvas.captureStream(16);
-    const mimeType = ['video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
-    if (!mimeType) throw new Error('No supported WebM MediaRecorder format is available.');
-    const recorder = new MediaRecorder(stream, { mimeType });
-    const chunks = [];
-    recorder.addEventListener('dataavailable', event => {
-      if (event.data?.size) chunks.push(event.data);
-    });
-    const stopped = new Promise(resolve => recorder.addEventListener('stop', resolve, { once: true }));
-    recorder.start();
-    for (let frame = 0; frame < 18; frame += 1) {
-      context.fillStyle = 'hsl(' + (frame * 19) + ', 65%, 45%)';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = '#ffffff';
-      context.fillRect(frame * 7, 35, 18, 18);
-      await new Promise(resolve => setTimeout(resolve, 45));
+  const sceneVideoBase64 = await page.evaluate(async () => {
+    const results = [];
+    for (let scene = 0; scene < 5; scene += 1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 90;
+      const context = canvas.getContext('2d');
+      const stream = canvas.captureStream(16);
+      const mimeType = ['video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) throw new Error('No supported WebM MediaRecorder format is available.');
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks = [];
+      recorder.addEventListener('dataavailable', event => {
+        if (event.data?.size) chunks.push(event.data);
+      });
+      const stopped = new Promise(resolve => recorder.addEventListener('stop', resolve, { once: true }));
+      recorder.start();
+      for (let frame = 0; frame < 18; frame += 1) {
+        context.fillStyle = ['#e53935', '#43a047', '#1e88e5', '#fdd835', '#8e24aa'][scene];
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        // Keep the sampled center pixel unobstructed so each clip's scene color is measurable.
+        await new Promise(resolve => setTimeout(resolve, 45));
+      }
+      recorder.stop();
+      await stopped;
+      stream.getTracks().forEach(track => track.stop());
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = '';
+      for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+      results.push(btoa(binary));
     }
-    recorder.stop();
-    await stopped;
-    stream.getTracks().forEach(track => track.stop());
-    const blob = new Blob(chunks, { type: 'video/webm' });
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    let binary = '';
-    for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
-    return btoa(binary);
+    return results;
   });
-  expect(Buffer.from(videoBase64, 'base64').byteLength).toBeGreaterThan(1024);
+  expect(sceneVideoBase64).toHaveLength(5);
+  expect(sceneVideoBase64.every(value => Buffer.from(value, 'base64').byteLength > 1024)).toBe(true);
 
   await page.route('http://127.0.0.1:8188/**', async route => {
     const request = route.request();
@@ -623,11 +626,13 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     }
 
     if (url.pathname === '/view') {
+      const filename = url.searchParams.get('filename') || '';
+      const sceneNumber = Number(filename.match(/scene-(\d+)/)?.[1] || 1);
       return route.fulfill({
         status: 200,
         contentType: 'video/webm',
         headers: corsHeaders,
-        body: Buffer.from(videoBase64, 'base64')
+        body: Buffer.from(sceneVideoBase64[Math.max(0, Math.min(4, sceneNumber - 1))], 'base64')
       });
     }
 
@@ -635,7 +640,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   });
 
   await page.locator('#idea').fill(
-    'A young fox finds a glowing key in a forest, follows its light to a hidden gate, opens it, and discovers a peaceful garden. Duration: 0.25 seconds'
+    'A young fox finds a glowing key in a forest, follows its light to a hidden gate, opens it, and discovers a peaceful garden. Duration: 1 second'
   );
   await page.locator('#make').click();
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
@@ -701,6 +706,60 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   expect(finalVideo.width).toBe(1280);
   expect(finalVideo.height).toBe(720);
   expect(finalVideo.readyState).toBeGreaterThanOrEqual(2);
+  const expectedSceneColorBuckets = ['7,2,2', '2,5,2', '1,4,7', '8,7,2', '4,1,5'];
+  const observedSceneColors = await page.locator('#finalFilmPlayer').evaluate(async player => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.src = player.currentSrc;
+    await new Promise((resolve, reject) => {
+      video.addEventListener('loadedmetadata', resolve, { once: true });
+      video.addEventListener('error', () => reject(new Error('Could not decode final film for scene-order verification.')), { once: true });
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 16;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const colors = new Set();
+    const samples = [];
+    const sceneColorSequence = [];
+    let firstSceneFrameSeen = false;
+    let lastSceneColorBucket = null;
+    let lastSampleAt = -1000;
+    await video.play();
+    const startedAt = performance.now();
+    while (!video.ended && performance.now() - startedAt < 30000) {
+      if (video.readyState >= 2) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const pixel = context.getImageData(8, 8, 1, 1).data;
+        const rgb = [pixel[0], pixel[1], pixel[2]];
+        // Ignore the recorder's initial black frame before the first scene frame is available.
+        const colorBucket = rgb.map(value => Math.round(value / 32)).join(',');
+        if (colorBucket !== '0,0,0') {
+          firstSceneFrameSeen = true;
+          if (colorBucket !== lastSceneColorBucket) {
+            sceneColorSequence.push(colorBucket);
+            lastSceneColorBucket = colorBucket;
+          }
+        }
+        if (firstSceneFrameSeen) colors.add(colorBucket);
+        if (performance.now() - lastSampleAt >= 100) {
+          samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb });
+          lastSampleAt = performance.now();
+        }
+      }
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    }
+    if (!video.ended) throw new Error('Timed out playing final WebM during scene-order verification.');
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    return { colors: [...colors], sceneColorSequence, samples };
+  });
+  const expectedColorBuckets = [...expectedSceneColorBuckets].sort();
+  const observedColorBuckets = [...new Set(observedSceneColors.colors)].sort();
+  expect(observedColorBuckets, 'Final WebM should contain exactly the five generated scene color buckets; expected: '+JSON.stringify(expectedColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedColorBuckets);
+  expect(observedSceneColors.sceneColorSequence, 'Final WebM scene colors should follow storyboard order; expected: '+JSON.stringify(expectedSceneColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.sceneColorSequence)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedSceneColorBuckets);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
