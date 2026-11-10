@@ -720,13 +720,20 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     canvas.height = 16;
     const context = canvas.getContext('2d', { willReadFrequently: true });
     const colors = new Set();
+    const samples = [];
+    let lastSampleAt = -1000;
     await video.play();
     const startedAt = performance.now();
     while (!video.ended && performance.now() - startedAt < 30000) {
       if (video.readyState >= 2) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         const pixel = context.getImageData(8, 8, 1, 1).data;
-        colors.add([pixel[0], pixel[1], pixel[2]].map(value => Math.round(value / 32)).join(','));
+        const rgb = [pixel[0], pixel[1], pixel[2]];
+        colors.add(rgb.map(value => Math.round(value / 32)).join(','));
+        if (performance.now() - lastSampleAt >= 100) {
+          samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb });
+          lastSampleAt = performance.now();
+        }
       }
       await new Promise(resolve => requestAnimationFrame(resolve));
     }
@@ -734,9 +741,9 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     video.pause();
     video.removeAttribute('src');
     video.load();
-    return [...colors];
+    return { colors: [...colors], samples };
   });
-  expect(new Set(observedSceneColors).size, 'Final WebM should visibly contain all five distinct generated scene clips in order; observed color buckets: '+JSON.stringify(observedSceneColors)).toBe(5);
+  expect(new Set(observedSceneColors.colors).size, 'Final WebM should visibly contain all five distinct generated scene clips in order; observed color buckets: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toBe(5);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
