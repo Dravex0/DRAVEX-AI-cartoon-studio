@@ -70,6 +70,7 @@ import { getAudioTimelineOffsetMs, getScheduledAudioStartAtMs } from "./audio-cl
 import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js";
 import { createAudioExportSession } from "./audio-export.js";
 import { buildLipSyncQualityReport } from "./lip-sync-quality-report.js";
+import { selectRenderableLipSyncTracks } from "./lip-sync-track-eligibility.js";
 import { waitForExportVideoReady, validateExportTracks } from "./film-export-readiness.js";
 import { buildSceneMediaReport } from "./scene-media-report.js";
 import { analyzeSceneVideoMotion, captureSceneVideoFrameSamples } from "./scene-motion-analysis.js";
@@ -3699,11 +3700,18 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     exportMouthTracks=[];
     let lipSyncEligibleTrackCount=0;
     if(voiceTracks.length){
-      const mainCharacterKey=String($("character").value||"").trim().toLowerCase();
-      const mainCharacterVoiceTracks=voiceTracks.filter(track=>{const meta=sceneMetadata[track.sceneIndex]||{};const hasFacialRig=sceneHasFacialRigForSpeaker(meta.characterFacialRigs,track.characterId,track.characterName);return track.characterName.trim().toLowerCase()===mainCharacterKey||hasFacialRig;});
-      // Generated images/videos are valid lip-sync backgrounds too. The facial
-      // rig compositor overlays mouth parts on top of the scene during canvas export.
-      const lipSyncRenderableTracks=mainCharacterVoiceTracks;
+      const mainCharacterKey=String($("character").value||"").trim();
+      const storyUsesFallback=currentStoryboardPlan
+        ?currentStoryboardPlan.proceduralDemoCharacter===true
+        :!mainCharacterKey;
+      // Analyze only dialogue whose mouth can actually be rendered: a valid
+      // facial mouth rig, or the built-in procedural demo character.
+      const lipSyncRenderableTracks=selectRenderableLipSyncTracks({
+        voiceTracks,
+        sceneMetadata,
+        mainCharacterKey,
+        storyUsesFallback
+      });
       lipSyncEligibleTrackCount=lipSyncRenderableTracks.length;
       const AudioContextClass=window.AudioContext||window.webkitAudioContext;
       if(AudioContextClass&&lipSyncRenderableTracks.length){
@@ -3775,8 +3783,8 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
           ?'Приблизительная синхронизация по тексту: '+lipSyncReport.approximateTrackCount+' реплик.'
           :'Approximate text-based lip-sync: '+lipSyncReport.approximateTrackCount+' dialogue line(s).');
         if(lipSyncReport.notSelectedTrackCount)lipSyncWarnings.push(uiLang==='ru'
-          ?'Липсинк не анализировался для '+lipSyncReport.notSelectedTrackCount+' реплик: персонажи не входят в текущую область обработки.'
-          :'Lip-sync was not analyzed for '+lipSyncReport.notSelectedTrackCount+' dialogue line(s): those speakers are outside the current processing scope.');
+          ?'Липсинк не применён для '+lipSyncReport.notSelectedTrackCount+' реплик: нет доступного лицевого рига с ртом или встроенного персонажа предпросмотра.'
+          :'Lip-sync was not applied to '+lipSyncReport.notSelectedTrackCount+' dialogue line(s): no renderable facial mouth rig or built-in preview character is available.');
         const lipSyncWarning=lipSyncWarnings.length?' · '+lipSyncWarnings.join(' '):'';
         $('status').textContent=uiLang==='ru'
           ?'Экспортировано '+timeline.segments.length+' сцен · '+timeline.totalDurationSeconds.toFixed(2)+' сек.'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+lipSyncWarning
