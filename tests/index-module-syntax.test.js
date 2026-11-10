@@ -182,3 +182,11 @@ test('cinematic camera transform covers generated media, props, and rigged chara
   assert.ok(cameraRestore > characterDraw);
   assert.ok(titleDraw > cameraRestore);
 });
+
+test('voice generation isolates progress observer failures from synthesis', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.match(app, /import \{ emitProgressSafely \} from ["']\.\/progress-callback\.js["']/);
+  assert.match(app, /const emitVoiceProgress=detail=>emitProgressSafely\(onProgress,detail,error=>console\.warn\(/);
+  assert.equal((app.match(/emitVoiceProgress\(\{phase:/g) || []).length, 3);
+  assert.doesNotMatch(app, /onProgress\(\{phase:'(?:reused|generating|scene-completed)'/);
+});
