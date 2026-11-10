@@ -722,7 +722,9 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     const context = canvas.getContext('2d', { willReadFrequently: true });
     const colors = new Set();
     const samples = [];
+    const sceneColorSequence = [];
     let firstSceneFrameSeen = false;
+    let lastSceneColorBucket = null;
     let lastSampleAt = -1000;
     await video.play();
     const startedAt = performance.now();
@@ -733,7 +735,13 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
         const rgb = [pixel[0], pixel[1], pixel[2]];
         // Ignore the recorder's initial black frame before the first scene frame is available.
         const colorBucket = rgb.map(value => Math.round(value / 32)).join(',');
-        if (colorBucket !== '0,0,0') firstSceneFrameSeen = true;
+        if (colorBucket !== '0,0,0') {
+          firstSceneFrameSeen = true;
+          if (colorBucket !== lastSceneColorBucket) {
+            sceneColorSequence.push(colorBucket);
+            lastSceneColorBucket = colorBucket;
+          }
+        }
         if (firstSceneFrameSeen) colors.add(colorBucket);
         if (performance.now() - lastSampleAt >= 100) {
           samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb });
@@ -746,11 +754,12 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     video.pause();
     video.removeAttribute('src');
     video.load();
-    return { colors: [...colors], samples };
+    return { colors: [...colors], sceneColorSequence, samples };
   });
   const expectedColorBuckets = [...expectedSceneColorBuckets].sort();
   const observedColorBuckets = [...new Set(observedSceneColors.colors)].sort();
-  expect(observedColorBuckets, 'Final WebM should visibly contain all five generated scene colors in order; expected buckets: '+JSON.stringify(expectedColorBuckets)+'; observed color buckets: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedColorBuckets);
+  expect(observedColorBuckets, 'Final WebM should contain exactly the five generated scene color buckets; expected: '+JSON.stringify(expectedColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedColorBuckets);
+  expect(observedSceneColors.sceneColorSequence, 'Final WebM scene colors should follow storyboard order; expected: '+JSON.stringify(expectedSceneColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.sceneColorSequence)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedSceneColorBuckets);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
