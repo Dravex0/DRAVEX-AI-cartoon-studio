@@ -50,6 +50,7 @@ import { createSceneVideoStorage, persistSceneVideoBestEffort } from "./scene-vi
 import { createFacialAssetStorage } from "./facial-asset-storage.js";
 import { createCharacterReferenceImageStorage } from "./character-reference-image-storage.js";
 import { generateStoryboardVideos, readVideoProgressPercent } from "./scene-video-batch.js";
+import { emitProgressSafely } from "./progress-callback.js";
 import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./huggingface-zerogpu-video-provider.js";
 import { fitSceneVideoToDuration, syncSceneVideoPlayback } from "./scene-video-transport.js";
 import { waitForSceneVideoReady, rewindSceneVideoAndWait, waitForSceneImageReady, isSceneVideoDecoded } from "./scene-video-readiness.js";
@@ -1875,6 +1876,7 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
  try{const parsed=JSON.parse(readLocalStorage('dravex-character-voice-map')||'{}');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))savedMap=parsed}catch{}
  const overallTotal=targets.reduce((total,target)=>total+target.dialogue.length,0);
  let overallIndex=0,lineCount=0,totalDurationMs=0,persistedInDraft=true;
+ const emitVoiceProgress=detail=>emitProgressSafely(onProgress,detail,error=>console.warn('DRAVEX voice progress callback failed:',error));
  const sceneIds=[];
  for(const target of targets){
   if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
@@ -1906,11 +1908,11 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
    const voiceId=voiceIds[index]||undefined;
    if(artifacts[index]){
     overallIndex++;
-    onProgress({phase:'reused',sceneIndex:targetIndex,index:index+1,total:dialogue.length,overallIndex,overallTotal,characterId:line.characterId});
+    emitVoiceProgress({phase:'reused',sceneIndex:targetIndex,index:index+1,total:dialogue.length,overallIndex,overallTotal,characterId:line.characterId});
     continue;
    }
    if(sceneIndex===targetIndex)$('sceneVoiceStatus').textContent=voiceText('Создаём голос сцены '+(targetIndex+1)+': '+(index+1)+' из '+dialogue.length+'…','Generating scene '+(targetIndex+1)+' voice '+(index+1)+' of '+dialogue.length+'…');
-   onProgress({phase:'generating',sceneIndex:targetIndex,index:index+1,total:dialogue.length,overallIndex:overallIndex+1,overallTotal,characterId:line.characterId});
+   emitVoiceProgress({phase:'generating',sceneIndex:targetIndex,index:index+1,total:dialogue.length,overallIndex:overallIndex+1,overallTotal,characterId:line.characterId});
    const result=await engine.synthesize({text:line.text,voiceId,filename:'scene-'+targetId+'-line-'+(index+1)+'.wav',signal});
    artifacts[index]={audioHash:result.audioHash,durationMs:result.durationMs,voiceId:voiceId||null,
     ...(Array.isArray(result.visemeEvents)?{visemeEvents:result.visemeEvents}:{}),
@@ -1946,7 +1948,7 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
     'Done: '+scheduled.cues.length+' lines · scene '+(resolvedIndex+1)+' · '+(scheduled.timeline.totalDurationMs/1000).toFixed(2)+' sec.'
    );
   }
-  onProgress({phase:'scene-completed',sceneIndex:resolvedIndex,sceneCount:targetIndices.length,overallIndex,overallTotal});
+  emitVoiceProgress({phase:'scene-completed',sceneIndex:resolvedIndex,sceneCount:targetIndices.length,overallIndex,overallTotal});
  }
  if(allScenes){
   const expectedIds=new Set(targets.map(target=>target.sceneId));
