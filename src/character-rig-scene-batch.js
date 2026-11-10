@@ -1,3 +1,5 @@
+import { validateCharacterRigTimeline } from './character-rig-timeline.js';
+
 /**
  * Generate character-rig timelines for every eligible scene without mutating input.
  * Existing timelines are preserved; scenes without validated rigs are never guessed.
@@ -32,7 +34,7 @@ export function generateCharacterRigTimelinesForScenes(scenes, createTimeline) {
       scenesWithoutRig++;
       return scene;
     }
-    if (Array.isArray(meta.characterRigTimeline?.keyframes) && meta.characterRigTimeline.keyframes.length) {
+    if (meta.characterRigTimeline != null && validateCharacterRigTimeline(meta.characterRigTimeline).passed) {
       preservedTimelines++;
       return scene;
     }
@@ -49,9 +51,19 @@ export function generateCharacterRigTimelinesForScenes(scenes, createTimeline) {
       return scene;
     }
 
-    if (!result?.timeline || !Array.isArray(result.timeline.keyframes) || !result.timeline.keyframes.length) {
+    if (!result?.timeline) {
       scenesWithoutActions++;
       if (result?.reason) skipped.push({ sceneIndex: index, reason: String(result.reason).slice(0, 500) });
+      return scene;
+    }
+    const timelineReport = validateCharacterRigTimeline(result.timeline);
+    if (!timelineReport.passed) {
+      scenesWithoutActions++;
+      skipped.push({
+        sceneIndex: index,
+        reason: 'generated-rig-timeline-invalid',
+        issues: timelineReport.issues.map(issue => issue.code)
+      });
       return scene;
     }
 
@@ -59,7 +71,7 @@ export function generateCharacterRigTimelinesForScenes(scenes, createTimeline) {
     generatedActions += Number.isFinite(result.generatedCount) ? Math.max(0, result.generatedCount) : 0;
     const skippedActions = Array.isArray(result.skipped) ? result.skipped.length : 0;
     if (skippedActions) skipped.push({ sceneIndex: index, skippedActions });
-    return { ...meta, characterRigTimeline: result.timeline };
+    return { ...meta, characterRigTimeline: timelineReport.timeline };
   });
 
   return {
