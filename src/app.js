@@ -19,7 +19,7 @@ import { createUniversalRemoteVideoCapability } from "./universal-remote-video-c
 import { createUniversalFilmCompositionCapability } from "./universal-film-composition-capability.js";
 import { resolveUniversalSceneTarget } from "./universal-scene-target.js";
 import { resolveUniversalVoiceTargets } from "./universal-voice-target.js";
-import { resolveAutomaticSpeechTasks } from "./automatic-speech-workflow.js";
+import { resolveAutomaticSpeechTasks, runOptionalSpeechPreparation } from "./automatic-speech-workflow.js";
 import { findScenesWithMissingVoiceAudio } from "./voice-artifact-readiness.js";
 import { generateSceneDialogue, selectScenesMissingDialogue } from "./scene-dialogue-generator.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
@@ -2265,24 +2265,35 @@ $('makeFilm').addEventListener('click',async()=>{
   return;
  }
  const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata,language:storyLanguage()});
- if(speechPlan.dialogueRequested||speechPlan.voiceRequested){
-  const speechController=new AbortController();
-  const createButton=$('makeFilm');
-  const cancelButton=$('cancelFullFilmComfy');
-  fullFilmAbortController=speechController;
-  createButton.disabled=true;
-  cancelButton.hidden=false;
-  try{
-   await runAutomaticDialogueAndVoice(request,speechController.signal);
-  }catch(error){
-   $('status').textContent=(uiLang==='ru'?'Не удалось подготовить диалоги/озвучку: ':'Could not prepare dialogue/voice: ')+(error?.message||'Unknown error');
-   return;
-  }finally{
-   if(fullFilmAbortController===speechController)fullFilmAbortController=null;
-   createButton.disabled=false;
-   cancelButton.hidden=true;
+ let speechController=null;
+ const speechPreparation=await runOptionalSpeechPreparation({
+  requested:speechPlan.dialogueRequested||speechPlan.voiceRequested,
+  prepare:async()=>{
+   speechController=new AbortController();
+   const createButton=$('makeFilm');
+   const cancelButton=$('cancelFullFilmComfy');
+   fullFilmAbortController=speechController;
+   createButton.disabled=true;
+   cancelButton.hidden=false;
+   try{
+    return await runAutomaticDialogueAndVoice(request,speechController.signal);
+   }finally{
+    if(fullFilmAbortController===speechController)fullFilmAbortController=null;
+    createButton.disabled=false;
+    cancelButton.hidden=true;
+   }
   }
-  if(speechController.signal.aborted)return;
+ });
+ if(speechPreparation.status==='cancelled'||speechController?.signal.aborted){
+  $('status').textContent=uiLang==='ru'?'Подготовка диалогов/озвучки отменена.':'Dialogue/voice preparation was cancelled.';
+  return;
+ }
+ if(speechPreparation.status==='skipped'){
+  const message=(uiLang==='ru'?'Видео продолжится без диалогов/озвучки: ':'Video will continue without dialogue/voice: ')+speechPreparation.reason;
+  const dialogueDetails=$('dialogueSummary')?.closest('details');
+  if(dialogueDetails)dialogueDetails.open=true;
+  if($('sceneVoiceStatus'))$('sceneVoiceStatus').textContent=message;
+  $('status').textContent=message;
  }
  const motionPreparation=prepareAutomaticCharacterMotion();
  if(mode==='local-canvas'){
