@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences, CHARACTER_REFERENCE_LIMIT } from '../src/character-reference.js';
+import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene, CHARACTER_REFERENCE_LIMIT } from '../src/character-reference.js';
 
 test('normalizes and bounds every visual identity field', () => {
   const result = normalizeCharacterReference({
@@ -98,4 +98,33 @@ test('preserves a local reference image asset ID without embedding image data', 
   });
   assert.equal(result.referenceImageAssetId, 'refimg_12345678');
   assert.equal(Object.hasOwn(result, 'referenceImage'), false);
+});
+
+
+test('routes only the reference profiles explicitly present in a scene cast', () => {
+  const profiles = [
+    { characterId: 'Foxy', referenceImageAssetId: 'fox-image' },
+    { characterId: 'Mira', referenceImageAssetId: 'mira-image' },
+    { characterId: 'Snowball', referenceImageAssetId: 'snow-image' }
+  ];
+  const selected = selectCharacterReferencesForScene(profiles, ['mIrA', 'Foxy']);
+  assert.deepEqual(selected.map(profile => profile.characterId), ['Foxy', 'Mira']);
+  assert.deepEqual(selected.map(profile => profile.referenceImageAssetId), ['fox-image', 'mira-image']);
+});
+
+test('does not leak character references into scenes with an empty or unrelated cast', () => {
+  const profiles = [
+    { characterId: 'Foxy', referenceImageAssetId: 'fox-image' },
+    { characterId: 'Mira', referenceImageAssetId: 'mira-image' }
+  ];
+  assert.deepEqual(selectCharacterReferencesForScene(profiles, []), []);
+  assert.deepEqual(selectCharacterReferencesForScene(profiles, ['Unknown character']), []);
+});
+
+test('limits scene-specific reference profiles to the two provider input slots', () => {
+  const profiles = ['Foxy', 'Mira', 'Snowball'].map(characterId => ({ characterId }));
+  assert.deepEqual(
+    selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball']).map(profile => profile.characterId),
+    ['Foxy', 'Mira']
+  );
 });
