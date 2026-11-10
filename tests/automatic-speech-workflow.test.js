@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveAutomaticSpeechTasks } from '../src/automatic-speech-workflow.js';
+import { resolveAutomaticSpeechTasks, runOptionalSpeechPreparation } from '../src/automatic-speech-workflow.js';
 import { findScenesWithMissingVoiceAudio } from '../src/voice-artifact-readiness.js';
 
 const hash = 'a'.repeat(64);
@@ -168,4 +168,31 @@ test('treats explicit lip-sync requests as requiring dialogue and voice artifact
     assert.equal(result.scenesMissingDialogue.length, 1, request);
     assert.deepEqual(result.scenesMissingVoice, [], request);
   }
+});
+
+
+test('continues the film workflow when optional speech preparation is unavailable', async () => {
+  const result = await runOptionalSpeechPreparation({
+    requested: true,
+    prepare: async () => { throw new Error('local text model is not loaded'); }
+  });
+  assert.deepEqual(result, { status: 'skipped', reason: 'local text model is not loaded' });
+});
+
+test('preserves cancellation as a hard stop for optional speech preparation', async () => {
+  const result = await runOptionalSpeechPreparation({
+    requested: true,
+    prepare: async () => { throw new DOMException('Cancelled', 'AbortError'); }
+  });
+  assert.equal(result.status, 'cancelled');
+});
+
+test('does not invoke speech preparation when dialogue and voice are not requested', async () => {
+  let called = false;
+  const result = await runOptionalSpeechPreparation({
+    requested: false,
+    prepare: async () => { called = true; }
+  });
+  assert.deepEqual(result, { status: 'not-requested' });
+  assert.equal(called, false);
 });

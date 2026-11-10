@@ -185,6 +185,17 @@ describe('character rig foundation', () => {
     assert.equal(report.rig.bones[1].pivotEnabled, false);
   });
 
+  it('keeps an absent rig timeline null, but preserves explicitly supplied malformed timelines for validation', () => {
+    const absent = normalizeScene({ id: 'no-rig-timeline' });
+    assert.equal(absent.characterRigTimeline, null);
+
+    const malformed = normalizeScene({
+      id: 'malformed-rig-timeline',
+      characterRigTimeline: { schemaVersion: 2, keyframes: [] }
+    });
+    assert.deepEqual(malformed.characterRigTimeline, { schemaVersion: 2, keyframes: [] });
+  });
+
 });
 
 

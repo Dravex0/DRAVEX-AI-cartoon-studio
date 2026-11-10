@@ -44,7 +44,7 @@ export function normalizeScene(input = {}, index = 0) {
     // Rig metadata is separate from whole-character sprites until segmented assets are supplied.
     characterRigs: Array.isArray(scene.characterRigs) ? scene.characterRigs.slice(0, 20).map(normalizeCharacterRig) : [],
     characterRigPoses: normalizeCharacterRigPoses(scene.characterRigPoses),
-    characterRigTimeline: normalizeCharacterRigTimeline(scene.characterRigTimeline),
+    characterRigTimeline: scene.characterRigTimeline == null ? null : normalizeCharacterRigTimeline(scene.characterRigTimeline),
     // Facial assets and expression controls remain explicit metadata until renderer integration.
     characterFacialRigs: Array.isArray(scene.characterFacialRigs) ? scene.characterFacialRigs.slice(0, 20).map(normalizeCharacterFacialRig) : [],
     characterFacialExpressions: normalizeCharacterFacialExpressions(scene.characterFacialExpressions),
