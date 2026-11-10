@@ -48,3 +48,21 @@ export function resolveAutomaticSpeechTasks({ request = '', scenes = [], languag
     scenesMissingVoice
   };
 }
+
+/**
+ * Speech is an optional production layer: unavailable local models must not
+ * prevent storyboard/video rendering. Cancellation remains a hard stop.
+ */
+export async function runOptionalSpeechPreparation({ requested = false, prepare } = {}) {
+  if (!requested) return { status: 'not-requested' };
+  if (typeof prepare !== 'function') throw new TypeError('A speech preparation callback is required.');
+  try {
+    return { status: 'completed', result: await prepare() };
+  } catch (error) {
+    if (error?.name === 'AbortError') return { status: 'cancelled' };
+    return {
+      status: 'skipped',
+      reason: clean(error?.message) || 'speech-preparation-failed'
+    };
+  }
+}
