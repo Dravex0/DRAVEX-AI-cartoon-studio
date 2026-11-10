@@ -845,3 +845,23 @@ test('keeps the essential creator settings visible and usable on mobile', async 
   await page.locator('#imageQuality').selectOption('high');
   await expect(page.locator('#imageQuality')).toHaveValue('high');
 });
+
+
+test('missing optional dialogue model does not block local film export', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#uiLanguage').selectOption('ru');
+  await page.locator('#idea').fill(
+    'Foxy идёт по лесу. Диалог: Foxy говорит «Привет!». Duration: 0.25 seconds'
+  );
+  await page.locator('#makeFilm').click();
+
+  await expect(page.locator('#sceneVoiceStatus')).toContainText(
+    /Видео продолжится без диалогов\/озвучки/i,
+    { timeout: 15000 }
+  );
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
+  expect(pageErrors).toEqual([]);
+});
