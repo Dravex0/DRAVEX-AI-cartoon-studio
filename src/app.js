@@ -60,7 +60,7 @@ import { buildExportTimeline } from "./export-timeline.js";
 import { captureFilmSceneSnapshot, matchesFilmSceneSnapshot } from "./film-scene-snapshot.js";
 import { createSceneGenerationGuard } from "./scene-generation-guard.js";
 import { buildAudioMouthEnvelope, sampleAudioMouthEnvelope } from "./audio-mouth-envelope.js";
-import { sampleCharacterFacialLipSync, sceneHasFacialRigForSpeaker } from "./facial-lipsync-runtime.js";
+import { sampleCharacterFacialLipSync } from "./facial-lipsync-runtime.js";
 import { createFaceLandmarkerWorkerClient } from "./face-landmarker-worker-client.js";
 import { sampleFaceLandmarkTimeline } from "./face-landmark-timeline.js";
 import { projectFaceLandmarkOverlay } from "./face-landmark-overlay.js";
