@@ -90,7 +90,7 @@ import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
 import { generateCharacterSpriteAsset } from "./character-sprite-generation.js";
 import { verifySpriteTransparency } from "./character-sprite-verification.js";
-import { upsertCharacterReference, mergeCharacterReferences } from "./character-reference.js";
+import { upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene } from "./character-reference.js";
 import { prepareStoryCharacterContext } from "./story-character-context.js";
 import { normalizeSceneCast } from "./scene-cast.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
@@ -1008,7 +1008,7 @@ $('removeCharacterReferenceImage').addEventListener('click',async()=>{
 });
 async function loadCharacterReferenceImagesForScene(scene){
   const cast=normalizeSceneCast('',scene?.characters);
-  const profiles=characterBible.filter(profile=>cast.some(name=>name.toLowerCase()===profile.characterId.toLowerCase()));
+  const profiles=selectCharacterReferencesForScene(characterBible,cast);
   const images=[];
   for(const profile of profiles){
     if(images.length>=2)break;

@@ -63,3 +63,27 @@ export function mergeCharacterReferences(existing = [], discovered = []) {
 
   return merged;
 }
+
+
+/**
+ * Return only character profiles explicitly named in a scene cast.
+ * An empty or unknown cast must never inherit unrelated character references.
+ */
+export function selectCharacterReferencesForScene(references = [], sceneCast = []) {
+  const cast = (Array.isArray(sceneCast) ? sceneCast : String(sceneCast ?? '').split(','))
+    .map(value => clean(value, 120).toLocaleLowerCase())
+    .filter(Boolean);
+  if (!cast.length) return [];
+  const allowed = new Set(cast);
+  const selected = [];
+  const seen = new Set();
+  for (const source of Array.isArray(references) ? references : []) {
+    const profile = normalizeCharacterReference(source);
+    const key = profile.characterId.toLocaleLowerCase();
+    if (!key || !allowed.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    selected.push(profile);
+    if (selected.length >= 2) break;
+  }
+  return selected;
+}
