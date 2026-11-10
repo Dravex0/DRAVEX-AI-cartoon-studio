@@ -721,6 +721,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     const context = canvas.getContext('2d', { willReadFrequently: true });
     const colors = new Set();
     const samples = [];
+    let firstSceneFrameSeen = false;
     let lastSampleAt = -1000;
     await video.play();
     const startedAt = performance.now();
@@ -730,7 +731,9 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
         const pixel = context.getImageData(8, 8, 1, 1).data;
         const rgb = [pixel[0], pixel[1], pixel[2]];
         // Ignore the recorder's initial black frame before the first scene frame is available.
-        if (video.currentTime > 0.05) colors.add(rgb.map(value => Math.round(value / 32)).join(','));
+        const colorBucket = rgb.map(value => Math.round(value / 32)).join(',');
+        if (colorBucket !== '0,0,0') firstSceneFrameSeen = true;
+        if (firstSceneFrameSeen) colors.add(colorBucket);
         if (performance.now() - lastSampleAt >= 100) {
           samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb });
           lastSampleAt = performance.now();
