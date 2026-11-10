@@ -147,6 +147,37 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 .quick-settings-grid .field:first-child{grid-column:1/-1}
 .quick-settings-grid .field small{display:block;font-size:11px;line-height:1.45}
 @media(max-width:720px){.quick-settings-grid{grid-template-columns:minmax(0,1fr)}.quick-settings-grid .field:first-child{grid-column:auto}}
+
+/* Minimal prompt-first workspace: keep the main path visible and diagnostics tucked away. */
+.top>div:last-child{display:none!important}
+.hero,.workflow-steps{display:none!important}
+.layout>.panel:first-child .field:has(#character){display:none!important}
+.layout>.panel:first-child .row:has(#character){grid-template-columns:minmax(0,1fr)!important}
+.layout>.panel:first-child details.simple-options:not(.quick-settings){display:none!important}
+.quick-settings{margin:8px 0 12px!important;padding:9px 11px!important}
+.quick-settings>summary{font-size:13px!important}
+.quick-settings .field:has(#imageQuality){display:none!important}
+.quick-settings .quick-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.layout>.panel:first-child>.field:has(#language){display:none!important}
+.layout>.panel:first-child .actions:has(#make){display:none!important}
+.layout>.panel:first-child>#qaReport:empty{display:none!important}
+.layout>.panel:first-child>#qaReport{font-size:12px!important}
+.advanced-video-settings{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:13px;background:#0d1729}
+.advanced-video-settings>summary,.advanced-audio-settings>summary{cursor:pointer;list-style:none;font-size:13px;font-weight:750;color:#d8d4ff}
+.advanced-video-settings>summary::-webkit-details-marker,.advanced-audio-settings>summary::-webkit-details-marker{display:none}
+.advanced-video-settings>summary:after,.advanced-audio-settings>summary:after{content:"+";float:right;color:var(--cyan);font-size:17px}
+.advanced-video-settings[open]>summary:after,.advanced-audio-settings[open]>summary:after{content:"−"}
+.editorFields>*:not(.advanced-video-settings):not(#fullFilmProgressPanel):not(#fullFilmStatus):not(#generatedImageWrap){display:none!important}
+.editorFields>.advanced-video-settings{display:block!important}
+#faceAnalysisPanel,#auditAllAnimations,#animationCompatibilityStatus,#analyzeCharacterMotion,#characterMotionAuditStatus,#downloadCharacterMotionEvidence{display:none!important}
+.audio-panel{margin-top:10px}
+.layout>.panel:nth-child(2)>.actions:has(#play),.layout>.panel:nth-child(2)>p:has([data-i18n="previewDisclaimer"]){display:none!important}
+.foot{display:none!important}
+#finalFilmResult{margin-top:12px}
+@media(max-width:720px){
+ .quick-settings .quick-settings-grid{grid-template-columns:minmax(0,1fr)!important}
+ .layout>.panel:first-child .row:has(#character){grid-template-columns:minmax(0,1fr)!important}
+}
 </style>
 </head>
 <body>
@@ -170,15 +201,15 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 <pre id="universalTaskPlanOutput" hidden style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;padding:10px;border:1px solid var(--line);border-radius:10px;background:#11131e;color:var(--text);font-size:12px"></pre>
 </details>
 <div class="row"><div class="field"><label for="character" data-i18n="characterLabel">Main character</label><input id="character" value="" placeholder="Auto-detect from story / Автоопределение из сценария"></div><div class="field"><label for="style" data-i18n="styleLabel">Visual style</label><select id="style"><option value="Storybook" data-i18n="styleStorybook">Storybook</option><option value="Anime-inspired" data-i18n="styleAnime">Anime-inspired</option><option value="Flat 2D" data-i18n="styleFlat2D">Flat 2D</option><option value="Pixel art" data-i18n="stylePixelArt">Pixel art</option><option value="3D animated" data-i18n="style3DAnimated">3D animated</option><option value="3D realistic" data-i18n="style3DRealistic">Realistic 3D</option><option value="Clay 3D" data-i18n="styleClay3D">Clay 3D</option><option value="Watercolor" data-i18n="styleWatercolor">Watercolor</option><option value="Comic / manga" data-i18n="styleManga">Comic / manga</option><option value="Paper cutout" data-i18n="stylePaperCutout">Paper cutout</option><option value="Stop-motion" data-i18n="styleStopMotion">Stop-motion</option></select></div></div>
-<details class="simple-options quick-settings" open>
-<summary>Основные настройки / More settings</summary>
+<details class="simple-options quick-settings">
+<summary>Настройки видео</summary>
 <div class="quick-settings-grid">
 <div class="field"><label for="canvasFormat">Формат видео / Video format</label><select id="canvasFormat"><option value="landscape">16:9 · горизонтальный / Landscape</option><option value="portrait">9:16 · вертикальный / Portrait</option></select><small class="muted">Формат применяется к предпросмотру и итоговому WebM. / Applies to preview and final WebM.</small></div>
 <div class="field"><label for="imageQuality" data-i18n="qualityLabel">Image quality</label><select id="imageQuality"><option value="standard" data-i18n="qualityStandard">Standard · 640×384</option><option value="high" data-i18n="qualityHigh">High · 768×448</option><option value="ultra" data-i18n="qualityUltra">Maximum · 1024×576</option></select><small class="muted" data-i18n="qualityNote">Applies to optional AI-generated still images. Higher quality takes longer in the free queue.</small></div>
 <div class="field"><label for="duration" data-i18n="durationLabel">Scene duration</label><select id="duration"><option value="3" data-i18n="seconds3">3 seconds</option><option value="5" data-i18n="seconds5">5 seconds</option><option value="8" data-i18n="seconds8">8 seconds</option></select></div>
 </div>
 </details>
-<div class="field"><label for="language" data-i18n="storyLanguageLabel">Story language</label><select id="language"><option value="en">English</option><option value="ru">Русский</option><option value="uk">Українська</option><option value="es">Español</option></select></div>
+<div class="field"><label for="language" data-i18n="storyLanguageLabel">Язык истории</label><select id="language"><option value="en">English</option><option value="ru" selected>Русский</option><option value="uk">Українська</option><option value="es">Español</option></select></div>
 <div class="actions"><button type="button" id="makeFilm" class="primary-action">Создать готовое видео / Create finished video</button></div><div class="actions"><button id="make" class="secondary" data-i18n="createButton">Create storyboard</button><button class="secondary" id="save" data-i18n="saveButton">Save draft</button></div><div class="status" id="status" role="status"><span data-i18n="readyStatus">Ready. Your idea stays in this browser unless you export it.</span></div><div id="qaReport" class="muted" role="status" aria-live="polite" style="font-size:12px;margin-top:8px"></div>
 </section>
 <section class="panel"><h2 data-i18n="previewTitle">02 · Preview</h2><div class="stage"><canvas id="canvas" width="1280" height="720" aria-label="Animated storyboard scene preview"></canvas><svg id="faceLandmarkOverlay" aria-hidden="true" hidden></svg><div class="hint" id="sceneLabel">Scene 1 · A discovery</div></div><div class="scenes" id="scenes"></div><div id="sceneMediaReport" class="muted" role="status" aria-live="polite" style="font-size:12px;margin:10px 0;padding:10px;border:1px solid rgba(255,255,255,.12);border-radius:10px">Media coverage will appear here.</div>
@@ -288,7 +319,7 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 <div id="characterRigPartResults" class="sprite-results" aria-live="polite"></div>
 </section>
 </details>
-<details class="comfy-panel" id="hfVideoPanel"><summary style="cursor:pointer;font-weight:750">Бесплатная облачная анимация · Hugging Face</summary><p class="muted" style="font-size:12px">Использует публичный Wan 2.2 14B Fast на Hugging Face ZeroGPU. Сцены и изображения отправляются на сервер Hugging Face. Бесплатная квота для аккаунта Free — до 5 минут GPU в сутки; очередь и доступность не гарантируются. Максимум одного AI-клипа — 5 секунд: более длинная сцена будет создана из 5-секундного клипа, скорость которого подстраивается под длительность сцены.</p><div class="field"><label for="hfVideoToken">Hugging Face access token (read) · токен не сохраняется</label><input id="hfVideoToken" type="password" autocomplete="off" spellcheck="false" placeholder="hf_…"><small>Вставь токен только в это поле сайта. Не отправляй его в чат. Он хранится только в памяти открытой вкладки.</small></div><div class="actions"><button type="button" class="secondary" id="connectHfVideo">Подключить бесплатный видеодвижок</button><button type="button" class="secondary" id="clearHfVideoToken">Очистить токен</button></div><label class="consent"><input type="checkbox" id="hfVideoConsent"><span>Я явно согласен отправлять изображения сцен и промпты в публичный Hugging Face Space для генерации видео. / I agree to send scene images and prompts to the public Hugging Face Space.</span></label><div class="status" id="hfVideoStatus" role="status" aria-live="polite">Не подключено. Проверка соединения не отправляет сцены.</div></details>
+<details class="advanced-video-settings"><summary>Подключить AI-видеодвижок (необязательно)</summary><p class="muted" style="font-size:12px">Для настоящих AI-видеосцен настрой Hugging Face или локальный ComfyUI. Без подключения будет создано локальное видео из предпросмотра.</p><details class="comfy-panel" id="hfVideoPanel"><summary style="cursor:pointer;font-weight:750">Бесплатная облачная анимация · Hugging Face</summary><p class="muted" style="font-size:12px">Использует публичный Wan 2.2 14B Fast на Hugging Face ZeroGPU. Сцены и изображения отправляются на сервер Hugging Face. Бесплатная квота для аккаунта Free — до 5 минут GPU в сутки; очередь и доступность не гарантируются. Максимум одного AI-клипа — 5 секунд: более длинная сцена будет создана из 5-секундного клипа, скорость которого подстраивается под длительность сцены.</p><div class="field"><label for="hfVideoToken">Hugging Face access token (read) · токен не сохраняется</label><input id="hfVideoToken" type="password" autocomplete="off" spellcheck="false" placeholder="hf_…"><small>Вставь токен только в это поле сайта. Не отправляй его в чат. Он хранится только в памяти открытой вкладки.</small></div><div class="actions"><button type="button" class="secondary" id="connectHfVideo">Подключить бесплатный видеодвижок</button><button type="button" class="secondary" id="clearHfVideoToken">Очистить токен</button></div><label class="consent"><input type="checkbox" id="hfVideoConsent"><span>Я явно согласен отправлять изображения сцен и промпты в публичный Hugging Face Space для генерации видео. / I agree to send scene images and prompts to the public Hugging Face Space.</span></label><div class="status" id="hfVideoStatus" role="status" aria-live="polite">Не подключено. Проверка соединения не отправляет сцены.</div></details>
 <details class="comfy-panel" id="comfyPanel">
 <summary style="cursor:pointer;font-weight:750">Local video animation · ComfyUI / Локальная анимация</summary>
 <p class="muted" style="font-size:12px">Runs only on your configured local/private ComfyUI server. No cloud fallback. A still image is optional: DRAVEX uses the I2V workflow when a scene image exists and the T2V workflow when it does not. Workflow JSON stays in this tab and must be selected again after reload.</p>
@@ -340,7 +371,7 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 <video id="comfySceneVideo" controls playsinline hidden></video>
 <div class="actions"><a id="comfyDownloadVideo" class="muted" hidden download="dravex-scene-animation.mp4">Download scene video / Скачать видео сцены</a></div>
 </details>
-<div class="field"><label for="videoGenerationMode">Режим создания видео / Video creation mode</label><select id="videoGenerationMode"><option value="local-canvas" selected>Сначала создать видео локально · бесплатно, без подключения / Local canvas video · free, no setup</option><option value="huggingface">AI-видеосцены · бесплатная очередь Hugging Face (нужны токен и согласие)</option><option value="comfyui">AI-видеосцены · локальный ComfyUI</option></select><small class="muted">Local mode exports the current canvas preview, attached character rigs and any already-generated clips. It does not generate new AI video clips. / Локальный режим экспортирует предпросмотр холста, подключённые риги и уже готовые клипы. Новые AI-видеосцены он не генерирует.</small></div><div class="actions"><button type="button" id="generateFullFilmComfy" disabled hidden>Создать весь мультфильм</button><button type="button" class="secondary" id="cancelFullFilmComfy" hidden>Отменить</button></div><section id="fullFilmProgressPanel" class="film-progress" hidden aria-label="Film creation progress">
+<div class="field"><label for="videoGenerationMode">Режим создания видео / Video creation mode</label><select id="videoGenerationMode"><option value="local-canvas" selected>Сначала создать видео локально · бесплатно, без подключения / Local canvas video · free, no setup</option><option value="huggingface">AI-видеосцены · бесплатная очередь Hugging Face (нужны токен и согласие)</option><option value="comfyui">AI-видеосцены · локальный ComfyUI</option></select><small class="muted">Local mode exports the current canvas preview, attached character rigs and any already-generated clips. It does not generate new AI video clips. / Локальный режим экспортирует предпросмотр холста, подключённые риги и уже готовые клипы. Новые AI-видеосцены он не генерирует.</small></div><div class="actions"><button type="button" id="generateFullFilmComfy" disabled hidden>Создать весь мультфильм</button><button type="button" class="secondary" id="cancelFullFilmComfy" hidden>Отменить</button></div></details><section id="fullFilmProgressPanel" class="film-progress" hidden aria-label="Film creation progress">
 <div class="film-progress__heading"><strong id="fullFilmPercent">0%</strong><span id="fullFilmStage">Ожидание</span></div>
 <progress id="fullFilmProgress" max="100" value="0"></progress>
 <div id="fullFilmProgressMeta" class="film-progress__meta" aria-live="polite">Подробный статус появится после запуска генерации.</div>
