@@ -56,6 +56,12 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
 
     await page.locator('#character').fill('Каэль Ворран — KAEL VORRAN');
     await page.locator('#style').selectOption('Anime-inspired');
+    // A portrait prompt does not change the canvas by itself. Select the format explicitly
+    // so the live test validates the actual exported dimensions instead of trusting prompt text.
+    await page.locator('#canvasFormat').selectOption('portrait');
+    const selectedCanvas = await page.locator('#canvas').evaluate(canvas => ({ width: canvas.width, height: canvas.height }));
+    expect(selectedCanvas).toEqual({ width: 720, height: 1280 });
+    report.checks.canvasFormat = { status: 'passed', selected: 'portrait', aspectRatio: '9:16', ...selectedCanvas };
     await page.locator('#characterBibleSummary').click();
     await page.locator('#bibleCharacterId').fill('Каэль');
     await page.locator('#bibleVisualDescription').fill('18 лет, высокий, стройный и спортивный; средняя длина растрёпанных чёрных волос; ярко-алые глаза. Внешность должна точно совпадать с оригинальным загруженным изображением Каэля.');
@@ -132,6 +138,14 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
 
     expect(Number(videoStream.width)).toBeGreaterThan(0);
     expect(Number(videoStream.height)).toBeGreaterThan(0);
+    expect(Number(videoStream.width)).toBe(720);
+    expect(Number(videoStream.height)).toBe(1280);
+    report.checks.exportAspectRatio = {
+      status: 'passed',
+      expected: '9:16',
+      width: Number(videoStream.width),
+      height: Number(videoStream.height)
+    };
     const browserEvidence = await page.locator('#finalFilmPlayer').evaluate(async (video, durationSeconds) => {
       const source = video.currentSrc || video.src;
       if (!source.startsWith('blob:')) throw new Error('The film preview is not backed by the exported local Blob URL.');
