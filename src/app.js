@@ -120,7 +120,7 @@ function refreshGenerationObserverReport(){
   panel.append(heading,summary,pre);host.appendChild(panel);
  }
  const observerSnapshot=activeGenerationObserver.snapshot();
- const report=activeGenerationObserver.report({interpretation:currentStoryboardPlan?.scenes||[],scenes:sceneMetadata,characterPresenceTimeline:buildCharacterPresenceTimeline(sceneMetadata)});
+ const report=activeGenerationObserver.report({interpretation:{parsedBrief:currentStoryboardPlan?.brief??null,plannedScenes:currentStoryboardPlan?.scenes||[]},scenes:sceneMetadata,characterPresenceTimeline:buildCharacterPresenceTimeline(sceneMetadata)});
  report.productionAudit=auditProductionRun({runId:observerSnapshot.runId,stages:observerSnapshot.stages});
  const summary=panel.querySelector('[data-observer-summary]');
  if(summary)summary.textContent=(uiLang==='ru'?'Проверено текстовых требований: ':'Text requirements: ')+report.summary.textEvidenceFound+'/'+report.summary.requirementCount+' · '+(uiLang==='ru'?'ошибок этапов: ':'failed stages: ')+report.summary.failedStages+' · '+(uiLang==='ru'?'непроверенных этапов: ':'unverified stages: ')+report.summary.unverifiedStages+' · '+report.summary.overall;
@@ -2397,6 +2397,7 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
   currentStoryboardPlan={...plan,eventChain:buildStoryEventChain(sceneMetadata),sourceText:idea,sourceLanguage:lang,sourceCharacter:character,characterSelectionWarning,proceduralDemoCharacter,scenes:sceneMetadata};
   activeGenerationObserver=createGenerationObserver({runId:'dravex-'+Date.now(),prompt:idea,requirements:[{id:'original-prompt',category:'prompt-fidelity',text:idea}]});
   activeGenerationObserver.recordStage('promptInput',{status:'completed',output:idea});
+  activeGenerationObserver.recordStage('promptParsing',{status:'completed',input:idea,output:{brief:plan.brief??null,protagonist:character,sceneCount:Array.isArray(plan.scenes)?plan.scenes.length:0}});
   activeGenerationObserver.recordStage('storyPlanning',{status:'completed',output:sceneMetadata});
   titles=plan.titles;
   descriptions=plan.descriptions;
