@@ -411,3 +411,16 @@ test('changes the scene-image seed when the canonical character design or visual
 test('does not force a seed when a scene has no saved character identity', () => {
   assert.equal(buildSceneIdentitySeed({ characters: ['unknown'] }, []), undefined);
 });
+
+test('motion prompt includes explicit world movement and object interaction contracts', () => {
+  const prompt = buildMotionGenerationPrompt({
+    visibleAction: 'Kel frees the mechanical bird.',
+    environmentMotion: ['Clouds drift across the sky.', 'Wind shakes the tree branches.'],
+    interactions: [{ type: 'rescue', actorId: 'Kel', targetId: 'mechanical bird', evidence: 'Kel frees the mechanical bird.' }],
+    stateChanges: [{ entityType: 'prop', entityId: 'fallen branch', property: 'holder', value: 'Kel', actorId: 'Kel' }]
+  });
+  assert.match(prompt, /Clouds drift across the sky/);
+  assert.match(prompt, /Wind shakes the tree branches/);
+  assert.match(prompt, /Kel.*rescue.*mechanical bird/);
+  assert.match(prompt, /fallen branch.*holder.*Kel/);
+});
