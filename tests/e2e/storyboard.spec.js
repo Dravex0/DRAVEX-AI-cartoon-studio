@@ -456,6 +456,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
 
+  await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('comfyui');
   await page.locator('#comfyPanel > summary').click();
   await expect(page.locator('label[for="comfySourceImageFile"]')).toContainText(/Local image for the selected scene/i);
