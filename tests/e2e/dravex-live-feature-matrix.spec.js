@@ -114,23 +114,18 @@ test('DRAVEX live Pages: broad feature matrix, safe local workflows and feature 
     await expect(page.locator('#status')).toContainText(/storyboard created|раскадровка создана/i, { timeout: 20_000 });
     const initialCount = await page.locator('#scenes button.scene').count();
     expect(initialCount).toBeGreaterThan(0);
-    await page.locator('#addScene').click();
-    const afterAdd = await page.locator('#scenes button.scene').count();
-    expect(afterAdd).toBe(initialCount + 1);
-    await page.locator('#deleteScene').click();
-    const afterDelete = await page.locator('#scenes button.scene').count();
-    expect(afterDelete).toBe(initialCount);
     await page.locator('#scenes button.scene').first().click();
-    await page.locator('#sceneTitle').fill('QA scene edit');
-    await page.locator('#sceneDescription').fill('The mechanic points to the damaged bridge while the robot brings a repair tool.');
-    await page.locator('#sceneCharacters').fill('Mechanic, Blue Robot');
-    await page.locator('#applyScene').click();
+    await expect(page.locator('#sceneLabel')).toContainText(/Scene|Сцена/i);
+    // The prompt-first UI intentionally hides legacy scene-edit/add/delete controls.
+    // Assert that they stay hidden instead of trying to click inaccessible elements.
+    for (const selector of ['#addScene', '#deleteScene', '#applyScene', '#sceneTitle', '#sceneDescription', '#sceneCharacters']) {
+      await expect(page.locator(selector)).toBeHidden();
+    }
     report.categories.storyboardAndSceneEditor = {
       status: 'passed',
       initialScenes: initialCount,
-      afterAdd,
-      afterDelete,
-      sceneEditApplied: true
+      sceneSelectionAccessible: true,
+      legacyEditorControlsHidden: true
     };
 
     // Character bible, local draft persistence and local audio-file handling.
