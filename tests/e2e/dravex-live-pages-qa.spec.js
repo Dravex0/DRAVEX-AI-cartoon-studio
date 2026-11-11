@@ -222,8 +222,10 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     ].map(value => Math.max(0, Math.min(value, probedDuration - 0.05))))];
     for (let index = 0; index < sampleTimes.length; index += 1) {
       const framePath = testInfo.outputPath('live-frame-' + index + '.png');
+      // Output-side seeking decodes from the start and does not depend on
+      // a WebM cue/seek index that MediaRecorder may omit.
       execFileSync('ffmpeg', [
-        '-v', 'error', '-ss', String(sampleTimes[index]), '-i', downloadPath,
+        '-v', 'error', '-i', downloadPath, '-ss', String(sampleTimes[index]),
         '-frames:v', '1', '-vf', 'scale=320:-1', '-y', framePath
       ], { encoding: 'utf8', timeout: 20_000 });
       const frameBytes = await readFile(framePath);
@@ -283,7 +285,7 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     report.browserErrors = { pageErrors, consoleErrors };
     report.quality = {
       generationFlow: { status: 'passed', evidence: 'published-page-prompt-accepted-and-result-panel-shown' },
-      webmExport: { status: 'passed', evidence: 'downloaded-file-has-valid-ebml-header' },
+      webmExport: { status: 'passed', evidence: 'valid-ebml-header-and-sha256-matches-preview-blob', previewMatchesDownload: true },
       videoDecode: { status: 'passed', evidence: 'chromium-player-and-ffmpeg-decoded-sampled-frames', browserFrames: browserEvidence.frames.length, ffmpegFrames: ffmpegEvidence.decodedFrames },
       visualHints: { motion: visualMetrics.status, orange: visualMetrics.orangeSignal, red: visualMetrics.redSignal, semanticRecognition: false },
       audio: {
