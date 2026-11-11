@@ -110,7 +110,9 @@ export function parseStoryBrief(input) {
         appendDirective(directives, key, directiveValue);
         instructionLines.push(part.trim());
         foundDirective = true;
-        readingCharacterProfiles = key === 'characters';
+        // Only an empty `Characters:` heading opens a multi-line cast section.
+        // A named protagonist or inline profile must not consume following prose as cast data.
+        readingCharacterProfiles = key === 'characters' && !match[2].trim();
       } else {
         remaining.push(part.trim());
       }
