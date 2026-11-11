@@ -76,7 +76,17 @@ function findEntity(source, actorId, verb) {
   const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
   const verbMatch = verb.re.exec(afterActor);
   if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) return null;
-  const entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
+  let entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
+  // In natural Russian/Ukrainian phrasing the object may be named before the
+  // action, while the phrase after the verb names only the body part ("толкает
+  // лапой"). Recover only a known prop noun from the same actor sentence.
+  const actionTool = /^(?:лапой|лапами|ногой|ногами|рукой|руками|paw|paws|foot|feet|hand|hands)$/iu;
+  if (actionTool.test(entity)) {
+    const beforeVerb = afterActor.slice(0, verbMatch.index);
+    const propPattern = /(?:красн(?:ый|ого|ую|ое)\s+мяч|red\s+ball|мяч(?:а|ом|у)?|ball|звезд[ауы]|star|ключ(?:а|ом|у)?|key|книг[ауи]|book|яблок[оа]|apple)/giu;
+    const matches = [...beforeVerb.matchAll(propPattern)];
+    if (matches.length) entity = clean(matches[matches.length - 1][0]);
+  }
   if (!entity || entity.length > 100 || /^(?:it|them|him|her|его|её|ее|их|його|її|їх)$/iu.test(entity)) return null;
   return { entity, evidence: clean(source, 1_200) };
 }

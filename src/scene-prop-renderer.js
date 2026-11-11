@@ -137,7 +137,7 @@ function drawProp(context, prop, x, y, time) {
     context.fillRect(-0.025, -0.018, 0.05, 0.036); context.strokeRect(-0.025, -0.018, 0.05, 0.036);
     context.strokeStyle = '#f5d9a8'; context.beginPath(); context.moveTo(0, -0.016); context.lineTo(0, 0.016); context.stroke();
   } else if (prop.kind === 'ball') {
-    context.fillStyle = '#72c6df'; context.strokeStyle = '#24566c';
+    context.fillStyle = '#e74b4b'; context.strokeStyle = '#7a2020';
     context.beginPath(); context.arc(0, 0, 0.022, 0, Math.PI * 2); context.fill(); context.stroke();
     context.beginPath(); context.arc(0, 0, 0.011, 0, Math.PI * 2); context.stroke();
   } else if (prop.kind === 'apple') {

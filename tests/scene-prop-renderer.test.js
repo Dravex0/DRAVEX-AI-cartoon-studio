@@ -153,3 +153,13 @@ test('animates an explicitly pushed ball rolling away from its named actor', () 
   assert.ok(end.x > start.x);
   assert.ok(end.rotation > start.rotation);
 });
+
+test('renders a ball in red so the visual matches a red-ball story prompt', () => {
+  const pushed = { stateChanges: [{
+    entityType: 'prop', entityId: 'красный мяч', property: 'motion',
+    previousValue: null, value: 'rolling', actorId: 'Fox', evidence: 'Foxy толкает красный мяч лапой.'
+  }] };
+  const plan = buildScenePropRenderPlan(pushed, layers, 0.7)[0];
+  assert.equal(plan.kind, 'ball');
+  assert.equal(plan.motion, 'rolling');
+});

@@ -83,3 +83,12 @@ test('tracks an explicit push action as a rolling prop in Russian and English', 
   assert.equal(en[0][0].property, 'motion');
   assert.equal(en[0][0].value, 'rolling');
 });
+
+test('recognizes a Russian object named before the push verb when the phrase after it names the paw', () => {
+  const changes = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy стоит на лесной тропинке, замечает красный мяч у дерева, подбегает к нему, толкает лапой, мяч катится.', characters: ['Foxy'] }
+  ], 'ru');
+  assert.equal(changes[0][0].entityId, 'красный мяч');
+  assert.equal(changes[0][0].property, 'motion');
+  assert.equal(changes[0][0].value, 'rolling');
+});
