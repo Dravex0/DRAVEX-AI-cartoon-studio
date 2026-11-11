@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('dravex-ui-language', 'en'));
+});
+
 test('assembles a storyboard into a non-empty WebM container', async ({ page }) => {
   test.setTimeout(120_000);
   const pageErrors = [];
