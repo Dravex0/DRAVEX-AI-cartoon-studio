@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('dravex-ui-language', 'en'));
+});
+
 test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -10,7 +14,8 @@ test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   await expect(page.locator('#makeFilm')).toBeVisible();
   await expect(page.locator('#make')).toBeVisible();
   await expect(page.locator('#scenes')).toBeVisible();
-  await expect(page.locator('.audio-panel')).toBeVisible();
+  await expect(page.locator('.advanced-audio-settings > summary')).toBeVisible();
+  await expect(page.locator('.audio-panel')).toBeHidden();
   await expect(page.locator('#play')).toBeVisible();
   await expect(page.locator('#export')).toBeVisible();
   await expect(page.locator('#make')).toBeVisible();
@@ -19,7 +24,7 @@ test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   await expect(page.locator('.quick-settings')).toHaveAttribute('open', '');
   await expect(page.locator('#style')).toBeVisible();
   await expect(page.locator('#language')).toBeVisible();
-  await expect(page.locator('.workflow-step')).toHaveCount(3);
+  await expect(page.locator('.workflow-step')).toBeHidden();
   await expect(page.locator('#generationTools')).not.toHaveAttribute('open', '');
   await expect(page.locator('#imageQuality')).toBeVisible();
   await expect(page.locator('#canvas')).toBeVisible();
@@ -177,6 +182,7 @@ test('explicitly selecting Hugging Face still requires provider connection and c
   page.on('pageerror', error => pageErrors.push(error.message));
 
   await page.goto('/');
+  await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('huggingface');
   await page.locator('#idea').fill(
     'A young fox finds a glowing key in an old forest, follows its light to a hidden gate, and discovers a peaceful garden.'
@@ -786,6 +792,7 @@ test('prompt-first creator keeps AI video provider setup reachable on desktop an
   await page.goto('/');
   await expect(page.locator('#idea')).toBeVisible();
   await expect(page.locator('#videoGenerationMode')).toBeVisible();
+  await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await expect(page.locator('#videoGenerationMode')).toHaveValue('local-canvas');
   await expect(page.locator('#hfVideoPanel > summary')).toBeVisible();
   await expect(page.locator('#comfyPanel > summary')).toBeVisible();
