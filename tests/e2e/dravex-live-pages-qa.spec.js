@@ -307,11 +307,11 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
     if (pageErrors.length) issues.push('Browser runtime errors occurred.');
     if (consoleErrors.length) issues.push('Browser console errors were recorded; inspect the attached report.');
     if (visualMetrics.status === 'likely-static') issues.push('Weak frame-to-frame pixel-change signal; motion needs manual review.');
-    issues.push('Character identity, red-ball interaction, and story-action accuracy require manual review of the attached decoded frames.');
+    issues.push('Kael identity, Shadow Blade action, shadow interaction, and story accuracy are not semantically verified; manually review the attached decoded frames.');
     report.findings = issues;
     report.browserErrors = { pageErrors, consoleErrors };
     report.quality = {
-      generationFlow: { status: 'passed', evidence: 'published-page-prompt-accepted-and-result-panel-shown' },
+      generationFlow: { status: mode === 'local-canvas' ? 'local-storyboard-exported-not-AI-video-generation' : 'provider-mode-selected-not-independently-confirmed', evidence: 'published-page-prompt-accepted-and-result-panel-shown' },
       webmExport: { status: 'passed', evidence: 'valid-ebml-header-and-sha256-matches-preview-blob', previewMatchesDownload: true },
       videoDecode: { status: 'passed', evidence: 'chromium-player-and-ffmpeg-decoded-sampled-frames', browserFrames: browserEvidence.frames.length, ffmpegFrames: ffmpegEvidence.decodedFrames },
       visualHints: { motion: visualMetrics.status, semanticRecognition: false },
@@ -322,7 +322,7 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
       },
       storySemantics: {
         status: 'manual-review-required',
-        checks: ['Kael identity and visual continuity', 'ruined cathedral and ancient floor symbol visible', 'Kael kneels and touches the symbol with his left hand', 'left-hand mark activates', 'black flame with silver edges appears and fades'],
+        checks: ['Kael identity and visual continuity', 'rainy gothic-city ruins visible', 'approaching shadow is visible', 'Kael draws the Shadow Blade', 'blade emits dark-red energy', 'Kael thrusts and the shadow dissolves into black particles', 'Kael lowers the blade'],
         evidence: 'attached-decoded-frames',
         automatedSemanticRecognition: false
       }
