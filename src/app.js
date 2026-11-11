@@ -96,10 +96,32 @@ import { prepareStoryCharacterContext } from "./story-character-context.js";
 import { normalizeSceneCast } from "./scene-cast.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
 import { buildStoryEventChain } from "./story-event-chain.js";
+import { createGenerationObserver } from "./generation-observer-agent.js";
 import { shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
 import { drawProceduralDemoFox } from './demo-character-renderer.js';
 const localTextRuntime = createLocalTransformersRuntime();
 let activeUniversalPlanController = null;
+let activeGenerationObserver = null;
+function refreshGenerationObserverReport(){
+ if(!activeGenerationObserver)return;
+ const host=document.getElementById('qaReport');
+ if(!host)return;
+ let panel=host.querySelector('[data-generation-observer]');
+ if(!panel){
+  panel=document.createElement('details');
+  panel.dataset.generationObserver='true';
+  panel.className='qa-report__observer';
+  const heading=document.createElement('summary');
+  heading.textContent=uiLang==='ru'?'Отчёт наблюдателя генерации':'Generation Observer report';
+  const summary=document.createElement('p');summary.dataset.observerSummary='true';
+  const pre=document.createElement('pre');pre.dataset.observerDetails='true';pre.style.whiteSpace='pre-wrap';pre.style.overflowWrap='anywhere';
+  panel.append(heading,summary,pre);host.appendChild(panel);
+ }
+ const report=activeGenerationObserver.report({interpretation:currentStoryboardPlan?.scenes||[],scenes:sceneMetadata});
+ const summary=panel.querySelector('[data-observer-summary]');
+ if(summary)summary.textContent=(uiLang==='ru'?'Проверено текстовых требований: ':'Text requirements: ')+report.summary.textEvidenceFound+'/'+report.summary.requirementCount+' · '+(uiLang==='ru'?'ошибок этапов: ':'failed stages: ')+report.summary.failedStages+' · '+(uiLang==='ru'?'непроверенных этапов: ':'unverified stages: ')+report.summary.unverifiedStages+' · '+report.summary.overall;
+ const pre=panel.querySelector('[data-observer-details]');if(pre)pre.textContent=JSON.stringify(report,null,2);
+}
 const translations={
 en:{freeTag:'FREE · LOCAL-FIRST',previewTag:'CARTOON WORKSPACE · EARLY PREVIEW',headline:'Turn your idea<br>into a story.',intro:'Create a storyboard, generate short AI scene clips through the optional free Hugging Face ZeroGPU queue or local ComfyUI, and assemble a WebM with timed dialogue and optional local music. Free cloud GPU is quota-limited; production voice and lip-sync are still in development.',createTitle:'01 · Create a story',ideaLabel:'Story idea',ideaPlaceholder:'A curious fox discovers a glowing star in the forest...',characterLabel:'Main character',styleLabel:'Visual style',durationLabel:'Scene duration',seconds3:'3 seconds',seconds5:'5 seconds',seconds8:'8 seconds',storyLanguageLabel:'Story language',createButton:'Start working',qualityLabel:'AI still-image quality',qualityNote:'Controls optional AI-generated scene images only. It does not change the exported video resolution.',styleStorybook:'Storybook',styleAnime:'2D Anime',styleFlat2D:'Flat 2D',stylePixelArt:'Pixel Art',style3DAnimated:'3D Animation',style3DRealistic:'Realistic 3D',styleClay3D:'Clay 3D',styleWatercolor:'Watercolor',styleManga:'Comic / Manga',stylePaperCutout:'Paper Cutout',styleStopMotion:'Stop-motion',qualityStandard:'Standard · 640×384',qualityHigh:'High · 768×448',qualityUltra:'Maximum · 1024×576',saveButton:'Save draft',readyStatus:'Ready. Your idea stays in this browser unless you export it.',previewTitle:'02 · Preview',playButton:'Play preview',pauseButton:'Pause preview',exportButton:'Export WebM with dialogue',previewDisclaimer:'Generated scene video clips are used when available; scenes without clips use the still-image/canvas preview. WebM combines the clips with timed dialogue and optional local music. Lip-sync is still in development.',footer:'DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to',sceneTitles:['A discovery','A closer look','A new adventure'],sceneDescriptions:['The fox spots a glowing star.','The little star floats nearby.','The fox follows the light.'],sceneLabel:'Scene',ready:'Ready. Your idea stays in this browser unless you export it.',emptyIdea:'Add a story idea first.',created:'Local DRAVEX storyboard created.',saved:'Draft saved in this browser.',storageError:'Browser storage is unavailable; you can still keep this page open.',restored:'Restored draft from this browser.',recording:'Recording a short preview…',exported:'WebM storyboard exported.',unsupported:'WebM recording is not supported by this browser.',exportFailed:'Export failed in this browser. Try Play preview first.'},
 ru:{freeTag:'БЕСПЛАТНО · ЛОКАЛЬНАЯ РАБОТА',previewTag:'РАБОЧЕЕ ПРОСТРАНСТВО МУЛЬТФИЛЬМОВ · РАННИЙ ПРЕДПРОСМОТР',headline:'Преврати идею<br>в историю.',intro:'Создавай раскадровку, генерируй короткие AI-видеосцены через бесплатную очередь Hugging Face ZeroGPU или локальный ComfyUI и собирай WebM с диалогами и локальной музыкой. Бесплатная облачная квота ограничена; профессиональная озвучка и синхронизация губ ещё разрабатываются.',createTitle:'01 · Создание истории',ideaLabel:'Идея истории',ideaPlaceholder:'Любопытный лисёнок находит светящуюся звезду в лесу…',characterLabel:'Главный персонаж',styleLabel:'Визуальный стиль',durationLabel:'Длительность сцены',seconds3:'3 секунды',seconds5:'5 секунд',seconds8:'8 секунд',storyLanguageLabel:'Язык истории',createButton:'Начать работу',qualityLabel:'Качество AI-изображений',qualityNote:'Настройка влияет только на дополнительные AI-изображения сцен. Она не меняет разрешение итогового видео.',styleStorybook:'Книжная иллюстрация',styleAnime:'2D-аниме',styleFlat2D:'Плоский 2D',stylePixelArt:'Пиксель-арт',style3DAnimated:'3D-анимация',style3DRealistic:'Реалистичный 3D',styleClay3D:'Пластилиновая 3D-анимация',styleWatercolor:'Акварель',styleManga:'Комикс / манга',stylePaperCutout:'Бумажная аппликация',styleStopMotion:'Покадровая анимация',qualityStandard:'Стандарт · 640×384',qualityHigh:'Высокое · 768×448',qualityUltra:'Максимум · 1024×576',saveButton:'Сохранить черновик',readyStatus:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',previewTitle:'02 · Предпросмотр',playButton:'Воспроизвести',pauseButton:'Пауза',exportButton:'Экспорт WebM с диалогами',previewDisclaimer:'Готовые видеоклипы сцен используются при наличии; для остальных сцен остаётся предпросмотр изображения и холста. WebM объединяет клипы, диалоги по таймлайну и необязательную локальную музыку. Синхронизация губ ещё разрабатывается.',footer:'DRAVEX AI Cartoon Studio · Прототип · Платный API не требуется · Используй только материалы, на которые у тебя есть права',sceneTitles:['Открытие','Поближе','Новое приключение'],sceneDescriptions:['Лисёнок замечает светящуюся звезду.','Маленькая звезда парит рядом.','Лисёнок следует за светом.'],sceneLabel:'Сцена',ready:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',emptyIdea:'Сначала добавь идею истории.',created:'Раскадровка создана локальным движком DRAVEX.',saved:'Черновик сохранён в этом браузере.',storageError:'Хранилище браузера недоступно; можно оставить страницу открытой.',restored:'Черновик восстановлен из этого браузера.',recording:'Записываем короткий предпросмотр…',exported:'Раскадровка экспортирована в WebM.',unsupported:'Этот браузер не поддерживает запись WebM.',exportFailed:'Не удалось экспортировать видео. Сначала попробуй запустить предпросмотр.'}
@@ -2369,6 +2391,9 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
   const stateChanges=inferStoryboardStateChanges(preparedScenes,lang,character);
   sceneMetadata=ensureSceneIds(preparedScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]})));
   currentStoryboardPlan={...plan,eventChain:buildStoryEventChain(sceneMetadata),sourceText:idea,sourceLanguage:lang,sourceCharacter:character,characterSelectionWarning,proceduralDemoCharacter,scenes:sceneMetadata};
+  activeGenerationObserver=createGenerationObserver({runId:'dravex-'+Date.now(),prompt:idea,requirements:[{id:'original-prompt',category:'prompt-fidelity',text:idea}]});
+  activeGenerationObserver.recordStage('promptInput',{status:'completed',output:idea});
+  activeGenerationObserver.recordStage('storyPlanning',{status:'completed',output:sceneMetadata});
   titles=plan.titles;
   descriptions=plan.descriptions;
   sceneIndex=0;
@@ -2378,6 +2403,9 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
   renderScenes();
   syncSceneEditor();
   updateStoryQA();
+  const initialStoryAudit=validateStoryScenes(sceneMetadata);
+  activeGenerationObserver?.recordStage('storyboardValidation',{status:initialStoryAudit.ok?'completed':'failed',output:initialStoryAudit});
+  refreshGenerationObserverReport();
   if(characterSelectionWarning){
    const warning=document.createElement('p');
    warning.className='qa-report__item qa-report__item--warning';
@@ -3350,6 +3378,8 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   renderFilmSceneProgress();
   setFilmProgress(0,filmProgressText('Подготовка сцен','Preparing scenes'),filmProgressText('Сцен: ','Scenes: ')+scenes.length);
   status.textContent='Подготовка '+scenes.length+' сцен к генерации…';
+  activeGenerationObserver?.recordStage('imageGeneration',{status:sceneMetadata.some(scene=>Boolean(scene.generatedImageUrl))?'completed':'unknown',output:sceneMetadata.filter(scene=>scene.generatedImageUrl).map(scene=>({sceneId:scene.id,imageUrl:scene.generatedImageUrl}))});
+  activeGenerationObserver?.recordStage('videoGeneration',{status:'running',input:{mode,sceneCount:scenes.length}});
   const report=await generateStoryboardVideos({
    scenes,
    signal:controller.signal,
@@ -3461,6 +3491,8 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     return persistence.persisted?result:{...result,storageWarning:persistence.error};
    }
   });
+  activeGenerationObserver?.recordStage('videoGeneration',{status:report.failed?'failed':'completed',output:{total:report.total,completed:report.completed,skipped:report.skipped,failed:report.failed,results:report.results.map(item=>({index:item.index,status:item.status,error:item.error||null}))},error:report.failed?report.results.filter(item=>item.status==='failed').map(item=>item.error).join('; '):''});
+  refreshGenerationObserverReport();
   if(report.cancelled){
    filmProgressTracking=false;
    setFilmProgress(Math.floor(((report.completed+report.skipped)/report.total)*85),filmProgressText('Создание остановлено','Generation cancelled'),filmProgressText('Готовые сцены сохранены. Можно продолжить позже.','Completed scenes are saved. You can resume later.'));
@@ -3774,6 +3806,11 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
         anchor.href=url;
         anchor.download=$('finalFilmDownload').download||'dravex-cartoon-film.webm';
         if(download){document.body.appendChild(anchor);anchor.click();anchor.remove();}
+        activeGenerationObserver?.recordStage('voiceGeneration',{status:voiceTracks.length?'completed':'not-configured',output:voiceTracks.length?{trackCount:voiceTracks.length}:null});
+        activeGenerationObserver?.recordStage('lipSync',{status:lipSyncEligibleTrackCount?'completed':'not-configured',output:lipSyncEligibleTrackCount?{eligibleTrackCount:lipSyncEligibleTrackCount,analyzedTrackCount:exportMouthTracks.length,skippedTrackCount:lipSyncSkippedTracks}:null});
+        activeGenerationObserver?.recordStage('export',{status:'completed',output:{filename:anchor.download,mimeType:blob.type||'video/webm',sizeBytes:blob.size,durationMs:timeline.totalDurationMs,width:decoded.width,height:decoded.height}});
+        activeGenerationObserver?.attachArtifact({kind:'video',name:anchor.download,mimeType:blob.type||'video/webm',sizeBytes:blob.size,durationSeconds:timeline.totalDurationSeconds,reference:'final-film-object-url',evidenceType:'metadata-and-browser-decode'});
+        refreshGenerationObserverReport();
         const lipSyncReport=buildLipSyncQualityReport({voiceTracks,eligibleTrackCount:lipSyncEligibleTrackCount,analyzedTracks:exportMouthTracks,skippedTracks:lipSyncSkippedTracks});
         const lipSyncWarnings=[];
         if(lipSyncReport.skippedTrackCount)lipSyncWarnings.push(uiLang==='ru'
