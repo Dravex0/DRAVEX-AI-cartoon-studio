@@ -41,7 +41,7 @@ jobs:
         run: npm test
 
       - name: Run desktop and Pixel 7 browser tests against the source build
-        run: npm run test:e2e
+        run: npx playwright test --grep-invert "DRAVEX live Pages"
 
       - name: Run the free QA agent against the published GitHub Pages site
         run: npx playwright test tests/e2e/dravex-live-pages-qa.spec.js
