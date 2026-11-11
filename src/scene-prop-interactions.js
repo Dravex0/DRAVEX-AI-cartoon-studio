@@ -34,7 +34,7 @@ const VERBS = {
 
 const ADVERBS = /^(?:carefully|gently|slowly|quickly|firmly|осторожно|аккуратно|медленно|быстро|нежно|обережно|повільно|швидко|cuidadosamente|suavemente|lentamente)$/iu;
 const PREPOSITIONS = /\s+(?:under|beneath|beside|near|on|onto|into|from|with|за|под|над|рядом|возле|около|из|в|на|біля|під|над|поруч|з|із|у|в|sobre|debajo|junto|cerca|desde|con)\s+/iu;
-const ACTION_JOINERS = /\s+(?:and|then|и|а|затем|потом|та|і|y|luego)\s+/iu;
+const ACTION_JOINERS = /\s+(?:and|then|и|а|затем|потом|та|і|y|luego)\s*/iu;
 const ARTICLES = /^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu;
 const clean = value => String(value ?? '').trim().replace(/^[\s"'«»“”‘’]+|[\s"'«»“”‘’]+$/gu, '').slice(0, 120);
 
