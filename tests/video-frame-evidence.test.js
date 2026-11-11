@@ -104,3 +104,24 @@ test('rejects inconsistent frame sizes and invalid sample counts', () => {
   );
   assert.throws(() => analyzeRgbaFrameSequence([solidFrame(8, 4, 0, 0, 0)]), /between 2 and 12/);
 });
+
+test('does not treat a one-frame color flash as persistent color evidence', () => {
+  const orange = solidFrame(10, 10, 220, 120, 50);
+  const neutral = solidFrame(10, 10, 80, 80, 80);
+  const report = analyzeRgbaFrameSequence([orange, neutral, neutral, neutral]);
+  assert.equal(report.orangePersistence.samplesAboveThreshold, 1);
+  assert.equal(report.orangeSignal, 'orange-color-sporadic-or-weak');
+});
+
+test('normalizes hidden transparent RGB before measuring appearance changes', () => {
+  const before = { width: 1, height: 1, data: new Uint8Array([255, 0, 0, 0]) };
+  const after = { width: 1, height: 1, data: new Uint8Array([0, 0, 0, 255]) };
+  const report = analyzeRgbaFrameSequence([before, after]);
+  assert.equal(report.meanPixelChange, 0.25);
+  assert.equal(report.changedPixelRatio, 1);
+});
+
+test('rejects invalid ratio thresholds', () => {
+  const frames = [solidFrame(2, 2, 0, 0, 0), solidFrame(2, 2, 0, 0, 0)];
+  assert.throws(() => analyzeRgbaFrameSequence(frames, { redPixelRatioThreshold: 2 }), /between 0 and 1/);
+});
