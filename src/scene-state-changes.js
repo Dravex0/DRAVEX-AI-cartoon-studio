@@ -75,7 +75,10 @@ function findEntity(source, actorId, verb) {
   if (!actorMatch) return null;
   const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
   const verbMatch = verb.re.exec(afterActor);
-  if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) return null;
+  if (!verbMatch) return null;
+  const afterVerb = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
+  const hasExplicitActionTool = /^(?:лапой|лапами|ногой|ногами|рукой|руками|paw|paws|foot|feet|hand|hands)$/iu.test(afterVerb);
+  if (!hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index)) && !hasExplicitActionTool) return null;
   let entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
   // In natural Russian/Ukrainian phrasing the object may be named before the
   // action, while the phrase after the verb names only the body part ("толкает
