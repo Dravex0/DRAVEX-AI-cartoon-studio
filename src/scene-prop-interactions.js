@@ -55,7 +55,7 @@ export function inferPropInteractions(detail, characterIds = [], language = 'en'
 
   for (const sentenceMatch of sentences) {
     const sentence = sentenceMatch[0].trim();
-    const baseOffset = sentenceMatch.index;
+    const baseOffset = sentenceMatch.index + sentenceMatch[0].indexOf(sentence);
     for (const actorId of actors) {
       const actor = actorPattern(actorId).exec(sentence);
       if (!actor) continue;
