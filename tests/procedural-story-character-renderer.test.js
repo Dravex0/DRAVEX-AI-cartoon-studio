@@ -10,3 +10,32 @@ test('keeps hair, eyes, clothing and accent colors independent',()=>{const resul
 
 test('infers hair and eye colors independently from a combined appearance description',()=>{const result=drawProceduralStoryCharacter(mockContext(),{characterId:'Kael Vorran',profile:{visualDescription:'Tall young man with messy black hair and bright scarlet red eyes, wearing a black tactical cloak.'}});assert.equal(result.colors.hair,'#17131f');assert.equal(result.colors.eyes,'#d52843');});
 test('supports non-red eye colors in a combined appearance description',()=>{const result=drawProceduralStoryCharacter(mockContext(),{characterId:'Blue-eyed hero',profile:{visualDescription:'A young woman with long blonde hair and bright blue eyes.'}});assert.equal(result.colors.hair,'#d9ad58');assert.equal(result.colors.eyes,'#4c9bd5');});
+
+test('renders Kael as a visible full-body character with his black hair, scarlet eyes, cloak and Shadow Blade',()=>{
+ const calls={ellipse:0,quadraticCurveTo:0,lineTo:0,fill:0,stroke:0,fillRect:0};
+ const noop=()=>{};
+ const context=new Proxy({
+  save:noop,restore:noop,beginPath:noop,closePath:noop,moveTo:noop,arc:noop,
+  translate:noop,rotate:noop,scale:noop,
+  ellipse(){calls.ellipse++},quadraticCurveTo(){calls.quadraticCurveTo++},
+  lineTo(){calls.lineTo++},fill(){calls.fill++},stroke(){calls.stroke++},
+  fillRect(){calls.fillRect++}
+ },{get:(target,key)=>key in target?target[key]:noop,set:(target,key,value)=>(target[key]=value,true)});
+ const result=drawProceduralStoryCharacter(context,{
+  x:180,y:492,time:0.8,action:'attack',sceneIndex:0,characterId:'Kael',
+  profile:{
+   visualDescription:'Tall slim athletic young man with messy black hair and bright scarlet red eyes.',
+   hair:'messy black hair',eyeColor:'scarlet red',clothing:'black tactical cloak with red accents',
+   signatureAccessories:'broken crown'
+  },
+  storyText:'Kael draws his glowing red Shadow Blade and attacks.'
+ });
+ assert.equal(result.characterId,'Kael');
+ assert.equal(result.action,'attack');
+ assert.equal(result.colors.hair,'#17131f');
+ assert.equal(result.colors.eyes,'#d52843');
+ assert.ok(calls.ellipse>=3,'head and body shadow geometry should be drawn');
+ assert.ok(calls.quadraticCurveTo>=1,'hair silhouette should be drawn');
+ assert.ok(calls.lineTo>=12,'body, cloak and weapon geometry should be drawn');
+ assert.ok(calls.fill>0&&calls.stroke>0,'visible filled and stroked shapes should be rendered');
+});
