@@ -71,16 +71,27 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     expect([...bytes.subarray(0, 4)]).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
     report.checks.download = { status: 'passed', filename: download.suggestedFilename(), bytes: bytes.byteLength, ebml: true };
 
+    // Inspect all streams first so the audio-track check is not accidentally
+    // filtered out by -select_streams v:0.
     const ffprobe = JSON.parse(execFileSync('ffprobe', [
-      '-v', 'error', '-show_streams', '-show_format', '-show_packets',
-      '-select_streams', 'v:0',
-      '-show_entries', 'format=duration:stream=codec_type,width,height,duration:packet=pts_time,duration_time',
+      '-v', 'error', '-show_streams', '-show_format',
+      '-show_entries', 'format=duration:stream=index,codec_type,width,height,duration',
       '-of', 'json', downloadPath
     ], { encoding: 'utf8', timeout: 30_000 }));
-    const packetTimes = (ffprobe.packets || [])
+    const videoStream = (ffprobe.streams || []).find(stream => stream.codec_type === 'video');
+    expect(videoStream).toBeTruthy();
+
+    // Read packet timestamps in a separate video-only pass. This avoids
+    // loading audio packets while retaining the complete stream inventory above.
+    const videoPackets = JSON.parse(execFileSync('ffprobe', [
+      '-v', 'error', '-select_streams', 'v:0', '-show_packets',
+      '-show_entries', 'packet=pts_time,duration_time',
+      '-of', 'json', downloadPath
+    ], { encoding: 'utf8', timeout: 30_000 }));
+    const packetTimes = (videoPackets.packets || [])
       .map(packet => Number(packet.pts_time))
       .filter(Number.isFinite);
-    const packetDurations = (ffprobe.packets || [])
+    const packetDurations = (videoPackets.packets || [])
       .map(packet => Number(packet.duration_time))
       .filter(Number.isFinite);
     const streamDuration = Math.max(0, ...(ffprobe.streams || [])
@@ -91,8 +102,6 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     const probedDuration = Math.max(Number(ffprobe.format?.duration) || 0, streamDuration, packetDuration);
     expect(Number.isFinite(probedDuration) && probedDuration > 1).toBeTruthy();
 
-    const videoStream = (ffprobe.streams || []).find(stream => stream.codec_type === 'video');
-    expect(videoStream).toBeTruthy();
     expect(Number(videoStream.width)).toBeGreaterThan(0);
     expect(Number(videoStream.height)).toBeGreaterThan(0);
     const browserEvidence = {
@@ -108,7 +117,6 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
       probedDuration * 0.75,
       Math.max(0.25, probedDuration - 0.25)
     ].map(value => Math.max(0, Math.min(value, probedDuration - 0.05))))];
-    const frameFiles = [];
     for (let index = 0; index < sampleTimes.length; index += 1) {
       const framePath = testInfo.outputPath('live-frame-' + index + '.png');
       execFileSync('ffmpeg', [
@@ -117,7 +125,6 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
       ], { encoding: 'utf8', timeout: 20_000 });
       const frameBytes = await readFile(framePath);
       expect(frameBytes.byteLength).toBeGreaterThan(100);
-      frameFiles.push(framePath);
       browserEvidence.decodedFrames += 1;
       report.frames.push({ timeSeconds: Number(sampleTimes[index].toFixed(2)), decodedBy: 'ffmpeg' });
       await testInfo.attach('live-frame-' + index + '.png', { path: framePath, contentType: 'image/png' });
