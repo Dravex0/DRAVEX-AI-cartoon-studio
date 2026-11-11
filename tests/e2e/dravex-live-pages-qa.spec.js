@@ -281,6 +281,11 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
       meanPixelChange: visualMetrics.meanPixelChange,
       changedPixelRatio: visualMetrics.changedPixelRatio,
       regionalMotion: visualMetrics.regionalMotion,
+      colorHints: {
+        orange: { signal: visualMetrics.orangeSignal, persistence: visualMetrics.orangePersistence, maxRatio: visualMetrics.maxOrangePixelRatio },
+        red: { signal: visualMetrics.redSignal, persistence: visualMetrics.redPersistence, maxRatio: visualMetrics.maxRedPixelRatio },
+        interpretation: 'Color presence is not proof of a specific character, costume, eye color, weapon, or object.'
+      },
       semanticCharacterRecognition: 'not-automated-review-attached-frames',
       note: visualMetrics.note
     };
