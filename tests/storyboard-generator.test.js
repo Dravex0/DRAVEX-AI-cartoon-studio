@@ -66,6 +66,18 @@ test('keeps semicolon-delimited production directions out of source story events
   assert.equal(result.scenes[0].sourceStoryText, 'Foxy finds a red ball under a tree;');
 });
 
+test('rejects production-only prompts instead of inventing a generic fallback story', () => {
+  assert.throws(
+    () => buildStoryboardFromText(
+      'Main character: Foxy.\\nKeep Foxy visible in every scene.\\nMedium shot.',
+      'en',
+      'Foxy'
+    ),
+    error => error.code === 'STORY_TEXT_REQUIRED'
+      && /Production directions alone/.test(error.message)
+  );
+});
+
 test('handles empty ideas with a localized fallback', () => {
   const result = buildStoryboardFromText('   ', 'ru', '');
   assert.equal(result.scenes.length, 5);
