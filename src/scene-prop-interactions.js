@@ -38,6 +38,19 @@ const ACTION_JOINERS = /\s+(?:and|then|и|а|затем|потом|та|і|y|lue
 const ARTICLES = /^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu;
 const clean = value => String(value ?? '').trim().replace(/^[\s"'«»“”‘’]+|[\s"'«»“”‘’]+$/gu, '').slice(0, 120);
 
+function findWholeVerb(source, pattern) {
+  const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
+  const matcher = new RegExp(pattern.source, flags);
+  for (const match of source.matchAll(matcher)) {
+    const before = source[match.index - 1];
+    const after = source[match.index + match[0].length];
+    if (before && /[\p{L}\p{N}]/u.test(before)) continue;
+    if (after && /[\p{L}\p{N}]/u.test(after)) continue;
+    return match;
+  }
+  return null;
+}
+
 function actorPattern(name) {
   const escaped = [...name].map(char => /[.*+?^{}()|[\]\\]/u.test(char) ? '\\' + char : char).join('');
   return new RegExp('(?<![\\p{L}\\p{N}_])' + escaped + '(?![\\p{L}\\p{N}_])', 'iu');
@@ -61,7 +74,7 @@ export function inferPropInteractions(detail, characterIds = [], language = 'en'
       if (!actor) continue;
       const afterActor = sentence.slice(actor.index + actor[0].length);
       for (const [type, verbPattern] of VERBS[locale]) {
-        const verb = verbPattern.exec(afterActor);
+        const verb = findWholeVerb(afterActor, verbPattern);
         if (!verb) continue;
         const prefix = afterActor.slice(0, verb.index).trim();
         const immediatePrefix = prefix.split(ACTION_JOINERS).at(-1).trim();
