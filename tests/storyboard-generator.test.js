@@ -72,7 +72,7 @@ test('rejects production-only prompts instead of inventing a generic fallback st
       'Main character: Foxy.',
       'Keep Foxy visible in every scene.',
       'Medium shot.'
-    ].join('\\n'), 'en', 'Foxy'),
+    ].join(String.fromCharCode(10)), 'en', 'Foxy'),
     error => error.code === 'STORY_TEXT_REQUIRED'
       && /Production directions alone/.test(error.message)
   );
