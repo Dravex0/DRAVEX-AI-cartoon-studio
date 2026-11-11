@@ -54,6 +54,18 @@ test('keeps production directions out of story events while retaining them in sc
   assert.equal(result.scenes[0].sourceStoryText, 'Foxy finds a red ball under a tree and pushes it with his paw.');
 });
 
+test('keeps semicolon-delimited production directions out of source story events', () => {
+  const result = buildStoryboardFromText(
+    'Foxy finds a red ball under a tree; Keep Foxy visible in every scene.',
+    'en',
+    'Foxy'
+  );
+  assert.equal(result.scenes[0].storyDetail, 'Foxy finds a red ball under a tree;');
+  assert.equal(result.scenes.filter(scene => scene.storyDetail).length, 1);
+  assert.match(result.scenes[0].productionDirectives.productionNotes, /Keep Foxy visible/);
+  assert.equal(result.scenes[0].sourceStoryText, 'Foxy finds a red ball under a tree;');
+});
+
 test('handles empty ideas with a localized fallback', () => {
   const result = buildStoryboardFromText('   ', 'ru', '');
   assert.equal(result.scenes.length, 5);
