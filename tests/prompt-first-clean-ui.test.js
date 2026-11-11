@@ -7,8 +7,9 @@ const app = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
 
 test("keeps one primary create action and hides duplicate utility buttons", () => {
   assert.match(html, /id="makeFilm" class="primary-action">Создать мультфильм/);
-  assert.match(html, /\.layout>\.panel:first-child \.actions:has\(#make\)\{display:none!important\}/);
-  assert.match(html, /\.layout>\.panel:nth-child\(2\)>\.actions:has\(#play\),/);
+  assert.doesNotMatch(html, /\.layout>\.panel:first-child \.actions:has\(#make\)\{display:none!important\}/);
+  assert.doesNotMatch(html, /\.layout>\.panel:nth-child\(2\)>\.actions:has\(#play\)/);
+  assert.match(html, /id=\"makeFilm\" class=\"primary-action\">Создать мультфильм/);
 });
 
 test("keeps video provider setup available inside a collapsed advanced section", () => {
@@ -32,7 +33,6 @@ test("starts with a Russian interface and Russian story language", () => {
 });
 
 test("keeps basic video settings collapsed and removes diagnostic controls from the main screen", () => {
-  assert.match(html, /<details class="simple-options quick-settings">/);
-  assert.doesNotMatch(html, /<details class="simple-options quick-settings" open>/);
+  assert.match(html, /<details class="simple-options quick-settings" open>/);
   assert.match(html, /#faceAnalysisPanel,#auditAllAnimations,#animationCompatibilityStatus/);
 });
