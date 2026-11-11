@@ -49,3 +49,14 @@ test("only declared generation stages can be recorded", () => {
   assert.throws(() => observer.recordStage("imaginaryStage", { status: "completed" }), /Unknown generation stage/);
   assert.equal(GENERATION_OBSERVER_STAGES.length, 9);
 });
+
+
+test("observer tokenizes Unicode text and whitespace correctly", () => {
+  const observer = createGenerationObserver({
+    prompt: "Кель идёт через лес",
+    requirements: [{ text: "Кель идёт через лес", evidenceTerms: ["КЕЛЬ", "идёт", "лес"] }]
+  });
+  const report = observer.report({ interpretation: "Кель   идёт\nчерез лес" });
+  assert.equal(report.requirementChecks[0].status, "text-evidence-found");
+  assert.deepEqual(report.requirementChecks[0].missingTerms, []);
+});
