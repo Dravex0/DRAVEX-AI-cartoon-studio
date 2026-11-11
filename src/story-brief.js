@@ -50,7 +50,7 @@ const PRODUCTION_DIRECTION_PREFIX = /^(?:stage\b|keep\b|preserve\b|maintain\b|en
 const STORY_DETAIL_LABEL = /^(?:story detail(?: to preserve)?|plot detail|сюжетная деталь(?: для сохранения)?|деталь истории|деталь початкової історії|деталь сюжету|деталь історії)\s*[:：]\s*(.*)$/iu;
 
 function splitBriefSentences(value) {
-  return (String(value ?? '').match(/[^.!?。！？]+[.!?。！？]?/gu) || [])
+  return (String(value ?? '').match(/[^.!?;；。！？]+[.!?;；。！？]?/gu) || [])
     .map(sentence => sentence.trim())
     .filter(Boolean);
 }
