@@ -138,3 +138,18 @@ test('uses an explicitly authored grip point transformed by the posed hand rotat
   assert.ok(Math.abs(plan.y - 0.54) < 1e-9);
   assert.ok(Math.abs(plan.rotation - Math.PI / 2) < 1e-9);
 });
+
+
+test('animates an explicitly pushed ball rolling away from its named actor', () => {
+  const pushed = { stateChanges: [{
+    entityType: 'prop', entityId: 'red ball', property: 'motion',
+    previousValue: null, value: 'rolling', actorId: 'Fox', evidence: 'Fox pushes the red ball.'
+  }] };
+  const start = buildScenePropRenderPlan(pushed, layers, 0.52)[0];
+  const end = buildScenePropRenderPlan(pushed, layers, 0.8)[0];
+  assert.equal(start.kind, 'ball');
+  assert.equal(start.motion, 'rolling');
+  assert.equal(start.held, false);
+  assert.ok(end.x > start.x);
+  assert.ok(end.rotation > start.rotation);
+});
