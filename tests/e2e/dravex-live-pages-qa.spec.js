@@ -401,3 +401,93 @@ test('DRAVEX source build: Kael is actually drawn on the portrait canvas', async
   expect(evidence.height).toBe(1280);
   expect(evidence.skinPixels, 'Kael face/hand pixels must be present in the expected character region').toBeGreaterThan(50);
 });
+
+
+test('DRAVEX source build: Kael remains visible in decoded WebM frames', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.goto('/');
+  await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);
+  await page.locator('#character').fill('Каэль Ворран — KAEL VORRAN');
+  await page.locator('#style').selectOption('Anime-inspired');
+  await page.locator('#canvasFormat').selectOption('portrait');
+  await page.locator('#duration').selectOption('3');
+  await page.locator('#characterBibleSummary').click();
+  await page.locator('#bibleCharacterId').fill('Каэль Ворран — KAEL VORRAN');
+  await page.locator('#bibleVisualDescription').fill('Высокий, стройный и спортивный юноша; средней длины растрёпанные чёрные волосы; ярко-алые глаза.');
+  await page.locator('#bibleClothing').fill('Длинный чёрный тактический плащ с красными элементами; чёрная броня и перчатки.');
+  await page.locator('#bibleColors').fill('Чёрный, алый и тёмно-красный.');
+  await page.locator('#bibleDistinctiveFeatures').fill('Символ сломанной короны; оружие Shadow Blade.');
+  await page.locator('#saveCharacterReference').click();
+  await expect(page.locator('#characterReferenceStatus')).toContainText('Образ сохранён');
+  await page.locator('#idea').fill('Каэль Ворран стоит среди руин готического города. Он достаёт Shadow Blade и атакует приближающуюся тень.');
+  await page.locator('#makeFilm').click();
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 100_000 });
+  const evidence = await page.locator('#finalFilmPlayer').evaluate(async video => {
+    if (!video.currentSrc && !video.src) throw new Error('Final WebM player has no media source.');
+    if (typeof video.requestVideoFrameCallback !== 'function') throw new Error('Decoded video frame callbacks are unavailable.');
+    video.muted = true;
+    await video.play();
+    const canvas = document.createElement('canvas');
+    canvas.width = 180;
+    canvas.height = 320;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('Could not create decoded-frame analysis canvas.');
+    const samples = [];
+    let targetFrame = 1;
+    try {
+      while (samples.length < 5) {
+        const sample = await new Promise((resolve, reject) => {
+          let settled = false;
+          const timeout = setTimeout(() => {
+            if (!settled) { settled = true; reject(new Error('Timed out waiting for decoded WebM frame.')); }
+          }, 15_000);
+          const next = () => video.requestVideoFrameCallback((_now, metadata) => {
+            if (settled) return;
+            const presented = Number(metadata?.presentedFrames) || 0;
+            if (presented < targetFrame) { next(); return; }
+            try {
+              context.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+              let skinPixels = 0;
+              const x0 = Math.floor(canvas.width * 0.30), x1 = Math.ceil(canvas.width * 0.70);
+              const y0 = Math.floor(canvas.height * 0.55), y1 = Math.ceil(canvas.height * 0.90);
+              for (let y = y0; y < y1; y += 1) for (let x = x0; x < x1; x += 1) {
+                const i = (y * canvas.width + x) * 4;
+                const r = data[i], g = data[i + 1], b = data[i + 2];
+                if (r > 150 && g > 85 && g < 195 && b > 60 && b < 170 && r > g + 18 && g > b + 8) skinPixels += 1;
+              }
+              settled = true;
+              clearTimeout(timeout);
+              resolve({ presentedFrames: presented, mediaTime: Number(metadata.mediaTime.toFixed(3)), skinPixels });
+            } catch (error) {
+              settled = true;
+              clearTimeout(timeout);
+              reject(error);
+            }
+          });
+          next();
+        });
+        samples.push(sample);
+        targetFrame += 15;
+      }
+    } finally {
+      video.pause();
+    }
+    return {
+      sourceKind: (video.currentSrc || video.src).startsWith('blob:') ? 'local-blob-webm' : 'media-url',
+      width: video.videoWidth,
+      height: video.videoHeight,
+      durationSeconds: Number.isFinite(video.duration) ? Number(video.duration.toFixed(2)) : null,
+      samples
+    };
+  });
+  await testInfo.attach('source-kael-webm-frame-evidence.json', {
+    body: Buffer.from(JSON.stringify(evidence, null, 2)),
+    contentType: 'application/json'
+  });
+  expect(evidence.width).toBe(720);
+  expect(evidence.height).toBe(1280);
+  expect(evidence.samples).toHaveLength(5);
+  expect(evidence.samples.some(frame => frame.skinPixels > 50),
+    'At least one decoded WebM frame must contain Kael in the expected character region').toBeTruthy();
+});
