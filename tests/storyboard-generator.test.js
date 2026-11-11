@@ -68,11 +68,11 @@ test('keeps semicolon-delimited production directions out of source story events
 
 test('rejects production-only prompts instead of inventing a generic fallback story', () => {
   assert.throws(
-    () => buildStoryboardFromText(
-      'Main character: Foxy.\\nKeep Foxy visible in every scene.\\nMedium shot.',
-      'en',
-      'Foxy'
-    ),
+    () => buildStoryboardFromText([
+      'Main character: Foxy.',
+      'Keep Foxy visible in every scene.',
+      'Medium shot.'
+    ].join('\\n'), 'en', 'Foxy'),
     error => error.code === 'STORY_TEXT_REQUIRED'
       && /Production directions alone/.test(error.message)
   );
