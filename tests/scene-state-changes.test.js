@@ -67,3 +67,19 @@ test('keeps location evidence inside the sentence that names the moving characte
   assert.equal(changes[0][0].value, 'inside:stone castle');
   assert.equal(changes[0][0].evidence, 'Mira enters the stone castle.');
 });
+
+
+test('tracks an explicit push action as a rolling prop in Russian and English', () => {
+  const ru = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy толкает красный мяч лапой.', characters: ['Foxy'] }
+  ], 'ru');
+  const en = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy pushes the red ball.', characters: ['Foxy'] }
+  ], 'en');
+  assert.equal(ru[0][0].entityId, 'красный мяч лапой');
+  assert.equal(ru[0][0].property, 'motion');
+  assert.equal(ru[0][0].value, 'rolling');
+  assert.equal(en[0][0].entityId, 'red ball');
+  assert.equal(en[0][0].property, 'motion');
+  assert.equal(en[0][0].value, 'rolling');
+});
