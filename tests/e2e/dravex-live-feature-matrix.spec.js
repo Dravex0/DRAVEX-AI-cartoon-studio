@@ -161,17 +161,18 @@ test('DRAVEX live Pages: broad feature matrix, safe local workflows and feature 
       audioVolumeControl: '42%'
     };
 
-    // Device diagnostics and the global animation/rig compatibility audit are local and safe.
+    // The hardware check is intentionally nested in two collapsed optional panels.
+    await page.locator('#generationTools > summary').click();
+    await page.locator('details:has(#checkLocalAI) > summary').click();
     await page.locator('#checkLocalAI').click();
     await expect(page.locator('#localAIStatus')).not.toContainText(/optional check only/i, { timeout: 15_000 });
     const deviceStatus = await page.locator('#localAIStatus').innerText();
-    await page.locator('#auditAllAnimations').click();
-    await expect(page.locator('#animationCompatibilityStatus')).toContainText(/Scenes:|Сцен:/i, { timeout: 10_000 });
-    const animationAudit = await page.locator('#animationCompatibilityStatus').innerText();
+    // The global animation audit button is intentionally hidden by the prompt-first UI.
+    await expect(page.locator('#auditAllAnimations')).toBeHidden();
     report.categories.deviceAndAnimationDiagnostics = {
-      status: 'passed',
+      status: 'partial',
       deviceDiagnostics: deviceStatus.slice(0, 1200),
-      animationCompatibilityAudit: animationAudit.slice(0, 2400)
+      animationCompatibilityAudit: 'Not run: the legacy global audit control is intentionally hidden in the prompt-first UI.'
     };
 
     // External generation is inventory-only: do not send prompts, tokens or private data.
