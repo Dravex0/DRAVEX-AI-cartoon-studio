@@ -89,7 +89,25 @@ export function parseStoryBrief(input) {
       const match = part.match(/^\s*([^:：]{2,60})\s*[:：]\s*(.{0,1000})\s*$/u);
       const key = match ? ALIASES.get(normalizeLabel(match[1])) : null;
       if (key && (match[2].trim() || key === 'characters')) {
-        appendDirective(directives, key, match[2]);
+        let directiveValue = match[2];
+        if (key === 'characters') {
+          const inlineProfile = parseCharacterLine(match[2]);
+          if (inlineProfile) {
+            if (!characterProfiles.some(profile => profile.characterId.toLocaleLowerCase() === inlineProfile.characterId.toLocaleLowerCase())) {
+              characterProfiles.push(inlineProfile);
+            }
+            directiveValue = inlineProfile.characterId;
+          } else {
+            // Keep a compact protagonist label separate from prose accidentally placed
+            // on the same line (for example: "Main character: Foxy. Stage the action...").
+            const sentence = match[2].match(/^([^.!?。！？]+)[.!?。！？]\\s+([\\s\\S]+)$/u);
+            if (sentence) {
+              directiveValue = sentence[1].trim();
+              remaining.push(sentence[2].trim());
+            }
+          }
+        }
+        appendDirective(directives, key, directiveValue);
         instructionLines.push(part.trim());
         foundDirective = true;
         readingCharacterProfiles = key === 'characters';
