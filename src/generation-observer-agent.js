@@ -2,8 +2,8 @@ const STAGE_ORDER = ["promptInput", "promptParsing", "storyPlanning", "storyboar
 const OPTIONAL_STAGES = new Set(["voiceGeneration", "lipSync"]);
 const record = value => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const text = value => typeof value === "string" ? value.trim() : "";
-const normalize = value => text(value).toLocaleLowerCase().normalize("NFKC").replace(/[’']/g, "'").replace(/[^\\p{L}\\p{N}]+/gu, " ").trim();
-const words = value => normalize(value).split(/\\s+/u).filter(Boolean);
+const normalize = value => text(value).toLocaleLowerCase().normalize("NFKC").replace(/[’']/g, "'").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const words = value => normalize(value).split(/\s+/u).filter(Boolean);
 const unique = values => [...new Set(values)];
 
 function compareRequirement(requirement, evidenceText) {
