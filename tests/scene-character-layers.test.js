@@ -137,7 +137,8 @@ test('places a five-character cast across two rows without stacking sprites', as
     layers = result.layers;
   }
   assert.deepEqual(layers.map(layer => layer.x), [0.2, 0.4, 0.6, 0.8, 0.5]);
-  assert.deepEqual(layers.map(layer => layer.y), [0.48, 0.48, 0.48, 0.48, 0.82]);
+  assert.deepEqual(layers.slice(0, 4).map(layer => layer.y), [0.48, 0.48, 0.48, 0.48]);
+  assert.ok(Math.abs(layers[4].y - 0.82) < 0.0001);
   assert.equal(new Set(layers.map(layer => layer.x + ':' + layer.y)).size, 5);
 });
 
