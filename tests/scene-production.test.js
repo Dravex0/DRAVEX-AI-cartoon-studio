@@ -26,6 +26,16 @@ test('image prompt builder includes scene, setting, camera, character bible and 
   assert.match(prompt, /No extra characters/);
 });
 
+test('image prompt explicitly requires every declared scene character to be visible', () => {
+  const prompt = buildImageGenerationPrompt({
+    imagePrompt: 'A magical forest at dusk.',
+    characters: ['Foxy', 'Bluebird']
+  });
+  assert.match(prompt, /Visible cast: Foxy, Bluebird/);
+  assert.match(prompt, /clearly visible, recognizable subject/i);
+  assert.match(prompt, /do not omit, replace, or hide them/i);
+});
+
 test('image prompt builder adds the selected visual style as explicit art direction', () => {
   const prompt = buildImageGenerationPrompt(scene, bible, { visualStyle: '3D animated' });
   assert.match(prompt, /polished stylized 3D animated feature-film frame/);
