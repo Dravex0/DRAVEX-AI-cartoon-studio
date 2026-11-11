@@ -776,39 +776,45 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
       return Math.min(distance, 360 - distance);
     };
     const expectedHues = expectedRgb.map(rgb => toHue(rgb).hue);
-    const samples = [];
+    const frames = [];
     await video.play();
-    video.pause();
-    for (let index = 0; index < expectedRgb.length; index += 1) {
-      const sampleTime = video.duration * ((index + 0.5) / expectedRgb.length);
-      await new Promise((resolve, reject) => {
-        const onSeeked = () => resolve();
-        const onError = () => reject(new Error('Could not seek final WebM for scene '+(index + 1)+'.'));
-        video.addEventListener('seeked', onSeeked, { once: true });
-        video.addEventListener('error', onError, { once: true });
-        video.currentTime = sampleTime;
-      });
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      if (video.readyState < 2) throw new Error('Final WebM frame was not decoded for scene '+(index + 1)+'.');
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const pixel = context.getImageData(8, 8, 1, 1).data;
-      const rgb = [pixel[0], pixel[1], pixel[2]];
-      const measured = toHue(rgb);
-      samples.push({
-        scene: index + 1,
-        timeMs: Math.round(sampleTime * 1000),
-        rgb,
-        hue: Number(measured.hue.toFixed(1)),
-        saturation: Number(measured.saturation.toFixed(3)),
-        expectedHue: Number(expectedHues[index].toFixed(1)),
-        hueDistance: Number(hueDistance(measured.hue, expectedHues[index]).toFixed(1))
-      });
+    const startedAt = performance.now();
+    while (!video.ended && performance.now() - startedAt < 30000) {
+      if (video.readyState >= 2 && Number.isFinite(video.currentTime)) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const pixel = context.getImageData(8, 8, 1, 1).data;
+        const rgb = [pixel[0], pixel[1], pixel[2]];
+        const measured = toHue(rgb);
+        frames.push({ time: video.currentTime, rgb, hue: measured.hue, saturation: measured.saturation });
+      }
+      await new Promise(resolve => requestAnimationFrame(resolve));
     }
+    if (!video.ended || !Number.isFinite(video.currentTime) || video.currentTime <= 0) {
+      throw new Error('Final WebM playback did not reach a finite end time for scene-order verification.');
+    }
+    const playbackDuration = video.currentTime;
+    const samples = expectedRgb.map((_, index) => {
+      const targetTime = playbackDuration * ((index + 0.5) / expectedRgb.length);
+      const frame = frames.reduce((closest, candidate) =>
+        !closest || Math.abs(candidate.time - targetTime) < Math.abs(closest.time - targetTime) ? candidate : closest, null);
+      if (!frame) throw new Error('No decoded frame was sampled for scene '+(index + 1)+'.');
+      return {
+        scene: index + 1,
+        timeMs: Math.round(frame.time * 1000),
+        rgb: frame.rgb,
+        hue: Number(frame.hue.toFixed(1)),
+        saturation: Number(frame.saturation.toFixed(3)),
+        expectedHue: Number(expectedHues[index].toFixed(1)),
+        hueDistance: Number(hueDistance(frame.hue, expectedHues[index]).toFixed(1))
+      };
+    });
+    video.pause();
     video.removeAttribute('src');
     video.load();
-    return { samples };
+    return { playbackDuration, samples };
   }, expectedSceneRgb);
   const observedSceneColorSequence = observedSceneColors.samples.map(sample => expectedSceneColorBuckets[sample.scene - 1]);
+  expect(observedSceneColors.playbackDuration).toBeGreaterThan(0);
   expect(observedSceneColors.samples.every(sample => sample.saturation >= 0.25),
     'Every generated scene must retain a visibly saturated center pixel; samples: '+JSON.stringify(observedSceneColors.samples)).toBe(true);
   expect(observedSceneColors.samples.every(sample => sample.hueDistance <= 35),
