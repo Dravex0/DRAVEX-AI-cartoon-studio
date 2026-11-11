@@ -149,17 +149,13 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 @media(max-width:720px){.quick-settings-grid{grid-template-columns:minmax(0,1fr)}.quick-settings-grid .field:first-child{grid-column:auto}}
 
 /* Minimal prompt-first workspace: keep the main path visible and diagnostics tucked away. */
-.top>div:last-child{display:none!important}
-.hero,.workflow-steps{display:none!important}
+.hero{display:none!important}
 .layout>.panel:first-child .field:has(#character){display:none!important}
 .layout>.panel:first-child .row:has(#character){grid-template-columns:minmax(0,1fr)!important}
 .layout>.panel:first-child details.simple-options:not(.quick-settings){display:none!important}
 .quick-settings{margin:8px 0 12px!important;padding:9px 11px!important}
 .quick-settings>summary{font-size:13px!important}
-.quick-settings .field:has(#imageQuality){display:none!important}
 .quick-settings .quick-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-.layout>.panel:first-child>.field:has(#language){display:none!important}
-.layout>.panel:first-child .actions:has(#make){display:none!important}
 .layout>.panel:first-child>#qaReport:empty{display:none!important}
 .layout>.panel:first-child>#qaReport{font-size:12px!important}
 .advanced-video-settings{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:13px;background:#0d1729}
@@ -167,11 +163,10 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 .advanced-video-settings>summary::-webkit-details-marker,.advanced-audio-settings>summary::-webkit-details-marker{display:none}
 .advanced-video-settings>summary:after,.advanced-audio-settings>summary:after{content:"+";float:right;color:var(--cyan);font-size:17px}
 .advanced-video-settings[open]>summary:after,.advanced-audio-settings[open]>summary:after{content:"−"}
-.editorFields>*:not(.advanced-video-settings):not(#fullFilmProgressPanel):not(#fullFilmStatus):not(#generatedImageWrap){display:none!important}
 .editorFields>.advanced-video-settings{display:block!important}
 #faceAnalysisPanel,#auditAllAnimations,#animationCompatibilityStatus,#analyzeCharacterMotion,#characterMotionAuditStatus,#downloadCharacterMotionEvidence{display:none!important}
 .audio-panel{margin-top:10px}
-.layout>.panel:nth-child(2)>.actions:has(#play),.layout>.panel:nth-child(2)>p:has([data-i18n="previewDisclaimer"]){display:none!important}
+.layout>.panel:nth-child(2)>p:has([data-i18n="previewDisclaimer"]){display:none!important}
 .foot{display:none!important}
 #finalFilmResult{margin-top:12px}
 @media(max-width:720px){
@@ -201,7 +196,7 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 <pre id="universalTaskPlanOutput" hidden style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;padding:10px;border:1px solid var(--line);border-radius:10px;background:#11131e;color:var(--text);font-size:12px"></pre>
 </details>
 <div class="row"><div class="field"><label for="character" data-i18n="characterLabel">Main character</label><input id="character" value="" placeholder="Auto-detect from story / Автоопределение из сценария"></div><div class="field"><label for="style" data-i18n="styleLabel">Visual style</label><select id="style"><option value="Storybook" data-i18n="styleStorybook">Storybook</option><option value="Anime-inspired" data-i18n="styleAnime">Anime-inspired</option><option value="Flat 2D" data-i18n="styleFlat2D">Flat 2D</option><option value="Pixel art" data-i18n="stylePixelArt">Pixel art</option><option value="3D animated" data-i18n="style3DAnimated">3D animated</option><option value="3D realistic" data-i18n="style3DRealistic">Realistic 3D</option><option value="Clay 3D" data-i18n="styleClay3D">Clay 3D</option><option value="Watercolor" data-i18n="styleWatercolor">Watercolor</option><option value="Comic / manga" data-i18n="styleManga">Comic / manga</option><option value="Paper cutout" data-i18n="stylePaperCutout">Paper cutout</option><option value="Stop-motion" data-i18n="styleStopMotion">Stop-motion</option></select></div></div>
-<details class="simple-options quick-settings">
+<details class="simple-options quick-settings" open>
 <summary>Настройки видео</summary>
 <div class="quick-settings-grid">
 <div class="field"><label for="canvasFormat">Формат видео / Video format</label><select id="canvasFormat"><option value="landscape">16:9 · горизонтальный / Landscape</option><option value="portrait">9:16 · вертикальный / Portrait</option></select><small class="muted">Формат применяется к предпросмотру и итоговому WebM. / Applies to preview and final WebM.</small></div>
