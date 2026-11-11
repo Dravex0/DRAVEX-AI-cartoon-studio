@@ -48,6 +48,32 @@ test('reports a red-color hint without identifying a requested object', () => {
   assert.match(report.note, /do not identify a character, object, or action/);
 });
 
+
+test('reports where motion is concentrated instead of treating every pixel change equally', () => {
+  const base = solidFrame(9, 9, 30, 30, 30);
+  const data = base.data.slice();
+  for (let y = 3; y < 6; y += 1) for (let x = 3; x < 6; x += 1) {
+    const offset = (y * base.width + x) * 4;
+    data.set([220, 30, 25, 255], offset);
+  }
+  const report = analyzeRgbaFrameSequence([base, { ...base, data }]);
+  assert.equal(report.regionalMotion.gridSize, 3);
+  assert.equal(report.regionalMotion.centerRegion.row, 1);
+  assert.equal(report.regionalMotion.centerRegion.column, 1);
+  assert.ok(report.regionalMotion.centerRegion.changedPixelRatio > 0);
+  assert.equal(report.regionalMotion.activeRegionsByTransition.length, 1);
+  assert.equal(report.regionalMotion.activeRegionsByTransition[0], 1);
+});
+
+test('does not mislabel a whole-frame lighting change as localized character movement', () => {
+  const report = analyzeRgbaFrameSequence([
+    solidFrame(9, 9, 30, 30, 30),
+    solidFrame(9, 9, 45, 45, 45)
+  ]);
+  assert.equal(report.regionalMotion.activeRegionsByTransition[0], 9);
+  assert.equal(report.regionalMotion.averageActiveRegionsPerTransition, 9);
+});
+
 test('ignores RGB values hidden under fully transparent pixels', () => {
   const hiddenOrange = new Uint8Array([220, 120, 50, 0, 80, 80, 80, 255]);
   const hiddenBlack = new Uint8Array([0, 0, 0, 0, 80, 80, 80, 255]);
