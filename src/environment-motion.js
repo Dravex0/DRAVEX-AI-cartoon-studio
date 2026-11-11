@@ -4,16 +4,16 @@
  */
 const SUBJECTS = {
   en: /\b(?:clouds?|sky|wind|trees?|branches?|leaves?|birds?|rain|snow|waves?|water|crowds?|villagers?|people)\b/iu,
-  ru: /(?:облак\w*|неб\w*|ветер\w*|дерев\w*|ветк\w*|лист\w*|птиц\w*|дожд\w*|снег\w*|волн\w*|вод\w*|толп\w*|люд\w*)/iu,
-  uk: /(?:хмар\w*|неб\w*|вітер\w*|дерев\w*|гілк\w*|лист\w*|птах\w*|дощ\w*|сніг\w*|хвил\w*|вод\w*|натовп\w*|люд\w*)/iu,
-  es: /\b(?:nubes?|cielo|viento|árbol\w*|ramas?|hojas?|aves?|pájaros?|lluvia|nieve|olas?|agua|multitud|personas)\b/iu
+  ru: /(?:облак[\p{L}]*|неб[\p{L}]*|ветер[\p{L}]*|дерев[\p{L}]*|ветк[\p{L}]*|лист[\p{L}]*|птиц[\p{L}]*|дожд[\p{L}]*|снег[\p{L}]*|волн[\p{L}]*|вод[\p{L}]*|толп[\p{L}]*|люд[\p{L}]*)/iu,
+  uk: /(?:хмар[\p{L}]*|неб[\p{L}]*|вітер[\p{L}]*|дерев[\p{L}]*|гілк[\p{L}]*|лист[\p{L}]*|птах[\p{L}]*|дощ[\p{L}]*|сніг[\p{L}]*|хвил[\p{L}]*|вод[\p{L}]*|натовп[\p{L}]*|люд[\p{L}]*)/iu,
+  es: /\b(?:nubes?|cielo|viento|árbol[\p{L}]*|ramas?|hojas?|aves?|pájaros?|lluvia|nieve|olas?|agua|multitud|personas)\b/iu
 };
 
 const MOTION = {
-  en: /\b(?:drift\w*|move\w*|sway\w*|blow\w*|fall\w*|fly\w*|cross\w*|rise\w*|shake\w*|flutter\w*|scatter\w*|flow\w*|wave\w*)\b/iu,
-  ru: /(?:движ\w*|плыв\w*|кач\w*|колыш\w*|ду\w*|пада\w*|лет\w*|пролет\w*|сып\w*|шевел\w*|теч\w*|волну\w*)/iu,
-  uk: /(?:рух\w*|плив\w*|гойда\w*|колиха\w*|ду\w*|пада\w*|лет\w*|проліта\w*|сип\w*|воруш\w*|теч\w*|хвилю\w*)/iu,
-  es: /\b(?:muev\w*|desplaz\w*|balance\w*|sopl\w*|cae\w*|vuel\w*|cruz\w*|sub\w*|agita\w*|flot\w*|flu\w*)\b/iu
+  en: /\b(?:drift[\p{L}]*|move[\p{L}]*|sway[\p{L}]*|blow[\p{L}]*|fall[\p{L}]*|fly[\p{L}]*|cross[\p{L}]*|rise[\p{L}]*|shake[\p{L}]*|flutter[\p{L}]*|scatter[\p{L}]*|flow[\p{L}]*|wave[\p{L}]*)\b/iu,
+  ru: /(?:движ[\p{L}]*|плыв[\p{L}]*|кач[\p{L}]*|колыш[\p{L}]*|ду[\p{L}]*|пада[\p{L}]*|лет[\p{L}]*|пролет[\p{L}]*|сып[\p{L}]*|шевел[\p{L}]*|теч[\p{L}]*|волну[\p{L}]*)/iu,
+  uk: /(?:рух[\p{L}]*|плив[\p{L}]*|гойда[\p{L}]*|колиха[\p{L}]*|ду[\p{L}]*|пада[\p{L}]*|лет[\p{L}]*|проліта[\p{L}]*|сип[\p{L}]*|воруш[\p{L}]*|теч[\p{L}]*|хвилю[\p{L}]*)/iu,
+  es: /\b(?:muev[\p{L}]*|desplaz[\p{L}]*|balance[\p{L}]*|sopl[\p{L}]*|cae[\p{L}]*|vuel[\p{L}]*|cruz[\p{L}]*|sub[\p{L}]*|agita[\p{L}]*|flot[\p{L}]*|flu[\p{L}]*)\b/iu
 };
 
 const clean = value => String(value ?? '').trim().slice(0, 700);
