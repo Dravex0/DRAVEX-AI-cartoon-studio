@@ -1,27 +1,26 @@
 # DRAVEX Browser QA Agent
 
-The Browser QA Agent is a deterministic Playwright runner. It uses a real Chromium browser to open the app, enter a fixed synthetic prompt, press the create button, wait for the film preview, receive the browser download, validate the downloaded WebM container, and verify that the preview decodes at least one video frame.
+The free DRAVEX Browser QA Agent uses Playwright Chromium in GitHub Actions. It runs without paid APIs, provider tokens, sign-in, or remote AI generation consent.
 
-## Evidence collected per desktop and Pixel 7 run
+## Two separate test targets
 
-- Playwright browser recording of the test interaction.
-- Screenshot before generation and screenshot after the film preview appears.
-- JSON report with the prompt, browser project, selected video mode, step outcomes, browser errors, downloaded filename/size, and decoded video dimensions.
-- The downloaded WebM file itself.
-- Playwright trace, screenshot and video on failures.
+- **Source-build QA** opens the local Vite build. It checks the local storyboard/canvas path and verifies that a WebM can be downloaded and decoded.
+- **Live Pages QA** opens the published production URL, enters a fixed Russian Foxy prompt, exports the result, and inspects the actual downloaded WebM. It runs on desktop Chromium and the Pixel 7 device profile.
 
-The existing Playwright workflow uploads `playwright-report/` and `test-results/` as the `dravex-playwright-report` artifact, including successful-run attachments, for 14 days. The GitHub Actions run and artifact metadata are the entry points for reviewing each run.
+The live test captures the prompt/result screenshots, several decoded video frames, the WebM itself, and a JSON report. FFprobe inspects the exported file's video/audio streams. The report records frame-to-frame pixel changes and a simple orange-pixel signal as hints only; these heuristics do not prove that Foxy is present or that the motion depicts the requested action. The attached frames must be visually reviewed for character identity and continuity.
 
-## Important classification boundary
+## Honest result classifications
 
-The current default workflow is `local-canvas`. A passing run proves only that the local storyboard/canvas path produced a downloadable and decodable WebM. It is explicitly reported as **local canvas animation**, not AI text-to-video.
+- `local-canvas-output-only-not-AI-video-generation`: the site exported its local canvas/storyboard output. This is not evidence of AI text-to-video.
+- `completed-with-findings`: the browser completed the flow, but the report found missing audio, weak motion evidence, or other quality issues.
+- `failed`: the live site could not be opened, generation/export did not complete, or the downloaded WebM could not be validated/decoded.
 
-Wan 2.2 through Hugging Face and local ComfyUI are separate opt-in provider paths. They require provider configuration and consent; this QA test does not submit prompts or images to remote services and does not claim that AI video clips were generated. A separate provider-enabled test must be designed only when a safe, configured test provider is available.
+Audio-track presence is not proof of audible or intelligible Russian speech. A human listening check is still required. Likewise, orange pixels and pixel differences are not semantic computer vision and cannot certify a visible Foxy character. The report deliberately avoids marking these checks as passed merely because a WebM exists.
 
-## How ChatGPT can review a run
+## Evidence
 
-Use the GitHub connector to inspect the exact commit's check runs, fetch the Playwright job logs, list the run artifacts, and download the `dravex-playwright-report` ZIP. Review the JSON report and attached screenshots/video/WebM rather than inferring success from a green workflow name. Binary artifacts are evidence; their existence alone is not proof that every scene is AI-generated or that production speech/lip-sync works.
+The GitHub Actions artifact `dravex-playwright-report` contains screenshots, frame samples, JSON reports, traces, recordings, and exported WebM files. Review the live Pages report and its attached frames, not only the green workflow status.
 
-## Safety
+## Privacy and cost
 
-The test prompt is synthetic. It uses the local-canvas mode, does not enter tokens, does not sign in, and does not enable remote provider consent. No user media is uploaded.
+The live QA test uses a synthetic prompt and the site's default local-canvas mode. It does not enter tokens, enable Hugging Face/AI Horde consent, or send the prompt/images to an AI video provider. GitHub Actions and Playwright are used as the free test runner within the repository's available CI quota.
