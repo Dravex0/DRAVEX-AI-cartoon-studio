@@ -61,6 +61,36 @@ test('motion prompt builder separates temporal action and preserves continuity',
   assert.match(prompt, /do not introduce new objects/i);
 });
 
+test('motion prompt forwards explicit environment motion and physical prop interactions', () => {
+  const prompt = buildMotionGenerationPrompt({
+    motionPrompt: 'Kel frees the mechanical bird.',
+    characters: ['Kel'],
+    environmentMotion: ['Clouds drift across the sky.', 'Wind shakes the tree branches.'],
+    interactions: [{
+      type: 'free',
+      actorId: 'Kel',
+      targetId: 'mechanical bird',
+      evidence: 'Kel carefully frees the mechanical bird.'
+    }]
+  }, [{ characterId: 'Kel', visualDescription: 'A young forest explorer' }]);
+
+  assert.match(prompt, /Environment motion 1: Clouds drift across the sky/);
+  assert.match(prompt, /Environment motion 2: Wind shakes the tree branches/);
+  assert.match(prompt, /Actor "Kel" performs "free" with target "mechanical bird"/);
+  assert.match(prompt, /Show cause and effect visibly/);
+  assert.match(prompt, /background motion spatially coherent and independent from camera motion/i);
+});
+
+test('motion prompt does not invent world motion or prop interactions when no evidence exists', () => {
+  const prompt = buildMotionGenerationPrompt({
+    motionPrompt: 'Kel stands in a quiet clearing.',
+    characters: ['Kel']
+  });
+  assert.doesNotMatch(prompt, /World and object motion contract/);
+  assert.doesNotMatch(prompt, /Environment motion \\d+:/);
+  assert.doesNotMatch(prompt, /Physical interaction \\d+:/);
+});
+
 test('motion prompt adds temporal stability and controlled camera constraints', () => {
   const prompt = buildMotionGenerationPrompt({
     visibleAction: 'The fox slowly waves.',
