@@ -57,6 +57,12 @@ test('parses an inline main-character profile without treating its description a
   assert.match(brief.directives.productionNotes, /Stage the story event/);
 });
 
+test('normalizes a standalone main-character label before narrative on the next line', () => {
+  const brief = parseStoryBrief('Main character: Foxy.\\nFoxy finds a red ball.');
+  assert.deepEqual(brief.characters, ['Foxy']);
+  assert.equal(brief.storyText, 'Foxy finds a red ball.');
+});
+
 test('separates a short main-character label and same-line production prose from the story', () => {
   const brief = parseStoryBrief('Main character: Foxy. Stage one clear action.\nFoxy finds a glowing crystal.');
   assert.deepEqual(brief.characters, ['Foxy']);
