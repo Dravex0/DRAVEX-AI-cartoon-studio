@@ -48,6 +48,19 @@ test('reports a red-color hint without identifying a requested object', () => {
   assert.match(report.note, /do not identify a character, object, or action/);
 });
 
+test('ignores RGB values hidden under fully transparent pixels', () => {
+  const hiddenOrange = new Uint8Array([220, 120, 50, 0, 80, 80, 80, 255]);
+  const hiddenBlack = new Uint8Array([0, 0, 0, 0, 80, 80, 80, 255]);
+  const report = analyzeRgbaFrameSequence([
+    { width: 2, height: 1, data: hiddenOrange },
+    { width: 2, height: 1, data: hiddenBlack }
+  ]);
+  assert.equal(report.status, 'likely-static');
+  assert.equal(report.orangeSignal, 'low-orange-pixel-signal');
+  assert.equal(report.redSignal, 'low-red-pixel-signal');
+  assert.equal(report.meanPixelChange, 0);
+});
+
 test('rejects mismatched pixel-buffer dimensions', () => {
   assert.throws(
     () => analyzeRgbaFrameSequence([
