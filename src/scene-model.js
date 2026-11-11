@@ -83,6 +83,8 @@ export function normalizeScene(input = {}, index = 0) {
       : null,
     location: text(scene.location, 500),
     environmentDescription: text(scene.environmentDescription, 2_000),
+    // Explicit non-character motion cues are kept separate from camera movement.
+    environmentMotion: uniqueStrings(scene.environmentMotion),
     weather: text(scene.weather, 200),
     environmentLighting: text(scene.environmentLighting, 300),
     environmentStyle: text(scene.environmentStyle, 300),
