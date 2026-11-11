@@ -2,18 +2,38 @@ const TAU=Math.PI*2;
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,Number.isFinite(Number(v))?Number(v):0));
 const clean=v=>String(v??'').trim().slice(0,1200);
 function colorFor(source,fallback,patterns){const text=clean(source).toLowerCase();for(const [re,color] of patterns)if(re.test(text))return color;return fallback;}
+function nearestTraitColor(source,traitPattern,fallback,patterns){
+ const text=clean(source).toLowerCase();
+ const trait=text.search(traitPattern);
+ if(trait<0)return fallback;
+ let best=null;
+ for(const [re,color] of patterns){
+  const scanner=new RegExp(re.source,re.flags.includes('g')?re.flags:re.flags+'g');
+  let match;
+  while((match=scanner.exec(text))){
+   const distance=Math.abs((match.index+match[0].length/2)-trait);
+   if(!best||distance<best.distance)best={distance,color};
+   if(!match[0])scanner.lastIndex++;
+  }
+ }
+ return best?.color||fallback;
+}
 function getColors(profile={}){
- // Prefer field-specific character traits. Never let red eyes recolor black hair,
- // or a gold accessory recolor the outfit.
- const hairSource=clean(profile.hair)||clean(profile.visualDescription)||clean(profile.distinctiveFeatures);
+ // Character Bible often stores the whole appearance in one visualDescription.
+ // Resolve hair/eye colors by proximity to their own trait words so "red eyes"
+ // cannot accidentally turn "black hair" red.
+ const appearance=[clean(profile.visualDescription),clean(profile.distinctiveFeatures)].filter(Boolean).join(' ');
+ const hairPatterns=[[/black|черн/i,'#17131f'],[/white|silver|бел|серебр/i,'#d9dce5'],[/blond|gold|золот|светл.*волос/i,'#d9ad58'],[/red|scarlet|рыж|красн|алый/i,'#9c342b'],[/blue|син/i,'#315a9b'],[/brown|каштан/i,'#55382f']];
+ const eyePatterns=[[/blue|голуб|син/i,'#4c9bd5'],[/green|зелен/i,'#55a96a'],[/gold|yellow|желт/i,'#e4bd49'],[/brown|кар/i,'#79513a'],[/red|scarlet|алый|красн/i,'#d52843']];
+ const hairSource=clean(profile.hair);
+ const eyeSource=clean(profile.eyeColor)||clean(profile.eyes);
  const outfitSource=clean(profile.clothing)||clean(profile.outfit);
  const accentSource=clean(profile.colors)||clean(profile.accentColor);
- const eyeSource=clean(profile.eyeColor)||clean(profile.eyes);
  return {
-  hair:colorFor(hairSource,'#17131f',[[/white|silver|бел|серебр/i,'#d9dce5'],[/blond|gold|золот|светл.*волос/i,'#d9ad58'],[/red|рыж|красн/i,'#9c342b'],[/blue|син/i,'#315a9b'],[/brown|каштан/i,'#55382f']]),
+  hair:hairSource?colorFor(hairSource,'#17131f',hairPatterns):nearestTraitColor(appearance,/hair|волос/i,'#17131f',hairPatterns),
   outfit:colorFor(outfitSource,'#171820',[[/white|бел/i,'#e5e2df'],[/blue|син/i,'#243d69'],[/green|зелен/i,'#28533f'],[/red|красн/i,'#641f2e']]),
   accent:colorFor(accentSource,'#a51d35',[[/gold|золот|yellow|желт/i,'#d7ad4b'],[/blue|син/i,'#4d78c7'],[/green|зелен/i,'#5a9b71'],[/purple|фиолет/i,'#8953b5']]),
-  eyes:colorFor(eyeSource,'#d52843',[[/blue|голуб|син/i,'#4c9bd5'],[/green|зелен/i,'#55a96a'],[/gold|yellow|желт/i,'#e4bd49'],[/brown|кар/i,'#79513a'],[/red|scarlet|алый|красн/i,'#d52843']]),
+  eyes:eyeSource?colorFor(eyeSource,'#d52843',eyePatterns):nearestTraitColor(appearance,/eyes?|глаз/i,'#d52843',eyePatterns),
   skin:'#d9a98f'
  };
 }
