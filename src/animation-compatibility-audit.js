@@ -3,6 +3,9 @@ import { validateCharacterFacialRig } from './character-facial-rig.js';
 import { validateCharacterRigTimeline } from './character-rig-timeline.js';
 import { validateCharacterActionTimeline } from './character-action-timeline.js';
 import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from './character-rig-motion-presets.js';
+import { sampleCharacterRigTimeline } from './character-rig-timeline.js';
+import { applyCharacterRigPose } from './character-rig.js';
+import { createCharacterFacialExpression, listCharacterFacialExpressions } from './character-facial-rig.js';
 
 const key = value => String(value ?? '').trim().toLocaleLowerCase();
 const record = value => Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -26,6 +29,8 @@ export function auditAnimationCompatibility(scenes) {
   let spriteMotionTimelineCount = 0;
   let voiceCueCount = 0;
   let presetCount = 0;
+  let presetRuntimeSampleCount = 0;
+  let facialExpressionPresetCount = 0;
 
   source.forEach((rawScene, sceneIndex) => {
     const scene = record(rawScene) ? rawScene : {};
@@ -69,6 +74,23 @@ export function auditAnimationCompatibility(scenes) {
           for (const warning of presetReport.warnings || []) {
             addIssue(issues, sceneIndex, 'rig-preset-limited', 'warning', 'Preset "' + preset.id + '": ' + warning, report.rig.characterId);
           }
+          const frames = presetReport.timeline.keyframes;
+          const sampleTimes = new Set(frames.map(frame => frame.time));
+          for (let frameIndex = 1; frameIndex < frames.length; frameIndex++) {
+            sampleTimes.add((frames[frameIndex - 1].time + frames[frameIndex].time) / 2);
+          }
+          for (const sampleTime of [...sampleTimes].sort((a, b) => a - b)) {
+            const sampledPose = sampleCharacterRigTimeline(presetReport.timeline, sampleTime);
+            const characterPose = sampledPose[report.rig.characterId] || {};
+            const posedParts = applyCharacterRigPose(report.rig.parts, report.rig, characterPose);
+            presetRuntimeSampleCount++;
+            const validParts = Array.isArray(posedParts) && posedParts.length === report.rig.parts.length
+              && posedParts.every(part => ['x', 'y', 'rotation'].every(field => Number.isFinite(part?.[field])));
+            if (!validParts) {
+              addIssue(issues, sceneIndex, 'rig-preset-runtime-invalid', 'error', 'Preset "' + preset.id + '" produced non-finite or incomplete part transforms when sampled by the body-rig runtime.', report.rig.characterId);
+              break;
+            }
+          }
         }
       }
     }
@@ -86,6 +108,13 @@ export function auditAnimationCompatibility(scenes) {
         continue;
       }
       facialRigCount++;
+      for (const expressionName of listCharacterFacialExpressions()) {
+        facialExpressionPresetCount++;
+        const expressionReport = createCharacterFacialExpression(expressionName);
+        if (expressionReport.status !== 'ready' || !record(expressionReport.expression)) {
+          addIssue(issues, sceneIndex, 'facial-expression-preset-invalid', 'error', 'Facial expression preset "' + expressionName + '" cannot produce a valid expression control set.', report.rig.characterId);
+        }
+      }
       if (facialIds.has(facialId)) {
         addIssue(issues, sceneIndex, 'facial-rig-character-duplicate', 'error', 'A scene contains more than one facial rig for the same character.', report.rig.characterId);
       }
@@ -265,6 +294,8 @@ export function auditAnimationCompatibility(scenes) {
     spriteMotionTimelineCount,
     voiceCueCount,
     presetCount,
+    presetRuntimeSampleCount,
+    facialExpressionPresetCount,
     errorCount: errors,
     warningCount: warnings,
     status: errors ? 'incompatible' : warnings ? 'compatible-with-warnings' : 'compatible',
