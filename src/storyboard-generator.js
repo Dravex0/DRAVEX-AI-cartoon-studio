@@ -11,6 +11,7 @@ import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
 import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 import { inferEnvironmentMotion } from './environment-motion.js';
+import { inferPropInteractions } from './scene-prop-interactions.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -159,9 +160,14 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
         : name.toLocaleLowerCase() === subject.toLocaleLowerCase()))
     ])];
     // Keep interaction inference source-grounded and limited to characters assigned to this scene.
-    scene.interactions = scene.storyDetail
+    const characterInteractions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
       : [];
+    const propInteractions = scene.storyDetail
+      ? inferPropInteractions(scene.storyDetail, scene.characters, locale)
+      : [];
+    scene.interactions = [...characterInteractions, ...propInteractions];
+
     // Extract only explicitly written non-character movement; never add default weather or crowd motion.
     scene.environmentMotion = inferEnvironmentMotion(scene.storyDetail, locale);
     // Semantic story intent is separate from renderer movement presets and is now
