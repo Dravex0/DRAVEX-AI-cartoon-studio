@@ -89,10 +89,30 @@ export function parseStoryBrief(input) {
       const match = part.match(/^\s*([^:：]{2,60})\s*[:：]\s*(.{0,1000})\s*$/u);
       const key = match ? ALIASES.get(normalizeLabel(match[1])) : null;
       if (key && (match[2].trim() || key === 'characters')) {
-        appendDirective(directives, key, match[2]);
+        let directiveValue = match[2];
+        if (key === 'characters') {
+          const inlineProfile = parseCharacterLine(match[2]);
+          if (inlineProfile) {
+            if (!characterProfiles.some(profile => profile.characterId.toLocaleLowerCase() === inlineProfile.characterId.toLocaleLowerCase())) {
+              characterProfiles.push(inlineProfile);
+            }
+            directiveValue = inlineProfile.characterId;
+          } else {
+            // Keep a compact protagonist label separate from prose accidentally placed
+            // on the same line (for example: "Main character: Foxy. Stage the action...").
+            const sentence = match[2].match(/^([^.!?。！？]+)[.!?。！？]\s+([\s\S]+)$/u);
+            if (sentence) {
+              directiveValue = sentence[1].trim();
+              remaining.push(sentence[2].trim());
+            }
+          }
+        }
+        appendDirective(directives, key, directiveValue);
         instructionLines.push(part.trim());
         foundDirective = true;
-        readingCharacterProfiles = key === 'characters';
+        // Only an empty `Characters:` heading opens a multi-line cast section.
+        // A named protagonist or inline profile must not consume following prose as cast data.
+        readingCharacterProfiles = key === 'characters' && !match[2].trim();
       } else {
         remaining.push(part.trim());
       }
@@ -153,10 +173,16 @@ export function parseStoryBrief(input) {
     '\\b(?:a|an|the)\\s+((?:(?:small|little|tiny|young|cute|brave|friendly|blue|red|green|golden|silver|white|black|orange|маленьк\\w*|крошечн\\w*|ю\\w*|син\\w*|красн\\w*|зелён\\w*|зелен\\w*|рыж\\w*|бел\\w*|чёрн\\w*|черн\\w*)\\s+){1,3}' + characterNouns + ')',
     'giu'
   );
-  for (const match of rawText.matchAll(characterDescriptorPattern)) {
+  const narrativeCharacterLines = [...storyLines, ...sceneBlocks.flatMap(scene => scene.lines)]
+    .filter(line => !/^(?:stage|keep|preserve|show|use|ensure|render|maintain|avoid|create|generate|medium shot|camera|do not|make sure)\b/iu.test(line));
+  const characterSourceText = narrativeCharacterLines.join('\n');
+  for (const match of characterSourceText.matchAll(characterDescriptorPattern)) {
     const description = clean(match[1], 120).replace(/[.,!?;:]+$/u, '');
     if (!description || /\b(?:named|по имени)\b/iu.test(match[0])) continue;
-    if (characterProfiles.some(profile => profile.characterId.toLocaleLowerCase() === description.toLocaleLowerCase())) continue;
+    if (characterProfiles.some(profile =>
+      profile.characterId.toLocaleLowerCase() === description.toLocaleLowerCase()
+      || profile.visualDescription.toLocaleLowerCase().includes(description.toLocaleLowerCase())
+    )) continue;
     characterProfiles.push({ characterId: description, visualDescription: description, clothing: '', colors: '', distinctiveFeatures: '' });
     appendDirective(directives, 'characters', description);
   }
@@ -164,7 +190,7 @@ export function parseStoryBrief(input) {
   // Also recognize natural-language introductions such as "лисёнок по имени Рыжик"
   // and "a rabbit named Snowball", so users do not need a separate cast section.
   const namedCharacterPattern = /([^.!?。！？\n]{0,140}?)(?:по имени|на имя|на ім'я|named)\s+([\p{L}][\p{L}'’-]{1,39})/giu;
-  for (const match of rawText.matchAll(namedCharacterPattern)) {
+  for (const match of characterSourceText.matchAll(namedCharacterPattern)) {
     const characterId = clean(match[2], 80);
     if (!characterId || characterProfiles.some(item => item.characterId.toLowerCase() === characterId.toLowerCase())) continue;
     const visualDescription = clean(match[1], 500).replace(/^(?:утром|однажды|вдруг|then|one day|in the morning)\s+/iu, '');

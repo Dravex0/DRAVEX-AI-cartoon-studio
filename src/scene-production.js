@@ -77,12 +77,14 @@ export function sceneHasSavedCharacterImageReference(scene = {}, characterBible 
 /** Creates a provider-neutral still-image prompt without calling a paid or remote service. */
 export function buildImageGenerationPrompt(scene = {}, characterBible = [], options = {}) {
   const characterLock = characterDetails(scene, characterBible);
+  const visibleCast = list(scene.characters);
   return [
     safe(scene.imagePrompt) || safe(scene.prompt) || safe(scene.description),
     VISUAL_STYLE_PROMPTS[safe(options.visualStyle, 80)] && `Visual art direction: ${VISUAL_STYLE_PROMPTS[safe(options.visualStyle, 80)]}. Keep this style consistent across every scene.`,
     safe(scene.location) && `Location: ${safe(scene.location, 500)}`,
     safe(scene.timeOfDay) && `Time: ${safe(scene.timeOfDay, 120)}`,
     safe(scene.camera) && `Composition and camera: ${safe(scene.camera, 1000)}`,
+    visibleCast.length && `Visible cast: ${visibleCast.join(', ')}. Render every listed character as a clearly visible, recognizable subject in the frame; do not omit, replace, or hide them in the background.`,
     characterLock.length && `Character appearance reference: ${characterLock.join(' | ')}`,
     safe(scene.continuityLock) && `Continuity lock: ${safe(scene.continuityLock, 2000)}`,
     options.includeNegative !== false && safe(scene.negativePrompt) && `Avoid: ${safe(scene.negativePrompt, 2000)}`,
