@@ -150,7 +150,8 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     }
 
     const orangeSignal = Math.max(...browserEvidence.frames.map(frame => frame.orangePixelRatio));
-    const frameChange = { changedPixelRatio: browserEvidence.changedPixelRatio };\n    report.checks.visualEvidence = {
+    const frameChange = { changedPixelRatio: browserEvidence.changedPixelRatio };
+    report.checks.visualEvidence = {
       changedPixelRatio: frameChange.changedPixelRatio,
       orangePixelSignal: orangeSignal,
       motionSignal: frameChange.changedPixelRatio >= 0.01 ? 'pixel-changes-detected' : 'no-significant-motion-detected',
