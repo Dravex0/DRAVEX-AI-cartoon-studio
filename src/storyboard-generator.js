@@ -10,6 +10,7 @@ import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
 import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
+import { inferEnvironmentMotion } from './environment-motion.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -161,6 +162,8 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     scene.interactions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
       : [];
+    // Extract only explicitly written non-character movement; never add default weather or crowd motion.
+    scene.environmentMotion = inferEnvironmentMotion(scene.storyDetail, locale);
     // Semantic story intent is separate from renderer movement presets and is now
     // carried into the actual motion prompt and validated action timeline.
     const semanticIntent = inferSceneActionIntent(scene.storyDetail);
