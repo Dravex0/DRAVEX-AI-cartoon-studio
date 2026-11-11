@@ -11,6 +11,8 @@ The live test saves an Kael Character Bible text profile (appearance, clothing, 
 
 The agent computes frame-to-frame pixel-change ratios and simple pixel-change ratios as hints only. These measurements can be affected by camera movement, backgrounds, lighting, and compression; they do not recognize Kael, the cathedral, or any story action. Character identity and story-action accuracy remain manual-review items.
 
+The live frame report also divides each sampled frame into a 3×3 spatial grid and records where pixel changes occur, including a center-region hint and the number of active regions per transition. This helps flag broadly distributed lighting/camera changes versus more localized image changes, but the center is not guaranteed to contain the character and localized change is not proof of body, hand, face, or character animation. Semantic action review remains separate.
+
 ## Broad live Pages feature matrix
 
 The live matrix runs against the published Pages site in addition to the focused prompt-to-WebM test. It checks:
