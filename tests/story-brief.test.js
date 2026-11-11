@@ -81,6 +81,13 @@ test('routes free-form production directions to metadata and keeps labeled story
   assert.equal(brief.keyEvents.length, 1);
 });
 
+test('separates a semicolon-delimited production direction from the preceding story event', () => {
+  const brief = parseStoryBrief('Foxy finds a red ball under a tree; Keep Foxy visible in every scene.');
+  assert.equal(brief.storyText, 'Foxy finds a red ball under a tree;');
+  assert.match(brief.directives.productionNotes, /Keep Foxy visible in every scene/);
+  assert.equal(brief.keyEvents.length, 1);
+});
+
 test('keeps inline character appearance separate from trailing production directions and story detail', () => {
   const brief = parseStoryBrief(
     'Main character: Foxy — a small orange fox with large expressive eyes. Keep Foxy visible in every scene. Story detail to preserve: Foxy pushes a red ball.'
