@@ -46,6 +46,17 @@ jobs:
       - name: Run the free QA agent against the published GitHub Pages site
         run: npx playwright test tests/e2e/dravex-live-pages-qa.spec.js
 
+      - name: Preserve live Pages QA video and frame evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dravex-live-pages-qa-evidence
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Run the broad published Pages feature matrix
         run: npx playwright test tests/e2e/dravex-live-feature-matrix.spec.js
 
