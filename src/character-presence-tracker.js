@@ -22,9 +22,13 @@ export function createCharacterPresenceTracker(characterIds = []) {
     for (const [id, record] of characters) {
       const before = record.status;
       if (exited.has(id)) { record.status = "exited"; record.lastTransition = "explicit-story-exit"; }
+      else if (before === "exited" && !entered.has(id)) {
+        record.status = "exited";
+        record.lastTransition = "remains-exited-until-explicit-entry";
+      }
       else if (visible.has(id)) {
         record.status = "visible"; record.lastSeenSceneId = currentSceneId || record.lastSeenSceneId;
-        record.lastTransition = "observed-in-frame";
+        record.lastTransition = before === "exited" ? "explicit-story-reentry-visible" : "observed-in-frame";
       } else if (entered.has(id)) { record.status = "offscreen"; record.lastTransition = "entered-scene-offscreen"; }
       else if (before !== "exited" && (cameraCut || before === "visible")) {
         record.status = "offscreen"; record.lastTransition = cameraCut ? "camera-cut" : "not-in-current-frame";
