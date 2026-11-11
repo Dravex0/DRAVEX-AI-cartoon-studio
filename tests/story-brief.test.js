@@ -53,7 +53,8 @@ test('parses an inline main-character profile without treating its description a
   assert.deepEqual(brief.characters, ['Foxy']);
   assert.equal(brief.characterProfiles[0].characterId, 'Foxy');
   assert.match(brief.characterProfiles[0].visualDescription, /small orange fox/i);
-  assert.equal(brief.storyText, 'Stage the story event as one visible cause-and-effect action; preserve the named character and show a clear state change.');
+  assert.equal(brief.storyText, '');
+  assert.match(brief.directives.productionNotes, /Stage the story event/);
 });
 
 test('separates a short main-character label and same-line production prose from the story', () => {
