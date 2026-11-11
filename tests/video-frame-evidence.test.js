@@ -40,6 +40,14 @@ test('reports an orange-color hint without claiming character recognition', () =
   assert.match(report.note, /heuristics only/);
 });
 
+test('reports a red-color hint without identifying a requested object', () => {
+  const frame = solidFrame(10, 10, 220, 30, 25);
+  const report = analyzeRgbaFrameSequence([frame, { ...frame, data: frame.data.slice() }]);
+  assert.equal(report.redSignal, 'red-pixels-detected');
+  assert.ok(report.maxRedPixelRatio > 0.9);
+  assert.match(report.note, /do not identify a character, object, or action/);
+});
+
 test('rejects mismatched pixel-buffer dimensions', () => {
   assert.throws(
     () => analyzeRgbaFrameSequence([
