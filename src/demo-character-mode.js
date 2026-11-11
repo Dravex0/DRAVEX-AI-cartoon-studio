@@ -1,16 +1,21 @@
-const FOX_IDENTITY = /\\bfox(?:y)?\\b|лис(?:[её]\\p{L}*|иц\\p{L}*|ичк\\p{L}*)/iu;
+const FOX_MARKERS = ['fox', 'лисиц', 'лисён', 'лисен', 'лисич'];
+
+function containsFoxMarker(value) {
+  const source = String(value ?? '').toLocaleLowerCase();
+  return FOX_MARKERS.some(marker => source.includes(marker));
+}
 
 /** Identify profiles that can be represented by the built-in procedural fox renderer. */
 export function isProceduralFoxCharacter(profile = {}) {
   if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return false;
   const species = String(profile.species ?? '').trim();
-  if (species) return FOX_IDENTITY.test(species);
+  if (species) return containsFoxMarker(species);
   const identity = [
     profile.characterId,
     profile.visualDescription,
     profile.distinctiveFeatures
   ].map(value => String(value ?? '').trim()).filter(Boolean).join(' ');
-  return FOX_IDENTITY.test(identity);
+  return containsFoxMarker(identity);
 }
 
 /** Decide when the built-in procedural character should stand in for missing art. */
