@@ -897,3 +897,46 @@ test('missing optional dialogue model does not block local film export', async (
   await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
   expect(pageErrors).toEqual([]);
 });
+
+
+test('renders the built-in procedural Foxy when a named fox has no scene artwork', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#idea').fill([
+    'Main character: Foxy — a small orange fox with large expressive eyes.',
+    'Foxy finds a red ball under a tree and pushes it with his paw.'
+  ].join(String.fromCharCode(10)));
+  await page.getByRole('button', { name: /start working/i }).click();
+
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await expect(page.locator('#character')).toHaveValue('Foxy');
+  await page.locator('#play').click();
+  await page.waitForTimeout(220);
+
+  const visual = await page.locator('#canvas').evaluate(canvas => {
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let orangePixels = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const red = pixels[offset];
+      const green = pixels[offset + 1];
+      const blue = pixels[offset + 2];
+      if (red >= 160 && green >= 60 && green <= 190 && blue <= 120
+        && red - green >= 35 && red - blue >= 60) orangePixels += 1;
+    }
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      orangePixels,
+      orangePixelRatio: orangePixels / (canvas.width * canvas.height)
+    };
+  });
+
+  expect(visual.width).toBe(1280);
+  expect(visual.height).toBe(720);
+  expect(visual.orangePixels).toBeGreaterThan(1000);
+  expect(visual.orangePixelRatio).toBeGreaterThan(0.001);
+  expect(pageErrors).toEqual([]);
+});
