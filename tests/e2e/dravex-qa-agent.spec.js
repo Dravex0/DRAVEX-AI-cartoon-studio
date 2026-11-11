@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('dravex-ui-language', 'en'));
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('dravex-e2e-language-initialized') !== '1') {
+      localStorage.setItem('dravex-ui-language', 'en');
+      sessionStorage.setItem('dravex-e2e-language-initialized', '1');
+    }
+  });
 });
 import { readFile } from 'node:fs/promises';
 
