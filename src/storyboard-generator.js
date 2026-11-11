@@ -101,6 +101,17 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   const subject = String(character ?? '').trim().slice(0, 120) || (locale === 'ru' || locale === 'uk' ? 'Персонаж' : locale === 'es' ? 'Personaje' : 'Character');
   const brief = parseStoryBrief(idea);
   const source = brief.storyText;
+  if (String(idea ?? '').trim() && !String(source ?? '').trim()) {
+    const messages = {
+      ru: 'Добавь хотя бы одно событие или описание истории. Одних производственных указаний недостаточно для раскадровки.',
+      uk: 'Додай хоча б одну подію або опис історії. Самих виробничих вказівок недостатньо для розкадрування.',
+      en: 'Add at least one story event or narrative sentence. Production directions alone cannot create a storyboard.',
+      es: 'Añade al menos un acontecimiento o una frase narrativa. Las instrucciones de producción por sí solas no crean una historia.'
+    };
+    const error = new Error(messages[locale] || messages.en);
+    error.code = 'STORY_TEXT_REQUIRED';
+    throw error;
+  }
   const explicitScenes = Array.isArray(brief.sceneBlocks) ? brief.sceneBlocks : [];
   const sentences = source ? (source.match(/[^.!?。！？]+[.!?。！？]?/gu) || []).map(part => part.trim()).filter(Boolean) : [FALLBACK[locale]];
   const beatCount = brief.requestedSceneCount ?? STORYBOARD_BEAT_COUNT;

@@ -53,13 +53,61 @@ test('parses an inline main-character profile without treating its description a
   assert.deepEqual(brief.characters, ['Foxy']);
   assert.equal(brief.characterProfiles[0].characterId, 'Foxy');
   assert.match(brief.characterProfiles[0].visualDescription, /small orange fox/i);
-  assert.equal(brief.storyText, 'Stage the story event as one visible cause-and-effect action; preserve the named character and show a clear state change.');
+  assert.equal(brief.storyText, '');
+  assert.match(brief.directives.productionNotes, /Stage the story event/);
 });
 
-test('separates a short main-character label from same-line production prose', () => {
+test('normalizes a standalone main-character label before narrative on the next line', () => {
+  const brief = parseStoryBrief('Main character: Foxy.\nFoxy finds a red ball.');
+  assert.deepEqual(brief.characters, ['Foxy']);
+  assert.equal(brief.storyText, 'Foxy finds a red ball.');
+});
+
+test('separates a short main-character label and same-line production prose from the story', () => {
   const brief = parseStoryBrief('Main character: Foxy. Stage one clear action.\nFoxy finds a glowing crystal.');
   assert.deepEqual(brief.characters, ['Foxy']);
-  assert.equal(brief.storyText, 'Stage one clear action.\nFoxy finds a glowing crystal.');
+  assert.equal(brief.storyText, 'Foxy finds a glowing crystal.');
+  assert.equal(brief.directives.productionNotes, 'Stage one clear action.');
+});
+
+
+test('routes free-form production directions to metadata and keeps labeled story detail as narrative', () => {
+  const brief = parseStoryBrief([
+    'Main character: Foxy.',
+    'Stage the story event as one visible cause-and-effect action; preserve its named participants and objects, and show a clear state change.',
+    'Keep Foxy involved when the story calls for it.',
+    'Medium shot with a clear view of the acting character, the important object, and the result.',
+    'Story detail to preserve: Foxy finds a red ball under a tree and pushes it with his paw.'
+  ].join('\n'));
+  assert.equal(brief.storyText, 'Foxy finds a red ball under a tree and pushes it with his paw.');
+  assert.doesNotMatch(brief.storyText, /Stage the story event|Keep Foxy|Medium shot/i);
+  assert.match(brief.directives.productionNotes, /Stage the story event/);
+  assert.match(brief.directives.productionNotes, /Keep Foxy involved/);
+  assert.match(brief.directives.productionNotes, /Medium shot/);
+  assert.equal(brief.keyEvents.length, 1);
+});
+
+test('separates a semicolon-delimited production direction from the preceding story event', () => {
+  const brief = parseStoryBrief('Foxy finds a red ball under a tree; Keep Foxy visible in every scene.');
+  assert.equal(brief.storyText, 'Foxy finds a red ball under a tree;');
+  assert.match(brief.directives.productionNotes, /Keep Foxy visible in every scene/);
+  assert.equal(brief.keyEvents.length, 1);
+});
+
+test('keeps inline character appearance separate from trailing production directions and story detail', () => {
+  const brief = parseStoryBrief(
+    'Main character: Foxy — a small orange fox with large expressive eyes. Keep Foxy visible in every scene. Story detail to preserve: Foxy pushes a red ball.'
+  );
+  assert.deepEqual(brief.characters, ['Foxy']);
+  assert.equal(brief.characterProfiles[0].visualDescription, 'a small orange fox with large expressive eyes.');
+  assert.equal(brief.storyText, 'Foxy pushes a red ball.');
+  assert.match(brief.directives.productionNotes, /Keep Foxy visible/);
+});
+
+test('does not fall back to raw production-only text as a story', () => {
+  const brief = parseStoryBrief('Main character: Foxy. Keep Foxy visible in every scene. Medium shot.');
+  assert.equal(brief.storyText, '');
+  assert.match(brief.directives.productionNotes, /Keep Foxy visible/);
 });
 
 test('extracts character profiles from bullet and comma-separated character descriptions', () => {
