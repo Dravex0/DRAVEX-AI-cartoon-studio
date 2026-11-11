@@ -163,7 +163,7 @@ test('DRAVEX live Pages: broad feature matrix, safe local workflows and feature 
 
     // The hardware check is intentionally nested in two collapsed optional panels.
     await page.locator('#generationTools > summary').click();
-    await page.locator('details:has(#checkLocalAI) > summary').click();
+    await page.locator('#generationTools details:has(#checkLocalAI) > summary').click();
     await page.locator('#checkLocalAI').click();
     await expect(page.locator('#localAIStatus')).not.toContainText(/optional check only/i, { timeout: 15_000 });
     const deviceStatus = await page.locator('#localAIStatus').innerText();
