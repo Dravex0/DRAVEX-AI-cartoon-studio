@@ -5,11 +5,11 @@ The free DRAVEX Browser QA Agent uses Playwright Chromium in GitHub Actions. It 
 ## Two separate test targets
 
 - **Source-build QA** opens the local Vite build. It checks the local storyboard/canvas path and verifies that a WebM can be downloaded and decoded.
-- **Live Pages QA** opens the published production URL, enters a fixed Russian Foxy prompt, exports the result, and inspects the actual downloaded WebM. It runs on desktop Chromium and the Pixel 7 device profile.
+- **Live Pages QA** opens the published production URL, enters a fixed Russian Kelya prompt, exports the result, and inspects the actual downloaded WebM. It runs on desktop Chromium and the Pixel 7 device profile.
 
 The live test captures the prompt/result screenshots, Chromium-player-decoded frames, FFmpeg-decoded frames from the downloaded WebM, the WebM itself, and a JSON report written into the Playwright test-results directory and attached to the report. FFprobe inspects the exported file's video/audio streams, while packet timestamps and stream metadata are used to estimate duration. The test compares the SHA-256 hash of the preview Blob with the downloaded file so it can confirm the download is byte-for-byte the same output that the page previewed.
 
-The agent computes frame-to-frame pixel-change ratios and simple orange/red color-pixel ratios as hints only. These measurements can be affected by camera movement, backgrounds, lighting, and compression; they do not recognize Foxy, a ball, or any story action. Character identity and story-action accuracy remain manual-review items.
+The agent computes frame-to-frame pixel-change ratios and simple orange/red color-pixel ratios as hints only. These measurements can be affected by camera movement, backgrounds, lighting, and compression; they do not recognize Kelya, a ball, or any story action. Character identity and story-action accuracy remain manual-review items.
 
 ## Broad live Pages feature matrix
 
@@ -32,10 +32,10 @@ The matrix deliberately does not submit prompts to remote providers, enter token
 The JSON report separates technical checks from media quality:
 - `quality.generationFlow`, `quality.webmExport`, and `quality.videoDecode` record technical evidence.
 - `quality.audio` reports whether an audio stream exists; it does not claim the dialogue is audible or intelligible.
-- `quality.storySemantics` remains `manual-review-required` and lists the expected Foxy/red-ball actions. The agent attaches decoded frames but does not pretend to understand their meaning.
+- `quality.storySemantics` remains `manual-review-required` and lists the expected Kelya/red-ball actions. The agent attaches decoded frames but does not pretend to understand their meaning.
 - `summary` provides a short human-readable result so a green CI run cannot be mistaken for a finished cartoon.
 
-Audio-track presence is not proof of audible or intelligible Russian speech. A human listening check is still required. Likewise, orange pixels and pixel differences are not semantic computer vision and cannot certify a visible Foxy character. The report deliberately avoids marking these checks as passed merely because a WebM exists.
+Audio-track presence is not proof of audible or intelligible Russian speech. A human listening check is still required. Likewise, orange pixels and pixel differences are not semantic computer vision and cannot certify a visible Kelya character. The report deliberately avoids marking these checks as passed merely because a WebM exists.
 
 ## Evidence
 

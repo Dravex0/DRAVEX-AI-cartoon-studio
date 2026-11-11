@@ -5,17 +5,17 @@ import { execFileSync } from 'node:child_process';
 import { analyzeRgbaFrameSequence } from '../helpers/video-frame-evidence.js';
 
 const LIVE_URL = 'https://dravex0.github.io/DRAVEX-AI-cartoon-studio/';
-const FOXY_PROMPT = [
+const KELYA_PROMPT = [
   'Создай короткий мультфильм на 10–15 секунд.',
-  'Главный персонаж — Foxy, маленький оранжевый лис с большими выразительными глазами.',
-  'Одна непрерывная сцена: Foxy стоит на лесной тропинке, замечает красный мяч у дерева, подбегает к нему, толкает лапой, мяч катится, Foxy радостно подпрыгивает.',
-  'Персонаж и мяч должны быть хорошо видны и заметно двигаться между кадрами. Не заменяй персонажа пустым фоном.',
+  'Главный персонаж — Келя. Сохрани имя Келя во всех сценах и не заменяй персонажа другим героем.',
+  'Одна непрерывная сцена: Келя замечает красный мяч у дерева, подходит к нему, толкает его ногой, мяч катится по дорожке, Келя радостно подпрыгивает.',
+  'Келя и красный мяч должны быть хорошо видны и заметно двигаться между кадрами. Не заменяй Келю лисой, другим персонажем или пустым фоном.',
   'Добавь русскую реплику: «Вот это находка!»'
 ].join(' ');
 
 test.use({ video: 'on' });
 
-test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', async ({ page }, testInfo) => {
+test('DRAVEX live Pages QA: Kelya prompt → real published output evidence', async ({ page }, testInfo) => {
   test.setTimeout(210_000);
   const report = {
     schemaVersion: 2,
@@ -24,7 +24,7 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     url: LIVE_URL,
     runAt: new Date().toISOString(),
     browserProject: testInfo.project.name,
-    prompt: FOXY_PROMPT,
+    prompt: KELYA_PROMPT,
     checks: {},
     frames: [],
     browserErrors: [],
@@ -54,9 +54,9 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     // This public smoke test must not enter tokens or grant remote-provider consent.
     expect(mode).toBe('local-canvas');
 
-    await page.locator('#idea').fill(FOXY_PROMPT);
+    await page.locator('#idea').fill(KELYA_PROMPT);
     await page.screenshot({ fullPage: true }).then(body =>
-      testInfo.attach('live-01-foxy-prompt.png', { body, contentType: 'image/png' })
+      testInfo.attach('live-01-kelya-prompt.png', { body, contentType: 'image/png' })
     );
 
     const downloadPromise = page.waitForEvent('download', { timeout: 170_000 });
@@ -65,7 +65,7 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 155_000 });
 
     const download = await downloadPromise;
-    downloadPath = testInfo.outputPath('dravex-live-pages-foxy.webm');
+    downloadPath = testInfo.outputPath('dravex-live-pages-kelya.webm');
     await download.saveAs(downloadPath);
     const bytes = await readFile(downloadPath);
     expect(download.suggestedFilename()).toMatch(/\.webm$/i);
