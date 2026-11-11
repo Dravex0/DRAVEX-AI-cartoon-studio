@@ -355,3 +355,49 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
     });
   }
 });
+
+
+test('DRAVEX source build: Kael is actually drawn on the portrait canvas', async ({ page }, testInfo) => {
+  test.setTimeout(45_000);
+  await page.goto('/');
+  await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);
+  await page.locator('#character').fill('Каэль Ворран — KAEL VORRAN');
+  await page.locator('#style').selectOption('Anime-inspired');
+  await page.locator('#canvasFormat').selectOption('portrait');
+  await page.locator('#characterBibleSummary').click();
+  await page.locator('#bibleCharacterId').fill('Каэль Ворран — KAEL VORRAN');
+  await page.locator('#bibleVisualDescription').fill('Высокий, стройный и спортивный юноша; средней длины растрёпанные чёрные волосы; ярко-алые глаза.');
+  await page.locator('#bibleClothing').fill('Длинный чёрный тактический плащ с красными элементами; чёрная броня и перчатки.');
+  await page.locator('#bibleColors').fill('Чёрный, алый и тёмно-красный.');
+  await page.locator('#bibleDistinctiveFeatures').fill('Символ сломанной короны; оружие Shadow Blade.');
+  await page.locator('#saveCharacterReference').click();
+  await expect(page.locator('#characterReferenceStatus')).toContainText('Образ сохранён');
+  await page.locator('#idea').fill('Каэль Ворран стоит среди руин готического города. Он достаёт Shadow Blade и атакует приближающуюся тень.');
+  await page.locator('#make').click();
+  await expect(page.locator('#status')).toContainText(/Раскадровка создана|Storyboard created/i, { timeout: 15_000 });
+  const cast = await page.locator('#sceneCharacters').inputValue();
+  expect(cast).toContain('Каэль');
+  const evidence = await page.locator('#canvas').evaluate(canvas => {
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const width = canvas.width, height = canvas.height;
+    const pixels = context.getImageData(0, 0, width, height).data;
+    let skinPixels = 0;
+    const x0 = Math.floor(width * 0.30), x1 = Math.ceil(width * 0.70);
+    const y0 = Math.floor(height * 0.55), y1 = Math.ceil(height * 0.90);
+    for (let y = y0; y < y1; y += 1) {
+      for (let x = x0; x < x1; x += 1) {
+        const i = (y * width + x) * 4;
+        const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+        if (r > 150 && g > 85 && g < 195 && b > 60 && b < 170 && r > g + 18 && g > b + 8) skinPixels += 1;
+      }
+    }
+    return { width, height, skinPixels, region: { x0, x1, y0, y1 } };
+  });
+  await testInfo.attach('source-kael-canvas-evidence.json', {
+    body: Buffer.from(JSON.stringify(evidence, null, 2)),
+    contentType: 'application/json'
+  });
+  expect(evidence.width).toBe(720);
+  expect(evidence.height).toBe(1280);
+  expect(evidence.skinPixels, 'Kael face/hand pixels must be present in the expected character region').toBeGreaterThan(50);
+});
