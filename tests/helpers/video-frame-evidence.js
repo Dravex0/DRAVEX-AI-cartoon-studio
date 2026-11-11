@@ -1,6 +1,6 @@
 /**
  * Lightweight visual evidence for the free browser QA agent.
- * Pixel changes and orange-color ratios are hints only; they do not recognize
+ * Alpha-aware pixel changes and orange/red color ratios are hints only; they do not recognize
  * characters, objects, or story actions.
  */
 export function analyzeRgbaFrameSequence(frames, {
@@ -42,6 +42,8 @@ export function analyzeRgbaFrameSequence(frames, {
   const orangePixelRatios = normalized.map(frame => {
     let orangePixels = 0;
     for (let offset = 0; offset < frame.data.length; offset += 4) {
+      const alpha = Number(frame.data[offset + 3]);
+      if (alpha < 128) continue;
       const red = Number(frame.data[offset]);
       const green = Number(frame.data[offset + 1]);
       const blue = Number(frame.data[offset + 2]);
@@ -53,6 +55,8 @@ export function analyzeRgbaFrameSequence(frames, {
   const redPixelRatios = normalized.map(frame => {
     let redPixels = 0;
     for (let offset = 0; offset < frame.data.length; offset += 4) {
+      const alpha = Number(frame.data[offset + 3]);
+      if (alpha < 128) continue;
       const red = Number(frame.data[offset]);
       const green = Number(frame.data[offset + 1]);
       const blue = Number(frame.data[offset + 2]);
@@ -70,16 +74,20 @@ export function analyzeRgbaFrameSequence(frames, {
     const current = normalized[frameIndex].data;
     for (let pixel = 0; pixel < pixelCount; pixel += 1) {
       const offset = pixel * 4;
+      const previousAlpha = Number(previous[offset + 3]);
+      const currentAlpha = Number(current[offset + 3]);
+      if (previousAlpha < 128 && currentAlpha < 128) continue;
       const redDelta = Math.abs(Number(current[offset]) - Number(previous[offset]));
       const greenDelta = Math.abs(Number(current[offset + 1]) - Number(previous[offset + 1]));
       const blueDelta = Math.abs(Number(current[offset + 2]) - Number(previous[offset + 2]));
-      totalChannelChange += redDelta + greenDelta + blueDelta;
-      if (Math.max(redDelta, greenDelta, blueDelta) >= pixelDeltaThreshold) changedPixels += 1;
+      const alphaDelta = Math.abs(currentAlpha - previousAlpha);
+      totalChannelChange += redDelta + greenDelta + blueDelta + alphaDelta;
+      if (Math.max(redDelta, greenDelta, blueDelta, alphaDelta) >= pixelDeltaThreshold) changedPixels += 1;
       comparisons += 1;
     }
   }
   const meanPixelChange = comparisons
-    ? totalChannelChange / (comparisons * 3 * 255)
+    ? totalChannelChange / (comparisons * 4 * 255)
     : 0;
   const changedPixelRatio = comparisons ? changedPixels / comparisons : 0;
   const status = meanPixelChange < staticMeanChangeThreshold
