@@ -17,7 +17,10 @@ export function analyzeRgbaFrameSequence(frames, {
   if (!Number.isFinite(pixelDeltaThreshold) || pixelDeltaThreshold < 1 || pixelDeltaThreshold > 255) {
     throw new RangeError('pixelDeltaThreshold must be between 1 and 255.');
   }
-  for (const [name, value] of Object.entries({ staticMeanChangeThreshold, staticChangedPixelRatioThreshold, orangePixelRatioThreshold, redPixelRatioThreshold })) {\n    if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError(name + ' must be between 0 and 1.');\n  }\n  if (!Number.isInteger(regionGridSize) || regionGridSize < 2 || regionGridSize > 4) {
+  for (const [name, value] of Object.entries({ staticMeanChangeThreshold, staticChangedPixelRatioThreshold, orangePixelRatioThreshold, redPixelRatioThreshold })) {
+    if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError(name + ' must be between 0 and 1.');
+  }
+  if (!Number.isInteger(regionGridSize) || regionGridSize < 2 || regionGridSize > 4) {
     throw new RangeError('regionGridSize must be an integer between 2 and 4.');
   }
   const normalized = frames.map((frame, index) => {
