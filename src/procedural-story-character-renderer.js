@@ -2,11 +2,21 @@ const TAU=Math.PI*2;
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,Number.isFinite(Number(v))?Number(v):0));
 const clean=v=>String(v??'').trim().slice(0,1200);
 function colorFor(source,fallback,patterns){const text=clean(source).toLowerCase();for(const [re,color] of patterns)if(re.test(text))return color;return fallback;}
-function getColors(profile={}){const appearance=[profile.visualDescription,profile.clothing,profile.colors,profile.distinctiveFeatures,profile.hair,profile.eyeColor,profile.signatureAccessories].map(clean).join(' ');return{
- hair:colorFor(profile.hair+' '+appearance,'#17131f',[[/white|silver|бел|серебр/i,'#d9dce5'],[/blond|gold|золот|светл.*волос/i,'#d9ad58'],[/red|рыж|красн.*волос/i,'#9c342b'],[/blue|син.*волос/i,'#315a9b'],[/brown|каштан/i,'#55382f']]),
- outfit:colorFor(profile.clothing+' '+appearance,'#171820',[[/white|бел/i,'#e5e2df'],[/blue|син/i,'#243d69'],[/green|зелен/i,'#28533f'],[/red|красн/i,'#641f2e']]),
- accent:colorFor(profile.colors+' '+appearance,'#a51d35',[[/gold|золот|yellow|желт/i,'#d7ad4b'],[/blue|син/i,'#4d78c7'],[/green|зелен/i,'#5a9b71'],[/purple|фиолет/i,'#8953b5']]),
- eyes:colorFor(profile.eyeColor+' '+appearance,'#d52843',[[/blue|голуб|син/i,'#4c9bd5'],[/green|зелен/i,'#55a96a'],[/gold|yellow|желт/i,'#e4bd49'],[/brown|кар/i,'#79513a']]),skin:'#d9a98f'};}
+function getColors(profile={}){
+ // Prefer field-specific character traits. Never let red eyes recolor black hair,
+ // or a gold accessory recolor the outfit.
+ const hairSource=clean(profile.hair)||clean(profile.visualDescription)||clean(profile.distinctiveFeatures);
+ const outfitSource=clean(profile.clothing)||clean(profile.outfit);
+ const accentSource=clean(profile.colors)||clean(profile.accentColor);
+ const eyeSource=clean(profile.eyeColor)||clean(profile.eyes);
+ return {
+  hair:colorFor(hairSource,'#17131f',[[/white|silver|бел|серебр/i,'#d9dce5'],[/blond|gold|золот|светл.*волос/i,'#d9ad58'],[/red|рыж|красн/i,'#9c342b'],[/blue|син/i,'#315a9b'],[/brown|каштан/i,'#55382f']]),
+  outfit:colorFor(outfitSource,'#171820',[[/white|бел/i,'#e5e2df'],[/blue|син/i,'#243d69'],[/green|зелен/i,'#28533f'],[/red|красн/i,'#641f2e']]),
+  accent:colorFor(accentSource,'#a51d35',[[/gold|золот|yellow|желт/i,'#d7ad4b'],[/blue|син/i,'#4d78c7'],[/green|зелен/i,'#5a9b71'],[/purple|фиолет/i,'#8953b5']]),
+  eyes:colorFor(eyeSource,'#d52843',[[/blue|голуб|син/i,'#4c9bd5'],[/green|зелен/i,'#55a96a'],[/gold|yellow|желт/i,'#e4bd49'],[/brown|кар/i,'#79513a'],[/red|scarlet|алый|красн/i,'#d52843']]),
+  skin:'#d9a98f'
+ };
+}
 /** Deterministic animated character fallback; generated sprites take precedence when attached. */
 export function drawProceduralStoryCharacter(ctx,{x=0,y=0,time=0,action='idle',sceneIndex=0,characterId='Hero',profile={},storyText='',mouthOpenness=0,viseme='neutral'}={}){
  if(!ctx||typeof ctx.save!=='function'||typeof ctx.beginPath!=='function')throw new TypeError('A CanvasRenderingContext2D-like context is required.');
