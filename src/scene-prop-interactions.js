@@ -34,6 +34,7 @@ const VERBS = {
 
 const ADVERBS = /^(?:carefully|gently|slowly|quickly|firmly|осторожно|аккуратно|медленно|быстро|нежно|обережно|повільно|швидко|cuidadosamente|suavemente|lentamente)$/iu;
 const PREPOSITIONS = /\s+(?:under|beneath|beside|near|on|onto|into|from|with|за|под|над|рядом|возле|около|из|в|на|біля|під|над|поруч|з|із|у|в|sobre|debajo|junto|cerca|desde|con)\s+/iu;
+const ACTION_JOINERS = /\s+(?:and|then|и|а|затем|потом|та|і|y|luego)\s+/iu;
 const ARTICLES = /^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu;
 const clean = value => String(value ?? '').trim().replace(/^[\s"'«»“”‘’]+|[\s"'«»“”‘’]+$/gu, '').slice(0, 120);
 
@@ -61,10 +62,13 @@ export function inferPropInteractions(detail, characterIds = [], language = 'en'
       const afterActor = sentence.slice(actor.index + actor[0].length);
       for (const [type, verbPattern] of VERBS[locale]) {
         const verb = verbPattern.exec(afterActor);
-        if (!verb || !/^[\s,]*$/u.test(afterActor.slice(0, verb.index)) && !ADVERBS.test(afterActor.slice(0, verb.index).trim())) continue;
+        if (!verb) continue;
+        const prefix = afterActor.slice(0, verb.index).trim();
+        const immediatePrefix = prefix.split(ACTION_JOINERS).at(-1).trim();
+        if (!/^[\s,]*$/u.test(immediatePrefix) && !ADVERBS.test(immediatePrefix)) continue;
         let targetText = afterActor.slice(verb.index + verb[0].length).trim();
         if (!targetText) continue;
-        targetText = targetText.split(PREPOSITIONS)[0].split(/[.!?,;:]/u)[0].replace(ARTICLES, '').trim();
+        targetText = targetText.split(ACTION_JOINERS)[0].split(PREPOSITIONS)[0].split(/[.!?,;:]/u)[0].replace(ARTICLES, '').trim();
         const targetId = clean(targetText);
         if (!targetId || targetId.length > 120 || targetId.toLocaleLowerCase() === actorId.toLocaleLowerCase()) continue;
         const key = actorId.toLocaleLowerCase() + '|' + type + '|' + targetId.toLocaleLowerCase();
@@ -76,7 +80,6 @@ export function inferPropInteractions(detail, characterIds = [], language = 'en'
           sourceStart: baseOffset + actor.index,
           sourceEnd: baseOffset + sentence.length
         });
-        break;
       }
     }
   }
