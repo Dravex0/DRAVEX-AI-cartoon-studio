@@ -1,5 +1,14 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('dravex-e2e-language-initialized') !== '1') {
+      localStorage.setItem('dravex-ui-language', 'en');
+      sessionStorage.setItem('dravex-e2e-language-initialized', '1');
+    }
+  });
+});
+
 function createToneWav({ sampleRate = 16000, durationSeconds = 2, frequency = 440 } = {}) {
   const sampleCount = Math.floor(sampleRate * durationSeconds);
   const dataSize = sampleCount * 2;
@@ -38,6 +47,7 @@ test('keeps selected local music as an audible audio track in the exported WebM'
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
 
+  await page.locator('.advanced-audio-settings').evaluate(element => { element.open = true; });
   await page.locator('#audioFile').setInputFiles({
     name: 'dravex-audio-export-test.wav',
     mimeType: 'audio/wav',

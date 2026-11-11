@@ -1,5 +1,14 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('dravex-e2e-language-initialized') !== '1') {
+      localStorage.setItem('dravex-ui-language', 'en');
+      sessionStorage.setItem('dravex-e2e-language-initialized', '1');
+    }
+  });
+});
+
 test('assembles a storyboard into a non-empty WebM container', async ({ page }) => {
   test.setTimeout(120_000);
   const pageErrors = [];

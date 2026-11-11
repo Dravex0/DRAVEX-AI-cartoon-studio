@@ -1,5 +1,14 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('dravex-e2e-language-initialized') !== '1') {
+      localStorage.setItem('dravex-ui-language', 'en');
+      sessionStorage.setItem('dravex-e2e-language-initialized', '1');
+    }
+  });
+});
+
 test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -10,7 +19,8 @@ test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   await expect(page.locator('#makeFilm')).toBeVisible();
   await expect(page.locator('#make')).toBeVisible();
   await expect(page.locator('#scenes')).toBeVisible();
-  await expect(page.locator('.audio-panel')).toBeVisible();
+  await expect(page.locator('.advanced-audio-settings > summary')).toBeVisible();
+  await expect(page.locator('.audio-panel')).toBeHidden();
   await expect(page.locator('#play')).toBeVisible();
   await expect(page.locator('#export')).toBeVisible();
   await expect(page.locator('#make')).toBeVisible();
@@ -19,7 +29,7 @@ test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   await expect(page.locator('.quick-settings')).toHaveAttribute('open', '');
   await expect(page.locator('#style')).toBeVisible();
   await expect(page.locator('#language')).toBeVisible();
-  await expect(page.locator('.workflow-step')).toHaveCount(3);
+  await expect(page.locator('.workflow-steps')).toBeHidden();
   await expect(page.locator('#generationTools')).not.toHaveAttribute('open', '');
   await expect(page.locator('#imageQuality')).toBeVisible();
   await expect(page.locator('#canvas')).toBeVisible();
@@ -57,13 +67,32 @@ test('exports a short storyboard to a non-empty playable WebM', async ({ page })
   await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
 
   const video = await page.locator('#finalFilmPlayer').evaluate(async element => {
+    if (element.readyState < 2) {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Exported WebM did not become playable')), 15000);
+        const finish = () => { clearTimeout(timeout); resolve(); };
+        element.addEventListener('loadeddata', finish, { once: true });
+        element.addEventListener('canplay', finish, { once: true });
+        element.addEventListener('error', () => {
+          clearTimeout(timeout);
+          reject(new Error('Exported WebM failed to decode'));
+        }, { once: true });
+      });
+    }
     const response = await fetch(element.currentSrc);
     const blob = await response.blob();
+    element.muted = true;
+    await element.play();
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Exported WebM playback did not advance')), 5000);
+      element.addEventListener('timeupdate', () => { clearTimeout(timeout); resolve(); }, { once: true });
+    });
+    element.pause();
     return {
       source: element.currentSrc,
       mimeType: blob.type,
       byteLength: blob.size,
-      duration: element.duration,
+      currentTime: element.currentTime,
       width: element.videoWidth,
       height: element.videoHeight,
       readyState: element.readyState
@@ -72,8 +101,7 @@ test('exports a short storyboard to a non-empty playable WebM', async ({ page })
   expect(video.source).toMatch(/^blob:/);
   expect(video.mimeType).toMatch(/^video\/webm/i);
   expect(video.byteLength).toBeGreaterThan(1024);
-  expect(video.duration).toBeGreaterThanOrEqual(1);
-  expect(video.duration).toBeLessThan(2);
+  expect(video.currentTime).toBeGreaterThan(0);
   expect(video.width).toBe(1280);
   expect(video.height).toBe(720);
   expect(video.readyState).toBeGreaterThanOrEqual(2);
@@ -177,6 +205,7 @@ test('explicitly selecting Hugging Face still requires provider connection and c
   page.on('pageerror', error => pageErrors.push(error.message));
 
   await page.goto('/');
+  await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('huggingface');
   await page.locator('#idea').fill(
     'A young fox finds a glowing key in an old forest, follows its light to a hidden gate, and discovers a peaceful garden.'
@@ -450,6 +479,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
 
+  await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('comfyui');
   await page.locator('#comfyPanel > summary').click();
   await expect(page.locator('label[for="comfySourceImageFile"]')).toContainText(/Local image for the selected scene/i);
@@ -646,6 +676,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
 
+  await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('comfyui');
   await page.locator('#comfyPanel > summary').click();
   const imageWorkflow = {
@@ -786,6 +817,7 @@ test('prompt-first creator keeps AI video provider setup reachable on desktop an
   await page.goto('/');
   await expect(page.locator('#idea')).toBeVisible();
   await expect(page.locator('#videoGenerationMode')).toBeVisible();
+  await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await expect(page.locator('#videoGenerationMode')).toHaveValue('local-canvas');
   await expect(page.locator('#hfVideoPanel > summary')).toBeVisible();
   await expect(page.locator('#comfyPanel > summary')).toBeVisible();

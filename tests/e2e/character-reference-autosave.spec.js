@@ -1,5 +1,14 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('dravex-e2e-language-initialized') !== '1') {
+      localStorage.setItem('dravex-ui-language', 'en');
+      sessionStorage.setItem('dravex-e2e-language-initialized', '1');
+    }
+  });
+});
+
 test('character reference image and profile survive page reload without manual save', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);

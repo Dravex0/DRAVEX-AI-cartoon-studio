@@ -1,5 +1,14 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('dravex-e2e-language-initialized') !== '1') {
+      localStorage.setItem('dravex-ui-language', 'en');
+      sessionStorage.setItem('dravex-e2e-language-initialized', '1');
+    }
+  });
+});
+
 const SCENE_SECONDS = 0.8;
 const TONE_SECONDS = 0.4;
 const SAMPLE_RATE = 48_000;
@@ -311,6 +320,7 @@ test('mixes local background music and all dialogue tones into the same exported
     mimeType: 'audio/wav',
     buffer: createSineWaveWavBuffer(220)
   });
+  await page.locator('.advanced-audio-settings').evaluate(element => { element.open = true; });
   await page.locator('#audioVolume').fill('35');
   await page.locator('#export').click();
   await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 20_000 });
