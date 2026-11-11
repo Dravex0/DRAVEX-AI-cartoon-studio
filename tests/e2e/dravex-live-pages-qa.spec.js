@@ -71,8 +71,14 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     expect([...bytes.subarray(0, 4)]).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
     report.checks.download = { status: 'passed', filename: download.suggestedFilename(), bytes: bytes.byteLength, ebml: true };
 
+    const ffprobe = JSON.parse(execFileSync('ffprobe', [
+      '-v', 'error', '-show_streams', '-show_format', '-of', 'json', downloadPath
+    ], { encoding: 'utf8', timeout: 20_000 }));
+    const probedDuration = Number(ffprobe.format?.duration);
+    expect(Number.isFinite(probedDuration) && probedDuration > 1).toBeTruthy();
+
     const player = page.locator('#finalFilmPlayer');
-    const browserEvidence = await player.evaluate(async video => {
+    const browserEvidence = await player.evaluate(async (video, mediaDuration) => {
       if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
         await new Promise((resolve, reject) => {
           const timer = setTimeout(() => reject(new Error('WebM metadata timeout')), 12_000);
@@ -81,7 +87,9 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
         });
       }
       video.muted = true;
-      const duration = video.duration;
+      // MediaRecorder WebM may omit duration/cues, so Chromium reports Infinity.
+      // ffprobe reads the actual container duration from the downloaded file.
+      const duration = Number.isFinite(video.duration) ? video.duration : mediaDuration;
       const width = video.videoWidth;
       const height = video.videoHeight;
       if (!Number.isFinite(duration) || duration <= 1) throw new Error('Invalid WebM duration: ' + duration);
@@ -141,7 +149,7 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
         changedPixelRatio: Number(changedPixelRatio.toFixed(5)),
         frames
       };
-    });
+    }, probedDuration);
     expect(browserEvidence.width).toBeGreaterThan(0);
     expect(browserEvidence.height).toBeGreaterThan(0);
     expect(browserEvidence.durationSeconds).toBeGreaterThan(1);
@@ -178,9 +186,6 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
       semanticCharacterRecognition: 'not-automated-review-attached-frames'
     };
 
-    const ffprobe = JSON.parse(execFileSync('ffprobe', [
-      '-v', 'error', '-show_streams', '-show_format', '-of', 'json', downloadPath
-    ], { encoding: 'utf8', timeout: 20_000 }));
     const streams = ffprobe.streams || [];
     const audioStreams = streams.filter(stream => stream.codec_type === 'audio');
     report.checks.mediaStreams = {
