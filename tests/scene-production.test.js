@@ -81,6 +81,29 @@ test('motion prompt forwards explicit environment motion and physical prop inter
   assert.match(prompt, /background motion spatially coherent and independent from camera motion/i);
 });
 
+test('production scene preserves explicit prop state changes through normalization into motion prompt', () => {
+  const prepared = buildProductionScene({
+    id: 'prop-state-scene',
+    title: 'Kel frees the bird',
+    imagePrompt: 'Kel kneels beside a fallen branch and a mechanical bird.',
+    motionPrompt: 'Kel lifts the branch and frees the bird.',
+    characters: ['Kel'],
+    stateChanges: [{
+      entityType: 'prop',
+      entityId: 'fallen branch',
+      property: 'holder',
+      previousValue: null,
+      value: 'Kel',
+      actorId: 'Kel',
+      evidence: 'Kel lifts the fallen branch.'
+    }]
+  }, [{ characterId: 'Kel', visualDescription: 'A young forest explorer' }]);
+
+  assert.equal(prepared.stateChanges.length, 1);
+  assert.equal(prepared.stateChanges[0].entityId, 'fallen branch');
+  assert.match(prepared.motionGenerationPrompt, /Prop "fallen branch" changes holder to "Kel"/);
+});
+
 test('motion prompt does not invent world motion or prop interactions when no evidence exists', () => {
   const prompt = buildMotionGenerationPrompt({
     motionPrompt: 'Kel stands in a quiet clearing.',
