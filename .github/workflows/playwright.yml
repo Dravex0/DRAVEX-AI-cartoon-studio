@@ -29,8 +29,13 @@ jobs:
       - name: Install project dependencies
         run: npm install --no-audit --no-fund --onnxruntime-node-install-cuda=skip
 
-      - name: Verify preinstalled FFmpeg on GitHub runner
-        run: ffmpeg -version
+      - name: Install portable FFmpeg for browser video checks
+        run: |
+          npm install --no-save --package-lock=false ffmpeg-static
+          FFMPEG_PATH="$(node -e "process.stdout.write(require('ffmpeg-static'))")"
+          test -x "$FFMPEG_PATH"
+          echo "$(dirname "$FFMPEG_PATH")" >> "$GITHUB_PATH"
+          "$FFMPEG_PATH" -version
 
       - name: Install Playwright Chromium
         run: npx playwright install chromium
