@@ -5,17 +5,17 @@ import { execFileSync } from 'node:child_process';
 import { analyzeRgbaFrameSequence } from '../helpers/video-frame-evidence.js';
 
 const LIVE_URL = 'https://dravex0.github.io/DRAVEX-AI-cartoon-studio/';
-const KELYA_PROMPT = [
-  'Создай короткий мультфильм на 10–15 секунд.',
-  'Главный персонаж — Келя. Сохрани имя Келя во всех сценах и не заменяй персонажа другим героем.',
-  'Одна непрерывная сцена: Келя замечает красный мяч у дерева, подходит к нему, толкает его ногой, мяч катится по дорожке, Келя радостно подпрыгивает.',
-  'Келя и красный мяч должны быть хорошо видны и заметно двигаться между кадрами. Не заменяй Келю лисой, другим персонажем или пустым фоном.',
-  'Добавь русскую реплику: «Вот это находка!»'
+const ASTER_PROMPT = [
+  'Создай короткий тёмно-фэнтезийный аниме-мультфильм на 10–15 секунд.',
+  'Главный герой — Астэр. Используй сохранённую Библию персонажа для внешности и костюма. Не переименовывай и не заменяй героя.',
+  'Одна последовательная история в разрушенном готическом соборе ночью: Астэр осторожно подходит к древнему круглому символу на каменном полу, опускается на колено и касается его левой рукой. Треснувшая метка на его левой руке начинает светиться, вокруг ладони появляется чёрное пламя с тонкими серебряными краями и несколько серебряных искр. Астэр испуганно отводит руку, пламя гаснет.',
+  'Покажи Астера в полный рост и средним планом, сохрани его серебристо-чёрные волосы, серо-бирюзовые глаза, шрам на левой щеке, длинное чёрное пальто с серебряной вышивкой, кулон и перчатки без пальцев. Сохраняй одно и то же лицо, пропорции и одежду во всех кадрах.',
+  'Добавь русскую реплику: «Только бы никого не задеть…»'
 ].join(' ');
 
 test.use({ video: 'on' });
 
-test('DRAVEX live Pages QA: Kelya prompt → real published output evidence', async ({ page }, testInfo) => {
+test('DRAVEX live Pages QA: Aster Character Bible → prompt → real published output evidence', async ({ page }, testInfo) => {
   test.setTimeout(210_000);
   const report = {
     schemaVersion: 2,
@@ -24,7 +24,7 @@ test('DRAVEX live Pages QA: Kelya prompt → real published output evidence', as
     url: LIVE_URL,
     runAt: new Date().toISOString(),
     browserProject: testInfo.project.name,
-    prompt: KELYA_PROMPT,
+    prompt: ASTER_PROMPT,
     checks: {},
     frames: [],
     browserErrors: [],
@@ -54,9 +54,28 @@ test('DRAVEX live Pages QA: Kelya prompt → real published output evidence', as
     // This public smoke test must not enter tokens or grant remote-provider consent.
     expect(mode).toBe('local-canvas');
 
-    await page.locator('#idea').fill(KELYA_PROMPT);
+    await page.locator('#character').fill('Астэр');
+    await page.locator('#style').selectOption('Anime-inspired');
+    await page.locator('#characterBibleSummary').click();
+    await page.locator('#bibleCharacterId').fill('Астэр');
+    await page.locator('#bibleVisualDescription').fill('Молодой мужчина 18–20 лет, высокий, стройный и подвижный; растрёпанные серебристо-чёрные волосы со светлыми прядями; серо-бирюзовые глаза; небольшой диагональный шрам на левой щеке; спокойное серьёзное лицо. Сохранять одно и то же лицо, причёску, цвет глаз и пропорции.');
+    await page.locator('#bibleClothing').fill('Длинное чёрное пальто до середины икры с высоким воротником и серебряной вышивкой; тёмно-серая рубашка; серебряная застёжка у воротника; чёрные перчатки без пальцев; чёрные брюки; высокие тёмные ботинки с металлическими деталями; серебряный кулон.');
+    await page.locator('#bibleColors').fill('Чёрный, графитовый, серебряный, серо-бирюзовый.');
+    await page.locator('#bibleDistinctiveFeatures').fill('Диагональный шрам на левой щеке; серебряный кулон; древняя треснувшая круглая метка на левой руке; чёрное пламя с тонкими серебряными краями и тёмные искры.');
+    await page.locator('#saveCharacterReference').click();
+    await expect(page.locator('#characterReferenceStatus')).toContainText('Образ сохранён');
+    await expect(page.locator('#characterReferenceCards')).toContainText('Астэр');
+    report.checks.characterBible = {
+      status: 'saved-and-matched-by-character-name',
+      character: 'Астэр',
+      visualProfile: 'saved',
+      referenceImageUsed: false,
+      referenceImageNote: 'The original character-sheet image was not uploaded to the public CI runner; this run tests the saved text profile only.'
+    };
+
+    await page.locator('#idea').fill(ASTER_PROMPT);
     await page.screenshot({ fullPage: true }).then(body =>
-      testInfo.attach('live-01-kelya-prompt.png', { body, contentType: 'image/png' })
+      testInfo.attach('live-01-aster-prompt.png', { body, contentType: 'image/png' })
     );
 
     const downloadPromise = page.waitForEvent('download', { timeout: 170_000 });
@@ -65,7 +84,7 @@ test('DRAVEX live Pages QA: Kelya prompt → real published output evidence', as
     await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 155_000 });
 
     const download = await downloadPromise;
-    downloadPath = testInfo.outputPath('dravex-live-pages-kelya.webm');
+    downloadPath = testInfo.outputPath('dravex-live-pages-aster.webm');
     await download.saveAs(downloadPath);
     const bytes = await readFile(downloadPath);
     expect(download.suggestedFilename()).toMatch(/\.webm$/i);
@@ -247,10 +266,6 @@ test('DRAVEX live Pages QA: Kelya prompt → real published output evidence', as
       motionSignal: visualMetrics.status,
       meanPixelChange: visualMetrics.meanPixelChange,
       changedPixelRatio: visualMetrics.changedPixelRatio,
-      orangePixelSignal: visualMetrics.orangeSignal,
-      maxOrangePixelRatio: visualMetrics.maxOrangePixelRatio,
-      redPixelSignal: visualMetrics.redSignal,
-      maxRedPixelRatio: visualMetrics.maxRedPixelRatio,
       semanticCharacterRecognition: 'not-automated-review-attached-frames',
       note: visualMetrics.note
     };
@@ -278,8 +293,6 @@ test('DRAVEX live Pages QA: Kelya prompt → real published output evidence', as
     if (pageErrors.length) issues.push('Browser runtime errors occurred.');
     if (consoleErrors.length) issues.push('Browser console errors were recorded; inspect the attached report.');
     if (visualMetrics.status === 'likely-static') issues.push('Weak frame-to-frame pixel-change signal; motion needs manual review.');
-    if (visualMetrics.orangeSignal === 'low-orange-pixel-signal') issues.push('Low orange-color pixel signal; this is not a character-recognition result.');
-    if (visualMetrics.redSignal === 'low-red-pixel-signal') issues.push('Low red-color pixel signal; this is not proof that the requested red ball is absent.');
     issues.push('Character identity, red-ball interaction, and story-action accuracy require manual review of the attached decoded frames.');
     report.findings = issues;
     report.browserErrors = { pageErrors, consoleErrors };
@@ -287,7 +300,7 @@ test('DRAVEX live Pages QA: Kelya prompt → real published output evidence', as
       generationFlow: { status: 'passed', evidence: 'published-page-prompt-accepted-and-result-panel-shown' },
       webmExport: { status: 'passed', evidence: 'valid-ebml-header-and-sha256-matches-preview-blob', previewMatchesDownload: true },
       videoDecode: { status: 'passed', evidence: 'chromium-player-and-ffmpeg-decoded-sampled-frames', browserFrames: browserEvidence.frames.length, ffmpegFrames: ffmpegEvidence.decodedFrames },
-      visualHints: { motion: visualMetrics.status, orange: visualMetrics.orangeSignal, red: visualMetrics.redSignal, semanticRecognition: false },
+      visualHints: { motion: visualMetrics.status, semanticRecognition: false },
       audio: {
         status: audioStreams.length ? 'track-present-content-unverified' : 'failed-no-audio-track',
         audioStreams: audioStreams.length,
@@ -295,7 +308,7 @@ test('DRAVEX live Pages QA: Kelya prompt → real published output evidence', as
       },
       storySemantics: {
         status: 'manual-review-required',
-        checks: ['Foxy identity', 'red ball visible', 'Foxy approaches and pushes ball', 'ball rolls', 'Foxy jumps'],
+        checks: ['Aster identity and visual continuity', 'ruined cathedral and ancient floor symbol visible', 'Aster kneels and touches the symbol with his left hand', 'left-hand mark activates', 'black flame with silver edges appears and fades'],
         evidence: 'attached-decoded-frames',
         automatedSemanticRecognition: false
       }
