@@ -39,6 +39,21 @@ test('preserves explicit production directions as metadata for every local scene
   assert.equal(result.scenes[0].sourceStoryText, 'Лисёнок находит ключ. Ключ открывает ворота.');
 });
 
+test('keeps production directions out of story events while retaining them in scene prompts', () => {
+  const result = buildStoryboardFromText([
+    'Main character: Foxy.',
+    'Stage the story event as one visible cause-and-effect action; preserve its named participants and objects, and show a clear state change.',
+    'Keep Foxy involved when the story calls for it.',
+    'Medium shot with a clear view of the acting character, the important object, and the result.',
+    'Story detail to preserve: Foxy finds a red ball under a tree and pushes it with his paw.'
+  ].join('\n'), 'en', 'Foxy');
+  assert.equal(result.scenes[0].storyDetail, 'Foxy finds a red ball under a tree and pushes it with his paw.');
+  assert.equal(result.scenes.filter(scene => scene.storyDetail).length, 1);
+  assert.match(result.scenes[0].prompt, /Stage the story event/);
+  assert.match(result.scenes[0].productionDirectives.productionNotes, /Medium shot/);
+  assert.equal(result.scenes[0].sourceStoryText, 'Foxy finds a red ball under a tree and pushes it with his paw.');
+});
+
 test('handles empty ideas with a localized fallback', () => {
   const result = buildStoryboardFromText('   ', 'ru', '');
   assert.equal(result.scenes.length, 5);
