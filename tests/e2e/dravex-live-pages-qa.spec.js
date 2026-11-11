@@ -166,13 +166,39 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     const issues = [];
     if (!audioStreams.length) issues.push('Export has no audio track; Russian dialogue is not verified.');
     if (pageErrors.length) issues.push('Browser runtime errors occurred.');
-    issues.push('Character identity and motion require manual review of the attached decoded frames.');
+    if (consoleErrors.length) issues.push('Browser console errors were recorded; inspect the attached report.');
+    issues.push('Character identity, red-ball interaction, and story-action accuracy require manual review of the attached decoded frames.');
     report.findings = issues;
     report.browserErrors = { pageErrors, consoleErrors };
+    report.quality = {
+      generationFlow: { status: 'passed', evidence: 'published-page-prompt-accepted-and-result-panel-shown' },
+      webmExport: { status: 'passed', evidence: 'downloaded-file-has-valid-ebml-header' },
+      videoDecode: { status: 'passed', evidence: 'ffmpeg-decoded-sampled-frames', decodedFrames: browserEvidence.decodedFrames },
+      audio: {
+        status: audioStreams.length ? 'track-present-content-unverified' : 'failed-no-audio-track',
+        audioStreams: audioStreams.length,
+        dialogue: 'not-verified-by-speech-recognition-or-human-listening'
+      },
+      storySemantics: {
+        status: 'manual-review-required',
+        checks: ['Foxy identity', 'red ball visible', 'Foxy approaches and pushes ball', 'ball rolls', 'Foxy jumps'],
+        evidence: 'attached-decoded-frames',
+        automatedSemanticRecognition: false
+      }
+    };
     report.classification = mode === 'local-canvas'
       ? 'local-canvas-output-only-not-AI-video-generation'
       : 'provider-mode-selected-provider-output-not-independently-confirmed';
-    report.outcome = issues.length ? 'completed-with-findings' : 'completed-needs-manual-character-review';
+    report.outcome = issues.length ? 'completed-with-findings' : 'completed-needs-manual-review';
+    report.summary = {
+      technicalExport: 'passed',
+      audio: report.quality.audio.status,
+      story: 'manual-review-required',
+      overall: report.outcome,
+      humanReadable: !audioStreams.length
+        ? 'Video file was created and decoded, but it has no audio track. Story content still needs visual review.'
+        : 'Video file was created and decoded. Audio content and story accuracy still need human review.'
+    };
   } catch (error) {
     report.outcome = 'failed';
     report.failure = String(error?.stack || error?.message || error).slice(0, 6000);
