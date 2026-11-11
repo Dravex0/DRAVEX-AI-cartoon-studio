@@ -7,7 +7,7 @@ The free DRAVEX Browser QA Agent uses Playwright Chromium in GitHub Actions. It 
 - **Source-build QA** opens the local Vite build. It checks the local storyboard/canvas path and verifies that a WebM can be downloaded and decoded.
 - **Live Pages QA** opens the published production URL, enters a fixed Russian Foxy prompt, exports the result, and inspects the actual downloaded WebM. It runs on desktop Chromium and the Pixel 7 device profile.
 
-The live test captures the prompt/result screenshots, several decoded video frames, the WebM itself, and a JSON report. FFprobe inspects the exported file's video/audio streams. The report records frame-to-frame pixel changes and a simple orange-pixel signal as hints only; these heuristics do not prove that Foxy is present or that the motion depicts the requested action. The attached frames must be visually reviewed for character identity and continuity.
+The live test captures the prompt/result screenshots, several FFmpeg-decoded video frames, the WebM itself, and a JSON report. FFprobe inspects the exported file's video/audio streams, while packet timestamps and stream metadata are used to estimate duration. Character identity, frame-to-frame motion, and story-action accuracy are deliberately marked for manual review; the test does not claim semantic computer-vision recognition.
 
 ## Honest result classifications
 
