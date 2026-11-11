@@ -58,7 +58,7 @@ test('parses an inline main-character profile without treating its description a
 });
 
 test('normalizes a standalone main-character label before narrative on the next line', () => {
-  const brief = parseStoryBrief('Main character: Foxy.\\nFoxy finds a red ball.');
+  const brief = parseStoryBrief('Main character: Foxy.\nFoxy finds a red ball.');
   assert.deepEqual(brief.characters, ['Foxy']);
   assert.equal(brief.storyText, 'Foxy finds a red ball.');
 });
