@@ -98,6 +98,7 @@ import { inferStoryboardStateChanges } from "./scene-state-changes.js";
 import { buildStoryEventChain } from "./story-event-chain.js";
 import { createGenerationObserver } from "./generation-observer-agent.js";
 import { buildCharacterPresenceTimeline } from "./character-presence-timeline.js";
+import { auditProductionRun } from "./production-audit-agent.js";
 import { shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
 import { drawProceduralDemoFox } from './demo-character-renderer.js';
 const localTextRuntime = createLocalTransformersRuntime();
@@ -118,7 +119,9 @@ function refreshGenerationObserverReport(){
   const pre=document.createElement('pre');pre.dataset.observerDetails='true';pre.style.whiteSpace='pre-wrap';pre.style.overflowWrap='anywhere';
   panel.append(heading,summary,pre);host.appendChild(panel);
  }
+ const observerSnapshot=activeGenerationObserver.snapshot();
  const report=activeGenerationObserver.report({interpretation:currentStoryboardPlan?.scenes||[],scenes:sceneMetadata,characterPresenceTimeline:buildCharacterPresenceTimeline(sceneMetadata)});
+ report.productionAudit=auditProductionRun({runId:observerSnapshot.runId,stages:observerSnapshot.stages});
  const summary=panel.querySelector('[data-observer-summary]');
  if(summary)summary.textContent=(uiLang==='ru'?'Проверено текстовых требований: ':'Text requirements: ')+report.summary.textEvidenceFound+'/'+report.summary.requirementCount+' · '+(uiLang==='ru'?'ошибок этапов: ':'failed stages: ')+report.summary.failedStages+' · '+(uiLang==='ru'?'непроверенных этапов: ':'unverified stages: ')+report.summary.unverifiedStages+' · '+report.summary.overall;
  const pre=panel.querySelector('[data-observer-details]');if(pre)pre.textContent=JSON.stringify(report,null,2);
