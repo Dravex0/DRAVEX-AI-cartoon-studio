@@ -31,9 +31,9 @@ jobs:
 
       - name: Install portable FFmpeg and ffprobe for browser video checks
         run: |
-          npm install --no-save --package-lock=false ffmpeg-static @ffprobe-installer/linux-x64
+          npm install --no-save --package-lock=false ffmpeg-static @derhuerst/ffprobe-static
           FFMPEG_PATH="$(node -e "process.stdout.write(require('ffmpeg-static'))")"
-          FFPROBE_PATH="$(node -e "process.stdout.write(require('@ffprobe-installer/linux-x64').path)")"
+          FFPROBE_PATH="$(node -e "process.stdout.write(require('@derhuerst/ffprobe-static'))")"
           test -x "$FFMPEG_PATH"
           test -x "$FFPROBE_PATH"
           mkdir -p "$RUNNER_TEMP/dravex-media-tools"
