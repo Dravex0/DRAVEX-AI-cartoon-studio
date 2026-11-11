@@ -7,7 +7,8 @@ export function analyzeRgbaFrameSequence(frames, {
   pixelDeltaThreshold = 18,
   staticMeanChangeThreshold = 0.01,
   staticChangedPixelRatioThreshold = 0.01,
-  orangePixelRatioThreshold = 0.01
+  orangePixelRatioThreshold = 0.01,
+  redPixelRatioThreshold = 0.001
 } = {}) {
   if (!Array.isArray(frames) || frames.length < 2 || frames.length > 12) {
     throw new RangeError('frames must contain between 2 and 12 samples.');
@@ -49,6 +50,17 @@ export function analyzeRgbaFrameSequence(frames, {
     }
     return Number((orangePixels / pixelCount).toFixed(4));
   });
+  const redPixelRatios = normalized.map(frame => {
+    let redPixels = 0;
+    for (let offset = 0; offset < frame.data.length; offset += 4) {
+      const red = Number(frame.data[offset]);
+      const green = Number(frame.data[offset + 1]);
+      const blue = Number(frame.data[offset + 2]);
+      if (red >= 160 && green <= 95 && blue <= 95
+        && red - green >= 70 && red - blue >= 70) redPixels += 1;
+    }
+    return Number((redPixels / pixelCount).toFixed(4));
+  });
 
   let totalChannelChange = 0;
   let changedPixels = 0;
@@ -75,6 +87,7 @@ export function analyzeRgbaFrameSequence(frames, {
     ? 'likely-static'
     : 'visible-change';
   const maxOrangePixelRatio = Math.max(0, ...orangePixelRatios);
+  const maxRedPixelRatio = Math.max(0, ...redPixelRatios);
   return {
     status,
     frameCount: normalized.length,
@@ -85,6 +98,11 @@ export function analyzeRgbaFrameSequence(frames, {
     orangeSignal: maxOrangePixelRatio >= orangePixelRatioThreshold
       ? 'orange-pixels-detected'
       : 'low-orange-pixel-signal',
-    note: 'Pixel changes and orange-color ratios are heuristics only; they do not identify a character, object, or action.'
+    redPixelRatios,
+    maxRedPixelRatio: Number(maxRedPixelRatio.toFixed(4)),
+    redSignal: maxRedPixelRatio >= redPixelRatioThreshold
+      ? 'red-pixels-detected'
+      : 'low-red-pixel-signal',
+    note: 'Pixel changes and orange/red color ratios are heuristics only; they do not identify a character, object, or action.'
   };
 }
