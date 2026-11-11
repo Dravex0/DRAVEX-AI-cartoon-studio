@@ -277,6 +277,7 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
   );
 
   await page.locator('#idea').fill('A small blue robot walks through a park, meets a little red bird, waves, and they become friends. Make a short animated film.');
+  await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('huggingface');
   await page.locator('#hfVideoPanel').evaluate(element => { element.open = true; });
   await page.locator('#hfVideoToken').fill('hf_mocktoken1234567890');
