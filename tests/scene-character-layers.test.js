@@ -96,6 +96,22 @@ test('rejects invalid viewport and missing drawing dependencies', () => {
   assert.deepEqual(drawCharacterLayers({ drawImage() {} }, [{}], () => null, 0, 100), { drawn: 0, skipped: 1 });
 });
 
+test('attaches generated sprites for a multi-character cast at separate visible positions', async () => {
+  const { attachCharacterSpriteToSceneLayers } = await import('../src/scene-character-layers.js');
+  const scene = { characters: ['Foxy', 'Bird', 'Wolf'] };
+  let layers = [];
+  for (const characterId of scene.characters) {
+    const result = attachCharacterSpriteToSceneLayers({ ...scene, characterLayers: layers }, {
+      characterId, imageUrl: 'https://cdn.example/' + characterId.toLowerCase() + '.png'
+    });
+    assert.equal(result.status, 'added');
+    layers = result.layers;
+  }
+  assert.deepEqual(layers.map(layer => layer.x), [0.25, 0.5, 0.75]);
+  assert.deepEqual(layers.map(layer => layer.y), [0.68, 0.68, 0.68]);
+  assert.equal(new Set(layers.map(layer => layer.x + ':' + layer.y)).size, 3);
+});
+
 test('attaches a generated HTTPS sprite to a new scene layer', async () => {
   const { attachCharacterSpriteToSceneLayers } = await import('../src/scene-character-layers.js');
   const result = attachCharacterSpriteToSceneLayers({}, {
