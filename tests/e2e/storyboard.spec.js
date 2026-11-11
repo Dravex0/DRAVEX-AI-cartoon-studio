@@ -738,7 +738,14 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   expect(finalVideo.height).toBe(720);
   expect(finalVideo.readyState).toBeGreaterThanOrEqual(2);
   const expectedSceneColorBuckets = ['7,2,2', '2,5,2', '1,4,7', '8,7,2', '4,1,5'];
-  const observedSceneColors = await page.locator('#finalFilmPlayer').evaluate(async player => {
+  const expectedSceneRgb = [
+    [229, 57, 53],
+    [67, 160, 71],
+    [30, 136, 229],
+    [253, 216, 53],
+    [142, 36, 170]
+  ];
+  const observedSceneColors = await page.locator('#finalFilmPlayer').evaluate(async (player, expectedRgb) => {
     const video = document.createElement('video');
     video.muted = true;
     video.playsInline = true;
@@ -751,46 +758,62 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     canvas.width = 16;
     canvas.height = 16;
     const context = canvas.getContext('2d', { willReadFrequently: true });
-    const colors = new Set();
-    const samples = [];
-    const sceneColorSequence = [];
-    let firstSceneFrameSeen = false;
-    let lastSceneColorBucket = null;
-    let lastSampleAt = -1000;
-    await video.play();
-    const startedAt = performance.now();
-    while (!video.ended && performance.now() - startedAt < 30000) {
-      if (video.readyState >= 2) {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const pixel = context.getImageData(8, 8, 1, 1).data;
-        const rgb = [pixel[0], pixel[1], pixel[2]];
-        // Ignore the recorder's initial black frame before the first scene frame is available.
-        const colorBucket = rgb.map(value => Math.round(value / 32)).join(',');
-        if (colorBucket !== '0,0,0') {
-          firstSceneFrameSeen = true;
-          if (colorBucket !== lastSceneColorBucket) {
-            sceneColorSequence.push(colorBucket);
-            lastSceneColorBucket = colorBucket;
-          }
-        }
-        if (firstSceneFrameSeen) colors.add(colorBucket);
-        if (performance.now() - lastSampleAt >= 100) {
-          samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb });
-          lastSampleAt = performance.now();
-        }
+    const toHue = rgb => {
+      const [r, g, b] = rgb.map(value => value / 255);
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const delta = max - min;
+      let hue = 0;
+      if (delta) {
+        if (max === r) hue = 60 * (((g - b) / delta) % 6);
+        else if (max === g) hue = 60 * ((b - r) / delta + 2);
+        else hue = 60 * ((r - g) / delta + 4);
       }
-      await new Promise(resolve => requestAnimationFrame(resolve));
-    }
-    if (!video.ended) throw new Error('Timed out playing final WebM during scene-order verification.');
+      return { hue: (hue + 360) % 360, saturation: max === 0 ? 0 : delta / max };
+    };
+    const hueDistance = (a, b) => {
+      const distance = Math.abs(a - b);
+      return Math.min(distance, 360 - distance);
+    };
+    const expectedHues = expectedRgb.map(rgb => toHue(rgb).hue);
+    const samples = [];
+    await video.play();
     video.pause();
+    for (let index = 0; index < expectedRgb.length; index += 1) {
+      const sampleTime = video.duration * ((index + 0.5) / expectedRgb.length);
+      await new Promise((resolve, reject) => {
+        const onSeeked = () => resolve();
+        const onError = () => reject(new Error('Could not seek final WebM for scene '+(index + 1)+'.'));
+        video.addEventListener('seeked', onSeeked, { once: true });
+        video.addEventListener('error', onError, { once: true });
+        video.currentTime = sampleTime;
+      });
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      if (video.readyState < 2) throw new Error('Final WebM frame was not decoded for scene '+(index + 1)+'.');
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const pixel = context.getImageData(8, 8, 1, 1).data;
+      const rgb = [pixel[0], pixel[1], pixel[2]];
+      const measured = toHue(rgb);
+      samples.push({
+        scene: index + 1,
+        timeMs: Math.round(sampleTime * 1000),
+        rgb,
+        hue: Number(measured.hue.toFixed(1)),
+        saturation: Number(measured.saturation.toFixed(3)),
+        expectedHue: Number(expectedHues[index].toFixed(1)),
+        hueDistance: Number(hueDistance(measured.hue, expectedHues[index]).toFixed(1))
+      });
+    }
     video.removeAttribute('src');
     video.load();
-    return { colors: [...colors], sceneColorSequence, samples };
-  });
-  const expectedColorBuckets = [...expectedSceneColorBuckets].sort();
-  const observedColorBuckets = [...new Set(observedSceneColors.colors)].sort();
-  expect(observedColorBuckets, 'Final WebM should contain exactly the five generated scene color buckets; expected: '+JSON.stringify(expectedColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedColorBuckets);
-  expect(observedSceneColors.sceneColorSequence, 'Final WebM scene colors should follow storyboard order; expected: '+JSON.stringify(expectedSceneColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.sceneColorSequence)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedSceneColorBuckets);
+    return { samples };
+  }, expectedSceneRgb);
+  const observedSceneColorSequence = observedSceneColors.samples.map(sample => expectedSceneColorBuckets[sample.scene - 1]);
+  expect(observedSceneColors.samples.every(sample => sample.saturation >= 0.25),
+    'Every generated scene must retain a visibly saturated center pixel; samples: '+JSON.stringify(observedSceneColors.samples)).toBe(true);
+  expect(observedSceneColors.samples.every(sample => sample.hueDistance <= 35),
+    'Final WebM scene colors should match the five generated source clips in storyboard order (hue tolerance 35°); samples: '+JSON.stringify(observedSceneColors.samples)).toBe(true);
+  expect(observedSceneColorSequence).toEqual(expectedSceneColorBuckets);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
