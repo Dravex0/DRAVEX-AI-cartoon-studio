@@ -138,13 +138,13 @@ test('published page exposes the experimental English timestamped Kokoro voice e
 });
 
 
-test('keeps facial lip-sync analysis enabled over generated scene media', () => {
+test('restricts lip-sync analysis to dialogue with a renderable mouth', () => {
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
-  assert.ok(app.includes('previewMouthTracks=pendingSession.decodedTracks.map(track=>'));
-  assert.ok(app.includes('const lipSyncRenderableTracks=mainCharacterVoiceTracks;'));
+  assert.ok(app.includes('selectRenderableLipSyncTracks'));
+  assert.ok(app.includes('const lipSyncRenderableTracks=selectRenderableLipSyncTracks({'));
+  assert.ok(app.includes('lipSyncEligibleTrackCount=lipSyncRenderableTracks.length'));
   assert.ok(app.includes('drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs'));
-  assert.ok(!app.includes('if(!hasGeneratedMedia){'));
-  assert.ok(!app.includes('lipSyncGeneratedMediaTracks'));
+  assert.ok(!app.includes('const lipSyncRenderableTracks=mainCharacterVoiceTracks;'));
 });
 
 test('wires landscape and portrait formats through canvas preview and export', () => {
