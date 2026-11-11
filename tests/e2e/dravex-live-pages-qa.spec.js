@@ -280,6 +280,7 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
       motionSignal: visualMetrics.status,
       meanPixelChange: visualMetrics.meanPixelChange,
       changedPixelRatio: visualMetrics.changedPixelRatio,
+      regionalMotion: visualMetrics.regionalMotion,
       semanticCharacterRecognition: 'not-automated-review-attached-frames',
       note: visualMetrics.note
     };
@@ -307,6 +308,14 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
     if (pageErrors.length) issues.push('Browser runtime errors occurred.');
     if (consoleErrors.length) issues.push('Browser console errors were recorded; inspect the attached report.');
     if (visualMetrics.status === 'likely-static') issues.push('Weak frame-to-frame pixel-change signal; motion needs manual review.');
+    if (visualMetrics.status !== 'likely-static'
+      && visualMetrics.regionalMotion.averageActiveRegionsPerTransition >= 8) {
+      issues.push('Pixel changes are distributed across nearly the whole frame; possible camera or lighting change, not verified character movement.');
+    }
+    if (visualMetrics.status !== 'likely-static'
+      && visualMetrics.regionalMotion.centerRegion.changedPixelRatio < 0.005) {
+      issues.push('The center image region has little measured change; this is only a spatial hint and does not prove whether a character is present or moving.');
+    }
     issues.push('Kael identity, Shadow Blade action, shadow interaction, and story accuracy are not semantically verified; manually review the attached decoded frames.');
     report.findings = issues;
     report.browserErrors = { pageErrors, consoleErrors };
