@@ -46,6 +46,19 @@ function parseCharacterLine(line) {
   return characterId ? { characterId, visualDescription: clean(match[2], 1200), clothing: '', colors: '', distinctiveFeatures: '' } : null;
 }
 
+const PRODUCTION_DIRECTION_PREFIX = /^(?:stage\s+(?:the\s+)?story\s+event\b|keep\b|preserve\b|maintain\b|ensure\b|use\b|avoid\b|do not\b|don't\b|make sure\b|medium shot\b|wide shot\b|close[- ]up\b|camera\b|one continuous scene\b|single continuous scene\b|single scene\b|one scene\b|the scene (?:must|should)\b|the character (?:must|should)\b|show\s+(?:a clear|the result|the outcome|the acting character|the important object|the consequence|every|all)\b|сохрани\b|сохраняй\b|поддерживай\b|обеспечь\b|используй\b|избегай\b|не добавляй\b|средний план\b|общий план\b|крупный план\b|камера\b|одна непрерывная сцена\b|единая сцена\b|сцена должна\b|покажи\s+(?:чёткий|четкий|ясный|результат|итог|всех|каждого)\b|зроби\b|збережи\b|зберігай\b|забезпеч\b|використовуй\b|уникай\b|не додавай\b|середній план\b|загальний план\b|крупний план\b|камера\b|одна безперервна сцена\b|сцена має\b|покажи\s+(?:чіткий|ясний|результат|підсумок|усіх|кожного)\b|mantén\b|preserva\b|mantener\b|asegura\b|usa\b|evita\b|no añadas\b|plano medio\b|plano general\b|primer plano\b|cámara\b|una escena continua\b|la escena debe\b|muestra\s+(?:un resultado claro|el resultado|el personaje|todos)\b)/iu;
+const STORY_DETAIL_LABEL = /^(?:story detail(?: to preserve)?|plot detail|сюжетная деталь(?: для сохранения)?|деталь истории|деталь початкової історії|деталь сюжету|деталь історії)\s*[:：]\s*(.*)$/iu;
+
+function splitBriefSentences(value) {
+  return (String(value ?? '').match(/[^.!?。！？]+[.!?。！？]?/gu) || [])
+    .map(sentence => sentence.trim())
+    .filter(Boolean);
+}
+
+function isProductionInstruction(value) {
+  return PRODUCTION_DIRECTION_PREFIX.test(String(value ?? '').trim());
+}
+
 /**
  * Separates narrative, numbered scene blocks and production directions.
  * Supports both one-direction-per-line and compact directions separated by middle dots.
@@ -65,6 +78,34 @@ export function parseStoryBrief(input) {
     if (!text) return;
     if (activeScene) activeScene.lines.push(text);
     else storyLines.push(text);
+  };
+
+  const addStoryOrProductionText = value => {
+    const text = clean(value, 3000);
+    if (!text) return;
+    const directStoryLabel = text.match(STORY_DETAIL_LABEL);
+    if (directStoryLabel) {
+      addStoryText(directStoryLabel[1]);
+      return;
+    }
+    const narrative = [];
+    const flushNarrative = () => {
+      if (narrative.length) addStoryText(narrative.splice(0).join(' '));
+    };
+    for (const sentence of splitBriefSentences(text)) {
+      const storyLabel = sentence.match(STORY_DETAIL_LABEL);
+      if (storyLabel) {
+        flushNarrative();
+        addStoryText(storyLabel[1]);
+      } else if (isProductionInstruction(sentence)) {
+        flushNarrative();
+        appendDirective(directives, 'productionNotes', sentence);
+        instructionLines.push(sentence);
+      } else {
+        narrative.push(sentence);
+      }
+    }
+    flushNarrative();
   };
 
   for (const rawLine of rawText.split('\n')) {
@@ -93,6 +134,22 @@ export function parseStoryBrief(input) {
         if (key === 'characters') {
           const inlineProfile = parseCharacterLine(match[2]);
           if (inlineProfile) {
+            const description = [];
+            const trailing = [];
+            let readingTrailingText = false;
+            for (const sentence of splitBriefSentences(inlineProfile.visualDescription)) {
+              if (isProductionInstruction(sentence)) {
+                readingTrailingText = true;
+                appendDirective(directives, 'productionNotes', sentence);
+                instructionLines.push(sentence);
+              } else if (readingTrailingText) {
+                trailing.push(sentence);
+              } else {
+                description.push(sentence);
+              }
+            }
+            inlineProfile.visualDescription = description.join(' ').trim();
+            if (trailing.length) addStoryOrProductionText(trailing.join(' '));
             if (!characterProfiles.some(profile => profile.characterId.toLocaleLowerCase() === inlineProfile.characterId.toLocaleLowerCase())) {
               characterProfiles.push(inlineProfile);
             }
@@ -134,7 +191,7 @@ export function parseStoryBrief(input) {
         characterProfiles.push(profile);
         appendDirective(directives, 'characters', profile.characterId);
       } else {
-        addStoryText(remainder);
+        addStoryOrProductionText(remainder);
       }
     }
   }
@@ -217,7 +274,7 @@ export function parseStoryBrief(input) {
   const preamble = storyLines.join('\n').trim();
   const storyText = sceneData.length
     ? [preamble, ...sceneData.map(scene => [scene.title, scene.text].filter(Boolean).join('\n'))].filter(Boolean).join('\n\n')
-    : preamble || rawText;
+    : preamble;
 
   const eventText = sceneData.length
     ? [preamble, ...sceneData.map(scene => scene.text)].filter(Boolean).join('\n')
