@@ -7,24 +7,32 @@ const VERBS = {
   en: [
     { re: /(?:picks up|takes|grabs|holds)/iu, property: 'holder', value: 'actor' },
     { re: /(?:drops|puts down|leaves behind)/iu, property: 'holder', value: null },
+    { re: /(?:frees|releases|unties)/iu, property: 'state', value: 'free' },
+    { re: /(?:traps|imprisons)/iu, property: 'state', value: 'trapped' },
     { re: /opens/iu, property: 'openState', value: 'open' },
     { re: /closes/iu, property: 'openState', value: 'closed' }
   ],
   ru: [
     { re: /(?:поднимает|бер[её]т|забирает|держит)/iu, property: 'holder', value: 'actor' },
     { re: /(?:роняет|клад[её]т|оставляет)/iu, property: 'holder', value: null },
+    { re: /(?:освобождает|высвобождает|выпускает)/iu, property: 'state', value: 'free' },
+    { re: /(?:ловит в ловушку|запирает|пленяет)/iu, property: 'state', value: 'trapped' },
     { re: /открывает/iu, property: 'openState', value: 'open' },
     { re: /закрывает/iu, property: 'openState', value: 'closed' }
   ],
   uk: [
     { re: /(?:піднімає|бере|забирає|тримає)/iu, property: 'holder', value: 'actor' },
     { re: /(?:роняє|кладе|залишає)/iu, property: 'holder', value: null },
+    { re: /(?:звільняє|визволяє|випускає)/iu, property: 'state', value: 'free' },
+    { re: /(?:ловить у пастку|замикає|полонить)/iu, property: 'state', value: 'trapped' },
     { re: /відкриває/iu, property: 'openState', value: 'open' },
     { re: /закриває/iu, property: 'openState', value: 'closed' }
   ],
   es: [
     { re: /(?:recoge|toma|agarra|sostiene)/iu, property: 'holder', value: 'actor' },
     { re: /(?:suelta|deja caer|deja)/iu, property: 'holder', value: null },
+    { re: /(?:libera|suelta)/iu, property: 'state', value: 'free' },
+    { re: /(?:atrapa|encierra)/iu, property: 'state', value: 'trapped' },
     { re: /abre/iu, property: 'openState', value: 'open' },
     { re: /cierra/iu, property: 'openState', value: 'closed' }
   ]
