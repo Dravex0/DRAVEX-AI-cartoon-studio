@@ -84,23 +84,40 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
       const duration = video.duration;
       const width = video.videoWidth;
       const height = video.videoHeight;
+      if (!Number.isFinite(duration) || duration <= 1) throw new Error('Invalid WebM duration: ' + duration);
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+        throw new Error('Invalid WebM dimensions: ' + width + 'x' + height);
+      }
       const sampleTimes = [...new Set([0.5, duration * 0.25, duration * 0.5, duration * 0.75, Math.max(0.5, duration - 0.5)]
-        .map(value => Math.max(0, Math.min(value, Math.max(0, duration - 0.05)))))];
+        .map(value => Math.max(0, Math.min(value, duration - 0.05))))];
       const canvas = document.createElement('canvas');
       canvas.width = Math.min(width, 320);
       canvas.height = Math.max(1, Math.round(canvas.width * height / width));
       const context = canvas.getContext('2d', { willReadFrequently: true });
       const frames = [];
+      let previousPixels = null;
+      let changedPixelRatio = 0;
       for (const time of sampleTimes) {
-        video.currentTime = time;
         await new Promise((resolve, reject) => {
           const timer = setTimeout(() => reject(new Error('Video seek timeout at ' + time)), 8_000);
           const done = () => { clearTimeout(timer); resolve(); };
-          if (typeof video.requestVideoFrameCallback === 'function') video.requestVideoFrameCallback(done);
-          else video.addEventListener('seeked', done, { once: true });
+          const failed = () => { clearTimeout(timer); reject(new Error(video.error?.message || 'Video seek failed')); };
+          video.addEventListener('seeked', done, { once: true });
+          video.addEventListener('error', failed, { once: true });
+          video.currentTime = time;
         });
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        if (previousPixels) {
+          let changed = 0;
+          for (let i = 0; i < pixels.length; i += 4) {
+            if (Math.abs(pixels[i] - previousPixels[i]) +
+                Math.abs(pixels[i + 1] - previousPixels[i + 1]) +
+                Math.abs(pixels[i + 2] - previousPixels[i + 2]) > 45) changed += 1;
+          }
+          changedPixelRatio = Math.max(changedPixelRatio, changed / (pixels.length / 4));
+        }
+        previousPixels = new Uint8ClampedArray(pixels);
         let orange = 0;
         let nonDark = 0;
         for (let i = 0; i < pixels.length; i += 4) {
@@ -115,13 +132,15 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
           visiblePixelRatio: Number((nonDark / (pixels.length / 4)).toFixed(5))
         });
       }
-      const framePixels = frames.map(frame => {
-        const image = new Image();
-        image.src = frame.pngDataUrl;
-        return frame.pngDataUrl;
-      });
       video.pause();
-      return { durationSeconds: Number(duration.toFixed(2)), width, height, readyState: video.readyState, frames };
+      return {
+        durationSeconds: Number(duration.toFixed(2)),
+        width,
+        height,
+        readyState: video.readyState,
+        changedPixelRatio: Number(changedPixelRatio.toFixed(5)),
+        frames
+      };
     });
     expect(browserEvidence.width).toBeGreaterThan(0);
     expect(browserEvidence.height).toBeGreaterThan(0);
