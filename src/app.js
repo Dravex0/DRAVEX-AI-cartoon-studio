@@ -2581,7 +2581,7 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
  if(!ready.length){status.textContent=uiLang==='ru'?'Нет готовых планов. Проверь состав сцены, справочник внешности и действия персонажей.':'No ready sprite plans. Check the scene cast, character appearance references, and character actions.';return}
  button.disabled=true;
  const existing=Array.isArray(meta.characterSpriteAssets)?[...meta.characterSpriteAssets]:[];
- let completed=0,failed=0;
+ let completed=0,failed=0,attached=0;
  try{
   for(const plan of ready){
    status.textContent=uiLang==='ru'?'Генерация '+(completed+failed+1)+' из '+ready.length+': '+plan.characterId+'…':'Generating '+(completed+failed+1)+' of '+ready.length+': '+plan.characterId+'…';
@@ -2592,6 +2592,16 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
     }});
     const oldIndex=existing.findIndex(item=>item&&item.assetId===asset.assetId);
     if(oldIndex>=0)existing[oldIndex]=asset;else existing.push(asset);
+    // A successful sprite generation must become visible in the scene automatically.
+    // Keep the explicit manual attach control for previously generated assets.
+    const currentSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id)===targetId);
+    if(currentSceneIndex>=0){
+     const attachResult=attachCharacterSpriteToSceneLayers(sceneMetadata[currentSceneIndex],asset);
+     if(attachResult.status==='added'||attachResult.status==='updated'){
+      sceneMetadata[currentSceneIndex]={...sceneMetadata[currentSceneIndex],characterLayers:attachResult.layers};
+      attached++;
+     }
+    }
     completed++;
    }catch(error){
     failed++;
@@ -2599,9 +2609,13 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
    }
    const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id)===targetId);
    if(resolvedIndex>=0)sceneMetadata[resolvedIndex]={...sceneMetadata[resolvedIndex],characterSpriteAssets:[...existing]};
-   if(sceneIndex===resolvedIndex)renderCharacterSpriteAssets();
+   if(sceneIndex===resolvedIndex){
+    renderCharacterSpriteAssets();
+    syncCharacterMotionEditor();
+    if(!playing)draw();
+   }
   }
-  status.textContent=uiLang==='ru'?'Готово: '+completed+' · ошибок: '+failed+'. Сохрани черновик, чтобы сохранить ссылки.':'Finished: '+completed+' generated · '+failed+' failed. Save the draft to keep the links.';
+  status.textContent=uiLang==='ru'?'Готово: '+completed+' · добавлено на сцену: '+attached+' · ошибок: '+failed+'. Сохрани черновик, чтобы сохранить ссылки.':'Finished: '+completed+' generated · '+attached+' attached to the scene · '+failed+' failed. Save the draft to keep the links.';
  }finally{
   button.disabled=!$('spriteHordeConsent').checked;
  }
