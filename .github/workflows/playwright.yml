@@ -40,6 +40,7 @@ jobs:
           ln -sf "$FFMPEG_PATH" "$RUNNER_TEMP/dravex-media-tools/ffmpeg"
           ln -sf "$FFPROBE_PATH" "$RUNNER_TEMP/dravex-media-tools/ffprobe"
           echo "$RUNNER_TEMP/dravex-media-tools" >> "$GITHUB_PATH"
+          export PATH="$RUNNER_TEMP/dravex-media-tools:$PATH"
           ffmpeg -version
           ffprobe -version
 
