@@ -244,7 +244,7 @@ export function attachCharacterSpriteToSceneLayers(scene = {}, asset = {}) {
   const column = slotIndex - rowStart;
   const placement = {
     x: (column + 1) / (rowCount + 1),
-    y: rows === 1 ? 0.68 : 0.48 + row * (0.34 / (rows - 1)),
+    y: Number((rows === 1 ? 0.68 : 0.48 + row * (0.34 / (rows - 1))).toFixed(4)),
     width: Math.min(0.28, 0.84 / columns),
     height: rows === 1 ? 0.46 : Math.min(0.34, 0.78 / rows)
   };
