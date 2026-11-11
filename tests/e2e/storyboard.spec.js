@@ -29,7 +29,7 @@ test('opens the DRAVEX Cartoon Studio workspace', async ({ page }) => {
   await expect(page.locator('.quick-settings')).toHaveAttribute('open', '');
   await expect(page.locator('#style')).toBeVisible();
   await expect(page.locator('#language')).toBeVisible();
-  await expect(page.locator('.workflow-step')).toBeHidden();
+  await expect(page.locator('.workflow-steps')).toBeHidden();
   await expect(page.locator('#generationTools')).not.toHaveAttribute('open', '');
   await expect(page.locator('#imageQuality')).toBeVisible();
   await expect(page.locator('#canvas')).toBeVisible();
@@ -67,6 +67,13 @@ test('exports a short storyboard to a non-empty playable WebM', async ({ page })
   await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
 
   const video = await page.locator('#finalFilmPlayer').evaluate(async element => {
+    if (element.readyState < 2 || !Number.isFinite(element.duration)) {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Exported WebM metadata did not load')), 15000);
+        element.addEventListener('loadedmetadata', () => { clearTimeout(timeout); resolve(); }, { once: true });
+        element.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('Exported WebM failed to load metadata')); }, { once: true });
+      });
+    }
     const response = await fetch(element.currentSrc);
     const blob = await response.blob();
     return {
@@ -463,6 +470,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
 
   await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('comfyui');
+  await page.locator('.advanced-video-settings > summary').click();
   await page.locator('#comfyPanel > summary').click();
   await expect(page.locator('label[for="comfySourceImageFile"]')).toContainText(/Local image for the selected scene/i);
   const imageWorkflow = {
