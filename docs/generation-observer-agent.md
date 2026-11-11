@@ -36,3 +36,28 @@ For every run, record:
 ## Integration requirement
 
 The application must emit a structured run trace at each generation stage and provide artifact references to the observer. A later integration can connect a vision-capable evaluator and browser/device playback tests. Until those are connected, this document describes the intended observer workflow, not a claim that autonomous visual inspection is already running.
+
+
+## Runtime implementation
+
+The read-only observer is implemented in `src/generation-observer-agent.js`.
+
+### API
+
+- `createGenerationObserver({ runId, prompt, requirements })`
+- `recordStage(name, { status, input, output, error, timestamp, evidenceRefs })`
+- `attachArtifact({ kind, name, mimeType, sizeBytes, durationSeconds, reference, evidenceType })`
+- `recordAssessment({ target, method, verdict, summary, evidenceRefs })`
+- `report({ interpretation, scenes })`
+
+The report separates lexical evidence from explicit visual/audio/playback assessments. Missing evidence remains unverified. The observer does not modify prompts, code, settings, or generated files.
+
+### First medium-complexity test prompt
+
+Use the user's established Kel character reference; do not invent missing visual traits. Create a short three-scene cartoon: Kel enters a forest clearing, notices a small glowing mechanical bird trapped beneath a fallen branch, lifts the branch and frees it, then speaks one short reassuring line. Use a wide establishing shot, a medium action shot, and a close-up reaction shot. Keep Kel's design, clothing, colors, and proportions consistent. Preserve the bird and branch state across camera cuts; a character outside the current frame remains offscreen unless the story explicitly shows an exit. Include visible character movement, timed dialogue, and export a playable WebM.
+
+Expected requirements should be supplied as structured records by the prompt parser/test harness: character identity, forest setting, bird/branch interaction, three distinct shots, dialogue, continuous state, real motion, and playable export.
+
+### Current limits
+
+This is a functional trace-and-evidence evaluator, not yet an autonomous vision model. Text matching is lexical only. Actual pixel inspection, motion classification, audio listening, lip-sync scoring, and browser playback must be supplied by trusted evaluators as `recordAssessment` entries with evidence references. File existence or metadata alone is never visual-quality proof.
