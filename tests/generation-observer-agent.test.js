@@ -36,6 +36,14 @@ test("visual claims require explicit assessments and artifact metadata is not vi
   assert.equal(report.mediaAssessments[0].verdict, "pass");
 });
 
+test("observer report can include a character presence timeline without treating it as visual proof", () => {
+  const observer = createGenerationObserver({ runId: "presence-test" });
+  const timeline = [{ sceneId: "scene-2", cameraCut: true, characters: [{ characterId: "Kel", status: "offscreen" }] }];
+  const report = observer.report({ characterPresenceTimeline: timeline });
+  assert.deepEqual(report.characterPresenceTimeline, timeline);
+  assert.equal(report.mediaAssessments.length, 0);
+});
+
 test("only declared generation stages can be recorded", () => {
   const observer = createGenerationObserver();
   assert.throws(() => observer.recordStage("imaginaryStage", { status: "completed" }), /Unknown generation stage/);
