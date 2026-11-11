@@ -1,3 +1,38 @@
+import { analyzeVideoFrameSequence } from "./video-frame-motion-metrics.js";
+
+function getVideoTimeline(video) {
+  const duration = Number(video.duration);
+  if (Number.isFinite(duration) && duration > 0) return { start: 0, end: duration };
+
+  let ranges;
+  try { ranges = video.seekable; } catch { return null; }
+  if (!ranges || !Number.isInteger(ranges.length) || ranges.length < 1 ||
+      typeof ranges.start !== "function" || typeof ranges.end !== "function") return null;
+
+  let timeline = null;
+  for (let index = 0; index < ranges.length; index += 1) {
+    try {
+      const start = Number(ranges.start(index));
+      const end = Number(ranges.end(index));
+      if (Number.isFinite(start) && Number.isFinite(end) && end > start &&
+          (!timeline || end - start > timeline.end - timeline.start)) {
+        timeline = { start, end };
+      }
+    } catch {}
+  }
+  return timeline;
+}
+
+function sampleVideoTime(timeline, fraction) {
+  const lastSampleTime = Math.max(timeline.start, timeline.end - 0.01);
+  const requestedTime = timeline.start + (timeline.end - timeline.start) * fraction;
+  return Math.min(lastSampleTime, Math.max(timeline.start, requestedTime));
+}
+
+function clampVideoTime(time, timeline) {
+  return Math.min(Math.max(timeline.start, time), Math.max(timeline.start, timeline.end - 0.01));
+}
+
 /**
  * Browser-local motion check for a decoded scene video.
  * Pixel-change heuristic only; it does not recognize semantic actions or quality.
@@ -19,13 +54,17 @@ function waitForSeek(video, targetTime, timeoutMs) {
     try { video.currentTime = targetTime; } catch (error) { cleanup(); reject(error); }
   });
 }
-function frameLuminance(imageData) {
+function framePixelValues(imageData) {
   const { data, width, height } = imageData;
-  const values = new Float32Array(width * height);
-  for (let pixel = 0, offset = 0; pixel < values.length; pixel += 1, offset += 4) {
-    values[pixel] = (0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2]) / 255;
+  const pixelCount = width * height;
+  const luminance = new Float32Array(pixelCount);
+  for (let pixel = 0, offset = 0; pixel < pixelCount; pixel += 1, offset += 4) {
+    const red = data[offset] / 255;
+    const green = data[offset + 1] / 255;
+    const blue = data[offset + 2] / 255;
+    luminance[pixel] = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
   }
-  return values;
+  return { luminance, rgba: data.slice() };
 }
 /**
  * Samples small frames locally and compares adjacent-frame luminance.
@@ -45,9 +84,10 @@ export async function analyzeSceneVideoMotion(video, {
   if (![width, height].every(value => Number.isInteger(value) && value > 0 && value <= 128)) {
     throw new RangeError("Frame analysis dimensions must be integers from 1 to 128.");
   }
-  if (!Number.isFinite(Number(video.duration)) || video.duration <= 0 ||
+  const timeline = getVideoTimeline(video);
+  if (!timeline ||
       !Number.isFinite(Number(video.videoWidth)) || video.videoWidth <= 0 || video.readyState < 2) {
-    throw new Error("Scene video must have a decoded frame and a finite duration.");
+    throw new Error("Scene video must have a decoded frame and a finite duration or seekable range.");
   }
   if (typeof canvasFactory !== "function") throw new TypeError("canvasFactory must be a function.");
   const canvas = canvasFactory();
@@ -64,10 +104,10 @@ export async function analyzeSceneVideoMotion(video, {
   try {
     for (let index = 0; index < sampleCount; index += 1) {
       const fraction = 0.08 + (0.84 * index) / (sampleCount - 1);
-      const targetTime = Math.min(Math.max(0, video.duration - 0.01), video.duration * fraction);
+      const targetTime = sampleVideoTime(timeline, fraction);
       await waitForSeek(video, targetTime, timeoutMs);
       context.drawImage(video, 0, 0, width, height);
-      frames.push(frameLuminance(context.getImageData(0, 0, width, height)));
+      frames.push(framePixelValues(context.getImageData(0, 0, width, height)));
     }
   } catch (error) {
     if (error?.name === "SecurityError") {
@@ -75,7 +115,7 @@ export async function analyzeSceneVideoMotion(video, {
     }
     throw error;
   } finally {
-    try { await waitForSeek(video, Math.min(originalTime, Math.max(0, video.duration - 0.01)), timeoutMs); } catch {}
+    try { await waitForSeek(video, clampVideoTime(originalTime, timeline), timeoutMs); } catch {}
     if (!wasPaused) {
       const playback = video.play?.();
       if (playback && typeof playback.catch === "function") playback.catch(() => {});
@@ -85,20 +125,37 @@ export async function analyzeSceneVideoMotion(video, {
   const pixelCount = width * height;
   for (let frame = 1; frame < frames.length; frame += 1) {
     for (let pixel = 0; pixel < pixelCount; pixel += 1) {
-      const delta = Math.abs(frames[frame][pixel] - frames[frame - 1][pixel]);
+      const previous = frames[frame - 1];
+      const current = frames[frame];
+      const delta = Math.abs(current.luminance[pixel] - previous.luminance[pixel]);
       totalChange += delta;
-      if (delta >= pixelDeltaThreshold) changedPixels += 1;
+      if (delta > 0 && delta >= pixelDeltaThreshold) changedPixels += 1;
       comparisons += 1;
     }
   }
   const meanPixelChange = comparisons ? totalChange / comparisons : 0;
   const changedPixelRatio = comparisons ? changedPixels / comparisons : 0;
-  const isLikelyStatic = meanPixelChange < staticMotionThreshold && changedPixelRatio < changedPixelThreshold;
+  const numericPixelThreshold = Number(pixelDeltaThreshold);
+  const rgbaPixelThreshold = Number.isFinite(numericPixelThreshold)
+    ? Math.min(255, Math.max(0, numericPixelThreshold * 255))
+    : 255;
+  const colorSequence = analyzeVideoFrameSequence(
+    frames.map(frame => frame.rgba),
+    { pixelThreshold: rgbaPixelThreshold }
+  );
+  const meanColorChange = colorSequence.averageMeanAbsoluteDifference / 255;
+  const colorChangedPixelRatio = colorSequence.averageChangedPixelRatio;
+  const isLikelyStatic = meanPixelChange < staticMotionThreshold &&
+    changedPixelRatio < changedPixelThreshold &&
+    meanColorChange < staticMotionThreshold &&
+    colorChangedPixelRatio < changedPixelThreshold;
   return {
     status: isLikelyStatic ? "likely-static" : "visible-change",
     sampleCount: frames.length,
     meanPixelChange: Number(meanPixelChange.toFixed(5)),
     changedPixelRatio: Number(changedPixelRatio.toFixed(4)),
+    meanColorChange: Number(meanColorChange.toFixed(5)),
+    colorChangedPixelRatio: Number(colorChangedPixelRatio.toFixed(4)),
     message: isLikelyStatic ? "Very little pixel change was detected between sampled frames." : "Pixel changes were detected between sampled frames."
   };
 }
@@ -120,9 +177,10 @@ export async function captureSceneVideoFrameSamples(video, {
   if (![width, height].every(value => Number.isInteger(value) && value > 0 && value <= 512)) {
     throw new RangeError("Frame capture dimensions must be integers from 1 to 512.");
   }
-  if (!Number.isFinite(Number(video.duration)) || video.duration <= 0 ||
+  const timeline = getVideoTimeline(video);
+  if (!timeline ||
       !Number.isFinite(Number(video.videoWidth)) || video.videoWidth <= 0 || video.readyState < 2) {
-    throw new Error("Scene video must have a decoded frame and a finite duration.");
+    throw new Error("Scene video must have a decoded frame and a finite duration or seekable range.");
   }
   if (typeof canvasFactory !== "function") throw new TypeError("canvasFactory must be a function.");
   const canvas = canvasFactory();
@@ -139,7 +197,7 @@ export async function captureSceneVideoFrameSamples(video, {
   try {
     for (let index = 0; index < sampleCount; index += 1) {
       const fraction = sampleCount === 1 ? 0.5 : 0.08 + (0.84 * index) / (sampleCount - 1);
-      const time = Math.min(Math.max(0, video.duration - 0.01), video.duration * fraction);
+      const time = sampleVideoTime(timeline, fraction);
       await waitForSeek(video, time, timeoutMs);
       context.drawImage(video, 0, 0, width, height);
       samples.push({ time: Number(time.toFixed(2)), dataUrl: canvas.toDataURL("image/jpeg", 0.72) });
@@ -150,7 +208,7 @@ export async function captureSceneVideoFrameSamples(video, {
     }
     throw error;
   } finally {
-    try { await waitForSeek(video, Math.min(originalTime, Math.max(0, video.duration - 0.01)), timeoutMs); } catch {}
+    try { await waitForSeek(video, clampVideoTime(originalTime, timeline), timeoutMs); } catch {}
     if (!wasPaused) {
       const playback = video.play?.();
       if (playback && typeof playback.catch === "function") playback.catch(() => {});
@@ -158,3 +216,4 @@ export async function captureSceneVideoFrameSamples(video, {
   }
   return samples;
 }
+

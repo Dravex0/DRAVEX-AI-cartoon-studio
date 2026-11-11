@@ -1637,9 +1637,9 @@ function renderSceneMediaReport(){
       const detail=document.createElement('small');
       detail.style.display='block';
       if(result.status==='likely-static'){
-        detail.textContent=(russian?'Почти нет изменений пикселей':'Very little pixel change')+' · '+(russian?'среднее изменение: ':'mean change: ')+Number(result.meanPixelChange||0).toFixed(5);
+        detail.textContent=(russian?'Почти нет изменений пикселей':'Very little pixel change')+' · '+(russian?'среднее изменение: ':'mean change: ')+Number(result.meanPixelChange||0).toFixed(5)+' · RGB: '+Number(result.meanColorChange||0).toFixed(5);
       }else if(result.status==='visible-change'){
-        detail.textContent=(russian?'Обнаружены изменения пикселей':'Pixel changes detected')+' · '+(russian?'доля изменившихся пикселей: ':'changed-pixel ratio: ')+(Number(result.changedPixelRatio||0)*100).toFixed(1)+'%';
+        detail.textContent=(russian?'Обнаружены изменения пикселей':'Pixel changes detected')+' · '+(russian?'доля изменившихся пикселей: ':'changed-pixel ratio: ')+(Number(result.changedPixelRatio||0)*100).toFixed(1)+'% · RGB: '+(Number(result.colorChangedPixelRatio||0)*100).toFixed(1)+'%';
       }else{
         detail.textContent=(russian?'Проверка пропущена: ':'Analysis skipped: ')+String(result.message||'');
       }
