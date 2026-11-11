@@ -151,8 +151,15 @@ test('DRAVEX live Pages: broad feature matrix, safe local workflows and feature 
     await expect(page.locator('#audioVolumeValue')).toHaveText('42%');
     await page.reload();
     await page.locator('details:has(#bibleCharacterId) > summary').click();
-    await expect(page.locator('#bibleCharacterId')).toHaveValue('QA Mechanic');
-    await expect(page.locator('#bibleVisualDescription')).toHaveValue('Young mechanic with dark curly hair, green jacket and tool belt');
+    // The editor opens on the first storyboard character after reload; verify
+    // persistence from the rendered profile cards instead of assuming which
+    // character is currently selected in the editor.
+    const restoredProfile = page.locator('#characterReferenceCards .character-reference-card').filter({ hasText: 'QA Mechanic' });
+    await expect(restoredProfile).toHaveCount(1);
+    await expect(restoredProfile).toContainText('Young mechanic with dark curly hair, green jacket and tool belt');
+    await expect(restoredProfile).toContainText('Green work jacket and orange gloves');
+    await expect(restoredProfile).toContainText('Green, orange, charcoal');
+    await expect(restoredProfile).toContainText('Round protective goggles');
     report.categories.characterBibleDraftAndAudio = {
       status: 'passed',
       characterProfileSaved: true,
