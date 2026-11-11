@@ -1,4 +1,8 @@
 import { test, expect } from '@playwright/test';
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('dravex-ui-language', 'en'));
+});
 import { readFile } from 'node:fs/promises';
 
 test.use({ video: 'on' });
