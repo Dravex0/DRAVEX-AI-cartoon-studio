@@ -11,6 +11,17 @@ The live test captures the prompt/result screenshots, Chromium-player-decoded fr
 
 The agent computes frame-to-frame pixel-change ratios and simple orange/red color-pixel ratios as hints only. These measurements can be affected by camera movement, backgrounds, lighting, and compression; they do not recognize Foxy, a ball, or any story action. Character identity and story-action accuracy remain manual-review items.
 
+## Broad live Pages feature matrix
+
+The live matrix runs against the published Pages site in addition to the focused prompt-to-WebM test. It checks:
+- Workspace controls and feature inventory, interface language, story language, visual styles, scene duration, image-quality setting, and both 16:9 / 9:16 canvas formats.
+- Storyboard creation, scene count, add/delete scene actions, selected-scene editing, and applying edits.
+- Character Bible profile creation, draft save/reload persistence, local audio-file selection, and music-volume control.
+- Local device capability diagnostics and the global animation / character-rig compatibility audit.
+- Availability and consent gates for AI image generation, sprites, rig parts, Hugging Face, ComfyUI, local language models, face analysis, and lip-sync.
+
+The matrix deliberately does not submit prompts to remote providers, enter tokens, grant external-service consent, or download large models. Those integrations are covered separately by mocked-provider integration tests and must be explicitly opted into for a real provider run. Presence of a control is not proof that the underlying remote service works. The report records this distinction and attaches a feature inventory.
+
 ## Honest result classifications
 
 - `local-canvas-output-only-not-AI-video-generation`: the site exported its local canvas/storyboard output. This is not evidence of AI text-to-video.
