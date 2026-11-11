@@ -1644,6 +1644,21 @@ function renderSceneMediaReport(){
         detail.textContent=(russian?'Проверка пропущена: ':'Analysis skipped: ')+String(result.message||'');
       }
       row.append(heading,detail);
+      if(result.spatialMotion){
+        const spatial=document.createElement('small');
+        spatial.style.display='block';
+        const patterns={
+          'no-change':russian?'Пространственный анализ: изменений не найдено':'Spatial analysis: no changed regions',
+          'localized-change':russian?'Пространственный анализ: изменения сосредоточены в отдельных областях':'Spatial analysis: localized pixel changes',
+          'distributed-change':russian?'Пространственный анализ: изменения распределены по кадру':'Spatial analysis: distributed pixel changes',
+          'mixed-change':russian?'Пространственный анализ: смешанное распределение изменений':'Spatial analysis: mixed pixel changes'
+        };
+        spatial.textContent=(patterns[result.spatialMotion.pattern]||result.spatialMotion.pattern)
+          +' · '+(russian?'активных областей: ':'active regions: ')+result.spatialMotion.activeRegionCount+'/'+result.spatialMotion.totalRegionCount
+          +' · '+(russian?'это не распознавание персонажа и не отделяет движение камеры':'not character recognition; camera motion is not separated');
+        spatial.style.opacity='.78';
+        row.appendChild(spatial);
+      }
       if(Array.isArray(result.frameSamples)&&result.frameSamples.length){
         const strip=document.createElement('div');
         strip.style.display='flex';
