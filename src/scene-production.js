@@ -2,6 +2,7 @@ import { normalizeScene, SCENE_DURATION_MIN, SCENE_DURATION_MAX } from './scene-
 import { validateCharacterActionTimeline } from './character-action-timeline.js';
 import { buildCharacterSpriteAssetPlan } from './character-sprite-asset-plan.js';
 import { buildSceneBackgroundPrompt } from './scene-background-prompt.js';
+import { buildWorldMotionInstructions } from './world-motion-contract.js';
 
 const safe = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const list = values => Array.isArray(values) ? values.map(value => safe(value, 500)).filter(Boolean) : [];
@@ -125,6 +126,7 @@ export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
     safe(scene.startState) && `Start state: ${safe(scene.startState, 1000)}`,
     safe(scene.endState) && `End state: ${safe(scene.endState, 1000)}`,
     actionTimelineInstructions(scene),
+    buildWorldMotionInstructions(scene),
     safe(scene.camera) && `Camera movement: ${safe(scene.camera, 1000)}`,
     characterLock.length && `Keep these character designs unchanged: ${characterLock.join(' | ')}`,
     safe(scene.continuityLock) && `Continuity lock: ${safe(scene.continuityLock, 2000)}`,
