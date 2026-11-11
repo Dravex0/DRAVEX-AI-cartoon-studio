@@ -125,6 +125,22 @@ test('attaches a generated HTTPS sprite to a new scene layer', async () => {
   });
 });
 
+test('places a five-character cast across two rows without stacking sprites', async () => {
+  const { attachCharacterSpriteToSceneLayers } = await import('../src/scene-character-layers.js');
+  const scene = { characters: ['Kael', 'Ally', 'Assassin 1', 'Assassin 2', 'Assassin 3'] };
+  let layers = [];
+  for (const characterId of scene.characters) {
+    const result = attachCharacterSpriteToSceneLayers({ ...scene, characterLayers: layers }, {
+      characterId, imageUrl: 'https://cdn.example/' + encodeURIComponent(characterId) + '.png'
+    });
+    assert.equal(result.status, 'added');
+    layers = result.layers;
+  }
+  assert.deepEqual(layers.map(layer => layer.x), [0.2, 0.4, 0.6, 0.8, 0.5]);
+  assert.deepEqual(layers.map(layer => layer.y), [0.48, 0.48, 0.48, 0.48, 0.82]);
+  assert.equal(new Set(layers.map(layer => layer.x + ':' + layer.y)).size, 5);
+});
+
 test('updates the existing character sprite while preserving its scene placement', async () => {
   const { attachCharacterSpriteToSceneLayers } = await import('../src/scene-character-layers.js');
   const result = attachCharacterSpriteToSceneLayers({
