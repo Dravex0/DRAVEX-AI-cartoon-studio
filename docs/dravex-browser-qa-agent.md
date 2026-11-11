@@ -7,7 +7,9 @@ The free DRAVEX Browser QA Agent uses Playwright Chromium in GitHub Actions. It 
 - **Source-build QA** opens the local Vite build. It checks the local storyboard/canvas path and verifies that a WebM can be downloaded and decoded.
 - **Live Pages QA** opens the published production URL, enters a fixed Russian Foxy prompt, exports the result, and inspects the actual downloaded WebM. It runs on desktop Chromium and the Pixel 7 device profile.
 
-The live test captures the prompt/result screenshots, several FFmpeg-decoded video frames, the WebM itself, and a JSON report. FFprobe inspects the exported file's video/audio streams, while packet timestamps and stream metadata are used to estimate duration. Character identity, frame-to-frame motion, and story-action accuracy are deliberately marked for manual review; the test does not claim semantic computer-vision recognition.
+The live test captures the prompt/result screenshots, Chromium-player-decoded frames, FFmpeg-decoded frames from the downloaded WebM, the WebM itself, and a JSON report written into the Playwright test-results directory and attached to the report. FFprobe inspects the exported file's video/audio streams, while packet timestamps and stream metadata are used to estimate duration. The test compares the SHA-256 hash of the preview Blob with the downloaded file so it can confirm the download is byte-for-byte the same output that the page previewed.
+
+The agent computes frame-to-frame pixel-change ratios and simple orange/red color-pixel ratios as hints only. These measurements can be affected by camera movement, backgrounds, lighting, and compression; they do not recognize Foxy, a ball, or any story action. Character identity and story-action accuracy remain manual-review items.
 
 ## Honest result classifications
 
@@ -26,7 +28,7 @@ Audio-track presence is not proof of audible or intelligible Russian speech. A h
 
 ## Evidence
 
-The GitHub Actions artifact `dravex-playwright-report` contains screenshots, frame samples, JSON reports, traces, recordings, and exported WebM files. Review the live Pages report and its attached frames, not only the green workflow status.
+The GitHub Actions artifact `dravex-playwright-report` contains screenshots, Chromium and FFmpeg frame samples, the JSON report in the test-results folder, traces, recordings, and exported WebM files. Review the live Pages report and its attached frames, not only the green workflow status.
 
 ## Privacy and cost
 
