@@ -150,33 +150,7 @@ test('DRAVEX live Pages QA: Foxy prompt → real published output evidence', asy
     }
 
     const orangeSignal = Math.max(...browserEvidence.frames.map(frame => frame.orangePixelRatio));
-    const frameChange = await page.evaluate(async () => {
-      const video = document.querySelector('#finalFilmPlayer');
-      const canvas = document.createElement('canvas');
-      canvas.width = 160;
-      canvas.height = 90;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      const samples = [];
-      for (const fraction of [0.1, 0.35, 0.6, 0.85]) {
-        video.currentTime = Math.min(video.duration * fraction, video.duration - 0.05);
-        await new Promise(resolve => video.addEventListener('seeked', resolve, { once: true }));
-        ctx.drawImage(video, 0, 0, 160, 90);
-        samples.push(Array.from(ctx.getImageData(0, 0, 160, 90).data));
-      }
-      let changed = 0;
-      let compared = 0;
-      for (let frame = 1; frame < samples.length; frame += 1) {
-        for (let i = 0; i < samples[frame].length; i += 4) {
-          const delta = Math.abs(samples[frame][i] - samples[0][i])
-            + Math.abs(samples[frame][i + 1] - samples[0][i + 1])
-            + Math.abs(samples[frame][i + 2] - samples[0][i + 2]);
-          if (delta > 45) changed += 1;
-          compared += 1;
-        }
-      }
-      return { changedPixelRatio: Number((changed / compared).toFixed(5)) };
-    });
-    report.checks.visualEvidence = {
+    const frameChange = { changedPixelRatio: browserEvidence.changedPixelRatio };\n    report.checks.visualEvidence = {
       changedPixelRatio: frameChange.changedPixelRatio,
       orangePixelSignal: orangeSignal,
       motionSignal: frameChange.changedPixelRatio >= 0.01 ? 'pixel-changes-detected' : 'no-significant-motion-detected',
