@@ -6,24 +6,28 @@
 const VERBS = {
   en: [
     { re: /(?:picks up|takes|grabs|holds)/iu, property: 'holder', value: 'actor' },
+    { re: /(?:pushes|nudges|kicks)/iu, property: 'motion', value: 'rolling' },
     { re: /(?:drops|puts down|leaves behind)/iu, property: 'holder', value: null },
     { re: /opens/iu, property: 'openState', value: 'open' },
     { re: /closes/iu, property: 'openState', value: 'closed' }
   ],
   ru: [
     { re: /(?:поднимает|бер[её]т|забирает|держит)/iu, property: 'holder', value: 'actor' },
+    { re: /(?:толкает|пинает)/iu, property: 'motion', value: 'rolling' },
     { re: /(?:роняет|клад[её]т|оставляет)/iu, property: 'holder', value: null },
     { re: /открывает/iu, property: 'openState', value: 'open' },
     { re: /закрывает/iu, property: 'openState', value: 'closed' }
   ],
   uk: [
     { re: /(?:піднімає|бере|забирає|тримає)/iu, property: 'holder', value: 'actor' },
+    { re: /(?:штовхає|копає)/iu, property: 'motion', value: 'rolling' },
     { re: /(?:роняє|кладе|залишає)/iu, property: 'holder', value: null },
     { re: /відкриває/iu, property: 'openState', value: 'open' },
     { re: /закриває/iu, property: 'openState', value: 'closed' }
   ],
   es: [
     { re: /(?:recoge|toma|agarra|sostiene)/iu, property: 'holder', value: 'actor' },
+    { re: /(?:empuja|patea)/iu, property: 'motion', value: 'rolling' },
     { re: /(?:suelta|deja caer|deja)/iu, property: 'holder', value: null },
     { re: /abre/iu, property: 'openState', value: 'open' },
     { re: /cierra/iu, property: 'openState', value: 'closed' }
