@@ -42,5 +42,5 @@ export function buildWorldMotionInstructions(scene = {}) {
     'Show cause and effect visibly: contact must occur before an object moves; objects must keep consistent size, orientation, and ownership; reactions must follow the action.',
     'Keep background motion spatially coherent and independent from camera motion. Do not animate an element unless it is listed above or explicitly required by the scene action.',
     'If a listed movement cannot be represented, preserve the element and report the limitation rather than replacing it with an unrelated motion.'
-  ].join('\\n');
+  ].join(String.fromCharCode(10));
 }
