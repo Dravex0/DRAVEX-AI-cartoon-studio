@@ -23,6 +23,19 @@ test("only explicit structured exit events mark a character exited", () => {
   assert.equal(timeline[2].characters[0].status, "exited");
 });
 
+test("an exited character stays exited until an explicit re-entry event", () => {
+  const timeline = buildCharacterPresenceTimeline([
+    { id: "s1", characters: ["Kel"] },
+    { id: "s2", characters: [], presenceEvents: [{ type: "exit", characterId: "Kel" }] },
+    { id: "s3", characters: ["Kel"] },
+    { id: "s4", characters: ["Kel"], presenceEvents: [{ type: "enter", characterId: "Kel" }] }
+  ]);
+  assert.equal(timeline[1].characters[0].status, "exited");
+  assert.equal(timeline[2].characters[0].status, "exited");
+  assert.equal(timeline[3].characters[0].status, "visible");
+  assert.equal(timeline[3].characters[0].lastTransition, "explicit-story-reentry-visible");
+});
+
 test("an omitted camera label does not fabricate a camera cut", () => {
   const timeline = buildCharacterPresenceTimeline([
     { id: "s1", camera: "wide", characters: ["Kel"] },
