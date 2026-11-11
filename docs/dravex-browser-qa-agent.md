@@ -12,8 +12,15 @@ The live test captures the prompt/result screenshots, several FFmpeg-decoded vid
 ## Honest result classifications
 
 - `local-canvas-output-only-not-AI-video-generation`: the site exported its local canvas/storyboard output. This is not evidence of AI text-to-video.
-- `completed-with-findings`: the browser completed the flow, but the report found missing audio, weak motion evidence, or other quality issues.
+- `completed-with-findings`: the browser completed the flow, but the report found missing audio, browser errors, or other quality issues.
+- `completed-needs-manual-review`: the technical export completed without recorded findings, but the story and audio still require human review.
 - `failed`: the live site could not be opened, generation/export did not complete, or the downloaded WebM could not be validated/decoded.
+
+The JSON report separates technical checks from media quality:
+- `quality.generationFlow`, `quality.webmExport`, and `quality.videoDecode` record technical evidence.
+- `quality.audio` reports whether an audio stream exists; it does not claim the dialogue is audible or intelligible.
+- `quality.storySemantics` remains `manual-review-required` and lists the expected Foxy/red-ball actions. The agent attaches decoded frames but does not pretend to understand their meaning.
+- `summary` provides a short human-readable result so a green CI run cannot be mistaken for a finished cartoon.
 
 Audio-track presence is not proof of audible or intelligible Russian speech. A human listening check is still required. Likewise, orange pixels and pixel differences are not semantic computer vision and cannot certify a visible Foxy character. The report deliberately avoids marking these checks as passed merely because a WebM exists.
 
