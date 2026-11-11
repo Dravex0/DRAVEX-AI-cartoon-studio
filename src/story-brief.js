@@ -168,7 +168,7 @@ export function parseStoryBrief(input) {
   // from falling back to a generic demo protagonist.
   const characterNouns = '(?:robot|bird|fox|rabbit|cat|dog|girl|boy|person|knight|dragon|wizard|alien|bear|wolf|princess|prince|машин(?:а|ку)|робот|птиц(?:а|у)|лис(?:а|ёнок|ёнка)|зайц(?:а|а)|кролик|кот(?:а|ёнок)|собак(?:а|у)|девочк(?:а|у)|мальчик|дракон|волк|медвед(?:ь|я)|принцесс(?:а|у)|принц)';
   const characterDescriptorPattern = new RegExp(
-    '\\b(?:a|an|the)\s+((?:(?:small|little|tiny|young|cute|brave|friendly|blue|red|green|golden|silver|white|black|orange|маленьк\\w*|крошечн\\w*|ю\\w*|син\\w*|красн\\w*|зелён\\w*|зелен\\w*|рыж\\w*|бел\\w*|чёрн\\w*|черн\\w*)\s+){1,3}' + characterNouns + ')',
+    '\\b(?:a|an|the)\\s+((?:(?:small|little|tiny|young|cute|brave|friendly|blue|red|green|golden|silver|white|black|orange|маленьк\\w*|крошечн\\w*|ю\\w*|син\\w*|красн\\w*|зелён\\w*|зелен\\w*|рыж\\w*|бел\\w*|чёрн\\w*|черн\\w*)\\s+){1,3}' + characterNouns + ')',
     'giu'
   );
   for (const match of rawText.matchAll(characterDescriptorPattern)) {
