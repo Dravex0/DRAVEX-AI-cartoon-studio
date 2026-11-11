@@ -68,7 +68,7 @@ export function createGenerationObserver({ runId = "", prompt = "", requirements
   function snapshot() {
     return { schemaVersion: 1, runId: text(runId), prompt: text(prompt), requirements: safeRequirements.map(item => ({ id: text(item.id) || null, category: text(item.category) || "general", text: text(item.text), evidenceTerms: Array.isArray(item.evidenceTerms) ? item.evidenceTerms : [] })), stages: structuredCloneSafe(stages), artifacts: artifacts.map(item => ({ ...item })), assessments: assessments.map(item => ({ ...item })) };
   }
-  function report({ interpretation = "", scenes = [] } = {}) {
+  function report({ interpretation = "", scenes = [], characterPresenceTimeline = [] } = {}) {
     const run = snapshot();
     const interpretationText = typeof interpretation === "string" ? interpretation : JSON.stringify(interpretation ?? {});
     const sceneText = Array.isArray(scenes) ? scenes.map(scene => JSON.stringify(scene)).join(" ") : "";
@@ -91,6 +91,7 @@ export function createGenerationObserver({ runId = "", prompt = "", requirements
       requirementChecks: textEvidence,
       stageResults,
       artifacts: run.artifacts,
+      characterPresenceTimeline: Array.isArray(characterPresenceTimeline) ? characterPresenceTimeline : [],
       mediaAssessments: visualChecks,
       summary: {
         requirementCount: textEvidence.length,
