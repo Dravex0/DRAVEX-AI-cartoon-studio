@@ -29,13 +29,19 @@ jobs:
       - name: Install project dependencies
         run: npm install --no-audit --no-fund --onnxruntime-node-install-cuda=skip
 
-      - name: Install portable FFmpeg for browser video checks
+      - name: Install portable FFmpeg and ffprobe for browser video checks
         run: |
-          npm install --no-save --package-lock=false ffmpeg-static
+          npm install --no-save --package-lock=false ffmpeg-static @ffprobe-installer/linux-x64
           FFMPEG_PATH="$(node -e "process.stdout.write(require('ffmpeg-static'))")"
+          FFPROBE_PATH="$(node -e "process.stdout.write(require('@ffprobe-installer/linux-x64').path)")"
           test -x "$FFMPEG_PATH"
-          echo "$(dirname "$FFMPEG_PATH")" >> "$GITHUB_PATH"
-          "$FFMPEG_PATH" -version
+          test -x "$FFPROBE_PATH"
+          mkdir -p "$RUNNER_TEMP/dravex-media-tools"
+          ln -sf "$FFMPEG_PATH" "$RUNNER_TEMP/dravex-media-tools/ffmpeg"
+          ln -sf "$FFPROBE_PATH" "$RUNNER_TEMP/dravex-media-tools/ffprobe"
+          echo "$RUNNER_TEMP/dravex-media-tools" >> "$GITHUB_PATH"
+          ffmpeg -version
+          ffprobe -version
 
       - name: Install Playwright Chromium
         run: npx playwright install chromium
