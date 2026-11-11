@@ -67,3 +67,27 @@ test('keeps location evidence inside the sentence that names the moving characte
   assert.equal(changes[0][0].value, 'inside:stone castle');
   assert.equal(changes[0][0].evidence, 'Mira enters the stone castle.');
 });
+
+
+test('tracks an explicitly freed prop state across scenes in Russian', () => {
+  const changes = inferStoryboardStateChanges([
+    { id: 's1', storyDetail: 'Кель освобождает маленькую механическую птицу.', characters: ['Кель'] },
+    { id: 's2', storyDetail: 'Кель наблюдает, как птица летит над поляной.', characters: ['Кель'] }
+  ], 'ru');
+  assert.equal(changes[0].length, 1);
+  assert.equal(changes[0][0].entityType, 'prop');
+  assert.match(changes[0][0].entityId, /маленькую механическую птицу/);
+  assert.equal(changes[0][0].property, 'state');
+  assert.equal(changes[0][0].value, 'free');
+  assert.deepEqual(changes[1], []);
+});
+
+test('tracks explicit trapped and freed prop state transitions in English', () => {
+  const changes = inferStoryboardStateChanges([
+    { id: 's1', storyDetail: 'Kel traps the small mechanical bird.', characters: ['Kel'] },
+    { id: 's2', storyDetail: 'Kel frees the small mechanical bird.', characters: ['Kel'] }
+  ], 'en');
+  assert.equal(changes[0][0].value, 'trapped');
+  assert.equal(changes[1][0].previousValue, 'trapped');
+  assert.equal(changes[1][0].value, 'free');
+});
