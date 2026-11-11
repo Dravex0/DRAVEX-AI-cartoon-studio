@@ -161,6 +161,11 @@ export function parseStoryBrief(input) {
             if (sentence) {
               directiveValue = sentence[1].trim();
               remaining.push(sentence[2].trim());
+            } else {
+              // A standalone label such as "Main character: Foxy." may be
+              // followed by the actual story on the next line. Do not retain
+              // the terminal sentence mark as part of the stable character ID.
+              directiveValue = match[2].trim().replace(/[.!?。！？]+$/u, '');
             }
           }
         }
