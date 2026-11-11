@@ -49,7 +49,7 @@ test('parses an inline main-character profile without treating its description a
   const brief = parseStoryBrief([
     'Main character: Foxy — a small orange fox with large expressive eyes.',
     'Stage the story event as one visible cause-and-effect action; preserve the named character and show a clear state change.'
-  ].join('\\n'));
+  ].join('\n'));
   assert.deepEqual(brief.characters, ['Foxy']);
   assert.equal(brief.characterProfiles[0].characterId, 'Foxy');
   assert.match(brief.characterProfiles[0].visualDescription, /small orange fox/i);
@@ -57,9 +57,9 @@ test('parses an inline main-character profile without treating its description a
 });
 
 test('separates a short main-character label from same-line production prose', () => {
-  const brief = parseStoryBrief('Main character: Foxy. Stage one clear action.\\nFoxy finds a glowing crystal.');
+  const brief = parseStoryBrief('Main character: Foxy. Stage one clear action.\nFoxy finds a glowing crystal.');
   assert.deepEqual(brief.characters, ['Foxy']);
-  assert.equal(brief.storyText, 'Stage one clear action.\\nFoxy finds a glowing crystal.');
+  assert.equal(brief.storyText, 'Stage one clear action.\nFoxy finds a glowing crystal.');
 });
 
 test('extracts character profiles from bullet and comma-separated character descriptions', () => {
