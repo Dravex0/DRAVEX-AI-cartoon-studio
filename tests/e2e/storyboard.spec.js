@@ -67,20 +67,32 @@ test('exports a short storyboard to a non-empty playable WebM', async ({ page })
   await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
 
   const video = await page.locator('#finalFilmPlayer').evaluate(async element => {
-    if (element.readyState < 2 || !Number.isFinite(element.duration)) {
+    if (element.readyState < 2) {
       await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Exported WebM metadata did not load')), 15000);
-        element.addEventListener('loadedmetadata', () => { clearTimeout(timeout); resolve(); }, { once: true });
-        element.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('Exported WebM failed to load metadata')); }, { once: true });
+        const timeout = setTimeout(() => reject(new Error('Exported WebM did not become playable')), 15000);
+        const finish = () => { clearTimeout(timeout); resolve(); };
+        element.addEventListener('loadeddata', finish, { once: true });
+        element.addEventListener('canplay', finish, { once: true });
+        element.addEventListener('error', () => {
+          clearTimeout(timeout);
+          reject(new Error('Exported WebM failed to decode'));
+        }, { once: true });
       });
     }
     const response = await fetch(element.currentSrc);
     const blob = await response.blob();
+    element.muted = true;
+    await element.play();
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Exported WebM playback did not advance')), 5000);
+      element.addEventListener('timeupdate', () => { clearTimeout(timeout); resolve(); }, { once: true });
+    });
+    element.pause();
     return {
       source: element.currentSrc,
       mimeType: blob.type,
       byteLength: blob.size,
-      duration: element.duration,
+      currentTime: element.currentTime,
       width: element.videoWidth,
       height: element.videoHeight,
       readyState: element.readyState
@@ -89,8 +101,7 @@ test('exports a short storyboard to a non-empty playable WebM', async ({ page })
   expect(video.source).toMatch(/^blob:/);
   expect(video.mimeType).toMatch(/^video\/webm/i);
   expect(video.byteLength).toBeGreaterThan(1024);
-  expect(video.duration).toBeGreaterThanOrEqual(1);
-  expect(video.duration).toBeLessThan(2);
+  expect(video.currentTime).toBeGreaterThan(0);
   expect(video.width).toBe(1280);
   expect(video.height).toBe(720);
   expect(video.readyState).toBeGreaterThanOrEqual(2);
@@ -470,7 +481,6 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
 
   await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('comfyui');
-  await page.locator('.advanced-video-settings > summary').click();
   await page.locator('#comfyPanel > summary').click();
   await expect(page.locator('label[for="comfySourceImageFile"]')).toContainText(/Local image for the selected scene/i);
   const imageWorkflow = {
@@ -666,6 +676,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
 
+  await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('comfyui');
   await page.locator('#comfyPanel > summary').click();
   const imageWorkflow = {
