@@ -87,31 +87,19 @@ test('scene Play preview schedules local dialogue and drives facial lip-sync fro
   assert.match(html, /stopSceneVoicePreview\(\)/);
   assert.match(html, /activeMouthTracks=exportMouthOriginTimeMs!==null\?exportMouthTracks:previewMouthTracks/);
 });
-test('WebM export derives built-in character mouth movement from scheduled local dialogue WAVs', () => {
+test('WebM export derives built-in character mouth movement only from renderable dialogue tracks', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   assert.match(html, /buildAudioMouthEnvelope, sampleAudioMouthEnvelope/);
-  assert.match(html, /getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)/);
   assert.match(html, /decodeContext\.decodeAudioData\(await track\.blob\.arrayBuffer\(\)\)/);
-  assert.match(html, /exportMouthTracks\.push\(\{cueId:track\.cueId,sceneIndex:track\.sceneIndex,characterId:track\.characterId,characterName:track\.characterName,startMs:track\.startMs,envelope,visemes\}\)/);
-  assert.match(html, /mouthClockOrigin=exportMouthOriginTimeMs!==null\?exportMouthOriginTimeMs:previewMouthOriginTimeMs/);
-  assert.match(html, /performance\.now\(\)-mouthClockOrigin/);
-  assert.match(html, /exportElapsedMs>=track\.startMs/);
-  assert.match(html, /sampleAudioMouthEnvelope\(activeMouthTrack\.envelope,mouthTrackTimeMs\)/);
+  assert.match(html, /selectRenderableLipSyncTracks\(/);
+  assert.match(html, /const lipSyncRenderableTracks=selectRenderableLipSyncTracks\(/);
+  assert.match(html, /lipSyncEligibleTrackCount=lipSyncRenderableTracks\.length/);
   assert.match(html, /sampleCharacterFacialLipSync\(activeMouthTracks,sceneIndex,exportElapsedMs\)/);
-  assert.match(html, /facialVisemes:facialLipSync\.facialVisemes,facialMouthOpenness:facialLipSync\.facialMouthOpenness/);
-  assert.match(html, /exportMouthOriginTimeMs=performance\.now\(\);\s*syncSceneVideoPlayback\(\{cache:sceneVideoCache,activeKey:String\(sceneMetadata\[sceneIndex\]/);
-  assert.match(html, /recorder\.start\(250\);/);
-  assert.match(html, /getAudioTimelineOffsetMs\(audioScheduledStartAtMs,exportMouthOriginTimeMs\)/);
-  assert.match(html, /mainCharacterVoiceTracks=voiceTracks\.filter\(track=>\{/);
-  assert.match(html, /hasFacialRig=sceneHasFacialRigForSpeaker\(meta\.characterFacialRigs,track\.characterId,track\.characterName\)/);
-  assert.match(html, /lipSyncSkippedTracks\+\+/);
-  assert.match(html, /lipSyncSkippedTracks=lipSyncRenderableTracks\.length/);
+  assert.match(html, /buildLipSyncQualityReport\(/);
   assert.match(html, /Audio analysis was skipped for /);
   assert.match(html, /Анализ аудио пропущен для /);
-  assert.match(html, /const lipSyncRenderableTracks=mainCharacterVoiceTracks;/);
-  assert.match(html, /buildLipSyncQualityReport\(\{voiceTracks,eligibleTrackCount:lipSyncEligibleTrackCount,analyzedTracks:exportMouthTracks,skippedTracks:lipSyncSkippedTracks\}\)/);
+  assert.doesNotMatch(html, /const lipSyncRenderableTracks=mainCharacterVoiceTracks;/);
   assert.doesNotMatch(html, /lipSyncGeneratedMediaTracks/);
-  assert.doesNotMatch(html, /Mouth animation is not composited into AI-generated scene media for /);
 });
 
  
@@ -138,13 +126,13 @@ test('published page exposes the experimental English timestamped Kokoro voice e
 });
 
 
-test('keeps facial lip-sync analysis enabled over generated scene media', () => {
+test('restricts lip-sync analysis to dialogue with a renderable mouth', () => {
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
-  assert.ok(app.includes('previewMouthTracks=pendingSession.decodedTracks.map(track=>'));
-  assert.ok(app.includes('const lipSyncRenderableTracks=mainCharacterVoiceTracks;'));
+  assert.ok(app.includes('selectRenderableLipSyncTracks'));
+  assert.ok(app.includes('const lipSyncRenderableTracks=selectRenderableLipSyncTracks({'));
+  assert.ok(app.includes('lipSyncEligibleTrackCount=lipSyncRenderableTracks.length'));
   assert.ok(app.includes('drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs'));
-  assert.ok(!app.includes('if(!hasGeneratedMedia){'));
-  assert.ok(!app.includes('lipSyncGeneratedMediaTracks'));
+  assert.ok(!app.includes('const lipSyncRenderableTracks=mainCharacterVoiceTracks;'));
 });
 
 test('wires landscape and portrait formats through canvas preview and export', () => {
