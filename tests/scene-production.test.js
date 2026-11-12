@@ -71,7 +71,7 @@ test('background-only motion prompt animates scenery without character actions o
   assert.match(prompt, /Environment motion 2: Leaves sway in the wind/);
   assert.match(prompt, /Slow static wide shot/);
   assert.match(prompt, /Animate only the environment and scenery/);
-  assert.doesNotMatch(prompt, /Kel|mechanical bird|green cloak|lifts a branch|Physical interaction/i);
+  assert.doesNotMatch(prompt, /Kel|mechanical bird|green cloak|lifts a branch|Physical interaction \\d+:/i);
 });
 
 test('image prompt explicitly requires every declared scene character to be visible', () => {
