@@ -44,6 +44,20 @@ export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}
   return { x, y, rotation, partId: anchor.id };
 }
 
+
+/** Resolve only explicitly authored normalized scene coordinates for a named prop. */
+export function resolveScenePropAnchor(scene = {}, entityId) {
+  const anchors = scene?.propAnchors;
+  if (!anchors || typeof anchors !== 'object' || Array.isArray(anchors)) return null;
+  const wanted = key(entityId);
+  if (!wanted) return null;
+  const entry = Object.entries(anchors).find(([id]) => key(id) === wanted)?.[1];
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)
+    || !Number.isFinite(entry.x) || !Number.isFinite(entry.y)
+    || entry.x < 0 || entry.x > 1 || entry.y < 0 || entry.y > 1) return null;
+  return { x: entry.x, y: entry.y };
+}
+
 /**
  * Builds a deterministic visual plan from explicit, source-grounded prop holder changes.
  * Uses the authored action phase when available; older scenes use a deterministic
@@ -77,7 +91,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     const actorY = Number.isFinite(actor?.y) ? actor.y : 0.68;
     const heldByActor = change.value != null && key(change.value) === key(actorId);
     const wasHeldByActor = change.previousValue != null && key(change.previousValue) === key(actorId);
-    const ground = { x: 0.68, y: 0.79 };
+    const ground = resolveScenePropAnchor(scene, change.entityId) || { x: 0.68, y: 0.79 };
     const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
     const hand = rigAnchor
       ? { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation }
