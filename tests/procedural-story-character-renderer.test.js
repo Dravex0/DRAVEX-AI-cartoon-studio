@@ -43,8 +43,23 @@ test('renders Kael as a visible full-body character with his black hair, scarlet
 
 test('uses the procedural character only when no generated media or character art is available', () => {
  assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Kael' }), true);
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Kael', profile: { visualDescription: 'a young man with dark hair' } }), true);
  assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Kael', hasGeneratedMedia: true }), false);
  assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Kael', hasReadyCharacterLayer: true }), false);
  assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Kael', hasReadyCharacterRig: true }), false);
  assert.equal(shouldDrawProceduralStoryCharacter({ characterId: '' }), false);
+});
+
+test('does not draw a human procedural stand-in for an explicitly non-human character', () => {
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Foxy', profile: { species: 'fox' } }), false);
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Foxy', profile: { visualDescription: 'a small orange fox' } }), false);
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Blue Robot', profile: { species: 'robot' } }), false);
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Bluebird', profile: { visualDescription: 'a small blue bird' } }), false);
+});
+
+test('uses explicit human species as the authoritative fallback type', () => {
+ assert.equal(shouldDrawProceduralStoryCharacter({
+  characterId: 'Wolf',
+  profile: { species: 'human', visualDescription: 'wearing a wolf costume' }
+ }), true);
 });
