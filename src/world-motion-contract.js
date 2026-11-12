@@ -46,7 +46,7 @@ export function buildWorldMotionInstructions(scene = {}) {
     'World and object motion contract (animate these explicit elements independently of the camera):',
     ...environment.map((cue, index) => `- Environment motion ${index + 1}: ${cue}`),
     ...explicitInteractions.map((cue, index) => `- Physical interaction ${index + 1}: ${cue}`),
-    ...stateChanges.map((cue, index) => `- Prop state change ${index + 1}: ${cue}`),
+    ...stateChanges.map((cue, index) => `- Prop state continuity ${index + 1}: ${cue}`),
     'Show cause and effect visibly: contact must occur before an object moves; objects must keep consistent size, orientation, and ownership; reactions must follow the action.',
     'Keep background motion spatially coherent and independent from camera motion. Do not animate an element unless it is listed above or explicitly required by the scene action.',
     'If a listed movement cannot be represented, preserve the element and report the limitation rather than replacing it with an unrelated motion.'
