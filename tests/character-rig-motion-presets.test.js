@@ -461,7 +461,7 @@ describe('dance motion preset', () => {
     assert.equal(result.status, 'ready');
     assert.deepEqual(result.warnings, []);
 
-    const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Kel;
+    const middle = sampleCharacterRigTimeline(result.timeline, 1).Kel;
     const posedParts = applyCharacterRigPose(candidate.parts, candidate, middle);
     const hand = posedParts.find(part => part.id === 'hand-part');
     const angle = hand.rotation;
