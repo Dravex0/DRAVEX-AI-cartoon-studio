@@ -99,6 +99,6 @@ test("an empty output object is not accepted as completed stage evidence", () =>
   const report = observer.report();
   const stage = report.stageResults.find(item => item.stage === "videoGeneration");
   assert.equal(stage.verdict, "not-verifiable");
-  assert.equal(report.summary.unverifiedStages, 8);
+  assert.equal(report.summary.unverifiedStages, 9);
   assert.equal(report.summary.overall, "incomplete-evidence");
 });
