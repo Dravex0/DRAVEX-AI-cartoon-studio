@@ -66,7 +66,15 @@ export function createGenerationObserver({ runId = "", prompt = "", requirements
     if (!target || !method || !["pass", "partial", "fail", "not-verifiable"].includes(verdict)) {
       throw new TypeError("Assessment needs target, method, and a supported verdict.");
     }
-    const item = { target, method, verdict, summary: text(assessment.summary), evidenceRefs: Array.isArray(assessment.evidenceRefs) ? assessment.evidenceRefs.filter(value => typeof value === "string") : [] };
+    const evidenceRefs = unique((Array.isArray(assessment.evidenceRefs) ? assessment.evidenceRefs : []).map(text).filter(Boolean));
+    const hasEvidence = evidenceRefs.length > 0;
+    const summary = text(assessment.summary);
+    const item = {
+      target, method,
+      verdict: hasEvidence ? verdict : "not-verifiable",
+      summary: hasEvidence ? summary : [summary, "No evidence references supplied; verdict is not verifiable."].filter(Boolean).join(" "),
+      evidenceRefs
+    };
     assessments.push(item);
     return item;
   }
