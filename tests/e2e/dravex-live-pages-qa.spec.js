@@ -502,6 +502,8 @@ test('DRAVEX source build: decoded WebM keeps a skin-tone pixel hint across play
     } catch (error) {
       failPlayback?.(error);
       video.pause();
+      // Consume a rejection from the playback observer when play() itself fails.
+      await playback.catch(() => {});
       throw error;
     }
     if (samples.length < 5) {
