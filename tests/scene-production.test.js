@@ -509,3 +509,18 @@ test('production prompt carries an inferred prop release from story text through
   assert.equal(prepared.stateChanges[0].value, 'free');
   assert.match(prepared.motionGenerationPrompt, /Prop "small mechanical bird" changes state to "free" through actor "Kel"/);
 });
+
+test('motion prompt separates character body action from camera and background motion', () => {
+  const prompt = buildMotionGenerationPrompt({
+    motionPrompt: 'Kel kneels, reaches beneath the fallen branch, lifts it with both hands, and frees the mechanical bird.',
+    characters: ['Kel'],
+    startState: 'Kel is standing beside the fallen branch; the bird is trapped.',
+    endState: 'Kel holds the raised branch; the bird is free.'
+  }, [{ characterId: 'Kel', visualDescription: 'Young forest explorer with a green jacket' }]);
+
+  assert.match(prompt, /Character action is the primary motion/i);
+  assert.match(prompt, /camera pan, zoom, shake, or background movement is not a substitute/i);
+  assert.match(prompt, /distinct intermediate poses/i);
+  assert.match(prompt, /visible contact, applying force, and completing the requested result/i);
+  assert.match(prompt, /Separate subject motion, object motion, environment motion, and camera motion/i);
+});
