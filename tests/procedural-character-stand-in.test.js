@@ -68,3 +68,24 @@ test('does not report a drawn character when canvas dimensions are invalid', () 
   });
   assert.equal(context.calls.length, 0);
 });
+
+
+test('keeps one hand on a carried prop while the other reaches for a second target', () => {
+  const context = contextStub();
+  const result = drawProceduralCharacterStandIn(context, {
+    characterId: 'Kel',
+    x: 0.4,
+    y: 0.75,
+    width: 1280,
+    height: 720,
+    progress: 1,
+    action: 'free',
+    held: true,
+    heldTarget: { x: 0.52, y: 0.67 },
+    target: { x: 0.54, y: 0.755 }
+  });
+  assert.ok(Math.abs(result.drawnHand.x - 0.52) < 0.001);
+  assert.ok(Math.abs(result.drawnHand.y - 0.67) < 0.001);
+  assert.ok(Math.abs(result.secondaryHand.x - 0.54) < 0.001);
+  assert.ok(Math.abs(result.secondaryHand.y - 0.755) < 0.001);
+});
