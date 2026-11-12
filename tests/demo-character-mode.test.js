@@ -28,3 +28,13 @@ test('does not substitute the fox renderer for a profile with an explicit non-fo
   assert.equal(isProceduralFoxCharacter({ characterId: 'Foxy', species: 'robot', visualDescription: 'metallic blue robot' }), false);
   assert.equal(isProceduralFoxCharacter({ characterId: 'Bluebird', visualDescription: 'a small blue bird' }), false);
 });
+
+test('does not treat a Foxy-named robot as a fox when its appearance describes a robot', () => {
+  assert.equal(isProceduralFoxCharacter({ characterId: 'Foxy', visualDescription: 'a small blue robot with glowing eyes' }), false);
+  assert.equal(isProceduralFoxCharacter({ characterId: 'Foxy', distinctiveFeatures: 'metallic android body' }), false);
+});
+
+test('keeps an explicitly described fox eligible even when its profile contains a secondary non-fox term', () => {
+  // The species field is the canonical identity source when present.
+  assert.equal(isProceduralFoxCharacter({ characterId: 'Foxy', species: 'fox', visualDescription: 'a small robotic fox' }), true);
+});
