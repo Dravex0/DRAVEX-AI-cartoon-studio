@@ -193,8 +193,13 @@ test('preserves the named ball color instead of hardcoding red for every ball', 
     entityType: 'prop', entityId: 'green ball', property: 'motion',
     value: 'rolling', actorId: 'Fox', evidence: 'Foxy pushes the green ball.'
   }] });
+  const ukrainianRed = renderFillStyles({ stateChanges: [{
+    entityType: 'prop', entityId: "червоний м'яч", property: 'motion',
+    value: 'rolling', actorId: 'Foxy', evidence: "Foxy копає червоний м'яч лапою."
+  }] });
   assert.ok(red.includes('#e74b4b'));
   assert.ok(blue.includes('#72c6df'));
   assert.ok(green.includes('#55a96a'));
+  assert.ok(ukrainianRed.includes('#e74b4b'));
   assert.ok(!blue.includes('#e74b4b'));
 });
