@@ -175,6 +175,8 @@ test('tracks a fallen branch and its lift as a continuous state in Russian', () 
     ['маленькую механическую птицу', 'state', 'trapped'],
     ['упавшая ветка', 'state', 'fallen']
   ]);
+  assert.equal(changes[1][0].entityId, 'упавшая ветка');
+  assert.equal(changes[1][0].property, 'holder');
   assert.ok(changes[1].some(change =>
     change.entityId === 'упавшая ветка' &&
     change.property === 'state' &&
