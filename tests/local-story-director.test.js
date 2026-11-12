@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { directStoryboardWithLocalAI } from '../src/local-story-director.js';
+import { directStoryboardWithLocalAI, normalizeScenePropAnchors } from '../src/local-story-director.js';
 import { buildStoryboardFromText } from '../src/storyboard-generator.js';
 import { inferStoryboardStateChanges } from '../src/scene-state-changes.js';
 
@@ -451,4 +451,36 @@ test('structured state memory fails closed without throwing on malformed baselin
   });
   assert.ok(result);
   assert.equal(result.usedLocalModel, true);
+});
+
+
+test('keeps prop anchors only for locked scene props with normalized finite coordinates', () => {
+  const locked = [
+    { entityType: 'prop', entityId: 'silver key' },
+    { entityType: 'character', entityId: 'Foxy' }
+  ];
+  assert.deepEqual(normalizeScenePropAnchors({
+    'silver key': { x: 0.74, y: 0.42 },
+    'invented chest': { x: 0.5, y: 0.5 },
+    Foxy: { x: 0.2, y: 0.3 },
+    'bad coordinate': { x: 1.2, y: 0.5 },
+    'not numeric': { x: '0.5', y: 0.5 }
+  }, locked), {
+    'silver key': { x: 0.74, y: 0.42 }
+  });
+});
+
+test('preserves model-authored contact anchors only for source-locked props', async () => {
+  const anchoredPlan = {
+    ...basePlan,
+    scenes: basePlan.scenes.map((scene, index) => index === 0
+      ? { ...scene, stateChanges: [{ entityType: 'prop', entityId: 'silver key', property: 'holder', actorId: 'Foxy', value: 'Foxy' }] }
+      : scene)
+  };
+  const directed = goodScenes.map((scene, index) => index === 0
+    ? { ...scene, propAnchors: { 'silver key': { x: 0.74, y: 0.42 }, 'invented chest': { x: 0.2, y: 0.2 } } }
+    : { ...scene });
+  const result = await directStoryboardWithLocalAI({ runtime: runtimeReturning(directed), basePlan: anchoredPlan });
+  assert.equal(result.usedLocalModel, true);
+  assert.deepEqual(result.scenes[0].propAnchors, { 'silver key': { x: 0.74, y: 0.42 } });
 });
