@@ -453,7 +453,7 @@ describe('dance motion preset', () => {
       parts: [
         { id: 'torso-part', boneId: 'torso', imageUrl: 'https://assets.example/torso.png', x: 0.5, y: 0.52, width: 0.3, height: 0.34 },
         { id: 'upper-arm-part', boneId: 'rightArm', imageUrl: 'https://assets.example/upper-arm.png', x: 0.65, y: 0.4, width: 0.15, height: 0.23 },
-        { id: 'hand-part', boneId: 'rightLowerArm', imageUrl: 'https://assets.example/hand.png', x: 0.71, y: 0.55, width: 0.14, height: 0.22, gripOffsetX: 0.5, gripOffsetY: 0 }
+        { id: 'hand-part', boneId: 'rightLowerArm', imageUrl: 'https://assets.example/hand.png', x: 0.71, y: 0.55, width: 0.14, height: 0.22, gripOffsetX: 0.07, gripOffsetY: 0 }
       ]
     };
     const target = { x: 0.78, y: 0.35 };
@@ -466,8 +466,8 @@ describe('dance motion preset', () => {
     const hand = posedParts.find(part => part.id === 'hand-part');
     const angle = hand.rotation;
     const grip = {
-      x: hand.x + Math.cos(angle) * hand.gripOffsetX * hand.width,
-      y: hand.y + Math.sin(angle) * hand.gripOffsetX * hand.width
+      x: hand.x + Math.cos(angle) * hand.gripOffsetX - Math.sin(angle) * hand.gripOffsetY,
+      y: hand.y + Math.sin(angle) * hand.gripOffsetX + Math.cos(angle) * hand.gripOffsetY
     };
     close(grip.x, target.x, 0.001);
     close(grip.y, target.y, 0.001);
@@ -488,7 +488,7 @@ describe('dance motion preset', () => {
       parts: [
         { id: 'torso-part', boneId: 'torso', imageUrl: 'https://assets.example/torso.png', x: 0.5, y: 0.52, width: 0.3, height: 0.34 },
         { id: 'upper-arm-part', boneId: 'rightArm', imageUrl: 'https://assets.example/upper-arm.png', x: 0.65, y: 0.4, width: 0.15, height: 0.23 },
-        { id: 'hand-part', boneId: 'rightLowerArm', imageUrl: 'https://assets.example/hand.png', x: 0.71, y: 0.55, width: 0.14, height: 0.22, gripOffsetX: 0.5, gripOffsetY: 0 }
+        { id: 'hand-part', boneId: 'rightLowerArm', imageUrl: 'https://assets.example/hand.png', x: 0.71, y: 0.55, width: 0.14, height: 0.22, gripOffsetX: 0.07, gripOffsetY: 0 }
       ]
     };
     const result = createCharacterRigMotionPreset(candidate, 'reach', { target: { x: 1.2, y: 0.39 } });
