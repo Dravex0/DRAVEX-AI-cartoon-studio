@@ -440,7 +440,6 @@ test('DRAVEX source build: decoded WebM keeps a skin-tone pixel hint across play
     if (!video.currentSrc && !video.src) throw new Error('Final WebM player has no media source.');
     if (typeof video.requestVideoFrameCallback !== 'function') throw new Error('Decoded video frame callbacks are unavailable.');
     video.muted = true;
-    await video.play();
     const canvas = document.createElement('canvas');
     canvas.width = 180;
     canvas.height = 320;
