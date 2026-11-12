@@ -20,7 +20,8 @@ const VERBS = {
   ],
   uk: [
     { re: /(?:піднімає|бере|забирає|тримає)/iu, property: 'holder', value: 'actor' },
-    { re: /(?:штовхає|копає)/iu, property: 'motion', value: 'rolling' },
+    { re: /штовхає/iu, property: 'motion', value: 'rolling' },
+    { re: /копає(?=\s+(?:червон\p{L}*\s+)?(?:м[’']?яч\p{L}*|кул\p{L}*))/iu, property: 'motion', value: 'rolling' },
     { re: /(?:роняє|кладе|залишає)/iu, property: 'holder', value: null },
     { re: /відкриває/iu, property: 'openState', value: 'open' },
     { re: /закриває/iu, property: 'openState', value: 'closed' }
@@ -86,7 +87,7 @@ function findEntity(source, actorId, verb) {
   const actionTool = /^(?:лапой|лапами|ногой|ногами|рукой|руками|paw|paws|foot|feet|hand|hands)$/iu;
   if (actionTool.test(entity)) {
     const beforeVerb = afterActor.slice(0, verbMatch.index);
-    const propPattern = /(?:красн(?:ый|ого|ую|ое)\s+мяч|red\s+ball|мяч(?:а|ом|у)?|ball|звезд[ауы]|star|ключ(?:а|ом|у)?|key|книг[ауи]|book|яблок[оа]|apple)/giu;
+    const propPattern = /(?:красн(?:ый|ого|ую|ое)\s+мяч|червон\p{L}*\s+м[’']?яч|red\s+ball|мяч(?:а|ом|у)?|м[’']?яч|ball|звезд[ауы]|star|ключ(?:а|ом|у)?|key|книг[ауи]|book|яблок[оа]|apple)/giu;
     const matches = [...beforeVerb.matchAll(propPattern)];
     if (matches.length) entity = clean(matches[matches.length - 1][0]);
   }
