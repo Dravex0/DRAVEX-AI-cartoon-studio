@@ -125,7 +125,7 @@ export function drawProceduralCharacterStandIn(context, {
     // Inactive arm swings; active arm reaches toward the locked prop target.
     const leftArmEnd = [-0.11, -0.005 + Math.sin(t * strideRate) * 0.025];
     limb(context, [-0.045, -0.08], leftArmEnd, cloak, 0.022);
-    const rightArmEnd = held ? [0.12, -0.075] : handTarget;
+    const rightArmEnd = held ? (target ? targetPoint : [0.12, -0.075]) : handTarget;
     line(context, [[0.045, -0.08], [0.055, -0.035], rightArmEnd], cloak, 0.023);
     context.fillStyle = skin;
     context.beginPath();
@@ -180,6 +180,7 @@ export function drawProceduralCharacterStandIn(context, {
     mode: 'procedural-stand-in',
     characterId: clean(characterId, 120),
     origin: { x: originX / width, y: originY / height },
-    handTarget: { x: originX / width + handTarget[0] * scale / width, y: originY / height + handTarget[1] * scale / height }
+    handTarget: { x: originX / width + handTarget[0] * scale / width, y: originY / height + handTarget[1] * scale / height },
+    drawnHand: { x: originX / width + rightArmEnd[0] * scale / width, y: originY / height + rightArmEnd[1] * scale / height }
   };
 }
