@@ -38,23 +38,24 @@ function getColors(profile={}){
  };
 }
 const NON_HUMAN_WORDS = new Set([
-  'fox', 'wolf', 'cat', 'dog', 'bird', 'rabbit', 'bunny', 'bear', 'dragon', 'horse', 'mouse', 'fish', 'turtle',
-  'robot', 'android', 'alien', 'monster', 'creature', 'animal', 'dinosaur', 'lion', 'tiger', 'deer', 'owl', 'eagle',
-  'snake', 'lizard', 'frog', 'penguin', 'otter', 'raccoon', 'squirrel',
-  'кот', 'котик', 'котёнок', 'котенок', 'пёс', 'пес', 'мышь', 'мыши', 'мышонок', 'лев', 'олень', 'сова', 'орёл', 'орел',
-  'змея', 'жаба', 'выдра', 'енот', 'белка',
+  'fox', 'foxes', 'wolf', 'wolves', 'cat', 'cats', 'dog', 'dogs', 'bird', 'birds', 'rabbit', 'rabbits',
+  'bunny', 'bear', 'bears', 'dragon', 'dragons', 'horse', 'horses', 'mouse', 'mice', 'fish', 'fishes',
+  'turtle', 'turtles', 'robot', 'robots', 'robotic', 'android', 'androids', 'alien', 'aliens', 'monster',
+  'monsters', 'creature', 'creatures', 'animal', 'animals', 'dinosaur', 'dinosaurs', 'lion', 'lions',
+  'tiger', 'tigers', 'deer', 'owl', 'owls', 'eagle', 'eagles', 'snake', 'snakes', 'lizard', 'lizards',
+  'frog', 'frogs', 'penguin', 'penguins', 'otter', 'otters', 'raccoon', 'raccoons', 'squirrel', 'squirrels',
+  'кот', 'котик', 'котёнок', 'котенок', 'пёс', 'пес', 'мышь', 'мыши', 'мышонок', 'лев', 'олень', 'сова',
+  'орёл', 'орел', 'змея', 'жаба', 'выдра', 'енот', 'белка',
   'кіт', 'котик', 'миша', 'миші', 'лев', 'олень', 'сова', 'орел', 'змія', 'жаба', 'видра', 'єнот', 'білка'
 ]);
 const NON_HUMAN_PREFIXES = [
-  'fox', 'wolf', 'cat', 'dog', 'bird', 'rabbit', 'bunny', 'bear', 'dragon', 'horse', 'mouse', 'fish', 'turtle',
-  'robot', 'android', 'alien', 'monster', 'creature', 'animal', 'dinosaur', 'lion', 'tiger', 'eagle', 'snake',
-  'lizard', 'frog', 'penguin', 'otter', 'raccoon', 'squirrel',
-  'лисиц', 'лисён', 'лисен', 'лисич', 'волч', 'кошк', 'собак', 'птиц', 'кролик', 'зайч', 'медвед', 'дракон',
-  'лошад', 'рыб', 'черепах', 'робот', 'андроид', 'чужезем', 'инопланет', 'монстр', 'динозавр', 'тигр',
-  'ящер', 'лягуш', 'пингвин',
+  'лисиц', 'лисён', 'лисен', 'лисич', 'волч', 'кошк', 'собак', 'птиц', 'кролик', 'зайч', 'медвед',
+  'дракон', 'лошад', 'рыб', 'черепах', 'робот', 'андроид', 'чужезем', 'инопланет', 'монстр', 'динозавр',
+  'тигр', 'ящер', 'лягуш', 'пингвин',
   'лисиц', 'лисич', 'вовч', 'кішк', 'собак', 'птах', 'кролик', 'зайц', 'ведмід', 'кін', 'риб', 'черепах',
   'робот', 'андроїд', 'прибул', 'монстр', 'динозавр', 'тигр', 'ящір', 'пінгвін'
 ];
+
 const FOX_NAME_PATTERN = /(?:fox|лисиц|лисён|лисен|лисич)/iu;
 
 function containsNonHumanType(value) {
