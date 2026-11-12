@@ -5,6 +5,11 @@ const text = value => typeof value === "string" ? value.trim() : "";
 const normalize = value => text(value).toLocaleLowerCase().normalize("NFKC").replace(/[’']/g, "'").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const words = value => normalize(value).split(/\s+/u).filter(Boolean);
 const unique = values => [...new Set(values)];
+const hasEvidencePayload = value => {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return Boolean(value && typeof value === "object" && Object.keys(value).length > 0);
+};
 
 function compareRequirement(requirement, evidenceText) {
   const expected = unique(words(requirement.evidenceTerms?.length ? requirement.evidenceTerms.join(" ") : requirement.text));
@@ -76,7 +81,8 @@ export function createGenerationObserver({ runId = "", prompt = "", requirements
     const stageResults = STAGE_ORDER.map(stage => {
       const item = record(run.stages[stage]);
       const status = item.status || "unknown";
-      const verdict = ["completed", "success", "passed"].includes(status) && (item.output !== null || item.evidenceRefs.length) ? "evidence-recorded"
+      const hasEvidence = hasEvidencePayload(item.output) || (Array.isArray(item.evidenceRefs) && item.evidenceRefs.length > 0);
+      const verdict = ["completed", "success", "passed"].includes(status) && hasEvidence ? "evidence-recorded"
         : ["failed", "error"].includes(status) ? "failed"
         : ["running", "pending"].includes(status) ? "pending"
         : ["skipped", "disabled", "not-configured"].includes(status) && OPTIONAL_STAGES.has(stage) ? "optional"
@@ -102,7 +108,7 @@ export function createGenerationObserver({ runId = "", prompt = "", requirements
         unverifiedStages: stageResults.filter(item => item.verdict === "not-verifiable").length,
         mediaAssessments: visualChecks.length,
         overall: failures.length || stageResults.some(item => item.verdict === "failed") || visualChecks.some(item => item.verdict === "fail") ? "issues-found"
-          : textEvidence.length === 0 || stageResults.some(item => item.verdict === "not-verifiable") || visualChecks.some(item => item.verdict === "not-verifiable") ? "incomplete-evidence"
+          : textEvidence.length === 0 || stageResults.some(item => item.verdict === "not-verifiable" || item.verdict === "pending") || visualChecks.some(item => item.verdict === "not-verifiable") ? "incomplete-evidence"
           : partial.length || visualChecks.some(item => item.verdict === "partial") ? "partially-verified"
           : "evidence-recorded-not-quality-certified"
       },
