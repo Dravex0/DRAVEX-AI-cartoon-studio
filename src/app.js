@@ -904,10 +904,10 @@ if(useProceduralStandIn){
   .find(phase=>String(phase?.actorId||'').toLocaleLowerCase()===standInActor.toLocaleLowerCase()
    &&sceneMotionProgress>=Number(phase.start||0)&&sceneMotionProgress<=Number(phase.end??1))||null;
  const detail=String(standInPhase?.description||currentSceneData.storyDetail||'').toLocaleLowerCase();
- const standInAction=/\\b(run|running|sprint|беж|біг|corre)\\b/u.test(detail)?'run'
-  :/\\b(walk|walking|ход|ид[её]т|іде|camina)\\b/u.test(detail)?'walk'
-  :/\\b(lift|lifts|raise|raises|поднима|підніма|levanta)\\b/u.test(detail)?'lift'
-  :/\\b(free|frees|release|releases|освобож|звільня|libera)\\b/u.test(detail)?'free'
+ const standInAction=/\b(run|running|sprint|беж|біг|corre)\b/u.test(detail)?'run'
+  :/\b(walk|walking|ход|ид[её]т|іде|camina)\b/u.test(detail)?'walk'
+  :/\b(lift|lifts|raise|raises|поднима|підніма|levanta)\b/u.test(detail)?'lift'
+  :/\b(free|frees|release|releases|освобож|звільня|libera)\b/u.test(detail)?'free'
   :standInPhase?.targetId?'reach':'idle';
  const stateRecords=[...(Array.isArray(currentSceneData.stateChanges)?currentSceneData.stateChanges:[]),...(Array.isArray(currentSceneData.propStates)?currentSceneData.propStates:[])];
  const heldRecord=stateRecords.find(change=>change?.entityType==='prop'&&change?.property==='holder'
