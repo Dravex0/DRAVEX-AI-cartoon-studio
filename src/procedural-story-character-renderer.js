@@ -37,17 +37,29 @@ function getColors(profile={}){
   skin:'#d9a98f'
  };
 }
-/** Draw the procedural stand-in only when no generated scene media or real character art exists. */
+const NON_HUMAN_PROFILE_PATTERN = /\b(?:fox|wolf|cat|dog|bird|rabbit|bunny|bear|dragon|horse|mouse|fish|turtle|robot|android|alien|monster|creature|animal|dinosaur|lion|tiger|deer|owl|eagle|snake|lizard|frog|penguin|otter|raccoon|squirrel)\b|(?:лисиц|лисён|лисен|лисич|волк|кот|кошк|собак|пёс|пес|птиц|кролик|заяц|медвед|дракон|лошад|мыш|рыб|черепах|робот|андроид|чужезем|инопланет|монстр|динозавр|лев|тигр|олень|сова|орёл|орел|змея|ящер|лягуш|пингвин|выдр|енот|белк|вовк|кіт|кішк|птах|заєць|ведмід|кінь|черепах|пінгвін|видр|єнот|білк|змія|ящір|жаб)/iu;
+
+/** Draw the human-like procedural stand-in only when no real scene media or character art exists. */
 export function shouldDrawProceduralStoryCharacter({
   characterId = '',
+  profile = {},
   hasGeneratedMedia = false,
   hasReadyCharacterLayer = false,
   hasReadyCharacterRig = false
 } = {}) {
-  return Boolean(String(characterId ?? '').trim())
-    && !Boolean(hasGeneratedMedia)
-    && !Boolean(hasReadyCharacterLayer)
-    && !Boolean(hasReadyCharacterRig);
+  if (!String(characterId ?? '').trim()
+    || Boolean(hasGeneratedMedia)
+    || Boolean(hasReadyCharacterLayer)
+    || Boolean(hasReadyCharacterRig)) return false;
+
+  // Prefer the explicit species field; otherwise inspect the saved appearance.
+  // A human-shaped fallback must not replace a clearly described animal or robot.
+  const species = clean(profile?.species);
+  const appearance = [clean(profile?.visualDescription), clean(profile?.distinctiveFeatures)]
+    .filter(Boolean)
+    .join(' ');
+  const typeEvidence = species || appearance || String(characterId ?? '');
+  return !NON_HUMAN_PROFILE_PATTERN.test(typeEvidence);
 }
 
 /** Deterministic animated character fallback; generated sprites take precedence when attached. */
