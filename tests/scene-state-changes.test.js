@@ -91,3 +91,57 @@ test('tracks explicit trapped and freed prop state transitions in English', () =
   assert.equal(changes[1][0].previousValue, 'trapped');
   assert.equal(changes[1][0].value, 'free');
 });
+
+
+test('carries an observed trapped bird state through branch lifting and explicit release', () => {
+  const changes = inferStoryboardStateChanges([
+    {
+      id: 'discovery',
+      storyDetail: 'Kel sees the small mechanical bird trapped under a fallen branch.',
+      characters: ['Kel']
+    },
+    {
+      id: 'lift',
+      storyDetail: 'Kel lifts the fallen branch.',
+      characters: ['Kel']
+    },
+    {
+      id: 'release',
+      storyDetail: 'Kel frees the small mechanical bird.',
+      characters: ['Kel']
+    },
+    {
+      id: 'aftermath',
+      storyDetail: 'The small mechanical bird flies above the clearing.',
+      characters: ['Kel']
+    }
+  ], 'en');
+  assert.deepEqual(changes[0].map(change => [change.entityId, change.property, change.value]), [
+    ['small mechanical bird', 'state', 'trapped']
+  ]);
+  assert.deepEqual(changes[1].map(change => [change.entityId, change.property, change.value]), [
+    ['fallen branch', 'holder', 'Kel']
+  ]);
+  assert.deepEqual(changes[2].map(change => [
+    change.entityId, change.property, change.previousValue, change.value
+  ]), [
+    ['small mechanical bird', 'state', 'trapped', 'free']
+  ]);
+  assert.deepEqual(changes[3], []);
+});
+
+test('recognizes an explicitly observed trapped bird in Russian', () => {
+  const changes = inferStoryboardStateChanges([
+    {
+      storyDetail: 'Кель замечает маленькую механическую птицу, застрявшую под упавшей веткой.',
+      characters: ['Кель']
+    },
+    {
+      storyDetail: 'Кель освобождает маленькую механическую птицу.',
+      characters: ['Кель']
+    }
+  ], 'ru');
+  assert.equal(changes[0][0].value, 'trapped');
+  assert.equal(changes[1][0].previousValue, 'trapped');
+  assert.equal(changes[1][0].value, 'free');
+});
