@@ -43,3 +43,23 @@ test("does not let the error reporter create a second failure", () => {
 test("returns false when no callable observer is supplied", () => {
   assert.equal(emitProgressSafely(null, {}), false);
 });
+
+test("isolates WebM recording and scene progress observer failures", () => {
+  const payloads = [
+    { phase: "recording", percent: 85 },
+    { phase: "scene", sceneIndex: 1, sceneCount: 3 }
+  ];
+  const errors = [];
+  for (const payload of payloads) {
+    const result = emitProgressSafely(
+      () => { throw new Error("export progress UI failed"); },
+      payload,
+      (error, value) => errors.push({ message: error.message, payload: value })
+    );
+    assert.equal(result, false);
+  }
+  assert.deepEqual(errors, payloads.map(payload => ({
+    message: "export progress UI failed",
+    payload
+  })));
+});
