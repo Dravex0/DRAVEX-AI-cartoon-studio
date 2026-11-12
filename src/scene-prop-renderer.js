@@ -116,6 +116,21 @@ function drawStar(context, size) {
   context.fill();
 }
 
+function ballPalette(prop) {
+  const source = key(prop?.id) + ' ' + key(prop?.evidence);
+  if (/(?:red\\s+ball|красн\\p{L}*\\s+мяч|червон\\p{L}*\\s+м[’']?яч|pelota\\s+roja)/iu.test(source)) {
+    return { fill: '#e74b4b', stroke: '#7a2020' };
+  }
+  if (/(?:blue\\s+ball|син\\p{L}*\\s+мяч|син\\p{L}*\\s+куля|pelota\\s+azul)/iu.test(source)) {
+    return { fill: '#72c6df', stroke: '#24566c' };
+  }
+  if (/(?:green\\s+ball|зел[её]н\\p{L}*\\s+мяч|зелен\\p{L}*\\s+куля|pelota\\s+verde)/iu.test(source)) {
+    return { fill: '#55a96a', stroke: '#28533f' };
+  }
+  // Preserve the original blue appearance when the story does not name a ball color.
+  return { fill: '#72c6df', stroke: '#24566c' };
+}
+
 function drawProp(context, prop, x, y, time) {
   const bob = prop.held ? Math.sin(time * 4) * 0.008 : 0;
   context.save();
@@ -137,7 +152,8 @@ function drawProp(context, prop, x, y, time) {
     context.fillRect(-0.025, -0.018, 0.05, 0.036); context.strokeRect(-0.025, -0.018, 0.05, 0.036);
     context.strokeStyle = '#f5d9a8'; context.beginPath(); context.moveTo(0, -0.016); context.lineTo(0, 0.016); context.stroke();
   } else if (prop.kind === 'ball') {
-    context.fillStyle = '#e74b4b'; context.strokeStyle = '#7a2020';
+    const palette = ballPalette(prop);
+    context.fillStyle = palette.fill; context.strokeStyle = palette.stroke;
     context.beginPath(); context.arc(0, 0, 0.022, 0, Math.PI * 2); context.fill(); context.stroke();
     context.beginPath(); context.arc(0, 0, 0.011, 0, Math.PI * 2); context.stroke();
   } else if (prop.kind === 'apple') {
