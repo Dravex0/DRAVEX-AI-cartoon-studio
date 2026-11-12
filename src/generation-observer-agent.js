@@ -113,7 +113,7 @@ export function createGenerationObserver({ runId = "", prompt = "", requirements
         partialTextEvidence: partial.length,
         noTextEvidence: failures.length,
         failedStages: stageResults.filter(item => item.verdict === "failed").length,
-        unverifiedStages: stageResults.filter(item => item.verdict === "not-verifiable").length,
+        unverifiedStages: stageResults.filter(item => item.verdict === "not-verifiable" || item.verdict === "pending").length,
         mediaAssessments: visualChecks.length,
         overall: failures.length || stageResults.some(item => item.verdict === "failed") || visualChecks.some(item => item.verdict === "fail") ? "issues-found"
           : textEvidence.length === 0 || stageResults.some(item => item.verdict === "not-verifiable" || item.verdict === "pending") || visualChecks.some(item => item.verdict === "not-verifiable") ? "incomplete-evidence"
