@@ -55,7 +55,9 @@ export function drawProceduralCharacterStandIn(context, {
   progress = 0,
   action = 'idle',
   target = null,
-  held = false
+  heldTarget = null,
+  held = false,
+  badgeText = 'LOCAL STAND-IN'
 } = {}) {
   if (!context || typeof context.save !== 'function'
     || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
@@ -84,6 +86,9 @@ export function drawProceduralCharacterStandIn(context, {
   const handTarget = isReach
     ? [0.055 + (targetPoint[0] - 0.055) * reachProgress, -0.075 + (targetPoint[1] + 0.075) * reachProgress]
     : [0.13, -0.02 + Math.sin(t * 2.2) * 0.025];
+  const heldPoint = heldTarget && Number.isFinite(heldTarget.x) && Number.isFinite(heldTarget.y)
+    ? [(heldTarget.x * width - originX) / scale, (heldTarget.y * height - originY) / scale]
+    : [0.12, -0.075];
 
   context.save();
   try {
@@ -123,9 +128,11 @@ export function drawProceduralCharacterStandIn(context, {
     context.fillRect(-0.009, 0.018, 0.018, 0.014);
 
     // Inactive arm swings; active arm reaches toward the locked prop target.
-    const leftArmEnd = [-0.11, -0.005 + Math.sin(t * strideRate) * 0.025];
+    const leftArmEnd = held && target
+      ? [targetPoint[0] * reachProgress + (-0.11) * (1 - reachProgress), targetPoint[1] * reachProgress + (-0.005) * (1 - reachProgress)]
+      : [-0.11, -0.005 + Math.sin(t * strideRate) * 0.025];
     limb(context, [-0.045, -0.08], leftArmEnd, cloak, 0.022);
-    const rightArmEnd = held ? (target ? targetPoint : [0.12, -0.075]) : handTarget;
+    const rightArmEnd = held ? heldPoint : handTarget;
     line(context, [[0.045, -0.08], [0.055, -0.035], rightArmEnd], cloak, 0.023);
     context.fillStyle = skin;
     context.beginPath();
@@ -171,7 +178,7 @@ export function drawProceduralCharacterStandIn(context, {
     context.font = '0.014px system-ui';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.fillText('LOCAL STAND-IN', 0, 0.221);
+    context.fillText(clean(badgeText, 32) || 'LOCAL STAND-IN', 0, 0.221);
   } finally {
     context.restore();
   }
@@ -181,6 +188,7 @@ export function drawProceduralCharacterStandIn(context, {
     characterId: clean(characterId, 120),
     origin: { x: originX / width, y: originY / height },
     handTarget: { x: originX / width + handTarget[0] * scale / width, y: originY / height + handTarget[1] * scale / height },
-    drawnHand: { x: originX / width + rightArmEnd[0] * scale / width, y: originY / height + rightArmEnd[1] * scale / height }
+    drawnHand: { x: originX / width + rightArmEnd[0] * scale / width, y: originY / height + rightArmEnd[1] * scale / height },
+    secondaryHand: { x: originX / width + leftArmEnd[0] * scale / width, y: originY / height + leftArmEnd[1] * scale / height }
   };
 }
