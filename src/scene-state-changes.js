@@ -63,7 +63,7 @@ const escapeRegExp = value => [...String(value)].map(char => '.*+?^$|{}()[]'.inc
 const boundary = '(?<![\\p{L}\\p{N}])';
 const tailBoundary = '(?![\\p{L}\\p{N}])';
 const cutTail = value => clean(String(value ?? '')
-    .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+/iu).at(-1);
+  .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+|[.!?,;:]/iu)[0].trim()
   .replace(/^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu, ''));
 
 const ALLOWED_ACTION_ADVERBS = /^(?:carefully|quickly|slowly|gently|quietly|осторожно|быстро|медленно|тихо|обережно|швидко|повільно|lentamente|cuidadosamente)$/iu;
@@ -80,7 +80,7 @@ function findEntity(source, actorId, verb) {
   const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
   const verbMatch = verb.re.exec(afterActor);
   const actionPrefix = afterActor.slice(0, verbMatch?.index ?? 0)
-    .split(/\\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\\s+/iu).at(-1);
+    .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+/iu).at(-1);
   if (!verbMatch || !hasOnlyOptionalAdverb(actionPrefix)) return null;
   const entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
   if (!entity || entity.length > 100 || /^(?:it|them|him|her|его|её|ее|их|його|її|їх)$/iu.test(entity)) return null;
