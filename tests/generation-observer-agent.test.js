@@ -102,3 +102,25 @@ test("an empty output object is not accepted as completed stage evidence", () =>
   assert.equal(report.summary.unverifiedStages, 9);
   assert.equal(report.summary.overall, "incomplete-evidence");
 });
+
+test("a media pass without evidence references is downgraded to not-verifiable", () => {
+  const observer = createGenerationObserver({
+    requirements: [{ id: "hero", text: "Kel", evidenceTerms: ["Kel"] }]
+  });
+  for (const stage of GENERATION_OBSERVER_STAGES) {
+    observer.recordStage(stage, {
+      status: stage === "voiceGeneration" || stage === "lipSync" ? "not-configured" : "completed",
+      output: stage === "voiceGeneration" || stage === "lipSync" ? null : { artifactId: stage }
+    });
+  }
+  observer.recordAssessment({
+    target: "video-motion",
+    method: "frame-sampling",
+    verdict: "pass",
+    summary: "Movement observed"
+  });
+  const report = observer.report({ interpretation: "Kel" });
+  assert.equal(report.mediaAssessments[0].verdict, "not-verifiable");
+  assert.match(report.mediaAssessments[0].summary, /No evidence references supplied/);
+  assert.equal(report.summary.overall, "incomplete-evidence");
+});
