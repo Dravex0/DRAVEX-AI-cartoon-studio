@@ -56,6 +56,8 @@ test('extends the active arm to the source-locked prop target during a rescue ac
   assert.equal(result.drawn, true);
   assert.ok(result.handTarget.x > 0.5);
   assert.ok(result.handTarget.y < 0.75);
+  assert.ok(Math.abs(result.drawnHand.x - 0.52) < 0.001);
+  assert.ok(Math.abs(result.drawnHand.y - 0.7) < 0.001);
 });
 
 test('does not report a drawn character when canvas dimensions are invalid', () => {
