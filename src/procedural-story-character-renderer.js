@@ -37,6 +37,19 @@ function getColors(profile={}){
   skin:'#d9a98f'
  };
 }
+/** Draw the procedural stand-in only when no generated scene media or real character art exists. */
+export function shouldDrawProceduralStoryCharacter({
+  characterId = '',
+  hasGeneratedMedia = false,
+  hasReadyCharacterLayer = false,
+  hasReadyCharacterRig = false
+} = {}) {
+  return Boolean(String(characterId ?? '').trim())
+    && !Boolean(hasGeneratedMedia)
+    && !Boolean(hasReadyCharacterLayer)
+    && !Boolean(hasReadyCharacterRig);
+}
+
 /** Deterministic animated character fallback; generated sprites take precedence when attached. */
 export function drawProceduralStoryCharacter(ctx,{x=0,y=0,time=0,action='idle',sceneIndex=0,characterId='Hero',profile={},storyText='',mouthOpenness=0,viseme='neutral'}={}){
  if(!ctx||typeof ctx.save!=='function'||typeof ctx.beginPath!=='function')throw new TypeError('A CanvasRenderingContext2D-like context is required.');
