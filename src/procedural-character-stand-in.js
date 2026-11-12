@@ -71,11 +71,14 @@ export function drawProceduralCharacterStandIn(context, {
   const cloak = cloakColor(profile);
   const dark = '#252b31';
   const skin = '#d9ad88';
-  const strideRate = action === 'run' ? 8 : action === 'walk' ? 5 : 2.3;
-  const stride = ['run', 'walk', 'jump'].includes(action) ? Math.sin(t * strideRate) : Math.sin(t * 1.8) * 0.12;
-  const bob = action === 'jump' ? -Math.abs(Math.sin(t * 3)) * 0.035 : Math.abs(Math.sin(t * strideRate)) * (action === 'walk' || action === 'run' ? 0.012 : 0.003);
-  const headTilt = action === 'surprised' ? -0.12 : action === 'sad' ? 0.12 : Math.sin(t * 1.4) * 0.018;
-  const isReach = Boolean(target) && ['reach', 'lift', 'free', 'rescue', 'open', 'pickup'].includes(action);
+  const strideRate = action === 'run' ? 8 : action === 'walk' ? 5 : action === 'dance' ? 7 : 2.3;
+  const stride = ['run', 'walk', 'dance', 'jump'].includes(action) ? Math.sin(t * strideRate) : Math.sin(t * 1.8) * 0.12;
+  const bob = action === 'jump' ? -Math.abs(Math.sin(t * 3)) * 0.055
+    : action === 'float' ? -Math.abs(Math.sin(t * 1.5)) * 0.04
+    : Math.abs(Math.sin(t * strideRate)) * (action === 'walk' || action === 'run' || action === 'dance' ? 0.012 : 0.003);
+  const headTilt = action === 'surprised' ? -0.16 : action === 'sad' || action === 'scared' ? 0.12
+    : action === 'turn' ? Math.sin(t * 2) * 0.45 : action === 'dance' ? Math.sin(t * 3.4) * 0.14 : Math.sin(t * 1.4) * 0.018;
+  const isReach = Boolean(target) && ['reach', 'lift', 'free', 'rescue', 'open', 'pickup', 'push', 'pull', 'grab'].includes(action);
   const reachProgress = isReach ? clamp((p - 0.08) / 0.72, 0, 1) : 0;
   const targetPoint = target && Number.isFinite(target.x) && Number.isFinite(target.y)
     ? [
@@ -85,7 +88,13 @@ export function drawProceduralCharacterStandIn(context, {
     : [0.19, -0.08];
   const handTarget = isReach
     ? [0.055 + (targetPoint[0] - 0.055) * reachProgress, -0.075 + (targetPoint[1] + 0.075) * reachProgress]
-    : [0.13, -0.02 + Math.sin(t * 2.2) * 0.025];
+    : action === 'wave'
+      ? [0.13 + Math.sin(t * 5) * 0.018, -0.13 + Math.sin(t * 5) * 0.022]
+      : action === 'happy' || action === 'magic'
+        ? [0.13, -0.08 + Math.sin(t * 3) * 0.025]
+        : action === 'scared' || action === 'defend'
+          ? [0.10, -0.11 + Math.sin(t * 2.5) * 0.012]
+          : [0.13, -0.02 + Math.sin(t * 2.2) * 0.025];
   const heldPoint = heldTarget && Number.isFinite(heldTarget.x) && Number.isFinite(heldTarget.y)
     ? [(heldTarget.x * width - originX) / scale, (heldTarget.y * height - originY) / scale]
     : [0.12, -0.075];
@@ -132,7 +141,11 @@ export function drawProceduralCharacterStandIn(context, {
     // Inactive arm swings; active arm reaches toward the locked prop target.
     const leftArmEnd = held && target
       ? [targetPoint[0] * reachProgress + (-0.11) * (1 - reachProgress), targetPoint[1] * reachProgress + (-0.005) * (1 - reachProgress)]
-      : [-0.11, -0.005 + Math.sin(t * strideRate) * 0.025];
+      : action === 'scared' || action === 'defend'
+        ? [-0.09, -0.12 + Math.sin(t * 2.5) * 0.012]
+        : action === 'dance'
+          ? [-0.14, -0.08 + Math.sin(t * 3.4 + Math.PI) * 0.035]
+          : [-0.11, -0.005 + Math.sin(t * strideRate) * 0.025];
     limb(context, [-0.045, -0.08], leftArmEnd, cloak, 0.022);
     const rightArmEnd = held ? heldPoint : handTarget;
     drawnHandLocal = rightArmEnd;
@@ -168,9 +181,27 @@ export function drawProceduralCharacterStandIn(context, {
     context.strokeStyle = '#754d40';
     context.lineWidth = 0.0035;
     context.beginPath();
-    context.moveTo(-0.008, 0.027);
-    context.quadraticCurveTo(0.005, 0.035, 0.018, 0.026);
+    if (action === 'sad' || action === 'scared') {
+      context.moveTo(-0.009, 0.035);
+      context.quadraticCurveTo(0.005, 0.022, 0.019, 0.035);
+    } else {
+      context.moveTo(-0.008, 0.027);
+      context.quadraticCurveTo(0.005, action === 'happy' || action === 'dance' ? 0.045 : 0.035, 0.018, 0.026);
+    }
     context.stroke();
+    if (action === 'surprised' || action === 'talk') {
+      context.fillStyle = '#34252a';
+      const mouthOpen = action === 'surprised' ? 0.014 : 0.006 + Math.abs(Math.sin(t * 7)) * 0.01;
+      context.beginPath();
+      context.ellipse(0.005, 0.04, action === 'surprised' ? 0.009 : 0.006, mouthOpen, 0, 0, Math.PI * 2);
+      context.fill();
+    }
+    if (action === 'sad') {
+      context.fillStyle = 'rgba(120,205,245,.9)';
+      context.beginPath();
+      context.ellipse(0.031, 0.026, 0.004, 0.009, -0.2, 0, Math.PI * 2);
+      context.fill();
+    }
     context.restore();
 
     // Subtle local-mode badge avoids implying that this is generated character art.
