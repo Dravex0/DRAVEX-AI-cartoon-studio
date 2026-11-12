@@ -12,9 +12,9 @@ import { normalizeCharacterFacialRig, normalizeCharacterFacialExpressions } from
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
 
-function normalizePropAnchors(input, rawStateChanges) {
+function normalizePropAnchors(input, rawStateChanges, rawPropStates) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
-  const allowed = new Set((Array.isArray(rawStateChanges) ? rawStateChanges : [])
+  const allowed = new Set([...(Array.isArray(rawStateChanges) ? rawStateChanges : []), ...(Array.isArray(rawPropStates) ? rawPropStates : [])]
     .filter(change => change && typeof change === 'object' && !Array.isArray(change)
       && change.entityType === 'prop' && text(change.entityId, 120))
     .map(change => text(change.entityId, 120).toLocaleLowerCase()));
@@ -100,7 +100,7 @@ export function normalizeScene(input = {}, index = 0) {
       actorId: text(change.actorId, 120),
       evidence: text(change.evidence, 1_200)
     })) : [],
-    propAnchors: normalizePropAnchors(scene.propAnchors, scene.stateChanges),
+    propAnchors: normalizePropAnchors(scene.propAnchors, scene.stateChanges, scene.propStates),
     interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
       type: text(item.type, 40), actorId: text(item.actorId, 120), targetId: text(item.targetId, 120),
       evidence: text(item.evidence, 500),
