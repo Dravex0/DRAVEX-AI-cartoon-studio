@@ -103,6 +103,7 @@ test("a pending required stage keeps the overall report incomplete", () => {
   }
   const report = observer.report({ interpretation: "Kel helps a bird" });
   assert.equal(report.stageResults.find(item => item.stage === "videoGeneration").verdict, "pending");
+  assert.equal(report.summary.unverifiedStages, 1);
   assert.equal(report.summary.overall, "incomplete-evidence");
 });
 
