@@ -225,7 +225,7 @@ test('semantic reveal creates a source-grounded action instead of a passive idle
 
 test('keeps Kel branch-lift and mechanical-bird release as ordered, separately targeted action phases', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nKel — a young forest adventurer.\\n\\nScene 1: Rescue\\nKel lifts the fallen branch and frees the small mechanical bird.',
+    'Characters:\nKel — a young forest adventurer.\n\nScene 1: Rescue\nKel lifts the fallen branch and frees the small mechanical bird.',
     'en',
     'Kel'
   );
