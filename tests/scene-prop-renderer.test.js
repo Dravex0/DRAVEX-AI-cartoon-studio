@@ -241,3 +241,21 @@ test('draws anchored bird and branch props through the shared canvas renderer', 
   assert.ok(calls.some(call => Array.isArray(call) && call[0] === 'lineTo'));
   assert.ok(calls.some(call => Array.isArray(call) && call[0] === 'scale' && call[1] === 360 && call[2] === 360));
 });
+
+
+test('renders an explicitly observed fallen branch at its authored anchor', () => {
+  const obstacleScene = {
+    stateChanges: [{
+      entityType: 'prop', entityId: 'fallen branch', property: 'state',
+      previousValue: null, value: 'fallen', actorId: 'Kel',
+      evidence: 'Kel sees the small mechanical bird trapped under a fallen branch.'
+    }],
+    propAnchors: { 'fallen branch': { x: 0.68, y: 0.79 } }
+  };
+  const plan = buildScenePropRenderPlan(obstacleScene, [], 0.1);
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].kind, 'branch');
+  assert.equal(plan[0].state, 'fallen');
+  assert.equal(plan[0].x, 0.68);
+  assert.equal(plan[0].y, 0.79);
+});
