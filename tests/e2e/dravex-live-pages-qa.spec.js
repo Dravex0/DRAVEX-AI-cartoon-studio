@@ -10,6 +10,7 @@ const KAEL_PROMPT = [
   'Загруженное изображение Каэля — главный и обязательный визуальный референс. Сохрани его точное лицо, причёску, ярко-алые глаза, пропорции, чёрный тактический плащ с красными элементами, броню и символ сломанной короны. Не заменяй героя другим персонажем и не меняй его дизайн.',
   'Каэлю 18 лет, он высокий, стройный и спортивный; у него средней длины растрёпанные чёрные волосы и ярко-алые глаза. На нём длинный чёрный тактический плащ с красными деталями и символом сломанной короны, чёрная броня и перчатки. Его оружие — Shadow Blade.',
   'Сюжет на 15–20 секунд: Каэль стоит среди руин готического города под дождём. Он замечает приближающуюся тень, достаёт Shadow Blade, клинок вспыхивает тёмно-красной энергией. Каэль делает быстрый точный выпад, тень распадается на чёрные частицы, затем Каэль опускает клинок. Сохраняй одного и того же Каэля во всех кадрах.',
+  'Каэль произносит по-русски одну короткую реплику: «Тень не скроется от меня». Обязательно создай диалог и озвучь его в итоговом видео.',
   'Стиль dark fantasy anime, выразительная анимация, кинематографичные движения камеры, вертикальный формат 9:16. Без клонов, надписей, субтитров, логотипов и водяных знаков. Нужен воспроизводимый видеофайл для скачивания.'
 ].join(' ');
 
@@ -87,6 +88,14 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
     const downloadPromise = page.waitForEvent('download', { timeout: 170_000 });
     await page.locator('#makeFilm').click();
     await expect(page.locator('#fullFilmProgressPanel')).toBeVisible({ timeout: 25_000 });
+    const speechStatusText = String(await page.locator('#sceneVoiceStatus').textContent().catch(() => '') || '').trim();
+    report.checks.speechPreparation = {
+      requested: true,
+      status: /local text model is not loaded|local voice model is not loaded|локальн.{0,40}модел.{0,40}не загружен/iu.test(speechStatusText)
+        ? 'skipped-local-model-unavailable'
+        : speechStatusText ? 'status-recorded' : 'status-not-recorded',
+      message: speechStatusText
+    };
     await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 155_000 });
 
     const download = await downloadPromise;
@@ -299,8 +308,9 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
       audio: audioStreams.length ? 'audio-track-present-content-still-needs-listening-review' : 'no-audio-track'
     };
     report.checks.voice = {
-      status: audioStreams.length ? 'audio-track-present-not-proof-of-intelligible-russian-speech' : 'missing',
-      note: 'Track presence is not speech recognition; Russian dialogue must be listened to separately.'
+      status: audioStreams.length ? 'audio-track-present-not-proof-of-intelligible-russian-speech' : 'missing-after-explicit-dialogue-request',
+      note: 'The prompt explicitly requests Russian dialogue and voice; track presence still does not prove intelligibility.',
+      speechPreparation: report.checks.speechPreparation
     };
 
     await page.screenshot({ fullPage: true }).then(body =>
@@ -309,7 +319,7 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
     await testInfo.attach('live-downloaded-film.webm', { path: downloadPath, contentType: 'video/webm' });
 
     const issues = [];
-    if (!audioStreams.length) issues.push('Export has no audio track; Russian dialogue is not verified.');
+    if (!audioStreams.length) issues.push('The prompt explicitly requested Russian dialogue and voice, but the exported WebM has no audio track; inspect local model preparation.');
     if (pageErrors.length) issues.push('Browser runtime errors occurred.');
     if (consoleErrors.length) issues.push('Browser console errors were recorded; inspect the attached report.');
     if (visualMetrics.status === 'likely-static') issues.push('Weak frame-to-frame pixel-change signal; motion needs manual review.');
@@ -330,7 +340,7 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
       videoDecode: { status: 'passed', evidence: 'chromium-player-and-ffmpeg-decoded-sampled-frames', browserFrames: browserEvidence.frames.length, ffmpegFrames: ffmpegEvidence.decodedFrames },
       visualHints: { motion: visualMetrics.status, semanticRecognition: false },
       audio: {
-        status: audioStreams.length ? 'track-present-content-unverified' : 'failed-no-audio-track',
+        status: audioStreams.length ? 'track-present-content-unverified' : 'failed-no-audio-track-after-explicit-request',
         audioStreams: audioStreams.length,
         dialogue: 'not-verified-by-speech-recognition-or-human-listening'
       },
@@ -351,7 +361,7 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
       story: 'manual-review-required',
       overall: report.outcome,
       humanReadable: !audioStreams.length
-        ? 'Video file was created and decoded, but it has no audio track. Story content still needs visual review.'
+        ? 'Video file was created and decoded, but the explicitly requested dialogue/voice is missing. Story content still needs visual review.'
         : 'Video file was created and decoded. Audio content and story accuracy still need human review.'
     };
   } catch (error) {
