@@ -79,7 +79,9 @@ function findEntity(source, actorId, verb) {
   if (!actorMatch) return null;
   const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
   const verbMatch = verb.re.exec(afterActor);
-  if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) return null;
+  const actionPrefix = afterActor.slice(0, verbMatch?.index ?? 0)
+    .split(/\\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\\s+/iu).at(-1);
+  if (!verbMatch || !hasOnlyOptionalAdverb(actionPrefix)) return null;
   const entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
   if (!entity || entity.length > 100 || /^(?:it|them|him|her|его|её|ее|их|його|її|їх)$/iu.test(entity)) return null;
   return { entity, evidence: clean(source, 1_200) };
