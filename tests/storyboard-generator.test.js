@@ -222,3 +222,48 @@ test('semantic reveal creates a source-grounded action instead of a passive idle
   assert.equal(scene.actionTimeline.phases[0].actorId, 'Nox');
   assert.match(scene.motionGenerationPrompt, /reveal/);
 });
+
+
+test('splits an explicitly written attack and target stagger into ordered grounded phases', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\\nKael — a young warrior.\\nGuard — an armored guard.\\n\\nScene 1: Clash\\nKael strikes the guard, and the guard stumbles backward.',
+    'en',
+    'Kael'
+  );
+  const scene = result.scenes[0];
+  assert.deepEqual(scene.actionTimeline.phases.map(({ phase, actorId, targetId, start, end }) => ({
+    phase, actorId, targetId, start, end
+  })), [
+    { phase: 'action', actorId: 'Kael', targetId: 'Guard', start: 0, end: 0.62 },
+    { phase: 'reaction', actorId: 'Guard', targetId: 'Kael', start: 0.62, end: 1 }
+  ]);
+  assert.equal(scene.actionTimeline.phases[0].evidence, 'Kael strikes the guard');
+  assert.equal(scene.actionTimeline.phases[1].evidence, 'and the guard stumbles backward.');
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+  assert.match(scene.motionGenerationPrompt, /reaction \(62%-100%/);
+});
+
+test('does not assign a stagger reaction to a character other than the attack target', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\\nKael — a young warrior.\\nGuard — an armored guard.\\nFoxy — a small fox.\\n\\nScene 1: Clash\\nKael strikes the guard, and Foxy stumbles backward.',
+    'en',
+    'Kael'
+  );
+  assert.equal(result.scenes[0].actionTimeline.phases.length, 1);
+  assert.equal(result.scenes[0].actionTimeline.phases[0].actorId, 'Kael');
+});
+
+test('recognizes an explicitly written Russian attack followed by the target stagger', () => {
+  const result = buildStoryboardFromText(
+    'Персонажи:\\nКаэль — молодой воин.\\nСтражник — воин в доспехах.\\n\\nСцена 1: Столкновение\\nКаэль ударяет стражника, и стражник отшатывается назад.',
+    'ru',
+    'Каэль'
+  );
+  const phases = result.scenes[0].actionTimeline.phases;
+  assert.equal(phases.length, 2);
+  assert.equal(phases[0].actorId, 'Каэль');
+  assert.equal(phases[1].phase, 'reaction');
+  assert.equal(phases[1].actorId, 'Стражник');
+  assert.equal(phases[1].evidence, 'и стражник отшатывается назад.');
+  assert.equal(result.scenes[0].productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+});
