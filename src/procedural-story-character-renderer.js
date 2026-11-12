@@ -58,7 +58,7 @@ const NON_HUMAN_PREFIXES = [
 const FOX_NAME_PATTERN = /(?:fox|лисиц|лисён|лисен|лисич)/iu;
 
 function containsNonHumanType(value) {
-  const tokens = String(value ?? '').toLocaleLowerCase().match(/[\\p{L}\\p{N}]+/gu) || [];
+  const tokens = String(value ?? '').toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
   return tokens.some(token => NON_HUMAN_WORDS.has(token)
     || NON_HUMAN_PREFIXES.some(prefix => token.startsWith(prefix)));
 }
