@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { inferStoryboardStateChanges } from '../src/scene-state-changes.js';
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildProductionScene, buildSceneIdentitySeed, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from '../src/scene-production.js';
 
 const scene = {
@@ -476,4 +477,35 @@ test('motion prompt includes explicit world movement and object interaction cont
   assert.match(prompt, /Wind shakes the tree branches/);
   assert.match(prompt, /Kel.*rescue.*mechanical bird/);
   assert.match(prompt, /fallen branch.*holder.*Kel/);
+});
+
+
+test('production prompt carries an inferred prop release from story text through scene normalization', () => {
+  const storyScenes = [
+    { id: 'kel-rescue', storyDetail: 'Kel frees the small mechanical bird.', characters: ['Kel'] },
+    { id: 'kel-after-rescue', storyDetail: 'Kel watches the small mechanical bird fly above the clearing.', characters: ['Kel'] }
+  ];
+  const changes = inferStoryboardStateChanges(storyScenes, 'en');
+  assert.equal(changes[0][0].property, 'state');
+  assert.equal(changes[0][0].value, 'free');
+  assert.deepEqual(changes[1], []);
+
+  const prepared = buildProductionScene({
+    id: 'kel-rescue',
+    title: 'Kel frees the bird',
+    storyDetail: storyScenes[0].storyDetail,
+    visibleAction: storyScenes[0].storyDetail,
+    motionPrompt: storyScenes[0].storyDetail,
+    imagePrompt: 'Kel beside a small mechanical bird under a fallen branch.',
+    camera: 'Medium shot',
+    startState: 'The mechanical bird is trapped beneath a fallen branch.',
+    endState: 'The mechanical bird is free.',
+    characters: ['Kel'],
+    stateChanges: changes[0]
+  }, [{ characterId: 'Kel', visualDescription: 'Small adventurer with a green jacket' }]);
+
+  assert.equal(prepared.stateChanges[0].entityId, 'small mechanical bird');
+  assert.equal(prepared.stateChanges[0].previousValue, null);
+  assert.equal(prepared.stateChanges[0].value, 'free');
+  assert.match(prepared.motionGenerationPrompt, /Prop "small mechanical bird" changes state to "free" through actor "Kel"/);
 });
