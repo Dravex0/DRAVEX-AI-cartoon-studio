@@ -394,9 +394,10 @@ test('DRAVEX Visual QA Agent: keeps rescue props visible through discovery, lift
     const targets = {
       trappedBird: [0x91, 0xa7, 0xb1],
       freedBird: [0xa9, 0xdc, 0xe5],
-      branch: [0x77, 0x54, 0x35]
+      branch: [0x77, 0x54, 0x35],
+      greenCloak: [0x31, 0x5d, 0x43]
     };
-    const counts = { trappedBird: 0, freedBird: 0, branch: 0 };
+    const counts = { trappedBird: 0, freedBird: 0, branch: 0, greenCloak: 0 };
     for (let index = 0; index < pixels.length; index += 4) {
       if (pixels[index + 3] < 220) continue;
       for (const name of Object.keys(targets)) {
@@ -407,11 +408,13 @@ test('DRAVEX Visual QA Agent: keeps rescue props visible through discovery, lift
         if (distance <= 12) counts[name] += 1;
       }
     }
-    return counts;
+    return { ...counts, characterRenderMode: canvas.dataset.characterRenderMode || 'missing' };
   });
 
   await page.waitForTimeout(250);
   const discovery = await inspectCanvas();
+  expect(discovery.characterRenderMode).toBe('procedural-stand-in');
+  expect(discovery.greenCloak).toBeGreaterThan(150);
   expect(discovery.trappedBird).toBeGreaterThan(10);
   expect(discovery.branch).toBeGreaterThan(10);
   await testInfo.attach('kel-rescue-discovery-canvas.png', {
@@ -426,6 +429,8 @@ test('DRAVEX Visual QA Agent: keeps rescue props visible through discovery, lift
   await page.locator('#scenes button.scene').nth(1).click();
   await page.waitForTimeout(200);
   const lifting = await inspectCanvas();
+  expect(lifting.characterRenderMode).toBe('procedural-stand-in');
+  expect(lifting.greenCloak).toBeGreaterThan(150);
   expect(lifting.trappedBird).toBeGreaterThan(10);
   expect(lifting.branch).toBeGreaterThan(10);
   await testInfo.attach('kel-rescue-lifting-canvas.png', {
@@ -436,6 +441,8 @@ test('DRAVEX Visual QA Agent: keeps rescue props visible through discovery, lift
   await page.locator('#scenes button.scene').nth(2).click();
   await page.waitForTimeout(200);
   const freedom = await inspectCanvas();
+  expect(freedom.characterRenderMode).toBe('procedural-stand-in');
+  expect(freedom.greenCloak).toBeGreaterThan(150);
   expect(freedom.freedBird).toBeGreaterThan(10);
   expect(freedom.branch).toBeGreaterThan(10);
   await testInfo.attach('kel-rescue-freedom-canvas.png', {
