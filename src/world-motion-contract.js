@@ -28,16 +28,20 @@ export function buildWorldMotionInstructions(scene = {}) {
       const object = clean(change.entityId, 120);
       const property = clean(change.property, 40);
       const value = change.value == null ? 'released / no longer held' : clean(change.value, 120);
+      const actor = clean(change.actorId, 120);
+      if (!object || !property) return '';
+      // Retain the legacy wording for scenes that do not supply a persistent
+      // prop snapshot; this keeps existing provider prompts stable.
+      if (!propStates.length) {
+        return `Prop "${object}" changes ${property} to "${value}"${actor ? ` through actor "${actor}"` : ''}.`;
+      }
       const startValue = Object.prototype.hasOwnProperty.call(change, 'startValue')
         ? change.startValue == null ? 'not held / not yet established' : clean(change.startValue, 120)
         : change.previousValue == null ? 'not held / not yet established' : clean(change.previousValue, 120);
-      const actor = clean(change.actorId, 120);
       const transition = startValue === value
         ? `remains ${property} "${value}"`
         : `changes ${property} from "${startValue}" to "${value}"`;
-      return object && property
-        ? `Prop "${object}" ${transition}${actor ? ` through actor "${actor}"` : ''}.`
-        : '';
+      return `Prop "${object}" ${transition}${actor ? ` through actor "${actor}"` : ''}.`;
     }).filter(Boolean);
 
   if (!environment.length && !explicitInteractions.length && !stateChanges.length) return '';
