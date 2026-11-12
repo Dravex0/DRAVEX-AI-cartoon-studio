@@ -457,16 +457,19 @@ test('structured state memory fails closed without throwing on malformed baselin
 test('keeps prop anchors only for locked scene props with normalized finite coordinates', () => {
   const locked = [
     { entityType: 'prop', entityId: 'silver key' },
-    { entityType: 'character', entityId: 'Foxy' }
+    { entityType: 'character', entityId: 'Foxy' },
+    { entityType: 'prop', entityId: 'small mechanical bird' }
   ];
   assert.deepEqual(normalizeScenePropAnchors({
     'silver key': { x: 0.74, y: 0.42 },
+    'small mechanical bird': { x: 0.44, y: 0.72 },
     'invented chest': { x: 0.5, y: 0.5 },
     Foxy: { x: 0.2, y: 0.3 },
     'bad coordinate': { x: 1.2, y: 0.5 },
     'not numeric': { x: '0.5', y: 0.5 }
   }, locked), {
-    'silver key': { x: 0.74, y: 0.42 }
+    'silver key': { x: 0.74, y: 0.42 },
+    'small mechanical bird': { x: 0.44, y: 0.72 }
   });
 });
 
