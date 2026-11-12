@@ -89,3 +89,31 @@ test('keeps one hand on a carried prop while the other reaches for a second targ
   assert.ok(Math.abs(result.secondaryHand.x - 0.54) < 0.001);
   assert.ok(Math.abs(result.secondaryHand.y - 0.755) < 0.001);
 });
+
+
+test('animates a raised waving hand and keeps the character render mode procedural', () => {
+  const context = contextStub();
+  const idle = drawProceduralCharacterStandIn(contextStub(), {
+    characterId: 'Kel', width: 1280, height: 720, x: 0.4, y: 0.75, time: 0.7, action: 'idle'
+  });
+  const waving = drawProceduralCharacterStandIn(context, {
+    characterId: 'Kel', width: 1280, height: 720, x: 0.4, y: 0.75, time: 0.7, action: 'wave'
+  });
+  assert.equal(waving.mode, 'procedural-stand-in');
+  assert.ok(waving.drawnHand.y < idle.drawnHand.y - 0.06);
+});
+
+test('supports jump and speech cues without inventing an asset-backed character', () => {
+  const jumpContext = contextStub();
+  const jump = drawProceduralCharacterStandIn(jumpContext, {
+    characterId: 'Kel', width: 1280, height: 720, x: 0.4, y: 0.75, time: 0.5, action: 'jump'
+  });
+  const talkContext = contextStub();
+  const talk = drawProceduralCharacterStandIn(talkContext, {
+    characterId: 'Kel', width: 1280, height: 720, x: 0.4, y: 0.75, time: 0.5, action: 'talk'
+  });
+  assert.equal(jump.drawn, true);
+  assert.equal(talk.drawn, true);
+  assert.ok(jumpContext.calls.some(call => call[0] === 'translate'));
+  assert.ok(talkContext.calls.some(call => call[0] === 'ellipse'));
+});
