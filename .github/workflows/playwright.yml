@@ -29,14 +29,46 @@ jobs:
       - name: Install project dependencies
         run: npm install --no-audit --no-fund --onnxruntime-node-install-cuda=skip
 
+      - name: Install portable FFmpeg and ffprobe for browser video checks
+        run: |
+          npm install --no-save --package-lock=false ffmpeg-static @derhuerst/ffprobe-static
+          FFMPEG_PATH="$(node -e "process.stdout.write(require('ffmpeg-static'))")"
+          FFPROBE_PATH="$(node -e "process.stdout.write(require('@derhuerst/ffprobe-static'))")"
+          test -x "$FFMPEG_PATH"
+          test -x "$FFPROBE_PATH"
+          mkdir -p "$RUNNER_TEMP/dravex-media-tools"
+          ln -sf "$FFMPEG_PATH" "$RUNNER_TEMP/dravex-media-tools/ffmpeg"
+          ln -sf "$FFPROBE_PATH" "$RUNNER_TEMP/dravex-media-tools/ffprobe"
+          echo "$RUNNER_TEMP/dravex-media-tools" >> "$GITHUB_PATH"
+          export PATH="$RUNNER_TEMP/dravex-media-tools:$PATH"
+          ffmpeg -version
+          ffprobe -version
+
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: Run existing unit tests
         run: npm test
 
-      - name: Run desktop and Pixel 7 browser tests
-        run: npm run test:e2e
+      - name: Run desktop and Pixel 7 browser tests against the source build
+        run: npx playwright test --grep-invert "DRAVEX live Pages"
+
+      - name: Run the free QA agent against the published GitHub Pages site
+        run: npx playwright test tests/e2e/dravex-live-pages-qa.spec.js
+
+      - name: Preserve live Pages QA video and frame evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dravex-live-pages-qa-evidence
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Run the broad published Pages feature matrix
+        run: npx playwright test tests/e2e/dravex-live-feature-matrix.spec.js
 
       - name: Upload Playwright report and failure evidence
         if: always()

@@ -138,3 +138,68 @@ test('uses an explicitly authored grip point transformed by the posed hand rotat
   assert.ok(Math.abs(plan.y - 0.54) < 1e-9);
   assert.ok(Math.abs(plan.rotation - Math.PI / 2) < 1e-9);
 });
+
+
+test('animates an explicitly pushed ball rolling away from its named actor', () => {
+  const pushed = { stateChanges: [{
+    entityType: 'prop', entityId: 'red ball', property: 'motion',
+    previousValue: null, value: 'rolling', actorId: 'Fox', evidence: 'Fox pushes the red ball.'
+  }] };
+  const start = buildScenePropRenderPlan(pushed, layers, 0.52)[0];
+  const end = buildScenePropRenderPlan(pushed, layers, 0.8)[0];
+  assert.equal(start.kind, 'ball');
+  assert.equal(start.motion, 'rolling');
+  assert.equal(start.held, false);
+  assert.ok(end.x > start.x);
+  assert.ok(end.rotation > start.rotation);
+});
+
+test('renders a ball in red so the visual matches a red-ball story prompt', () => {
+  const pushed = { stateChanges: [{
+    entityType: 'prop', entityId: 'красный мяч', property: 'motion',
+    previousValue: null, value: 'rolling', actorId: 'Fox', evidence: 'Foxy толкает красный мяч лапой.'
+  }] };
+  const plan = buildScenePropRenderPlan(pushed, layers, 0.7)[0];
+  assert.equal(plan.kind, 'ball');
+  assert.equal(plan.motion, 'rolling');
+});
+
+test('preserves the named ball color instead of hardcoding red for every ball', () => {
+  const renderFillStyles = scene => {
+    const fillStyles = [];
+    const context = new Proxy({}, {
+      get(target, property) {
+        if (['save', 'restore', 'beginPath', 'closePath', 'stroke', 'fill', 'arc', 'moveTo', 'lineTo', 'fillRect', 'strokeRect', 'ellipse', 'roundRect', 'translate', 'rotate'].includes(property)) return () => {};
+        return undefined;
+      },
+      set(target, property, value) {
+        if (property === 'fillStyle') fillStyles.push(value);
+        target[property] = value;
+        return true;
+      }
+    });
+    drawSceneProps(context, scene, layers, 0.7, 640, 360, 0.5);
+    return fillStyles;
+  };
+  const red = renderFillStyles({ stateChanges: [{
+    entityType: 'prop', entityId: 'red ball', property: 'motion',
+    value: 'rolling', actorId: 'Fox', evidence: 'Foxy pushes the red ball.'
+  }] });
+  const blue = renderFillStyles({ stateChanges: [{
+    entityType: 'prop', entityId: 'blue ball', property: 'motion',
+    value: 'rolling', actorId: 'Fox', evidence: 'Foxy pushes the blue ball.'
+  }] });
+  const green = renderFillStyles({ stateChanges: [{
+    entityType: 'prop', entityId: 'green ball', property: 'motion',
+    value: 'rolling', actorId: 'Fox', evidence: 'Foxy pushes the green ball.'
+  }] });
+  const ukrainianRed = renderFillStyles({ stateChanges: [{
+    entityType: 'prop', entityId: "червоний м'яч", property: 'motion',
+    value: 'rolling', actorId: 'Foxy', evidence: "Foxy копає червоний м'яч лапою."
+  }] });
+  assert.ok(red.includes('#e74b4b'));
+  assert.ok(blue.includes('#72c6df'));
+  assert.ok(green.includes('#55a96a'));
+  assert.ok(ukrainianRed.includes('#e74b4b'));
+  assert.ok(!blue.includes('#e74b4b'));
+});

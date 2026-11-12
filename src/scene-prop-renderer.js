@@ -9,7 +9,7 @@ function propKind(name) {
   if (/star|звезд|зірк|estrella/.test(value)) return 'star';
   if (/key|ключ|ключик|llave/.test(value)) return 'key';
   if (/book|книг|книж|libro/.test(value)) return 'book';
-  if (/ball|мяч|куля|pelota/.test(value)) return 'ball';
+  if (/ball|м[’']?яч|куля|pelota/.test(value)) return 'ball';
   if (/apple|яблок|яблук|manzana/.test(value)) return 'apple';
   return 'generic';
 }
@@ -65,7 +65,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   const eased = transition * transition * (3 - 2 * transition);
   const latest = new Map();
   for (const change of changes) {
-    if (!change || change.entityType !== 'prop' || change.property !== 'holder') continue;
+    if (!change || change.entityType !== 'prop' || !['holder', 'motion'].includes(change.property)) continue;
     const entityId = clean(change.entityId);
     if (!entityId) continue;
     latest.set(key(entityId), change);
@@ -75,23 +75,28 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     const actor = layers.find(layer => key(layer?.characterId) === key(actorId));
     const actorX = Number.isFinite(actor?.x) ? actor.x : 0.5;
     const actorY = Number.isFinite(actor?.y) ? actor.y : 0.68;
-    const heldByActor = change.value != null && key(change.value) === key(actorId);
+    const rolling = change.property === 'motion' && key(change.value) === 'rolling';
+    const heldByActor = change.property === 'holder' && change.value != null && key(change.value) === key(actorId);
     const wasHeldByActor = change.previousValue != null && key(change.previousValue) === key(actorId);
     const ground = { x: 0.68, y: 0.79 };
     const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
     const hand = rigAnchor
       ? { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation }
       : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96), y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
-    const from = wasHeldByActor ? hand : ground;
-    const to = heldByActor ? hand : ground;
+    const rollStart = { x: clamp(actorX + (actor?.flipX ? -0.14 : 0.14), 0.04, 0.96), y: ground.y };
+    const rollEnd = { x: clamp(rollStart.x + (actor?.flipX ? -0.28 : 0.28), 0.04, 0.96), y: ground.y };
+    const from = rolling ? rollStart : (wasHeldByActor ? hand : ground);
+    const to = rolling ? rollEnd : (heldByActor ? hand : ground);
     const x = from.x + (to.x - from.x) * eased;
     const y = from.y + (to.y - from.y) * eased;
-    const rotation = (from.rotation || 0) + ((to.rotation || 0) - (from.rotation || 0)) * eased;
+    const rotation = rolling ? eased * (actor?.flipX ? -Math.PI * 2 : Math.PI * 2)
+      : (from.rotation || 0) + ((to.rotation || 0) - (from.rotation || 0)) * eased;
     return {
       id: clean(change.entityId),
       kind: propKind(change.entityId),
       x, y, rotation,
       held: heldByActor,
+      motion: rolling ? 'rolling' : 'static',
       visible: true,
       scale: 1,
       evidence: clean(change.evidence)
@@ -109,6 +114,21 @@ function drawStar(context, size) {
   }
   context.closePath();
   context.fill();
+}
+
+function ballPalette(prop) {
+  const source = key(prop?.id) + ' ' + key(prop?.evidence);
+  if (/(?:red\s+ball|красн\p{L}*\s+мяч|червон\p{L}*\s+м[’']?яч|pelota\s+roja)/iu.test(source)) {
+    return { fill: '#e74b4b', stroke: '#7a2020' };
+  }
+  if (/(?:blue\s+ball|син\p{L}*\s+мяч|син\p{L}*\s+куля|pelota\s+azul)/iu.test(source)) {
+    return { fill: '#72c6df', stroke: '#24566c' };
+  }
+  if (/(?:green\s+ball|зел[её]н\p{L}*\s+мяч|зелен\p{L}*\s+куля|pelota\s+verde)/iu.test(source)) {
+    return { fill: '#55a96a', stroke: '#28533f' };
+  }
+  // Preserve the original blue appearance when the story does not name a ball color.
+  return { fill: '#72c6df', stroke: '#24566c' };
 }
 
 function drawProp(context, prop, x, y, time) {
@@ -132,7 +152,8 @@ function drawProp(context, prop, x, y, time) {
     context.fillRect(-0.025, -0.018, 0.05, 0.036); context.strokeRect(-0.025, -0.018, 0.05, 0.036);
     context.strokeStyle = '#f5d9a8'; context.beginPath(); context.moveTo(0, -0.016); context.lineTo(0, 0.016); context.stroke();
   } else if (prop.kind === 'ball') {
-    context.fillStyle = '#72c6df'; context.strokeStyle = '#24566c';
+    const palette = ballPalette(prop);
+    context.fillStyle = palette.fill; context.strokeStyle = palette.stroke;
     context.beginPath(); context.arc(0, 0, 0.022, 0, Math.PI * 2); context.fill(); context.stroke();
     context.beginPath(); context.arc(0, 0, 0.011, 0, Math.PI * 2); context.stroke();
   } else if (prop.kind === 'apple') {
