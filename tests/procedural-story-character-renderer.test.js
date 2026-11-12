@@ -65,3 +65,10 @@ test('uses explicit human species as the authoritative fallback type', () => {
   profile: { species: 'human', visualDescription: 'wearing a wolf costume' }
  }), true);
 });
+
+test('does not mistake ordinary words such as song or left for non-human species', () => {
+ assert.equal(shouldDrawProceduralStoryCharacter({
+  characterId: 'Kael',
+  profile: { visualDescription: 'A young man with a song in the background and a scar over his left eye.' }
+ }), true);
+});
