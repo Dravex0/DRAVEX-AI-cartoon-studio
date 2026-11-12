@@ -218,7 +218,7 @@ describe('procedural character rig motion presets', () => {
     assert.equal(end.rightArm?.rotation || 0, 0);
   });
 
-  it('creates a jump with vertical root movement and a greeting with arm motion', () =>
+  it('creates a jump with vertical root movement and a greeting with arm motion', () => {
     const jump = createCharacterRigMotionPreset(rig(), 'jump');
     const wave = createCharacterRigMotionPreset(rig(), 'wave');
     assert.ok(jump.timeline.keyframes.some(frame => frame.poses.Foxy?.root?.y < 0));
