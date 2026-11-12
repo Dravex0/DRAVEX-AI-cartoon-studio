@@ -138,3 +138,14 @@ test('uses an explicitly authored grip point transformed by the posed hand rotat
   assert.ok(Math.abs(plan.y - 0.54) < 1e-9);
   assert.ok(Math.abs(plan.rotation - Math.PI / 2) < 1e-9);
 });
+
+
+test('renders a prop at its explicitly authored scene anchor', () => {
+  const anchoredScene = {
+    ...scene,
+    propAnchors: { 'glowing star': { x: 0.74, y: 0.42 } }
+  };
+  const plan = buildScenePropRenderPlan(anchoredScene, layers, 0)[0];
+  assert.equal(plan.x, 0.74);
+  assert.equal(plan.y, 0.42);
+});
