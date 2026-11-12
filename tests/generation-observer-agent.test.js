@@ -25,6 +25,17 @@ test("missing evidence is never treated as success", () => {
   assert.equal(report.stageResults[0].verdict, "not-verifiable");
 });
 
+test("unknown voice and lip-sync provenance remains unverified rather than successful", () => {
+  const observer = createGenerationObserver();
+  observer.recordStage("voiceGeneration", { status: "unknown", output: { trackCount: 2, includedInExport: true, provenance: "not-tracked" } });
+  observer.recordStage("lipSync", { status: "unknown", output: { eligibleTrackCount: 2, analyzedTrackCount: 0, appliedToExport: false } });
+  const report = observer.report();
+  assert.equal(report.stageResults.find(item => item.stage === "voiceGeneration").verdict, "not-verifiable");
+  assert.equal(report.stageResults.find(item => item.stage === "lipSync").verdict, "not-verifiable");
+  assert.equal(report.summary.unverifiedStages, 2);
+  assert.equal(report.summary.overall, "incomplete-evidence");
+});
+
 test("visual claims require explicit assessments and artifact metadata is not visual proof", () => {
   const observer = createGenerationObserver();
   observer.attachArtifact({ kind: "video", name: "film.webm", sizeBytes: 5000, durationSeconds: 12 });
