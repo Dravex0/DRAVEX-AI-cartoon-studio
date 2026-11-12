@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { drawProceduralStoryCharacter } from '../src/procedural-story-character-renderer.js';
+import { drawProceduralStoryCharacter, shouldDrawProceduralStoryCharacter } from '../src/procedural-story-character-renderer.js';
 function mockContext(){const noop=()=>{};return new Proxy({save:noop,restore:noop,beginPath:noop,ellipse:noop,fill:noop,stroke:noop,moveTo:noop,lineTo:noop,quadraticCurveTo:noop,closePath:noop,fillRect:noop,arc:noop,translate:noop,rotate:noop,scale:noop},{get:(target,key)=>key in target?target[key]:noop,set:(target,key,value)=>(target[key]=value,true)});}
 test('draws a named character from its text profile without a sprite',()=>{const result=drawProceduralStoryCharacter(mockContext(),{x:100,y:200,characterId:'Kael Vorran',profile:{hair:'messy black hair',eyeColor:'scarlet red',clothing:'black tactical cloak',signatureAccessories:'broken crown'},storyText:'He draws his Shadow Blade and attacks.'});assert.equal(result.characterId,'Kael Vorran');assert.equal(result.colors.hair,'#17131f');assert.equal(result.colors.eyes,'#d52843');});
 test('animates a named character while retaining identity',()=>{const a=drawProceduralStoryCharacter(mockContext(),{x:100,y:200,time:0,action:'run',characterId:'Hero'}),b=drawProceduralStoryCharacter(mockContext(),{x:100,y:200,time:1,action:'run',characterId:'Hero'});assert.equal(a.characterId,b.characterId);assert.notEqual(a.x,b.x);assert.equal(b.action,'run');});
@@ -38,4 +38,13 @@ test('renders Kael as a visible full-body character with his black hair, scarlet
  assert.ok(calls.quadraticCurveTo>=1,'hair silhouette should be drawn');
  assert.ok(calls.lineTo>=12,'body, cloak and weapon geometry should be drawn');
  assert.ok(calls.fill>0&&calls.stroke>0,'visible filled and stroked shapes should be rendered');
+});
+
+
+test('uses the procedural character only when no generated media or character art is available', () => {
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Kael' }), true);
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Kael', hasGeneratedMedia: true }), false);
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Kael', hasReadyCharacterLayer: true }), false);
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Kael', hasReadyCharacterRig: true }), false);
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: '' }), false);
 });
