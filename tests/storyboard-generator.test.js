@@ -196,7 +196,7 @@ test('creates a single action phase for explicit movement without inventing othe
 
 test('splits an explicitly written attack and target stagger into ordered grounded phases', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nKael — a young warrior.\\nGuard — an armored guard.\\n\\nScene 1: Clash\\nKael strikes the guard, and the guard stumbles backward.',
+    'Characters:\nKael — a young warrior.\nGuard — an armored guard.\n\nScene 1: Clash\nKael strikes the guard, and the guard stumbles backward.',
     'en',
     'Kael'
   );
@@ -219,7 +219,7 @@ test('splits an explicitly written attack and target stagger into ordered ground
 
 test('does not assign a stagger reaction to a character other than the attack target', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nKael — a young warrior.\\nGuard — an armored guard.\\nFoxy — a small fox.\\n\\nScene 1: Clash\\nKael strikes the guard, and Foxy stumbles backward.',
+    'Characters:\nKael — a young warrior.\nGuard — an armored guard.\nFoxy — a small fox.\n\nScene 1: Clash\nKael strikes the guard, and Foxy stumbles backward.',
     'en',
     'Kael'
   );
@@ -229,7 +229,7 @@ test('does not assign a stagger reaction to a character other than the attack ta
 
 test('recognizes an explicitly written Russian attack followed by the target stagger', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nКаэль — молодой воин.\\nСтражник — воин в доспехах.\\n\\nScene 1: Столкновение\\nКаэль ударяет стражника, и стражник отшатывается назад.',
+    'Characters:\nКаэль — молодой воин.\nСтражник — воин в доспехах.\n\nScene 1: Столкновение\nКаэль ударяет стражника, и стражник отшатывается назад.',
     'ru',
     'Каэль'
   );
