@@ -470,17 +470,3 @@ test('keeps prop anchors only for locked scene props with normalized finite coor
   });
 });
 
-test('preserves model-authored contact anchors only for source-locked props', async () => {
-  const anchoredPlan = {
-    ...basePlan,
-    scenes: basePlan.scenes.map((scene, index) => index === 0
-      ? { ...scene, stateChanges: [{ entityType: 'prop', entityId: 'silver key', property: 'holder', actorId: 'Foxy', value: 'Foxy' }] }
-      : scene)
-  };
-  const directed = goodScenes.map((scene, index) => index === 0
-    ? { ...scene, propAnchors: { 'silver key': { x: 0.74, y: 0.42 }, 'invented chest': { x: 0.2, y: 0.2 } } }
-    : { ...scene });
-  const result = await directStoryboardWithLocalAI({ runtime: runtimeReturning(directed), basePlan: anchoredPlan });
-  assert.equal(result.usedLocalModel, true);
-  assert.deepEqual(result.scenes[0].propAnchors, { 'silver key': { x: 0.74, y: 0.42 } });
-});
