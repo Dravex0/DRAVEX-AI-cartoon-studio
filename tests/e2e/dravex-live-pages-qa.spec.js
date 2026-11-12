@@ -371,7 +371,7 @@ test('DRAVEX live Pages QA: Kael Character Bible → prompt → real published o
 });
 
 
-test('DRAVEX source build: Kael is actually drawn on the portrait canvas', async ({ page }, testInfo) => {
+test('DRAVEX source build: procedural renderer draws a skin-tone pixel hint on the portrait canvas', async ({ page }, testInfo) => {
   test.setTimeout(45_000);
   await page.goto('/');
   await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);
@@ -413,7 +413,7 @@ test('DRAVEX source build: Kael is actually drawn on the portrait canvas', async
   });
   expect(evidence.width).toBe(720);
   expect(evidence.height).toBe(1280);
-  expect(evidence.skinPixels, 'Kael face/hand pixels must be present in the expected character region').toBeGreaterThan(50);
+  expect(evidence.skinPixels, 'Skin-tone pixels should appear in the procedural character region; this is not semantic identity recognition.').toBeGreaterThan(50);
 });
 
 
