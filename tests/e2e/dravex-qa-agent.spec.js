@@ -382,6 +382,11 @@ test('DRAVEX Visual QA Agent: keeps rescue props visible through discovery, lift
   await expect(page.locator('#scenes button.scene')).toHaveCount(3);
   await expect(page.locator('#character')).toHaveValue('Kel');
 
+  // Creating a storyboard updates the scene model; selecting the first card
+  // asks the paused preview renderer to draw that newly created scene.
+  await page.locator('#scenes button.scene').first().click();
+  await page.waitForTimeout(150);
+
   const inspectCanvas = async () => page.locator('#canvas').evaluate(canvas => {
     const context = canvas.getContext('2d', { willReadFrequently: true });
     if (!context) throw new Error('Local canvas context is unavailable.');
@@ -409,6 +414,10 @@ test('DRAVEX Visual QA Agent: keeps rescue props visible through discovery, lift
   const discovery = await inspectCanvas();
   expect(discovery.trappedBird).toBeGreaterThan(10);
   expect(discovery.branch).toBeGreaterThan(10);
+  await testInfo.attach('kel-rescue-discovery-canvas.png', {
+    body: await page.locator('#canvas').screenshot(),
+    contentType: 'image/png'
+  });
   await testInfo.attach('kel-rescue-discovery-canvas.json', {
     body: Buffer.from(JSON.stringify(discovery, null, 2)),
     contentType: 'application/json'
@@ -419,12 +428,20 @@ test('DRAVEX Visual QA Agent: keeps rescue props visible through discovery, lift
   const lifting = await inspectCanvas();
   expect(lifting.trappedBird).toBeGreaterThan(10);
   expect(lifting.branch).toBeGreaterThan(10);
+  await testInfo.attach('kel-rescue-lifting-canvas.png', {
+    body: await page.locator('#canvas').screenshot(),
+    contentType: 'image/png'
+  });
 
   await page.locator('#scenes button.scene').nth(2).click();
   await page.waitForTimeout(200);
   const freedom = await inspectCanvas();
   expect(freedom.freedBird).toBeGreaterThan(10);
   expect(freedom.branch).toBeGreaterThan(10);
+  await testInfo.attach('kel-rescue-freedom-canvas.png', {
+    body: await page.locator('#canvas').screenshot(),
+    contentType: 'image/png'
+  });
   expect(pageErrors).toEqual([]);
   await testInfo.attach('kel-rescue-prop-continuity.json', {
     body: Buffer.from(JSON.stringify({ discovery, lifting, freedom }, null, 2)),
