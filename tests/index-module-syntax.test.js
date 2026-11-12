@@ -190,3 +190,14 @@ test('voice generation isolates progress observer failures from synthesis', () =
   assert.equal((app.match(/emitVoiceProgress\(\{phase:/g) || []).length, 3);
   assert.doesNotMatch(app, /onProgress\(\{phase:'(?:reused|generating|scene-completed)'/);
 });
+
+test('WebM export isolates recording and scene progress observer failures', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const start = app.indexOf('async function exportFilm(');
+  const end = app.indexOf("$('export').onclick", start);
+  assert.ok(start >= 0 && end > start, 'exportFilm source must be present');
+  const source = app.slice(start, end);
+  assert.match(source, /const emitExportProgress=detail=>emitProgressSafely\(onProgress,detail,error=>console\.warn\(/);
+  assert.equal((source.match(/emitExportProgress\(\{phase:/g) || []).length, 2);
+  assert.doesNotMatch(source, /onProgress\?\.\(/);
+});
