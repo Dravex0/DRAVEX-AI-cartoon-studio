@@ -205,9 +205,9 @@ describe('procedural character rig motion presets', () => {
     const result = createCharacterRigMotionPreset(rig(), 'stagger');
     assert.equal(result.status, 'ready');
     assert.equal(result.timeline.keyframes.length, 5);
-    const start = sampleCharacterRigTimeline(result.timeline, 0).Foxy;
+    const start = sampleCharacterRigTimeline(result.timeline, 0).Foxy || {};
     const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
-    const end = sampleCharacterRigTimeline(result.timeline, 1).Foxy;
+    const end = sampleCharacterRigTimeline(result.timeline, 1).Foxy || {};
     assert.ok(middle.root.x < 0, 'root should recoil backward');
     assert.ok(middle.root.y > 0, 'root should dip during the stumble');
     assert.ok(Math.abs(middle.head.rotation) > 0.05);
