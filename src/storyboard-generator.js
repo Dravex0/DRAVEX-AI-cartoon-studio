@@ -12,6 +12,7 @@ import { buildProductionScene } from './scene-production.js';
 import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 import { inferEnvironmentMotion } from './environment-motion.js';
 import { inferPropInteractions } from './scene-prop-interactions.js';
+import { buildDeterministicScenePropAnchors } from './scene-prop-layout.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -183,6 +184,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     scene.causalLink = causalLinks[index];
     scene.stateChanges = stateChanges[index];
     scene.propStates = propStateSnapshots[index];
+    scene.propAnchors = buildDeterministicScenePropAnchors(scene);
     // Keep interaction inference source-grounded and limited to characters assigned to this scene.
     const characterInteractions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
