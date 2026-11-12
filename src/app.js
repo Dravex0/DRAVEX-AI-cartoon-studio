@@ -2850,6 +2850,10 @@ const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targ
 titles[targetIndex]=scene.title;descriptions[targetIndex]=scene.description;
 sceneMetadata[targetIndex]=scene;
 const prompt=buildImageGenerationPrompt(scene,characterBible,{includeNegative:false,visualStyle:$('style').value});
+if(!prompt){
+ status.textContent=uiLang==='ru'?'Для фона без персонажей сначала укажи описание окружения сцены.':'Add an environment description before generating a background-only scene.';
+ return;
+}
 const hasSavedPhotoReference=sceneHasSavedCharacterImageReference(scene,characterBible);
 const referenceNotice=hasSavedPhotoReference?(uiLang==='ru'?'Фото-референсы не отправляются; AI Horde использует текстовое описание. ':'Photo references are not uploaded; AI Horde uses text descriptions only. '):'';
 renderScenes();
@@ -3453,6 +3457,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      updateFilmVideoProgress(null,filmProgressText('Подготовка изображений сцен','Preparing scene images'));
      status.textContent='Создаём изображение сцены '+(index+1)+' из '+scenes.length+' в AI Horde…';
      const imagePrompt=buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value});
+     if(!imagePrompt)throw new Error('Background-only generation requires an explicit environment description for scene '+(index+1)+'.');
      const referenceNotice=sceneHasSavedCharacterImageReference(meta,characterBible)?(uiLang==='ru'?'Фото-референсы не отправляются; AI Horde использует текстовые описания. ':'Photo references are not uploaded; AI Horde uses text descriptions only. '):'';
      status.textContent=referenceNotice+'Создаём изображение сцены '+(index+1)+' из '+scenes.length+' в AI Horde…';
      const imageResult=await generateImageWithHorde({prompt:imagePrompt,negativePrompt:meta.negativePrompt||'',...quality,seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),signal,onProgress:queue=>{
