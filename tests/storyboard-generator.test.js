@@ -201,6 +201,10 @@ test('splits an explicitly written attack and target stagger into ordered ground
     'Kael'
   );
   const scene = result.scenes[0];
+  assert.deepEqual(result.brief.characters, ['Kael', 'Guard']);
+  assert.equal(scene.storyDetail, 'Kael strikes the guard, and the guard stumbles backward.');
+  assert.deepEqual(scene.characters, ['Kael', 'Guard']);
+  assert.equal(scene.interactions[0]?.type, 'attack');
   assert.deepEqual(scene.actionTimeline.phases.map(({ phase, actorId, targetId, start, end }) => ({
     phase, actorId, targetId, start, end
   })), [
