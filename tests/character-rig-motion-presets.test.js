@@ -184,9 +184,9 @@ describe('procedural character rig motion presets', () => {
     const result = createCharacterRigMotionPreset(rig(), 'dodge');
     assert.equal(result.status, 'ready');
     assert.equal(result.timeline.keyframes.length, 5);
-    const start = sampleCharacterRigTimeline(result.timeline, 0).Foxy;
+    const start = sampleCharacterRigTimeline(result.timeline, 0).Foxy || {};
     const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
-    const end = sampleCharacterRigTimeline(result.timeline, 1).Foxy;
+    const end = sampleCharacterRigTimeline(result.timeline, 1).Foxy || {};
     assert.ok(Math.abs(middle.leftArm.rotation) > 0.5);
     assert.ok(Math.abs(middle.rightArm.rotation) > 0.5);
     assert.ok(Math.abs(middle.leftLeg.rotation) > 0.2);
