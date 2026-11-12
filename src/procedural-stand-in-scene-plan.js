@@ -98,9 +98,10 @@ export function buildProceduralStandInScenePlan(scene = {}, options = {}) {
     }
 
     const semanticIntent = clean(scene?.semanticActionIntent?.intent, 40);
-    const isTeamPartner = activePhase && key(activePhase.targetId) === actorKey
-      && ['team_magic', 'energy_clash'].includes(semanticIntent);
-    const primaryActor = activePhase ? positions.get(key(activePhase.actorId)) : null;
+    const incomingPartnerPhase = phases.find(phase => key(phase?.targetId) === actorKey) || null;
+    const isTeamPartner = Boolean(incomingPartnerPhase
+      && ['team_magic', 'energy_clash'].includes(semanticIntent));
+    const primaryActor = isTeamPartner ? positions.get(key(incomingPartnerPhase.actorId)) : null;
     if (isTeamPartner && primaryActor) {
       target = { x: primaryActor.x, y: primaryActor.y - 0.08 };
     }
@@ -115,8 +116,8 @@ export function buildProceduralStandInScenePlan(scene = {}, options = {}) {
       target,
       heldTarget,
       held: Boolean(heldRecord),
-      targetId: targetId || null,
-      phase: activePhase?.phase || null
+      targetId: targetId || (isTeamPartner ? clean(incomingPartnerPhase.targetId) : null),
+      phase: activePhase?.phase || (isTeamPartner ? incomingPartnerPhase.phase : null)
     };
   });
 }
