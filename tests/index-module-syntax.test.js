@@ -170,3 +170,13 @@ test('cinematic camera transform covers generated media, props, and rigged chara
   assert.ok(cameraRestore > characterDraw);
   assert.ok(titleDraw > cameraRestore);
 });
+
+
+test('all ComfyUI scene-generation paths prioritize manual references and preserve provider capacity reporting', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.match(app, /import \{ prioritizeCharacterReferenceImages \} from ["']\.\/character-reference-selection\.js["']/);
+  assert.match(app, /async function buildCharacterReferenceImagesForScene\(scene\)[\s\S]*?return prioritizeCharacterReferenceImages\(comfyCharacterReferenceFiles,profileImages\)/);
+  assert.equal((app.match(/buildCharacterReferenceImagesForScene\(/g) || []).length, 4);
+  assert.doesNotMatch(app, /profileReferences\.concat\(comfyCharacterReferenceFiles\.filter\(Boolean\)\)\.slice\(0,2\)/);
+  assert.doesNotMatch(app, /profileReferenceImages\.concat\(comfyCharacterReferenceFiles\.filter\(Boolean\)\)\.slice\(0,2\)/);
+});
