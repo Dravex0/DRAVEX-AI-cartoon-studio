@@ -184,3 +184,69 @@ test('maps explicit fear reactions through the Doodle adapter to the existing de
   assert.ok(Math.abs(middle.leftArm.rotation) > 0.4);
   assert.ok(Math.abs(middle.rightArm.rotation) > 0.4);
 });
+
+
+test('solves a grounded pickup phase to the explicit prop anchor and keeps the hand there while holding', () => {
+  const target = { x: 0.78, y: 0.35 };
+  const candidate = {
+    schemaVersion: 1,
+    characterId: 'Foxy',
+    bones: [
+      { id: 'root', parentId: null, pivotX: 0.5, pivotY: 0.78, pivotEnabled: true },
+      { id: 'torso', parentId: 'root', pivotX: 0.5, pivotY: 0.43, pivotEnabled: true },
+      { id: 'rightArm', parentId: 'torso', pivotX: 0.63, pivotY: 0.39, pivotEnabled: true },
+      { id: 'rightLowerArm', parentId: 'rightArm', pivotX: 0.69, pivotY: 0.47, pivotEnabled: true }
+    ],
+    parts: [
+      { id: 'torso-part', boneId: 'torso', imageUrl: 'https://assets.example/torso.png', x: 0.5, y: 0.52, width: 0.3, height: 0.34 },
+      { id: 'upper-arm-part', boneId: 'rightArm', imageUrl: 'https://assets.example/upper-arm.png', x: 0.65, y: 0.4, width: 0.15, height: 0.23 },
+      { id: 'rightHand', boneId: 'rightLowerArm', imageUrl: 'https://assets.example/hand.png', x: 0.71, y: 0.55, width: 0.14, height: 0.22, gripOffsetX: 0.07, gripOffsetY: 0 }
+    ]
+  };
+  const scene = {
+    characters: ['Foxy'],
+    characterCastProvided: true,
+    storyDetail: 'Foxy picks up the glowing star.',
+    propAnchors: { 'glowing star': target },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'glowing star', property: 'holder',
+      previousValue: null, value: 'Foxy', actorId: 'Foxy',
+      evidence: 'Foxy picks up the glowing star.'
+    }],
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0.2, end: 0.8, actorId: 'Foxy',
+        targetId: 'glowing star', description: 'Foxy picks up the glowing star.',
+        evidence: 'Foxy picks up the glowing star.'
+      }]
+    }
+  };
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [candidate]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.mappedActions[0].contactTargetId, 'glowing star');
+  assert.equal(result.mappedActions[0].contactTargetResolved, true);
+  assert.equal(result.mappedActions[0].holdAfterAction, true);
+
+  const pose = sampleCharacterRigTimeline(result.timeline, 0.9).Foxy;
+  const hand = applyCharacterRigPose(candidate.parts, candidate, pose).find(part => part.id === 'rightHand');
+  const grip = {
+    x: hand.x + Math.cos(hand.rotation) * hand.gripOffsetX - Math.sin(hand.rotation) * hand.gripOffsetY,
+    y: hand.y + Math.sin(hand.rotation) * hand.gripOffsetX + Math.cos(hand.rotation) * hand.gripOffsetY
+  };
+  assert.ok(Math.abs(grip.x - target.x) < 0.001);
+  assert.ok(Math.abs(grip.y - target.y) < 0.001);
+});
+
+test('does not infer a hand contact point when a prop has no explicit scene anchor', () => {
+  const scene = makeScene('picks up the glowing star');
+  scene.actionTimeline.phases[0].targetId = 'glowing star';
+  scene.stateChanges = [{
+    entityType: 'prop', entityId: 'glowing star', property: 'holder',
+    previousValue: null, value: 'Foxy', actorId: 'Foxy'
+  }];
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.ok(result.skipped.some(item => item.reason === 'explicit-prop-anchor-missing'));
+  assert.equal(result.mappedActions[0].contactTargetResolved, undefined);
+});
