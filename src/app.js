@@ -1503,7 +1503,6 @@ function invalidateCurrentSceneVideoForEdit(){
  updateProductionPreview();
 }));
 $('sceneCompositionMode').addEventListener('change',()=>{
- const key=String(sceneMetadata[sceneIndex]?.id||'');
  sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),characterCompositionMode:$('sceneCompositionMode').value,environmentDescription:$('sceneEnvironmentDescription').value.trim()};
  invalidateCurrentSceneVideoForEdit();
  if($('sceneCompositionMode').value==='background-only'){
@@ -1513,6 +1512,7 @@ $('sceneCompositionMode').addEventListener('change',()=>{
   $('status').textContent=uiLang==='ru'?'Режим фона включён: старое изображение очищено. Добавь описание окружения и создай новый фон.':'Background-only mode enabled: the previous image was cleared. Add environment details and generate a new background.';
  }
  updateProductionPreview();
+ if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
  writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
 });
 $("facialPartSelect").addEventListener("change",syncFacialRigEditor);
