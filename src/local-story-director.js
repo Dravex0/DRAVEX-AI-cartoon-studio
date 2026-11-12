@@ -277,7 +277,7 @@ export async function directStoryboardWithLocalAI({
       startState: clean(scene.startState, 1_000),
       endState: clean(scene.endState, 1_000),
       actionTimeline: scene.actionTimeline ?? null,
-      propAnchors: normalizeScenePropAnchors(scene.propAnchors, [...(base.stateChanges || []), ...(base.propStates || [])])
+      propAnchors: normalizeScenePropAnchors(scene.propAnchors, [...(Array.isArray(base.stateChanges) ? base.stateChanges : []), ...(Array.isArray(base.propStates) ? base.propStates : [])])
     };
   }));
 
