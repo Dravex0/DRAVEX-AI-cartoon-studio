@@ -3553,7 +3553,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   const finalGeneratedImageScenes=sceneMetadata.filter(scene=>Boolean(scene.generatedImageUrl));
   const finalImageStageStatus=finalGeneratedImageScenes.length===scenes.length?'completed':finalGeneratedImageScenes.length===0&&mode==='comfyui'?'skipped':'unknown';
   activeGenerationObserver?.recordStage('imageGeneration',{status:finalImageStageStatus,output:{sceneCount:scenes.length,generatedImageSceneCount:finalGeneratedImageScenes.length,scenes:finalGeneratedImageScenes.map(scene=>({sceneId:scene.id,imageUrl:scene.generatedImageUrl})),reason:finalImageStageStatus==='skipped'?'ComfyUI text-to-video path did not require generated still images.':null}});
-  activeGenerationObserver?.recordStage('videoGeneration',{status:report.failed?'failed':'completed',output:{total:report.total,completed:report.completed,skipped:report.skipped,failed:report.failed,results:report.results.map(item=>({index:item.index,status:item.status,error:item.error||null}))},error:report.failed?report.results.filter(item=>item.status==='failed').map(item=>item.error).join('; '):''});
+  activeGenerationObserver?.recordStage('videoGeneration',{status:report.cancelled?'cancelled':report.failed?'failed':'completed',output:{total:report.total,completed:report.completed,skipped:report.skipped,failed:report.failed,cancelled:Boolean(report.cancelled),results:report.results.map(item=>({index:item.index,status:item.status,error:item.error||null}))},error:report.failed?report.results.filter(item=>item.status==='failed').map(item=>item.error).join('; '):''});
   refreshGenerationObserverReport();
   if(report.cancelled){
    filmProgressTracking=false;
