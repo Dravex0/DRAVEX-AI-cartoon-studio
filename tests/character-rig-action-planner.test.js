@@ -251,3 +251,14 @@ test('does not infer a hand contact point when a prop has no explicit scene anch
   assert.ok(result.skipped.some(item => item.reason === 'explicit-prop-anchor-missing'));
   assert.equal(result.mappedActions[0].contactTargetResolved, undefined);
 });
+
+
+test('does not solve contact against an anchor for a prop absent from locked state changes', () => {
+  const scene = makeScene('picks up the glowing star');
+  scene.actionTimeline.phases[0].targetId = 'glowing star';
+  scene.propAnchors = { 'glowing star': { x: 0.78, y: 0.35 } };
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.ok(result.skipped.some(item => item.reason === 'explicit-prop-target-not-locked'));
+  assert.equal(result.mappedActions[0].contactTargetResolved, undefined);
+});
