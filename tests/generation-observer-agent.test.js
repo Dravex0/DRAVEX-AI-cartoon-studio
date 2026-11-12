@@ -73,3 +73,32 @@ test("observer tokenizes Unicode text and whitespace correctly", () => {
   assert.equal(report.requirementChecks[0].status, "text-evidence-found");
   assert.deepEqual(report.requirementChecks[0].missingTerms, []);
 });
+
+test("a pending required stage keeps the overall report incomplete", () => {
+  const observer = createGenerationObserver({
+    prompt: "Kel helps a small bird",
+    requirements: [{ id: "hero", text: "Kel", evidenceTerms: ["Kel"] }]
+  });
+  for (const stage of GENERATION_OBSERVER_STAGES) {
+    if (stage === "videoGeneration") {
+      observer.recordStage(stage, { status: "pending" });
+    } else if (stage === "voiceGeneration" || stage === "lipSync") {
+      observer.recordStage(stage, { status: "not-configured" });
+    } else {
+      observer.recordStage(stage, { status: "completed", output: { artifactId: stage } });
+    }
+  }
+  const report = observer.report({ interpretation: "Kel helps a bird" });
+  assert.equal(report.stageResults.find(item => item.stage === "videoGeneration").verdict, "pending");
+  assert.equal(report.summary.overall, "incomplete-evidence");
+});
+
+test("an empty output object is not accepted as completed stage evidence", () => {
+  const observer = createGenerationObserver();
+  observer.recordStage("videoGeneration", { status: "completed", output: {} });
+  const report = observer.report();
+  const stage = report.stageResults.find(item => item.stage === "videoGeneration");
+  assert.equal(stage.verdict, "not-verifiable");
+  assert.equal(report.summary.unverifiedStages, 8);
+  assert.equal(report.summary.overall, "incomplete-evidence");
+});
