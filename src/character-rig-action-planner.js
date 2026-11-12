@@ -61,7 +61,10 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
       skipped.push({ actorId, phase: phase.phase, reason: 'actor-rig-missing' });
       continue;
     }
-    const contactTarget = preset === 'reach' && phase.targetId
+    const targetIsLockedProp = Boolean(phase.targetId && Array.isArray(scene.stateChanges)
+      && scene.stateChanges.some(change => change?.entityType === 'prop'
+        && key(change.entityId) === key(phase.targetId)));
+    const contactTarget = preset === 'reach' && targetIsLockedProp
       ? resolveScenePropAnchor(scene, phase.targetId)
       : null;
     const result = preset
@@ -72,7 +75,11 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
         actorId,
         phase: phase.phase,
         targetId: phase.targetId || null,
-        reason: phase.targetId ? 'explicit-prop-anchor-missing' : 'explicit-prop-target-missing'
+        reason: !phase.targetId
+          ? 'explicit-prop-target-missing'
+          : !targetIsLockedProp
+            ? 'explicit-prop-target-not-locked'
+            : 'explicit-prop-anchor-missing'
       });
     }
     if (result.status !== 'ready' || !result.timeline) {
