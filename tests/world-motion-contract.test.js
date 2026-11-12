@@ -29,3 +29,18 @@ test('world motion contract does not invent movement when no explicit cues exist
 test('world motion contract ignores incomplete interaction records', () => {
   assert.equal(buildWorldMotionInstructions({ interactions: [{ actorId: 'Kel', type: 'push' }] }), '');
 });
+
+
+test('world motion contract carries unchanged and transitioned props across shot boundaries', () => {
+  const prompt = buildWorldMotionInstructions({
+    propStates: [
+      { entityType: 'prop', entityId: 'small mechanical bird', property: 'state', startValue: 'trapped', value: 'trapped', actorId: 'Kel' },
+      { entityType: 'prop', entityId: 'fallen branch', property: 'state', startValue: 'fallen', value: 'lifted', actorId: 'Kel' },
+      { entityType: 'prop', entityId: 'fallen branch', property: 'holder', startValue: null, value: 'Kel', actorId: 'Kel' }
+    ],
+    stateChanges: []
+  });
+  assert.match(prompt, /small mechanical bird.*remains state "trapped"/);
+  assert.match(prompt, /fallen branch.*changes state from "fallen" to "lifted"/);
+  assert.match(prompt, /fallen branch.*changes holder from "not held \/ not yet established" to "Kel"/);
+});
