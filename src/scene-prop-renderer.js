@@ -82,7 +82,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     const entityId = clean(change.entityId);
     if (!entityId) continue;
     if (change.property === 'holder') latestHolders.set(key(entityId), change);
-    if (change.property === 'state' && ['trapped', 'free'].includes(key(change.value))) {
+    if (change.property === 'state' && ['trapped', 'free', 'fallen', 'lifted'].includes(key(change.value))) {
       latestStates.set(key(entityId), change);
     }
   }
