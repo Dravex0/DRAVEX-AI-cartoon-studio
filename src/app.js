@@ -897,7 +897,7 @@ const hasCharacterLayers=Array.isArray(currentSceneData.characterLayers)&&curren
 const hasCharacterRigs=Array.isArray(currentSceneData.characterRigs)&&currentSceneData.characterRigs.length>0;
 const useProceduralStandIn=!showDemoFox&&!hasGeneratedMedia&&!hasCharacterLayers&&!hasCharacterRigs&&sceneCast.length>0;
 const standInActor=sceneCast[0]||'';
-const standInLayer=useProceduralStandIn?{characterId:standInActor,x:0.4,y:0.78}:null;
+const standInLayer=useProceduralStandIn?{characterId:standInActor,x:0.4,y:0.75}:null;
 let standInPhase=null;
 if(useProceduralStandIn){
  standInPhase=(Array.isArray(currentSceneData.actionTimeline?.phases)?currentSceneData.actionTimeline.phases:[])
@@ -913,10 +913,12 @@ if(useProceduralStandIn){
  const heldRecord=stateRecords.find(change=>change?.entityType==='prop'&&change?.property==='holder'
   &&String(change.value??'').toLocaleLowerCase()===standInActor.toLocaleLowerCase());
  const phaseTarget=standInPhase?.targetId?String(standInPhase.targetId):'';
- const handTarget=heldRecord?{x:standInLayer.x+0.12,y:standInLayer.y-0.08}
-  :phaseTarget?(currentSceneData.propAnchors?.[phaseTarget]||null):null;
+ const heldTarget=heldRecord?{x:standInLayer.x+0.12,y:standInLayer.y-0.08}:null;
+ const separateInteractionTarget=phaseTarget&&(!heldRecord||String(heldRecord.entityId||'').toLocaleLowerCase()!==phaseTarget.toLocaleLowerCase())
+  ?(currentSceneData.propAnchors?.[phaseTarget]||null):null;
+ const actionTarget=separateInteractionTarget||(heldRecord&&phaseTarget&&String(heldRecord.entityId||'').toLocaleLowerCase()===phaseTarget.toLocaleLowerCase()?heldTarget:null);
  const profile=Array.isArray(characterBible)?characterBible.find(item=>String(item?.characterId||'').toLocaleLowerCase()===standInActor.toLocaleLowerCase())||{}:{};
- drawProceduralCharacterStandIn(ctx,{characterId:standInActor,profile,x:standInLayer.x,y:standInLayer.y,width:w,height:h,time:t,progress:sceneMotionProgress,action:standInAction,target:handTarget,held:Boolean(heldRecord)});
+ drawProceduralCharacterStandIn(ctx,{characterId:standInActor,profile,x:standInLayer.x,y:standInLayer.y,width:w,height:h,time:t,progress:sceneMotionProgress,action:standInAction,target:actionTarget,heldTarget,held:Boolean(heldRecord),badgeText:uiLang==='ru'?'ЛОКАЛЬНЫЙ ОБРАЗЕЦ':'LOCAL STAND-IN'});
 }
 canvas.dataset.characterRenderMode=useProceduralStandIn?'procedural-stand-in':hasGeneratedMedia?'generated-media':hasCharacterLayers||hasCharacterRigs?'character-assets':showDemoFox?'built-in-demo-character':'no-character-visual';
 const propCharacterLayers=standInLayer?[standInLayer]:currentSceneData.characterLayers;
