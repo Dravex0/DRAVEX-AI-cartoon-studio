@@ -3811,8 +3811,12 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
         anchor.href=url;
         anchor.download=$('finalFilmDownload').download||'dravex-cartoon-film.webm';
         if(download){document.body.appendChild(anchor);anchor.click();anchor.remove();}
-        activeGenerationObserver?.recordStage('voiceGeneration',{status:voiceTracks.length?'completed':'not-configured',output:voiceTracks.length?{trackCount:voiceTracks.length}:null});
-        activeGenerationObserver?.recordStage('lipSync',{status:lipSyncEligibleTrackCount?'completed':'not-configured',output:lipSyncEligibleTrackCount?{eligibleTrackCount:lipSyncEligibleTrackCount,analyzedTrackCount:exportMouthTracks.length,skippedTrackCount:lipSyncSkippedTracks}:null});
+        // Existing voice tracks are confirmed in the exported mix, but this observer
+        // does not yet know whether they were synthesized in this run or restored.
+        activeGenerationObserver?.recordStage('voiceGeneration',{status:voiceTracks.length?'unknown':'not-configured',output:voiceTracks.length?{trackCount:voiceTracks.length,includedInExport:true,provenance:'not-tracked'}:null});
+        // Lip-sync is complete only when analyzed mouth tracks were actually available
+        // to the export renderer; eligibility alone is not evidence of applied lip-sync.
+        activeGenerationObserver?.recordStage('lipSync',{status:exportMouthTracks.length?'completed':lipSyncEligibleTrackCount?'unknown':'not-configured',output:lipSyncEligibleTrackCount?{eligibleTrackCount:lipSyncEligibleTrackCount,analyzedTrackCount:exportMouthTracks.length,appliedTrackCount:exportMouthTracks.length,skippedTrackCount:lipSyncSkippedTracks,appliedToExport:exportMouthTracks.length>0}:null});
         activeGenerationObserver?.recordStage('export',{status:'completed',output:{filename:anchor.download,mimeType:blob.type||'video/webm',sizeBytes:blob.size,durationMs:timeline.totalDurationMs,width:decoded.width,height:decoded.height}});
         activeGenerationObserver?.attachArtifact({kind:'video',name:anchor.download,mimeType:blob.type||'video/webm',sizeBytes:blob.size,durationSeconds:timeline.totalDurationSeconds,reference:'final-film-object-url',evidenceType:'metadata-and-browser-decode'});
         refreshGenerationObserverReport();
