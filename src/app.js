@@ -3435,7 +3435,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   setFilmProgress(0,filmProgressText('Подготовка сцен','Preparing scenes'),filmProgressText('Сцен: ','Scenes: ')+scenes.length);
   status.textContent='Подготовка '+scenes.length+' сцен к генерации…';
   const generatedImageScenes=sceneMetadata.filter(scene=>Boolean(scene.generatedImageUrl));
-   const imageStageStatus=generatedImageScenes.length===scenes.length?'completed':generatedImageScenes.length===0&&mode==='comfyui'?'skipped':'unknown';
+   const imageStageStatus=generatedImageScenes.length===scenes.length?'completed':generatedImageScenes.length===0&&mode==='comfyui'?'skipped':'running';
    activeGenerationObserver?.recordStage('imageGeneration',{status:imageStageStatus,output:{sceneCount:scenes.length,generatedImageSceneCount:generatedImageScenes.length,scenes:generatedImageScenes.map(scene=>({sceneId:scene.id,imageUrl:scene.generatedImageUrl})),reason:imageStageStatus==='skipped'?'ComfyUI text-to-video path did not require generated still images.':null}});
   activeGenerationObserver?.recordStage('videoGeneration',{status:'running',input:{mode,sceneCount:scenes.length}});
   const report=await generateStoryboardVideos({
@@ -3550,6 +3550,9 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     return persistence.persisted?result:{...result,storageWarning:persistence.error};
    }
   });
+  const finalGeneratedImageScenes=sceneMetadata.filter(scene=>Boolean(scene.generatedImageUrl));
+  const finalImageStageStatus=finalGeneratedImageScenes.length===scenes.length?'completed':finalGeneratedImageScenes.length===0&&mode==='comfyui'?'skipped':'unknown';
+  activeGenerationObserver?.recordStage('imageGeneration',{status:finalImageStageStatus,output:{sceneCount:scenes.length,generatedImageSceneCount:finalGeneratedImageScenes.length,scenes:finalGeneratedImageScenes.map(scene=>({sceneId:scene.id,imageUrl:scene.generatedImageUrl})),reason:finalImageStageStatus==='skipped'?'ComfyUI text-to-video path did not require generated still images.':null}});
   activeGenerationObserver?.recordStage('videoGeneration',{status:report.failed?'failed':'completed',output:{total:report.total,completed:report.completed,skipped:report.skipped,failed:report.failed,results:report.results.map(item=>({index:item.index,status:item.status,error:item.error||null}))},error:report.failed?report.results.filter(item=>item.status==='failed').map(item=>item.error).join('; '):''});
   refreshGenerationObserverReport();
   if(report.cancelled){
