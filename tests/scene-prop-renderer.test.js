@@ -169,7 +169,7 @@ test('preserves the named ball color instead of hardcoding red for every ball', 
     const fillStyles = [];
     const context = new Proxy({}, {
       get(target, property) {
-        if (['save', 'restore', 'beginPath', 'closePath', 'stroke', 'fill', 'arc', 'moveTo', 'lineTo', 'fillRect', 'strokeRect', 'ellipse', 'roundRect'].includes(property)) return () => {};
+        if (['save', 'restore', 'beginPath', 'closePath', 'stroke', 'fill', 'arc', 'moveTo', 'lineTo', 'fillRect', 'strokeRect', 'ellipse', 'roundRect', 'translate', 'rotate'].includes(property)) return () => {};
         return undefined;
       },
       set(target, property, value) {
