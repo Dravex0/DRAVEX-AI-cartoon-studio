@@ -3434,7 +3434,9 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   renderFilmSceneProgress();
   setFilmProgress(0,filmProgressText('Подготовка сцен','Preparing scenes'),filmProgressText('Сцен: ','Scenes: ')+scenes.length);
   status.textContent='Подготовка '+scenes.length+' сцен к генерации…';
-  activeGenerationObserver?.recordStage('imageGeneration',{status:sceneMetadata.some(scene=>Boolean(scene.generatedImageUrl))?'completed':'unknown',output:sceneMetadata.filter(scene=>scene.generatedImageUrl).map(scene=>({sceneId:scene.id,imageUrl:scene.generatedImageUrl}))});
+  const generatedImageScenes=sceneMetadata.filter(scene=>Boolean(scene.generatedImageUrl));
+   const imageStageStatus=generatedImageScenes.length===scenes.length?'completed':generatedImageScenes.length===0&&mode==='comfyui'?'skipped':'unknown';
+   activeGenerationObserver?.recordStage('imageGeneration',{status:imageStageStatus,output:{sceneCount:scenes.length,generatedImageSceneCount:generatedImageScenes.length,scenes:generatedImageScenes.map(scene=>({sceneId:scene.id,imageUrl:scene.generatedImageUrl})),reason:imageStageStatus==='skipped'?'ComfyUI text-to-video path did not require generated still images.':null}});
   activeGenerationObserver?.recordStage('videoGeneration',{status:'running',input:{mode,sceneCount:scenes.length}});
   const report=await generateStoryboardVideos({
    scenes,
