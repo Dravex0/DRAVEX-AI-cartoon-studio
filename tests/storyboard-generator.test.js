@@ -240,3 +240,41 @@ test('keeps Kel branch-lift and mechanical-bird release as ordered, separately t
   ]);
   assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
 });
+
+
+test('keeps Kel rescue state continuous across three explicitly authored scenes', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nKel — a young forest adventurer.\n\nScene 1: Discovery\nKel notices the small mechanical bird trapped under a fallen branch.\n\nScene 2: Lifting the branch\nKel lifts the fallen branch.\n\nScene 3: Freedom\nKel frees the small mechanical bird.',
+    'en',
+    'Kel'
+  );
+
+  assert.equal(result.scenes.length, 3);
+  assert.deepEqual(result.scenes.map(scene => scene.title), [
+    'Discovery',
+    'Lifting the branch',
+    'Freedom'
+  ]);
+
+  const [discovery, lifting, freedom] = result.scenes;
+  assert.ok(discovery.stateChanges.some(change =>
+    change.entityId === 'small mechanical bird' &&
+    change.property === 'state' &&
+    change.value === 'trapped'
+  ));
+  assert.ok(lifting.stateChanges.some(change =>
+    change.entityId === 'fallen branch' &&
+    change.property === 'holder' &&
+    change.value === 'Kel'
+  ));
+  assert.ok(freedom.stateChanges.some(change =>
+    change.entityId === 'small mechanical bird' &&
+    change.property === 'state' &&
+    change.previousValue === 'trapped' &&
+    change.value === 'free'
+  ));
+
+  assert.equal(lifting.actionTimeline.phases[0].targetId, 'fallen branch');
+  assert.equal(freedom.actionTimeline.phases[0].targetId, 'small mechanical bird');
+  assert.ok(result.eventChain.nodes.every(node => node.sceneId));
+});
