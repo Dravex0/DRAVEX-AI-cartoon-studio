@@ -72,6 +72,12 @@ const SEMANTIC_ACTIONS = [
     /зіткнен\w*.{0,35}(?:енерг|сил|маг)|зштовх\w*.{0,35}(?:енерг|сил)/i,
     /choque.{0,35}(?:energ|poder|magia)|energ\w*.{0,35}choque/i
   ] },
+  { intent: 'stagger', motionCue: 'stagger', patterns: [
+    /\b(?:recoils?|staggers? back|stumbles? backward|reels? from the impact|is knocked back|flinches?)\b/i,
+    /отшат\w*|пошат\w*|оступа\w*|отбрасыва\w* назад/i,
+    /відсаху\w*|хитаєть\w* назад|спотика\w* назад|відкидає\w* назад/i,
+    /retroced\w* tambale\w*|trastabill\w*|se tambale\w*|retrocede por el impacto/i
+  ] },
   { intent: 'defend', motionCue: 'turn', patterns: [
     /\b(?:blocks?|parries|deflects?|raises? a shield|protects?)\b|\bshield\b/i,
     /блокиру\w*|отража\w* удар|поднима\w* щит|защища\w*/i,
