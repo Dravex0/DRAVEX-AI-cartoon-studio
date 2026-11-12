@@ -130,6 +130,17 @@ function actionTimelineInstructions(scene = {}) {
 
 /** Creates a motion-only instruction and keeps the still image description separate. */
 export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
+  if (scene.characterCompositionMode === 'background-only') {
+    const environmentMotion = list(scene.environmentMotion);
+    return [
+      safe(scene.backgroundMotionPrompt, 1200),
+      ...environmentMotion.map((motion, index) => `Environment motion ${index + 1}: ${motion}`),
+      safe(scene.camera) && `Camera movement: ${safe(scene.camera, 1000)}`,
+      'Animate only the environment and scenery in this background plate. Do not render, animate, add, or imply people, characters, animals, creatures, figures, silhouettes, or character-shaped shadows.',
+      'Keep the foreground clear for separately composited character sprites. Preserve the background layout, lighting direction, perspective, and object geometry; use subtle continuous environmental movement only.',
+      'Do not invent story actions, physical interactions, props, dialogue, or character reactions in the background layer.'
+    ].filter(Boolean).join('\\n');
+  }
   const characterLock = characterDetails(scene, characterBible);
   return [
     safe(scene.motionPrompt) || safe(scene.visibleAction),
