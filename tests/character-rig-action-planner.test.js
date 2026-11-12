@@ -61,7 +61,7 @@ test('maps a grounded opponent recoil to a distinct stagger rig motion', () => {
   assert.ok(Math.abs(end.root?.x || 0) < 1e-9, 'the rig should return to neutral after the reaction interval');
 });
 
-test('maps jump action and preserves neutral poses outside its scene-time interval', () =>
+test('maps jump action and preserves neutral poses outside its scene-time interval', () => {
   const result = createCharacterRigTimelineFromActionTimeline(makeScene('jumps over the stone'), [rig()]);
   assert.equal(result.status, 'generated');
   const before = sampleCharacterRigTimeline(result.timeline, 0.1).Foxy || {};
