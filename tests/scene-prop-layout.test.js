@@ -59,3 +59,18 @@ test('recognizes prompt-defined cast for state tracking without a selected-chara
   assert.ok(storyboard.scenes.every(scene => scene.characters.includes('Kel')));
   assert.ok(storyboard.scenes[0].propAnchors['small mechanical bird']);
 });
+
+
+test('fills a missing locked prop anchor without moving the director-authored point', () => {
+  const anchors = buildDeterministicScenePropAnchors({
+    stateChanges: [
+      { entityType: 'prop', entityId: 'small mechanical bird', property: 'state', value: 'trapped' },
+      { entityType: 'prop', entityId: 'fallen branch', property: 'state', value: 'fallen' }
+    ],
+    propAnchors: { 'small mechanical bird': { x: 0.48, y: 0.76 } }
+  });
+  assert.deepEqual(anchors, {
+    'small mechanical bird': { x: 0.48, y: 0.76 },
+    'fallen branch': { x: 0.54, y: 0.715 }
+  });
+});
