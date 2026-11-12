@@ -73,8 +73,6 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       && phase.start >= 0 && phase.start < phase.end && phase.end <= 1)
     : [];
   const actionPhase = actionPhases.find(phase => phase.phase === 'action') || null;
-  const transition = clamp((p - transitionStart) / (transitionEnd - transitionStart), 0, 1);
-  const eased = transition * transition * (3 - 2 * transition);
   const latest = new Map();
   for (const change of changes) {
     if (!change || change.entityType !== 'prop' || change.property !== 'holder') continue;
