@@ -78,6 +78,33 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
     report.steps.push({ id: 'kel-rescue-storyboard-created', status: 'passed', sceneCount: sceneLabels.length, sceneLabels });
     await expect(page.locator('#character')).toHaveValue('Kel');
 
+    // Inspect the real on-page Canvas, not just the storyboard data. These colors
+    // belong to the locked mechanical bird and fallen-branch procedural renderers.
+    await page.waitForTimeout(500);
+    const rescueCanvasEvidence = await page.locator('#canvas').evaluate(canvas => {
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) throw new Error('Could not read the local rescue preview canvas.');
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      const targets = {
+        bird: [0x91, 0xa7, 0xb1],
+        branch: [0x77, 0x54, 0x35]
+      };
+      const counts = { bird: 0, branch: 0 };
+      for (let index = 0; index < pixels.length; index += 4) {
+        for (const name of Object.keys(targets)) {
+          const color = targets[name];
+          const distance = Math.abs(pixels[index] - color[0])
+            + Math.abs(pixels[index + 1] - color[1])
+            + Math.abs(pixels[index + 2] - color[2]);
+          if (distance <= 12 && pixels[index + 3] > 220) counts[name] += 1;
+        }
+      }
+      return { width: canvas.width, height: canvas.height, ...counts };
+    });
+    report.steps.push({ id: 'kel-rescue-props-visible-in-canvas', status: 'passed', ...rescueCanvasEvidence });
+    expect(rescueCanvasEvidence.bird).toBeGreaterThan(10);
+    expect(rescueCanvasEvidence.branch).toBeGreaterThan(10);
+
     await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 140_000 });
     await expect(page.locator('#finalFilmDownload')).toHaveAttribute('download', 'dravex-cartoon-film.webm');
     report.steps.push({ id: 'film-preview-created', status: 'passed' });
