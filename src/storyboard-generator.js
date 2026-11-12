@@ -100,8 +100,10 @@ function distributeStoryDetails(sentences, beatCount) {
  */
 export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   const locale = Object.hasOwn(BEATS, lang) ? lang : 'en';
-  const subject = String(character ?? '').trim().slice(0, 120) || (locale === 'ru' || locale === 'uk' ? 'Персонаж' : locale === 'es' ? 'Personaje' : 'Character');
   const brief = parseStoryBrief(idea);
+  const subject = String(character ?? '').trim().slice(0, 120)
+    || String(brief.characters?.[0] ?? '').trim().slice(0, 120)
+    || (locale === 'ru' || locale === 'uk' ? 'Персонаж' : locale === 'es' ? 'Personaje' : 'Character');
   const source = brief.storyText;
   const explicitScenes = Array.isArray(brief.sceneBlocks) ? brief.sceneBlocks : [];
   const sentences = source ? (source.match(/[^.!?。！？]+[.!?。！？]?/gu) || []).map(part => part.trim()).filter(Boolean) : [FALLBACK[locale]];
@@ -143,6 +145,21 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   });
 
   const causalLinks = inferSceneCausalLinks(scenes, locale);
+  const explicitSubject = !explicitScenes.length && String(character ?? '').trim() ? subject : '';
+  const knownCharacters = [...new Set([explicitSubject, ...brief.characters].filter(Boolean))];
+  const characterMention = (name, sourceText) => {
+    const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
+    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
+  };
+  scenes.forEach(scene => {
+    scene.characters = [...new Set([
+      ...(explicitSubject ? [explicitSubject] : []),
+      ...knownCharacters.filter(name => name !== explicitSubject && (scene.storyDetail
+        ? characterMention(name, scene.storyDetail)
+        : name.toLocaleLowerCase() === subject.toLocaleLowerCase()))
+    ])];
+  });
+
   const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
   // Build an end-of-scene prop snapshot so props that do not change in a cut
   // remain available to the renderer and the next scene's continuity prompts.
@@ -162,22 +179,10 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
       changedThisScene: changedKeys.has(stateKey)
     }));
   });
-  const explicitSubject = !explicitScenes.length && String(character ?? '').trim() ? subject : '';
-  const knownCharacters = [...new Set([explicitSubject, ...brief.characters].filter(Boolean))];
-  const characterMention = (name, sourceText) => {
-    const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
-    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
-  };
   scenes.forEach((scene, index) => {
     scene.causalLink = causalLinks[index];
     scene.stateChanges = stateChanges[index];
     scene.propStates = propStateSnapshots[index];
-    scene.characters = [...new Set([
-      ...(explicitSubject ? [explicitSubject] : []),
-      ...knownCharacters.filter(name => name !== explicitSubject && (scene.storyDetail
-        ? characterMention(name, scene.storyDetail)
-        : name.toLocaleLowerCase() === subject.toLocaleLowerCase()))
-    ])];
     // Keep interaction inference source-grounded and limited to characters assigned to this scene.
     const characterInteractions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
