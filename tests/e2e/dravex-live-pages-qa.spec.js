@@ -417,7 +417,7 @@ test('DRAVEX source build: Kael is actually drawn on the portrait canvas', async
 });
 
 
-test('DRAVEX source build: Kael remains visible in decoded WebM frames', async ({ page }, testInfo) => {
+test('DRAVEX source build: decoded WebM keeps a skin-tone pixel hint across playback', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.goto('/');
   await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);
@@ -446,23 +446,30 @@ test('DRAVEX source build: Kael remains visible in decoded WebM frames', async (
     canvas.height = 320;
     const context = canvas.getContext('2d', { willReadFrequently: true });
     if (!context) throw new Error('Could not create decoded-frame analysis canvas.');
-    const durationSeconds = Number(video.duration);
-    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
-      throw new Error('Final WebM duration is unavailable for full-timeline character sampling.');
-    }
-    const targetTimes = [0.1, 0.3, 0.5, 0.7, 0.9].map(fraction => durationSeconds * fraction);
     const samples = [];
-    try {
-      for (const targetTime of targetTimes) {
-        const sample = await new Promise((resolve, reject) => {
-          let settled = false;
-          const timeout = setTimeout(() => {
-            if (!settled) { settled = true; reject(new Error('Timed out waiting for decoded WebM frame near ' + targetTime.toFixed(2) + 's.')); }
-          }, 15_000);
-          const next = () => video.requestVideoFrameCallback((_now, metadata) => {
-            if (settled) return;
-            const mediaTime = Number(metadata?.mediaTime);
-            if (!Number.isFinite(mediaTime) || mediaTime + 0.01 < targetTime) { next(); return; }
+    let settled = false;
+    let lastSampleTime = -Infinity;
+    let failPlayback = null;
+    const playback = new Promise((resolve, reject) => {
+      const finish = error => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        video.removeEventListener('ended', onEnded);
+        video.removeEventListener('error', onError);
+        if (error) reject(error);
+        else resolve();
+      };
+      const timeout = setTimeout(() => finish(new Error('Timed out waiting for the WebM playback to finish.')), 60_000);
+      const onEnded = () => finish();
+      const onError = () => finish(new Error('The final WebM player reported a media error.'));
+      failPlayback = error => finish(error);
+      const requestNext = () => {
+        if (settled) return;
+        video.requestVideoFrameCallback((_now, metadata) => {
+          if (settled) return;
+          const mediaTime = Number(metadata?.mediaTime);
+          if (Number.isFinite(mediaTime) && mediaTime - lastSampleTime >= 0.25) {
             try {
               context.drawImage(video, 0, 0, canvas.width, canvas.height);
               const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -474,28 +481,46 @@ test('DRAVEX source build: Kael remains visible in decoded WebM frames', async (
                 const r = data[i], g = data[i + 1], b = data[i + 2];
                 if (r > 150 && g > 85 && g < 195 && b > 60 && b < 170 && r > g + 18 && g > b + 8) skinPixels += 1;
               }
-              settled = true;
-              clearTimeout(timeout);
-              resolve({ targetTimeSeconds: Number(targetTime.toFixed(3)), mediaTime: Number(mediaTime.toFixed(3)), skinPixels });
+              samples.push({ mediaTime: Number(mediaTime.toFixed(3)), skinPixels });
+              lastSampleTime = mediaTime;
             } catch (error) {
-              settled = true;
-              clearTimeout(timeout);
-              reject(error);
+              finish(error);
+              return;
             }
-          });
-          next();
+          }
+          if (!settled && !video.ended) requestNext();
         });
-        samples.push(sample);
-      }
-    } finally {
+      };
+      video.addEventListener('ended', onEnded, { once: true });
+      video.addEventListener('error', onError, { once: true });
+      requestNext();
+    });
+    try {
       video.pause();
+      try { video.currentTime = 0; } catch {}
+      await video.play();
+      await playback;
+    } catch (error) {
+      failPlayback?.(error);
+      video.pause();
+      throw error;
     }
+    if (samples.length < 5) {
+      throw new Error('Not enough decoded WebM frames were sampled across playback: ' + samples.length + '.');
+    }
+    const sampleFractions = [0.1, 0.3, 0.5, 0.7, 0.9];
+    const selectedSamples = sampleFractions.map(sampleFraction => {
+      const index = Math.min(samples.length - 1, Math.round(sampleFraction * (samples.length - 1)));
+      return { ...samples[index], sampleFraction };
+    });
     return {
       sourceKind: (video.currentSrc || video.src).startsWith('blob:') ? 'local-blob-webm' : 'media-url',
       width: video.videoWidth,
       height: video.videoHeight,
-      durationSeconds: Number(durationSeconds.toFixed(2)),
-      samples
+      durationSeconds: Number.isFinite(video.duration) ? Number(video.duration.toFixed(2)) : null,
+      sampledFrameCount: samples.length,
+      playbackEnded: video.ended,
+      samples: selectedSamples
     };
   });
   await testInfo.attach('source-kael-webm-frame-evidence.json', {
@@ -504,7 +529,9 @@ test('DRAVEX source build: Kael remains visible in decoded WebM frames', async (
   });
   expect(evidence.width).toBe(720);
   expect(evidence.height).toBe(1280);
+  expect(evidence.playbackEnded).toBe(true);
+  expect(evidence.sampledFrameCount).toBeGreaterThanOrEqual(5);
   expect(evidence.samples).toHaveLength(5);
   expect(evidence.samples.filter(frame => frame.skinPixels > 50).length,
-    'Kael must remain visible in at least three samples distributed across the full WebM timeline').toBeGreaterThanOrEqual(3);
+    'Skin-tone pixel hints should appear in at least three samples; this is not semantic character recognition.').toBeGreaterThanOrEqual(3);
 });
