@@ -229,7 +229,7 @@ test('does not assign a stagger reaction to a character other than the attack ta
 
 test('recognizes an explicitly written Russian attack followed by the target stagger', () => {
   const result = buildStoryboardFromText(
-    'Characters:\nКаэль — молодой воин.\nСтражник — воин в доспехах.\n\nScene 1: Столкновение\nКаэль ударяет стражника, и стражник отшатывается назад.',
+    'Characters:\nКаэль — молодой воин.\nРико — воин в доспехах.\n\nScene 1: Столкновение\nКаэль атакует Рико, и Рико отшатывается назад.',
     'ru',
     'Каэль'
   );
@@ -237,8 +237,8 @@ test('recognizes an explicitly written Russian attack followed by the target sta
   assert.equal(phases.length, 2);
   assert.equal(phases[0].actorId, 'Каэль');
   assert.equal(phases[1].phase, 'reaction');
-  assert.equal(phases[1].actorId, 'Стражник');
-  assert.equal(phases[1].evidence, 'и стражник отшатывается назад.');
+  assert.equal(phases[1].actorId, 'Рико');
+  assert.equal(phases[1].evidence, 'и Рико отшатывается назад.');
   assert.equal(result.scenes[0].productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
 });
 
