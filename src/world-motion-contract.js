@@ -20,15 +20,23 @@ export function buildWorldMotionInstructions(scene = {}) {
         ? `Actor "${actor}" performs "${type}" with target "${target}" (source: ${evidence || 'explicit storyboard interaction'}).`
         : '';
     }).filter(Boolean);
-  const stateChanges = (Array.isArray(scene.stateChanges) ? scene.stateChanges : [])
+  const propStates = Array.isArray(scene.propStates) ? scene.propStates : [];
+  const stateSource = propStates.length ? propStates : (Array.isArray(scene.stateChanges) ? scene.stateChanges : []);
+  const stateChanges = stateSource
     .filter(change => change && typeof change === 'object' && clean(change.entityType, 20) === 'prop')
     .map(change => {
       const object = clean(change.entityId, 120);
       const property = clean(change.property, 40);
       const value = change.value == null ? 'released / no longer held' : clean(change.value, 120);
+      const startValue = Object.prototype.hasOwnProperty.call(change, 'startValue')
+        ? change.startValue == null ? 'not held / not yet established' : clean(change.startValue, 120)
+        : change.previousValue == null ? 'not held / not yet established' : clean(change.previousValue, 120);
       const actor = clean(change.actorId, 120);
+      const transition = startValue === value
+        ? `remains ${property} "${value}"`
+        : `changes ${property} from "${startValue}" to "${value}"`;
       return object && property
-        ? `Prop "${object}" changes ${property} to "${value}"${actor ? ` through actor "${actor}"` : ''}.`
+        ? `Prop "${object}" ${transition}${actor ? ` through actor "${actor}"` : ''}.`
         : '';
     }).filter(Boolean);
 
