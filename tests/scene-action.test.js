@@ -172,3 +172,17 @@ test('prefers the source-grounded semantic event over later incidental actions i
     storyDetail: 'Герой уклоняется от луча и создаёт энергетический щит.'
   }), 'jump');
 });
+
+
+test('animates explicit discovery and observation cues as character head turns', () => {
+  const examples = [
+    ['Kel notices a small mechanical bird trapped under a fallen branch.', 'turn'],
+    ['Кель замечает маленькую птицу под веткой.', 'turn'],
+    ['Кель помічає маленьку пташку під гілкою.', 'turn'],
+    ['Kel observes the strange light in the forest.', 'turn'],
+    ['El zorro observa una luz extraña.', 'turn']
+  ];
+  for (const [story, expected] of examples) {
+    assert.equal(detectSceneAction(story), expected, story);
+  }
+});
