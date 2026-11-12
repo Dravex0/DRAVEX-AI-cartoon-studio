@@ -190,12 +190,30 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     const actionTarget = primaryInteraction?.targetId ||
       (semanticNeedsPair && scene.characters.length > 1 ? scene.characters[1] : null);
     const canRepresentSemanticPair = !semanticNeedsPair || Boolean(actionTarget);
-    if (actionActor && actionEvidence && canRepresentSemanticPair &&
+    const orderedPropInteractions = [...propInteractions]
+      .filter(interaction => stateChanges[index]?.some(change =>
+        change?.entityType === 'prop' &&
+        String(change.entityId).toLocaleLowerCase() === String(interaction.targetId).toLocaleLowerCase()
+      ))
+      .sort((a, b) => (a.sourceStart ?? 0) - (b.sourceStart ?? 0));
+    if (orderedPropInteractions.length >= 2) {
+      // Preserve a two-step physical sequence (e.g. lift the branch, then free the bird)
+      // as preparation + action. Each target must already exist in locked scene state.
+      const first = orderedPropInteractions[0];
+      const decisive = orderedPropInteractions[1];
+      scene.actionTimeline = {
+        schemaVersion: 1,
+        phases: [
+          { phase: 'preparation', start: 0.12, end: 0.46, actorId: first.actorId, targetId: first.targetId, description: first.evidence, evidence: first.evidence },
+          { phase: 'action', start: 0.54, end: 0.9, actorId: decisive.actorId, targetId: decisive.targetId, description: decisive.evidence, evidence: decisive.evidence }
+        ]
+      };
+    } else if (actionActor && actionEvidence && canRepresentSemanticPair &&
         (sourceAction !== 'idle' || primaryInteraction || semanticIsActionable)) {
       const semanticDescription = semanticIsActionable
         ? semanticNeedsPair
-          ? `${scene.characters[0]} and ${actionTarget} combine their powers as described in the source event: ${scene.storyDetail}`
-          : `Perform the ${semanticIntent.intent} event: ${scene.storyDetail}`
+          ? scene.characters[0] + ' and ' + actionTarget + ' combine their powers as described in the source event: ' + scene.storyDetail
+          : 'Perform the ' + semanticIntent.intent + ' event: ' + scene.storyDetail
         : scene.visibleAction || scene.storyDetail;
       scene.actionTimeline = {
         schemaVersion: 1,
