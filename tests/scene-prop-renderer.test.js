@@ -149,3 +149,26 @@ test('renders a prop at its explicitly authored scene anchor', () => {
   assert.equal(plan.x, 0.74);
   assert.equal(plan.y, 0.42);
 });
+
+
+test('moves the fallen branch during its own preparation phase, before the bird-release action', () => {
+  const rescueScene = {
+    stateChanges: [{
+      entityType: 'prop', entityId: 'fallen branch', property: 'holder',
+      previousValue: null, value: 'Kel', actorId: 'Kel',
+      evidence: 'Kel lifts the fallen branch and frees the small mechanical bird.'
+    }],
+    propAnchors: { 'fallen branch': { x: 0.68, y: 0.79 } },
+    actionTimeline: { schemaVersion: 1, phases: [
+      { phase: 'preparation', start: 0.12, end: 0.46, actorId: 'Kel', targetId: 'fallen branch' },
+      { phase: 'action', start: 0.54, end: 0.9, actorId: 'Kel', targetId: 'small mechanical bird' }
+    ] }
+  };
+  const kelLayers = [{ characterId: 'Kel', x: 0.4, y: 0.7 }];
+  const atLiftEnd = buildScenePropRenderPlan(rescueScene, kelLayers, 0.46)[0];
+  const afterBirdRelease = buildScenePropRenderPlan(rescueScene, kelLayers, 0.9)[0];
+  assert.ok(Math.abs(atLiftEnd.x - 0.52) < 1e-9);
+  assert.ok(Math.abs(atLiftEnd.y - 0.62) < 1e-9);
+  assert.equal(atLiftEnd.x, afterBirdRelease.x);
+  assert.equal(atLiftEnd.y, afterBirdRelease.y);
+});
