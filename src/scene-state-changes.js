@@ -138,7 +138,7 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
         for (const verb of VERBS[locale]) {
           const found = findEntity(sentence, actorId, verb);
           if (!found) continue;
-          const entityId = found.entity;
+          const entityId = canonicalPropEntityId(locale, found.entity);
           const property = verb.property;
           const key = 'prop:' + entityId.toLocaleLowerCase() + ':' + property;
           const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
