@@ -172,7 +172,7 @@ function reachArmChainFor(rig, side, rawRigInput) {
 }
 
 function solveReachContactPose(chain, target, phase) {
-  const extension = Math.sin(Math.PI * phase);
+  const extension = phase * phase * (3 - 2 * phase);
   const desired = {
     x: chain.grip.x + (target.x - chain.grip.x) * extension,
     y: chain.grip.y + (target.y - chain.grip.y) * extension
