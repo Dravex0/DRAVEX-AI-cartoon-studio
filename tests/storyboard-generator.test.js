@@ -210,7 +210,7 @@ test('splits an explicitly written attack and target stagger into ordered ground
   assert.equal(scene.actionTimeline.phases[0].evidence, 'Kael strikes the guard');
   assert.equal(scene.actionTimeline.phases[1].evidence, 'and the guard stumbles backward.');
   assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
-  assert.match(scene.motionGenerationPrompt, /reaction \\(62%-100%/);
+  assert.match(scene.motionGenerationPrompt, /reaction \(62%-100%/);
 });
 
 test('does not assign a stagger reaction to a character other than the attack target', () => {
