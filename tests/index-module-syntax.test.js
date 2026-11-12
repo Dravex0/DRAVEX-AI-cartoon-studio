@@ -147,6 +147,17 @@ test('wires landscape and portrait formats through canvas preview and export', (
 });
 
 
+test('applying scene edits persists background-only composition and environment description', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const applyStart = app.indexOf("$('applyScene').onclick=()=>{");
+  const applyEnd = app.indexOf("$('addScene').onclick=", applyStart);
+  const applyHandler = app.slice(applyStart, applyEnd);
+  assert.ok(applyStart >= 0);
+  assert.ok(applyEnd > applyStart);
+  assert.match(applyHandler, /characterCompositionMode:\$\('sceneCompositionMode'\)\.value/);
+  assert.match(applyHandler, /environmentDescription:\$\('sceneEnvironmentDescription'\)\.value\.trim\(\)/);
+});
+
 test('does not publish a successful WebM after MediaRecorder reports an error', () => {
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   assert.ok(app.includes('recorderFailed=false'));
