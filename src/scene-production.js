@@ -135,6 +135,10 @@ export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
     'Do not redesign, replace, duplicate, merge, or add characters. Do not change costumes, colors, age, anatomy, or art style between frames. Preserve the source image composition unless the requested camera movement or action requires a controlled change.',
     'Maintain temporal coherence from the first frame to the last: preserve stable facial features, limb count, body shape, clothing details, object geometry, and background layout; avoid flicker, morphing, wobble, texture crawling, and unintended identity changes.',
     'Use smooth, physically plausible motion with consistent speed and clear anticipation, action, and settling. Avoid sudden pose resets, teleporting, frame jumps, or abrupt camera changes unless explicitly requested.',
+    'Character action is the primary motion: visibly animate the named actor\'s body, limbs, head, and orientation as required by the described action. A camera pan, zoom, shake, or background movement is not a substitute for character movement.',
+    'Keep the actor recognizably visible while the action happens. Show distinct intermediate poses and a readable change from the start state to the end state; do not satisfy an action request by holding one still pose.',
+    'For actor-object interactions, show the actor approaching or reaching the exact object, making visible contact, applying force, and completing the requested result in that order. Keep the object attached to or supported by the correct actor when the story requires it.',
+    'Separate subject motion, object motion, environment motion, and camera motion. Each must follow its own explicit instruction; do not let camera motion fake a walk, reach, jump, turn, or interaction.',
     'Keep the camera fixed when no camera movement is specified. When camera movement is specified, execute only that movement smoothly and keep the subject readable in frame.',
     'Animate only the described action. Preserve scene continuity and do not introduce new objects or characters.'
   ].filter(Boolean).join('\n\n');
