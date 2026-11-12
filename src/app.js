@@ -3810,6 +3810,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     $('status').textContent=uiLang==='ru'
       ?'Записываем '+timeline.segments.length+' сцен'+(voiceTracks.length?' · реплик: '+voiceTracks.length:'')+'…'
       :'Recording '+timeline.segments.length+' scenes'+(voiceTracks.length?' · dialogue lines: '+voiceTracks.length:'')+'…';
+    const emitExportProgress=detail=>emitProgressSafely(onProgress,detail,error=>console.warn('DRAVEX export progress callback failed:',error));
     if(filmProgressTracking||typeof onProgress==='function'){
       exportStartedAtMs=performance.now();
       if(filmProgressTracking)setFilmProgress(85,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Запись итогового видео…','Recording the final video…'));
@@ -3817,7 +3818,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
         const fraction=Math.max(0,Math.min(1,(performance.now()-exportStartedAtMs)/Math.max(1,timeline.totalDurationMs)));
         const percent=85+Math.min(14,Math.floor(fraction*14));
         if(filmProgressTracking)setFilmProgress(percent,filmProgressText('Сборка WebM','Assembling WebM'),filmProgressText('Записано примерно ','Recorded approximately ')+Math.round(fraction*100)+'%');
-        onProgress?.({phase:'recording',percent,elapsedMs:Math.round(fraction*timeline.totalDurationMs),totalDurationMs:timeline.totalDurationMs});
+        emitExportProgress({phase:'recording',percent,elapsedMs:Math.round(fraction*timeline.totalDurationMs),totalDurationMs:timeline.totalDurationMs});
       },250);
     }
     timeline.segments.slice(1).forEach(segment=>{
@@ -3831,7 +3832,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
           activeKey:String(nextScene.id||('scene-index-'+segment.sceneIndex)),
           shouldPlay:true
         });
-        onProgress?.({phase:'scene',sceneIndex:segment.sceneIndex,sceneCount:timeline.segments.length,percent:Math.round(segment.startMs/Math.max(1,timeline.totalDurationMs)*100)});
+        emitExportProgress({phase:'scene',sceneIndex:segment.sceneIndex,sceneCount:timeline.segments.length,percent:Math.round(segment.startMs/Math.max(1,timeline.totalDurationMs)*100)});
         $('status').textContent=uiLang==='ru'
           ?'Записываем сцену '+(segment.sceneIndex+1)+' из '+timeline.segments.length+'…'
           :'Recording scene '+(segment.sceneIndex+1)+' of '+timeline.segments.length+'…';
