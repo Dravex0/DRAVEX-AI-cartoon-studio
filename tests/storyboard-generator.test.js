@@ -232,7 +232,8 @@ test('keeps Kel branch-lift and mechanical-bird release as ordered, separately t
   const scene = result.scenes[0];
   assert.deepEqual(scene.stateChanges.map(change => [change.entityId, change.property, change.value]), [
     ['fallen branch', 'holder', 'Kel'],
-    ['small mechanical bird', 'state', 'free']
+    ['small mechanical bird', 'state', 'free'],
+    ['fallen branch', 'state', 'lifted']
   ]);
   assert.deepEqual(scene.actionTimeline.phases.map(phase => [phase.phase, phase.targetId, phase.actorId]), [
     ['preparation', 'fallen branch', 'Kel'],
