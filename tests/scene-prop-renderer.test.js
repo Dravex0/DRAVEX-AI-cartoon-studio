@@ -163,3 +163,38 @@ test('renders a ball in red so the visual matches a red-ball story prompt', () =
   assert.equal(plan.kind, 'ball');
   assert.equal(plan.motion, 'rolling');
 });
+
+test('preserves the named ball color instead of hardcoding red for every ball', () => {
+  const renderFillStyles = scene => {
+    const fillStyles = [];
+    const context = new Proxy({}, {
+      get(target, property) {
+        if (['save', 'restore', 'beginPath', 'closePath', 'stroke', 'fill', 'arc', 'moveTo', 'lineTo', 'fillRect', 'strokeRect', 'ellipse', 'roundRect'].includes(property)) return () => {};
+        return undefined;
+      },
+      set(target, property, value) {
+        if (property === 'fillStyle') fillStyles.push(value);
+        target[property] = value;
+        return true;
+      }
+    });
+    drawSceneProps(context, scene, layers, 0.7, 640, 360, 0.5);
+    return fillStyles;
+  };
+  const red = renderFillStyles({ stateChanges: [{
+    entityType: 'prop', entityId: 'red ball', property: 'motion',
+    value: 'rolling', actorId: 'Fox', evidence: 'Foxy pushes the red ball.'
+  }] });
+  const blue = renderFillStyles({ stateChanges: [{
+    entityType: 'prop', entityId: 'blue ball', property: 'motion',
+    value: 'rolling', actorId: 'Fox', evidence: 'Foxy pushes the blue ball.'
+  }] });
+  const green = renderFillStyles({ stateChanges: [{
+    entityType: 'prop', entityId: 'green ball', property: 'motion',
+    value: 'rolling', actorId: 'Fox', evidence: 'Foxy pushes the green ball.'
+  }] });
+  assert.ok(red.includes('#e74b4b'));
+  assert.ok(blue.includes('#72c6df'));
+  assert.ok(green.includes('#55a96a'));
+  assert.ok(!blue.includes('#e74b4b'));
+});
