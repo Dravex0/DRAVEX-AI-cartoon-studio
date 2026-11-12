@@ -37,8 +37,31 @@ function getColors(profile={}){
   skin:'#d9a98f'
  };
 }
-const NON_HUMAN_PROFILE_PATTERN = /\b(?:fox|wolf|cat|dog|bird|rabbit|bunny|bear|dragon|horse|mouse|fish|turtle|robot|android|alien|monster|creature|animal|dinosaur|lion|tiger|deer|owl|eagle|snake|lizard|frog|penguin|otter|raccoon|squirrel)\b|(?:лисиц|лисён|лисен|лисич|волк|кот|кошк|собак|пёс|пес|птиц|кролик|заяц|медвед|дракон|лошад|мыш|рыб|черепах|робот|андроид|чужезем|инопланет|монстр|динозавр|лев|тигр|олень|сова|орёл|орел|змея|ящер|лягуш|пингвин|выдр|енот|белк|вовк|кіт|кішк|птах|заєць|ведмід|кінь|черепах|пінгвін|видр|єнот|білк|змія|ящір|жаб)/iu;
+const NON_HUMAN_WORDS = new Set([
+  'fox', 'wolf', 'cat', 'dog', 'bird', 'rabbit', 'bunny', 'bear', 'dragon', 'horse', 'mouse', 'fish', 'turtle',
+  'robot', 'android', 'alien', 'monster', 'creature', 'animal', 'dinosaur', 'lion', 'tiger', 'deer', 'owl', 'eagle',
+  'snake', 'lizard', 'frog', 'penguin', 'otter', 'raccoon', 'squirrel',
+  'кот', 'котик', 'котёнок', 'котенок', 'пёс', 'пес', 'мышь', 'мыши', 'мышонок', 'лев', 'олень', 'сова', 'орёл', 'орел',
+  'змея', 'жаба', 'выдра', 'енот', 'белка',
+  'кіт', 'котик', 'миша', 'миші', 'лев', 'олень', 'сова', 'орел', 'змія', 'жаба', 'видра', 'єнот', 'білка'
+]);
+const NON_HUMAN_PREFIXES = [
+  'fox', 'wolf', 'cat', 'dog', 'bird', 'rabbit', 'bunny', 'bear', 'dragon', 'horse', 'mouse', 'fish', 'turtle',
+  'robot', 'android', 'alien', 'monster', 'creature', 'animal', 'dinosaur', 'lion', 'tiger', 'eagle', 'snake',
+  'lizard', 'frog', 'penguin', 'otter', 'raccoon', 'squirrel',
+  'лисиц', 'лисён', 'лисен', 'лисич', 'волч', 'кошк', 'собак', 'птиц', 'кролик', 'зайч', 'медвед', 'дракон',
+  'лошад', 'рыб', 'черепах', 'робот', 'андроид', 'чужезем', 'инопланет', 'монстр', 'динозавр', 'тигр',
+  'ящер', 'лягуш', 'пингвин',
+  'лисиц', 'лисич', 'вовч', 'кішк', 'собак', 'птах', 'кролик', 'зайц', 'ведмід', 'кін', 'риб', 'черепах',
+  'робот', 'андроїд', 'прибул', 'монстр', 'динозавр', 'тигр', 'ящір', 'пінгвін'
+];
 const FOX_NAME_PATTERN = /(?:fox|лисиц|лисён|лисен|лисич)/iu;
+
+function containsNonHumanType(value) {
+  const tokens = String(value ?? '').toLocaleLowerCase().match(/[\\p{L}\\p{N}]+/gu) || [];
+  return tokens.some(token => NON_HUMAN_WORDS.has(token)
+    || NON_HUMAN_PREFIXES.some(prefix => token.startsWith(prefix)));
+}
 
 /** Draw the human-like procedural stand-in only when no real scene media or character art exists. */
 export function shouldDrawProceduralStoryCharacter({
@@ -59,9 +82,9 @@ export function shouldDrawProceduralStoryCharacter({
   const appearance = [clean(profile?.visualDescription), clean(profile?.distinctiveFeatures)]
     .filter(Boolean)
     .join(' ');
-  if (species) return !NON_HUMAN_PROFILE_PATTERN.test(species);
-  if (appearance) return !NON_HUMAN_PROFILE_PATTERN.test(appearance);
-  return !NON_HUMAN_PROFILE_PATTERN.test(id) && !FOX_NAME_PATTERN.test(id);
+  if (species) return !containsNonHumanType(species);
+  if (appearance) return !containsNonHumanType(appearance);
+  return !containsNonHumanType(id) && !FOX_NAME_PATTERN.test(id);
 }
 
 /** Deterministic animated character fallback; generated sprites take precedence when attached. */
