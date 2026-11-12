@@ -26,16 +26,34 @@ export function analyzeRgbaFrameSequence(frames, {
   const normalized = frames.map((frame, index) => {
     const width = Number(frame?.width);
     const height = Number(frame?.height);
-    const data = frame?.data;
+    const sourceData = frame?.data;
     if (!Number.isInteger(width) || width < 1 || width > 512
       || !Number.isInteger(height) || height < 1 || height > 512) {
       throw new TypeError('Frame ' + (index + 1) + ' has invalid dimensions.');
     }
-    if (!Array.isArray(data) && !ArrayBuffer.isView(data)) {
+    if (!Array.isArray(sourceData) && !ArrayBuffer.isView(sourceData)) {
       throw new TypeError('Frame ' + (index + 1) + ' must contain RGBA pixel data.');
     }
-    if (data.length !== width * height * 4) {
+    if (sourceData.length !== width * height * 4) {
       throw new RangeError('Frame ' + (index + 1) + ' pixel data length does not match its dimensions.');
+    }
+
+    // RGB values under transparent pixels are undefined image data. Normalize
+    // them before comparison so changing hidden RGB cannot look like motion.
+    const data = new Uint8Array(sourceData.length);
+    for (let offset = 0; offset < sourceData.length; offset += 4) {
+      const alpha = Number(sourceData[offset + 3]);
+      if (alpha < 128) {
+        data[offset] = 0;
+        data[offset + 1] = 0;
+        data[offset + 2] = 0;
+        data[offset + 3] = 0;
+      } else {
+        data[offset] = Number(sourceData[offset]);
+        data[offset + 1] = Number(sourceData[offset + 1]);
+        data[offset + 2] = Number(sourceData[offset + 2]);
+        data[offset + 3] = alpha;
+      }
     }
     return { width, height, data };
   });
@@ -72,6 +90,22 @@ export function analyzeRgbaFrameSequence(frames, {
     }
     return Number((redPixels / pixelCount).toFixed(4));
   });
+
+  // A single flash is not persistent evidence. Require at least two samples
+  // and a minimum 40% of the sampled frames before reporting a sustained hint.
+  const measurePersistence = (ratios, threshold) => {
+    const samplesAboveThreshold = ratios.filter(ratio => ratio > 0 && ratio >= threshold).length;
+    const requiredSamples = Math.max(2, Math.ceil(ratios.length * 0.4));
+    return {
+      samplesAboveThreshold,
+      sampleCount: ratios.length,
+      ratio: Number((samplesAboveThreshold / ratios.length).toFixed(4)),
+      requiredSamples,
+      persistent: samplesAboveThreshold >= requiredSamples
+    };
+  };
+  const orangePersistence = measurePersistence(orangePixelRatios, orangePixelRatioThreshold);
+  const redPersistence = measurePersistence(redPixelRatios, redPixelRatioThreshold);
 
   let totalChannelChange = 0;
   let changedPixels = 0;
@@ -146,14 +180,20 @@ export function analyzeRgbaFrameSequence(frames, {
     },
     orangePixelRatios,
     maxOrangePixelRatio: Number(maxOrangePixelRatio.toFixed(4)),
-    orangeSignal: maxOrangePixelRatio >= orangePixelRatioThreshold
+    orangePersistence,
+    orangeSignal: orangePersistence.persistent
       ? 'orange-pixels-detected'
-      : 'low-orange-pixel-signal',
+      : orangePersistence.samplesAboveThreshold
+        ? 'orange-color-sporadic-or-weak'
+        : 'low-orange-pixel-signal',
     redPixelRatios,
     maxRedPixelRatio: Number(maxRedPixelRatio.toFixed(4)),
-    redSignal: maxRedPixelRatio >= redPixelRatioThreshold
+    redPersistence,
+    redSignal: redPersistence.persistent
       ? 'red-pixels-detected'
-      : 'low-red-pixel-signal',
+      : redPersistence.samplesAboveThreshold
+        ? 'red-color-sporadic-or-weak'
+        : 'low-red-pixel-signal',
     note: 'Pixel changes, spatial regions and orange/red color ratios are heuristics only; they do not identify a character, body part, object, or action.'
   };
 }
