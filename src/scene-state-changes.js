@@ -38,6 +38,14 @@ const VERBS = {
   ]
 };
 
+
+const PASSIVE_TRAPPED_PATTERNS = {
+  en: /(?:sees?|finds?|notices?|discovers?)\\s+(?:the|a|an)\\s+(.+?)\\s+(?:is\\s+)?trapped\\b/iu,
+  ru: /(?:видит|замечает|находит|обнаруживает)\\s+(.+?)(?:,\\s*|\\s+)(?:застрявш\\p{L}*|зажат\\p{L}*|придавлен\\p{L}*)/iu,
+  uk: /(?:бачить|помічає|знаходить|виявляє)\\s+(.+?)(?:,\\s*|\\s+)(?:застрягл\\p{L}*|затиснут\\p{L}*|притиснут\\p{L}*)/iu,
+  es: /(?:ve|encuentra|nota|descubre)\\s+(?:el|la|los|las|un|una)\\s+(.+?)\\s+(?:atrapad[oa]s?|aprisionad[oa]s?)\\b/iu
+};
+
 const LOCATION_VERBS = {
   en: [
     { re: /(?:enters|goes into|walks into)/iu, value: 'inside' },
@@ -116,6 +124,21 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
           if (previousValue === value) continue;
           changes.push({ entityType: 'prop', entityId, property, previousValue, value, actorId, evidence: found.evidence });
           knownStates.set(key, value);
+        }
+        // Recognize a directly observed trapped state without inventing a trapping action.
+        // The named actor must explicitly see/find/notice the prop in this same sentence.
+        const passiveTrap = PASSIVE_TRAPPED_PATTERNS[locale].exec(sentence);
+        if (passiveTrap) {
+          const entityId = clean(passiveTrap[1], 100).replace(/^(?:the|a|an|этот|эта|это|el|la|los|las|un|una)\\s+/iu, '');
+          const key = 'prop:' + entityId.toLocaleLowerCase() + ':state';
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          if (entityId && previousValue !== 'trapped') {
+            changes.push({
+              entityType: 'prop', entityId, property: 'state', previousValue,
+              value: 'trapped', actorId, evidence: clean(sentence, 1_200)
+            });
+            knownStates.set(key, 'trapped');
+          }
         }
         const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
         const actorMatch = actor.exec(sentence);
