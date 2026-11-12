@@ -40,10 +40,10 @@ const VERBS = {
 
 
 const PASSIVE_TRAPPED_PATTERNS = {
-  en: /(?:sees?|finds?|notices?|discovers?)\\s+(?:the|a|an)\\s+(.+?)\\s+(?:is\\s+)?trapped\\b/iu,
-  ru: /(?:видит|замечает|находит|обнаруживает)\\s+(.+?)(?:,\\s*|\\s+)(?:застрявш\\p{L}*|зажат\\p{L}*|придавлен\\p{L}*)/iu,
-  uk: /(?:бачить|помічає|знаходить|виявляє)\\s+(.+?)(?:,\\s*|\\s+)(?:застрягл\\p{L}*|затиснут\\p{L}*|притиснут\\p{L}*)/iu,
-  es: /(?:ve|encuentra|nota|descubre)\\s+(?:el|la|los|las|un|una)\\s+(.+?)\\s+(?:atrapad[oa]s?|aprisionad[oa]s?)\\b/iu
+  en: /(?:sees?|finds?|notices?|discovers?)\s+(?:the|a|an)\s+(.+?)\s+(?:is\s+)?trapped\b/iu,
+  ru: /(?:видит|замечает|находит|обнаруживает)\s+(.+?)(?:,\s*|\s+)(?:застрявш\p{L}*|зажат\p{L}*|придавлен\p{L}*)/iu,
+  uk: /(?:бачить|помічає|знаходить|виявляє)\s+(.+?)(?:,\s*|\s+)(?:застрягл\p{L}*|затиснут\p{L}*|притиснут\p{L}*)/iu,
+  es: /(?:ve|encuentra|nota|descubre)\s+(?:el|la|los|las|un|una)\s+(.+?)\s+(?:atrapad[oa]s?|aprisionad[oa]s?)\b/iu
 };
 
 const LOCATION_VERBS = {
