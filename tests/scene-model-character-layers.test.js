@@ -87,3 +87,21 @@ test('scene normalization preserves the explicit character rig animation timelin
   assert.equal(scene.characterRigTimeline.keyframes.length, 2);
   assert.equal(scene.characterRigTimeline.keyframes[1].easing, 'ease-in-out');
 });
+
+
+test('scene normalization preserves only bounded anchors for explicitly tracked props', () => {
+  const scene = normalizeScene({
+    stateChanges: [{ entityType: 'prop', entityId: 'silver key', property: 'holder', actorId: 'Foxy', value: 'Foxy' }],
+    propAnchors: {
+      'silver key': { x: 0.74, y: 0.42 },
+      'invented chest': { x: 0.5, y: 0.5 },
+      'out of bounds': { x: 1.1, y: 0.5 },
+      'not numeric': { x: '0.4', y: 0.5 }
+    }
+  });
+  assert.deepEqual(scene.propAnchors, { 'silver key': { x: 0.74, y: 0.42 } });
+});
+
+test('legacy scenes without prop anchors normalize to an empty anchor map', () => {
+  assert.deepEqual(normalizeScene({ title: 'Legacy scene' }).propAnchors, {});
+});
