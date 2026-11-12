@@ -56,6 +56,24 @@ test('background-only image prompt refuses to fall back when environment details
   assert.equal(prompt, '');
 });
 
+test('background-only motion prompt animates scenery without character actions or interactions', () => {
+  const prompt = buildMotionGenerationPrompt({
+    characterCompositionMode: 'background-only',
+    motionPrompt: 'Kel lifts a branch and frees a mechanical bird.',
+    visibleAction: 'Kel frees the bird.',
+    characters: ['Kel'],
+    environmentMotion: ['Clouds drift across the moon.', 'Leaves sway in the wind.'],
+    interactions: [{ type: 'free', actorId: 'Kel', targetId: 'mechanical bird', evidence: 'Kel frees the mechanical bird.' }],
+    camera: 'Slow static wide shot'
+  }, [{ characterId: 'Kel', visualDescription: 'Young forest explorer in a green cloak' }]);
+
+  assert.match(prompt, /Environment motion 1: Clouds drift across the moon/);
+  assert.match(prompt, /Environment motion 2: Leaves sway in the wind/);
+  assert.match(prompt, /Slow static wide shot/);
+  assert.match(prompt, /Animate only the environment and scenery/);
+  assert.doesNotMatch(prompt, /Kel|mechanical bird|green cloak|lifts a branch|Physical interaction/i);
+});
+
 test('image prompt explicitly requires every declared scene character to be visible', () => {
   const prompt = buildImageGenerationPrompt({
     imagePrompt: 'A magical forest at dusk.',
