@@ -12,6 +12,25 @@ import { normalizeCharacterFacialRig, normalizeCharacterFacialExpressions } from
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
 
+function normalizePropAnchors(input, rawStateChanges) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const allowed = new Set((Array.isArray(rawStateChanges) ? rawStateChanges : [])
+    .filter(change => change && typeof change === 'object' && !Array.isArray(change)
+      && change.entityType === 'prop' && text(change.entityId, 120))
+    .map(change => text(change.entityId, 120).toLocaleLowerCase()));
+  const result = {};
+  for (const [rawId, point] of Object.entries(input).slice(0, 12)) {
+    const entityId = text(rawId, 120);
+    if (!entityId || !allowed.has(entityId.toLocaleLowerCase())
+      || !point || typeof point !== 'object' || Array.isArray(point)) continue;
+    if (typeof point.x !== 'number' || !Number.isFinite(point.x)
+      || typeof point.y !== 'number' || !Number.isFinite(point.y)
+      || point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1) continue;
+    result[entityId] = { x: point.x, y: point.y };
+  }
+  return result;
+}
+
 /** Normalize both current and legacy prototype scene shapes without dropping production prompts. */
 export function normalizeScene(input = {}, index = 0) {
   const scene = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
@@ -67,6 +86,7 @@ export function normalizeScene(input = {}, index = 0) {
       actorId: text(change.actorId, 120),
       evidence: text(change.evidence, 1_200)
     })) : [],
+    propAnchors: normalizePropAnchors(scene.propAnchors, scene.stateChanges),
     interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
       type: text(item.type, 40), actorId: text(item.actorId, 120), targetId: text(item.targetId, 120),
       evidence: text(item.evidence, 500),
