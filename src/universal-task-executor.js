@@ -1,10 +1,12 @@
 import { validateUniversalTaskPlan } from './universal-task-planner.js';
+import { emitProgressSafely } from './progress-callback.js';
 
 const isRecord = value => value && typeof value === 'object' && !Array.isArray(value);
-const notify = (callback, payload) => {
-  if (typeof callback !== 'function') return;
-  try { callback(payload); } catch { /* Observers must not break task execution. */ }
-};
+const notify = (callback, payload) => emitProgressSafely(
+  callback,
+  payload,
+  error => console.warn('DRAVEX task progress callback failed:', error)
+);
 
 function normalizeHandler(entry) {
   if (typeof entry === 'function') return { run: entry, capabilities: null };

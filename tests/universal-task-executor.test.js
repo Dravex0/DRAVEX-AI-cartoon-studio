@@ -126,3 +126,23 @@ test('does not invoke handlers for a malformed plan', async () => {
   assert.equal(result.status, 'invalid-plan');
   assert.equal(called, false);
 });
+
+
+test('continues task execution when asynchronous progress observers reject', async () => {
+  const result = await executeUniversalTaskPlan({
+    plan,
+    handlers: {
+      briefing: async ({ reportProgress }) => { reportProgress('brief ready'); return 'brief'; },
+      'video-rendering': async () => 'video',
+      export: async () => 'file'
+    },
+    onProgress: async () => {
+      throw new Error('async progress observer failed');
+    }
+  });
+
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(result.status, 'completed');
+  assert.equal(result.completed, 3);
+  assert.equal(result.results.export, 'file');
+});

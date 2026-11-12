@@ -1,3 +1,5 @@
+import { emitProgressSafely } from "./progress-callback.js";
+
 /**
  * Normalize provider progress values to a 0–100 percentage.
  * Gradio commonly reports fractions (0–1); other providers may report 0–100.
@@ -77,15 +79,13 @@ export async function generateStoryboardVideos({
 
   // UI/reporting failures must never cancel otherwise valid provider work.
   const emitProgress = (index, stage) => {
-    try {
-      onProgress({ ...report, currentIndex: index, stage });
-    } catch (error) {
+    emitProgressSafely(onProgress, { ...report, currentIndex: index, stage }, error => {
       report.progressErrors.push({
         index,
         stage,
         error: String(error?.message || error || "Unknown progress callback error")
       });
-    }
+    });
   };
 
   for (let index = 0; index < scenes.length; index += 1) {
