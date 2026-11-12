@@ -32,7 +32,9 @@ test("unknown voice and lip-sync provenance remains unverified rather than succe
   const report = observer.report();
   assert.equal(report.stageResults.find(item => item.stage === "voiceGeneration").verdict, "not-verifiable");
   assert.equal(report.stageResults.find(item => item.stage === "lipSync").verdict, "not-verifiable");
-  assert.equal(report.summary.unverifiedStages, 2);
+  assert.equal(report.summary.unverifiedStages, 9);
+  assert.equal(report.stageResults.find(item => item.stage === "voiceGeneration").status, "unknown");
+  assert.equal(report.stageResults.find(item => item.stage === "lipSync").status, "unknown");
   assert.equal(report.summary.overall, "incomplete-evidence");
 });
 
