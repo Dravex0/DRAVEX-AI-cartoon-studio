@@ -160,13 +160,15 @@ test('cinematic camera transform covers generated media, props, and rigged chara
   const cameraStart = app.indexOf('ctx.save();ctx.translate(w/2,h/2+cameraPlan.offsetY);');
   const mediaDraw = app.indexOf('drawImageCover(ctx,generatedVideo,w,h,motionTransform)', cameraStart);
   const propsDraw = app.indexOf('drawSceneProps(ctx,currentSceneData', cameraStart);
-  const characterDraw = app.indexOf('drawCharacterLayers(ctx,currentSceneData.characterLayers', cameraStart);
+  const overlayGuard = app.indexOf('shouldRenderCharacterLayers({hasGeneratedMedia,characterCompositionMode:currentSceneData.characterCompositionMode})', cameraStart);
+  const characterDraw = app.indexOf('drawCharacterLayers(ctx,allowCharacterOverlay?currentSceneData.characterLayers:[]', cameraStart);
   const cameraRestore = app.indexOf('ctx.restore();', characterDraw);
   const titleDraw = app.indexOf("ctx.fillText($('character').value", cameraRestore);
   assert.ok(cameraStart >= 0);
   assert.ok(mediaDraw > cameraStart);
   assert.ok(propsDraw > mediaDraw);
-  assert.ok(characterDraw > propsDraw);
+  assert.ok(overlayGuard > propsDraw);
+  assert.ok(characterDraw > overlayGuard);
   assert.ok(cameraRestore > characterDraw);
   assert.ok(titleDraw > cameraRestore);
 });
