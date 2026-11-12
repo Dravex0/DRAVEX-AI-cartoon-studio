@@ -144,6 +144,24 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
 
   const causalLinks = inferSceneCausalLinks(scenes, locale);
   const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
+  // Build an end-of-scene prop snapshot so props that do not change in a cut
+  // remain available to the renderer and the next scene's continuity prompts.
+  const propStateMemory = new Map();
+  const propStateSnapshots = stateChanges.map(sceneChanges => {
+    const startStates = new Map(propStateMemory);
+    const changedKeys = new Set();
+    for (const change of sceneChanges) {
+      if (change?.entityType !== 'prop' || !change.entityId || !change.property) continue;
+      const stateKey = String(change.entityId).toLocaleLowerCase() + ':' + String(change.property);
+      propStateMemory.set(stateKey, { ...change });
+      changedKeys.add(stateKey);
+    }
+    return [...propStateMemory.entries()].map(([stateKey, state]) => ({
+      ...state,
+      startValue: startStates.get(stateKey)?.value ?? null,
+      changedThisScene: changedKeys.has(stateKey)
+    }));
+  });
   const explicitSubject = !explicitScenes.length && String(character ?? '').trim() ? subject : '';
   const knownCharacters = [...new Set([explicitSubject, ...brief.characters].filter(Boolean))];
   const characterMention = (name, sourceText) => {
@@ -153,6 +171,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   scenes.forEach((scene, index) => {
     scene.causalLink = causalLinks[index];
     scene.stateChanges = stateChanges[index];
+    scene.propStates = propStateSnapshots[index];
     scene.characters = [...new Set([
       ...(explicitSubject ? [explicitSubject] : []),
       ...knownCharacters.filter(name => name !== explicitSubject && (scene.storyDetail
