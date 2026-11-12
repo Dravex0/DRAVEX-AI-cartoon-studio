@@ -279,3 +279,28 @@ test('keeps Kel rescue state continuous across three explicitly authored scenes'
   assert.equal(freedom.actionTimeline.phases[0].targetId, 'small mechanical bird');
   assert.ok(result.eventChain.nodes.every(node => node.sceneId));
 });
+
+
+test('uses prompt-defined characters for action and prop-state inference without a separate character field', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nKel — a young forest adventurer in a dark green cloak.\n\nScene 1: Discovery\nKel notices the small mechanical bird trapped under a fallen branch.\n\nScene 2: Lifting the branch\nKel carefully lifts the fallen branch while watching the bird.\n\nScene 3: Freedom\nKel frees the small mechanical bird.',
+    'en',
+    ''
+  );
+
+  assert.equal(result.scenes.length, 3);
+  assert.ok(result.scenes.every(scene => scene.characters.includes('Kel')));
+  assert.match(result.scenes[0].visibleAction, /Kel/i);
+  assert.ok(result.scenes[0].stateChanges.some(change =>
+    change.entityId === 'small mechanical bird' && change.property === 'state' && change.value === 'trapped'
+  ));
+  assert.ok(result.scenes[0].stateChanges.some(change =>
+    change.entityId === 'fallen branch' && change.property === 'state' && change.value === 'fallen'
+  ));
+  assert.ok(result.scenes[1].stateChanges.some(change =>
+    change.entityId === 'fallen branch' && change.property === 'holder' && change.value === 'Kel'
+  ));
+  assert.ok(result.scenes[1].propStates.some(state =>
+    state.entityId === 'small mechanical bird' && state.property === 'state' && state.value === 'trapped'
+  ));
+});
