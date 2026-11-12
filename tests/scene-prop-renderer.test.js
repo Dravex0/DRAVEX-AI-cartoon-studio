@@ -172,3 +172,71 @@ test('moves the fallen branch during its own preparation phase, before the bird-
   assert.equal(atLiftEnd.x, afterBirdRelease.x);
   assert.equal(atLiftEnd.y, afterBirdRelease.y);
 });
+
+
+test('renders a trapped bird at an explicit story anchor without inventing its position', () => {
+  const trappedScene = {
+    stateChanges: [{
+      entityType: 'prop', entityId: 'small mechanical bird', property: 'state',
+      previousValue: null, value: 'trapped', actorId: 'Kel',
+      evidence: 'Kel notices the small mechanical bird trapped under the fallen branch.'
+    }],
+    propAnchors: { 'small mechanical bird': { x: 0.44, y: 0.72 } }
+  };
+  const plan = buildScenePropRenderPlan(trappedScene, [], 0.2);
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].kind, 'bird');
+  assert.equal(plan[0].state, 'trapped');
+  assert.equal(plan[0].x, 0.44);
+  assert.equal(plan[0].y, 0.72);
+
+  const withoutAnchor = buildScenePropRenderPlan({
+    ...trappedScene,
+    propAnchors: {}
+  }, [], 0.2);
+  assert.deepEqual(withoutAnchor, []);
+});
+
+test('animates an explicitly anchored freed bird during its own action phase', () => {
+  const freedScene = {
+    stateChanges: [{
+      entityType: 'prop', entityId: 'small mechanical bird', property: 'state',
+      previousValue: 'trapped', value: 'free', actorId: 'Kel',
+      evidence: 'Kel frees the small mechanical bird.'
+    }],
+    propAnchors: { 'small mechanical bird': { x: 0.44, y: 0.72 } },
+    actionTimeline: { schemaVersion: 1, phases: [
+      { phase: 'action', start: 0.54, end: 0.9, actorId: 'Kel', targetId: 'small mechanical bird' }
+    ] }
+  };
+  const beforeRelease = buildScenePropRenderPlan(freedScene, [], 0.54)[0];
+  const afterRelease = buildScenePropRenderPlan(freedScene, [], 0.9)[0];
+  assert.equal(beforeRelease.kind, 'bird');
+  assert.equal(beforeRelease.state, 'free');
+  assert.equal(beforeRelease.y, 0.72);
+  assert.ok(afterRelease.y < beforeRelease.y);
+  assert.ok(afterRelease.rotation < beforeRelease.rotation);
+});
+
+test('draws anchored bird and branch props through the shared canvas renderer', () => {
+  const calls = [];
+  const context = new Proxy({}, { get(target, property) {
+    if (property === 'save' || property === 'restore' || property === 'beginPath' || property === 'closePath' || property === 'stroke' || property === 'fill') return () => calls.push(property);
+    if (property === 'translate' || property === 'rotate' || property === 'moveTo' || property === 'lineTo' || property === 'fillRect' || property === 'strokeRect' || property === 'arc' || property === 'ellipse' || property === 'roundRect') return (...args) => calls.push([property, ...args]);
+    return undefined;
+  }, set(target, property, value) { target[property] = value; return true; } });
+  const rescueScene = {
+    stateChanges: [
+      { entityType: 'prop', entityId: 'fallen branch', property: 'holder', previousValue: null, value: 'Kel', actorId: 'Kel' },
+      { entityType: 'prop', entityId: 'small mechanical bird', property: 'state', previousValue: null, value: 'trapped', actorId: 'Kel' }
+    ],
+    propAnchors: {
+      'fallen branch': { x: 0.68, y: 0.79 },
+      'small mechanical bird': { x: 0.44, y: 0.72 }
+    }
+  };
+  const result = drawSceneProps(context, rescueScene, [{ characterId: 'Kel', x: 0.4, y: 0.7 }], 1, 640, 360);
+  assert.equal(result.drawn, 2);
+  assert.equal(calls.filter(call => Array.isArray(call) && call[0] === 'ellipse').length, 3);
+  assert.ok(calls.some(call => Array.isArray(call) && call[0] === 'lineTo'));
+});
