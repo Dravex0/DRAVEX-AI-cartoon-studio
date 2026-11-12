@@ -37,6 +37,8 @@ test('reports an orange-color hint without claiming character recognition', () =
   const report = analyzeRgbaFrameSequence([frame, { ...frame, data: frame.data.slice() }]);
   assert.equal(report.orangeSignal, 'orange-pixels-detected');
   assert.ok(report.maxOrangePixelRatio > 0.9);
+  assert.equal(report.orangePersistence.samplesAboveThreshold, 2);
+  assert.equal(report.orangePersistence.persistent, true);
   assert.match(report.note, /heuristics only/);
 });
 
@@ -45,7 +47,9 @@ test('reports a red-color hint without identifying a requested object', () => {
   const report = analyzeRgbaFrameSequence([frame, { ...frame, data: frame.data.slice() }]);
   assert.equal(report.redSignal, 'red-pixels-detected');
   assert.ok(report.maxRedPixelRatio > 0.9);
-  assert.match(report.note, /do not identify a character, object, or action/);
+  assert.equal(report.redPersistence.samplesAboveThreshold, 2);
+  assert.equal(report.redPersistence.persistent, true);
+  assert.match(report.note, /do not identify a character, body part, object, or action/);
 });
 
 
@@ -68,7 +72,8 @@ test('reports where motion is concentrated instead of treating every pixel chang
 test('does not mislabel a whole-frame lighting change as localized character movement', () => {
   const report = analyzeRgbaFrameSequence([
     solidFrame(9, 9, 30, 30, 30),
-    solidFrame(9, 9, 45, 45, 45)
+    // A 25-level change exceeds the default 18-level pixel threshold in every region.
+    solidFrame(9, 9, 55, 55, 55)
   ]);
   assert.equal(report.regionalMotion.activeRegionsByTransition[0], 9);
   assert.equal(report.regionalMotion.averageActiveRegionsPerTransition, 9);
@@ -110,7 +115,17 @@ test('does not treat a one-frame color flash as persistent color evidence', () =
   const neutral = solidFrame(10, 10, 80, 80, 80);
   const report = analyzeRgbaFrameSequence([orange, neutral, neutral, neutral]);
   assert.equal(report.orangePersistence.samplesAboveThreshold, 1);
+  assert.equal(report.orangePersistence.persistent, false);
   assert.equal(report.orangeSignal, 'orange-color-sporadic-or-weak');
+});
+
+test('does not treat a one-frame red flash as persistent color evidence', () => {
+  const red = solidFrame(10, 10, 220, 30, 25);
+  const neutral = solidFrame(10, 10, 80, 80, 80);
+  const report = analyzeRgbaFrameSequence([red, neutral, neutral, neutral]);
+  assert.equal(report.redPersistence.samplesAboveThreshold, 1);
+  assert.equal(report.redPersistence.persistent, false);
+  assert.equal(report.redSignal, 'red-color-sporadic-or-weak');
 });
 
 test('normalizes hidden transparent RGB before measuring appearance changes', () => {
