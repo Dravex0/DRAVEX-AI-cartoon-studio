@@ -92,6 +92,7 @@ import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './characte
 import { generateCharacterSpriteAsset } from "./character-sprite-generation.js";
 import { verifySpriteTransparency } from "./character-sprite-verification.js";
 import { upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene } from "./character-reference.js";
+import { prioritizeCharacterReferenceImages } from "./character-reference-selection.js";
 import { prepareStoryCharacterContext } from "./story-character-context.js";
 import { normalizeSceneCast } from "./scene-cast.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
@@ -1012,12 +1013,15 @@ async function loadCharacterReferenceImagesForScene(scene){
   const profiles=selectCharacterReferencesForScene(characterBible,cast);
   const images=[];
   for(const profile of profiles){
-    if(images.length>=2)break;
     if(!profile.referenceImageAssetId)continue;
     const record=await characterReferenceImageStorage.get(profile.referenceImageAssetId);
     if(record?.blob?.size)images.push({name:record.filename||profile.characterId+'.png',blob:record.blob});
   }
   return images;
+}
+async function buildCharacterReferenceImagesForScene(scene){
+  const profileImages=await loadCharacterReferenceImagesForScene(scene);
+  return prioritizeCharacterReferenceImages(comfyCharacterReferenceFiles,profileImages);
 }
 function updateProductionPreview(){
 const meta=sceneMetadata[sceneIndex]||{};
@@ -3018,9 +3022,8 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  const provider=createComfyUIVideoProvider(comfyProviderOptions());
  const registry=createVideoProviderRegistry();registry.register(provider);
  const duration=Math.max(0.25,Math.min(30,Number(originalMeta.durationSeconds??originalMeta.duration??$('duration').value)||3));
- const profileReferences=await loadCharacterReferenceImagesForScene(motionScene);
- assertGenerationCurrent();
- const referenceImages=profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2);
+ const referenceImages=await buildCharacterReferenceImagesForScene(motionScene);
+  assertGenerationCurrent();
  reportProgress?.('Submitting scene to local ComfyUI');
  const result=await generateVideoWithProvider(registry,provider.id,{
   taskType,prompt,negativePrompt:motionScene.negativePrompt,
@@ -3157,9 +3160,8 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
   let referenceWarning='';
-  const profileReferences=await loadCharacterReferenceImagesForScene(motionScene);
+  const referenceImages=await buildCharacterReferenceImagesForScene(motionScene);
   assertGenerationCurrent();
-  const referenceImages=profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2);
   const result=await generateVideoWithProvider(registry,provider.id,{taskType,prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageBlob}:{}),seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages},{onProgress:progress=>{
    if(progress.stage==='warning'&&progress.message){referenceWarning=String(progress.message);status.textContent='ComfyUI · Внимание: '+referenceWarning;return;}
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
@@ -3421,8 +3423,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
     const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Отправка в видеодвижок','Submitting to video engine')});
-    const profileReferenceImages=mode==='comfyui'?await loadCharacterReferenceImagesForScene(meta):[];
-    const referenceImages=mode==='comfyui'?profileReferenceImages.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2):[];
+    const referenceImages=mode==='comfyui'?await buildCharacterReferenceImagesForScene(meta):[];
     assertSceneIdentityCurrent();
     let referenceWarning='';
     const result=await generateVideoWithProvider(registry,provider.id,{taskType,prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageInput}:{}),seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),referenceImages},{signal,onProgress:job=>{

@@ -66,7 +66,9 @@ export function mergeCharacterReferences(existing = [], discovered = []) {
 
 
 /**
- * Return only character profiles explicitly named in a scene cast.
+ * Return every character profile explicitly named in a scene cast.
+ * The provider adapter owns its configured input capacity and reports any
+ * references it cannot use; this selector must not silently discard matches.
  * An empty or unknown cast must never inherit unrelated character references.
  */
 export function selectCharacterReferencesForScene(references = [], sceneCast = []) {
@@ -83,7 +85,6 @@ export function selectCharacterReferencesForScene(references = [], sceneCast = [
     if (!key || !allowed.has(key) || seen.has(key)) continue;
     seen.add(key);
     selected.push(profile);
-    if (selected.length >= 2) break;
   }
   return selected;
 }

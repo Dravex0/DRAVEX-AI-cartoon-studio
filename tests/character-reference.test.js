@@ -121,10 +121,10 @@ test('does not leak character references into scenes with an empty or unrelated 
   assert.deepEqual(selectCharacterReferencesForScene(profiles, ['Unknown character']), []);
 });
 
-test('limits scene-specific reference profiles to the two provider input slots', () => {
-  const profiles = ['Foxy', 'Mira', 'Snowball'].map(characterId => ({ characterId }));
+test('preserves every matching scene profile so the provider can report workflow capacity', () => {
+  const profiles = ['Foxy', 'Mira', 'Snowball', 'Kel', 'Kael'].map(characterId => ({ characterId }));
   assert.deepEqual(
-    selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball']).map(profile => profile.characterId),
-    ['Foxy', 'Mira']
+    selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball', 'Kel', 'Kael']).map(profile => profile.characterId),
+    ['Foxy', 'Mira', 'Snowball', 'Kel', 'Kael']
   );
 });
