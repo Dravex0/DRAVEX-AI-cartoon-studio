@@ -19,7 +19,7 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
     agent: 'DRAVEX Browser QA Agent',
     runAt: new Date().toISOString(),
     browserProject: testInfo.project.name,
-    prompt: 'A small blue robot walks through a park, meets a little red bird, waves, and they become friends. Duration: 0.25 seconds.',
+    prompt: 'Characters:\nKel — a young forest adventurer in a dark green cloak.\n\nScene 1: Discovery\nKel notices the small mechanical bird trapped under a fallen branch.\n\nScene 2: Lifting the branch\nKel carefully lifts the fallen branch while watching the bird.\n\nScene 3: Freedom\nKel frees the small mechanical bird, and it flutters above the clearing.\n\nDuration: 0.25 seconds',
     steps: [],
     provider: { selectedMode: null, classification: 'not-verified-yet', externalVideoRequests: [] },
     browserErrors: [],
@@ -72,6 +72,11 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
 
     await expect(page.locator('#fullFilmProgressPanel')).toBeVisible({ timeout: 20_000 });
     report.steps.push({ id: 'render-progress-visible', status: 'passed' });
+
+    await expect(page.locator('#scenes button.scene')).toHaveCount(3, { timeout: 30_000 });
+    const sceneLabels = await page.locator('#scenes button.scene').allTextContents();
+    report.steps.push({ id: 'kel-rescue-storyboard-created', status: 'passed', sceneCount: sceneLabels.length, sceneLabels });
+    await expect(page.locator('#character')).toHaveValue('Kel');
 
     await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 140_000 });
     await expect(page.locator('#finalFilmDownload')).toHaveAttribute('download', 'dravex-cartoon-film.webm');
