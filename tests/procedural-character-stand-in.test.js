@@ -51,7 +51,7 @@ test('extends the active arm to the source-locked prop target during a rescue ac
     progress: 1,
     action: 'lift',
     target: { x: 0.52, y: 0.7 },
-    held: true
+    held: false
   });
   assert.equal(result.drawn, true);
   assert.ok(result.handTarget.x > 0.5);
