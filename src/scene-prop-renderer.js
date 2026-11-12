@@ -163,12 +163,13 @@ function drawStar(context, size) {
   context.fill();
 }
 
-function drawProp(context, prop, x, y, time) {
+function drawProp(context, prop, x, y, time, unitScale = 1) {
   const bob = prop.held ? Math.sin(time * 4) * 0.008 : prop.state === 'free' ? Math.sin(time * 5) * 0.006 : 0;
   context.save();
   context.translate(x, y + bob);
+  context.scale(unitScale, unitScale);
   context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
-  context.lineWidth = 2.5;
+  context.lineWidth = 2.5 / unitScale;
   context.lineJoin = 'round';
   if (prop.kind === 'bird') {
     context.fillStyle = prop.state === 'trapped' ? '#91a7b1' : '#a9dce5'; context.strokeStyle = '#365966';
@@ -179,13 +180,13 @@ function drawProp(context, prop, x, y, time) {
     context.fillStyle = '#e5a94f'; context.beginPath(); context.moveTo(0.024, -0.007); context.lineTo(0.035, -0.003); context.lineTo(0.024, 0.001); context.closePath(); context.fill();
     context.strokeStyle = '#7eabb7'; context.beginPath(); context.moveTo(-0.016, 0.012); context.lineTo(-0.021, 0.019); context.moveTo(-0.006, 0.014); context.lineTo(-0.008, 0.02); context.stroke();
   } else if (prop.kind === 'branch') {
-    context.strokeStyle = '#775435'; context.lineWidth = 6;
+    context.strokeStyle = '#775435'; context.lineWidth = 6 / unitScale;
     context.beginPath(); context.moveTo(-0.04, 0.012); context.lineTo(-0.017, -0.006);
     context.lineTo(0.005, 0.006); context.lineTo(0.025, -0.014);
     context.moveTo(-0.017, -0.006); context.lineTo(-0.024, -0.023);
     context.moveTo(0.005, 0.006); context.lineTo(0.014, 0.026);
     context.stroke();
-    context.strokeStyle = '#9b754a'; context.lineWidth = 2;
+    context.strokeStyle = '#9b754a'; context.lineWidth = 2 / unitScale;
     context.beginPath(); context.moveTo(-0.035, 0.009); context.lineTo(-0.015, -0.005); context.lineTo(0.005, 0.006); context.stroke();
   } else if (prop.kind === 'star') {
     context.fillStyle = '#ffe58a'; context.strokeStyle = '#9b6b24';
@@ -221,6 +222,7 @@ export function drawSceneProps(context, scene, characterLayers, progress, width,
     return { drawn: 0, skipped: 0 };
   }
   const plan = buildScenePropRenderPlan(scene, characterLayers, progress, runtime);
-  for (const prop of plan) drawProp(context, prop, prop.x * width, prop.y * height, Number.isFinite(time) ? time : 0);
+  const unitScale = Math.max(1, Math.min(width, height));
+  for (const prop of plan) drawProp(context, prop, prop.x * width, prop.y * height, Number.isFinite(time) ? time : 0, unitScale);
   return { drawn: plan.length, skipped: 0, props: plan };
 }
