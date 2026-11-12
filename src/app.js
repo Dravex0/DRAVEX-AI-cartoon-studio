@@ -101,6 +101,7 @@ import { buildCharacterPresenceTimeline } from "./character-presence-timeline.js
 import { auditProductionRun } from "./production-audit-agent.js";
 import { shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
 import { drawProceduralDemoFox } from './demo-character-renderer.js';
+import { drawProceduralCharacterStandIn } from './procedural-character-stand-in.js';
 const localTextRuntime = createLocalTransformersRuntime();
 let activeUniversalPlanController = null;
 let activeGenerationObserver = null;
@@ -891,7 +892,36 @@ else if(generatedFrame){drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
 const sampledRigPoses=currentSceneData.characterRigTimeline?.keyframes?.length
  ? sampleCharacterRigTimeline(currentSceneData.characterRigTimeline,rigAnimationProgress)
  : currentSceneData.characterRigPoses;
-drawSceneProps(ctx,currentSceneData,currentSceneData.characterLayers,sceneMotionProgress,w,h,t,{characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);ctx.restore();
+const sceneCast=Array.isArray(currentSceneData.characters)?currentSceneData.characters.map(id=>String(id||'').trim()).filter(Boolean):[];
+const hasCharacterLayers=Array.isArray(currentSceneData.characterLayers)&&currentSceneData.characterLayers.length>0;
+const hasCharacterRigs=Array.isArray(currentSceneData.characterRigs)&&currentSceneData.characterRigs.length>0;
+const useProceduralStandIn=!showDemoFox&&!hasGeneratedMedia&&!hasCharacterLayers&&!hasCharacterRigs&&sceneCast.length>0;
+const standInActor=sceneCast[0]||'';
+const standInLayer=useProceduralStandIn?{characterId:standInActor,x:0.4,y:0.78}:null;
+let standInPhase=null;
+if(useProceduralStandIn){
+ standInPhase=(Array.isArray(currentSceneData.actionTimeline?.phases)?currentSceneData.actionTimeline.phases:[])
+  .find(phase=>String(phase?.actorId||'').toLocaleLowerCase()===standInActor.toLocaleLowerCase()
+   &&sceneMotionProgress>=Number(phase.start||0)&&sceneMotionProgress<=Number(phase.end??1))||null;
+ const detail=String(standInPhase?.description||currentSceneData.storyDetail||'').toLocaleLowerCase();
+ const standInAction=/\\b(run|running|sprint|беж|біг|corre)\\b/u.test(detail)?'run'
+  :/\\b(walk|walking|ход|ид[её]т|іде|camina)\\b/u.test(detail)?'walk'
+  :/\\b(lift|lifts|raise|raises|поднима|підніма|levanta)\\b/u.test(detail)?'lift'
+  :/\\b(free|frees|release|releases|освобож|звільня|libera)\\b/u.test(detail)?'free'
+  :standInPhase?.targetId?'reach':'idle';
+ const stateRecords=[...(Array.isArray(currentSceneData.stateChanges)?currentSceneData.stateChanges:[]),...(Array.isArray(currentSceneData.propStates)?currentSceneData.propStates:[])];
+ const heldRecord=stateRecords.find(change=>change?.entityType==='prop'&&change?.property==='holder'
+  &&String(change.value??'').toLocaleLowerCase()===standInActor.toLocaleLowerCase());
+ const phaseTarget=standInPhase?.targetId?String(standInPhase.targetId):'';
+ const handTarget=heldRecord?{x:standInLayer.x+0.12,y:standInLayer.y-0.08}
+  :phaseTarget?(currentSceneData.propAnchors?.[phaseTarget]||null):null;
+ const profile=Array.isArray(characterBible)?characterBible.find(item=>String(item?.characterId||'').toLocaleLowerCase()===standInActor.toLocaleLowerCase())||{}:{};
+ drawProceduralCharacterStandIn(ctx,{characterId:standInActor,profile,x:standInLayer.x,y:standInLayer.y,width:w,height:h,time:t,progress:sceneMotionProgress,action:standInAction,target:handTarget,held:Boolean(heldRecord)});
+}
+canvas.dataset.characterRenderMode=useProceduralStandIn?'procedural-stand-in':hasGeneratedMedia?'generated-media':hasCharacterLayers||hasCharacterRigs?'character-assets':showDemoFox?'built-in-demo-character':'no-character-visual';
+const propCharacterLayers=standInLayer?[standInLayer]:currentSceneData.characterLayers;
+drawSceneProps(ctx,currentSceneData,propCharacterLayers,sceneMotionProgress,w,h,t,{characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});
+drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);ctx.restore();
 updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGeneratedVideo,motionTransform,viewportWidth:w,viewportHeight:h,cameraPlan,focusX,focusY});
 try {
  captureCharacterMotionAuditFrame({
