@@ -139,7 +139,7 @@ export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
       'Animate only the environment and scenery in this background plate. Do not render, animate, add, or imply people, characters, animals, creatures, figures, silhouettes, or character-shaped shadows.',
       'Keep the foreground clear for separately composited character sprites. Preserve the background layout, lighting direction, perspective, and object geometry; use subtle continuous environmental movement only.',
       'Do not invent story actions, physical interactions, props, dialogue, or character reactions in the background layer.'
-    ].filter(Boolean).join('\\n');
+    ].filter(Boolean).join('\n');
   }
   const characterLock = characterDetails(scene, characterBible);
   return [
