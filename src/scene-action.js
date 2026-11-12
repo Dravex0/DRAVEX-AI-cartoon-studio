@@ -1,6 +1,7 @@
 const ACTION_PATTERNS = [
   { action: 'vanish', patterns: [/исчез|пропад|растворя|тает на глазах|исчезает/, /\bvanish\w*|disappear\w*|fade\s*out|dissolve\w*/, /зника|щез|розчиня/, /desaparec\w*|se desvanece/] },
   { action: 'wave', patterns: [/машет(?: рукой)?|помахива|приветственно машет/, /\bwave\w*|\bwaves? hello|\bgreet\w* with a wave/, /махає(?: рукою)?|привітально махає/, /saluda con la mano|\bagita\w* la mano/] },
+  { action: 'reach', patterns: [/тянется к|освобожда\w*|высвобожда\w*|выпуска\w*|поднима\w*|бер[её]т|хвата\w*|держит/, /\breach(?:es|ing)? (?:for|toward|towards)\b|\bfrees?\b|\breleases?\b|\blifts?\b|\bpicks? up\b|\bgrabs?\b|\bholds?\b/, /тягнеться до|звільня\w*|визволя\w*|випуска\w*|підніма\w*|бере|хапа\w*|трима\w*/, /\breach(?:es|ing)? for\b|libera\w*|suelta|levanta|recoge|agarra|alcanza/] },
   { action: 'jump', patterns: [/прыга|подпрыг|перепрыг|скачет/, /\bjump\w*|leap\w*|bounce\w*/, /стриба|підстрибу|перестрибу/, /salt\w*|brinca\w*/] },
   { action: 'run', patterns: [/беж|побеж|убега|мчится|гонится/, /\brun\w*|sprint\w*|chase\w*|runn?ing\b/, /біж|тіка|мчить|пересліду/, /corr\w*|persigue\w*|huye\w*/] },
   { action: 'dance', patterns: [/танцу|пляш|ритмично двига|кружится в танце/, /\bdanc\w*|twirl\w*|groove\w*/, /танцю|ритмічно руха|крутиться в танці/, /bail\w*|gira bailando/] },
@@ -59,6 +60,12 @@ export function detectSceneAction(input) {
 
 
 const SEMANTIC_ACTIONS = [
+  { intent: 'prop_interaction', motionCue: 'reach', patterns: [
+    /\b(?:reaches? for|frees?|releases?|lifts?|picks? up|grabs?|holds?)\b/i,
+    /тянется к|освобожда\w*|высвобожда\w*|выпуска\w*|поднима\w*|бер[её]т|хвата\w*|держит/i,
+    /тягнеться до|звільня\w*|визволя\w*|випуска\w*|підніма\w*|бере|хапа\w*|трима\w*/i,
+    /\b(?:libera|suelta|levanta|recoge|agarra|alcanza)\w*\b/i
+  ] },
   { intent: 'team_magic', motionCue: 'magic', patterns: [
     /(?:unite|combine|join|merge|channel|synchronize).{0,55}(?:power|energy|magic|light)|(?:power|energy|magic|light).{0,55}(?:unite|combine|join|merge|together)/i,
     /объединя\w*.{0,55}(?:сил|энерг|маг)|соединя\w*.{0,55}(?:сил|энерг|маг)|слива\w*.{0,55}(?:сил|энерг|маг)/i,
