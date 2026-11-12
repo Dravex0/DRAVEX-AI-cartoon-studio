@@ -81,7 +81,7 @@ test('positions the second team-magic partner toward the first partner and keeps
   const mira = plan.find(actor => actor.characterId === 'Mira');
   assert.equal(mira.action, 'magic');
   assert.deepEqual(mira.target, { x: 0.31, y: 0.67 });
-  assert.equal(mira.targetId, 'Mira');
+  assert.equal(mira.targetId, 'Kel');
   assert.equal(mira.phase, 'action');
 });
 
@@ -98,4 +98,19 @@ test('does not infer a team-magic partner action from a non-team semantic intent
   assert.equal(mira.target, null);
   assert.equal(mira.targetId, null);
   assert.equal(mira.phase, null);
+});
+
+test('does not invent a team-magic partner when the primary actor is absent from the locked cast', () => {
+  const plan = buildProceduralStandInScenePlan({
+    characters: ['Mira'],
+    semanticActionIntent: { intent: 'team_magic', motionCue: 'magic' },
+    actionTimeline: { schemaVersion: 1, phases: [
+      { phase: 'action', start: 0, end: 1, actorId: 'Kel', targetId: 'Mira', description: 'Kel and Mira combine their magic.' }
+    ] }
+  });
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].characterId, 'Mira');
+  assert.equal(plan[0].action, 'idle');
+  assert.equal(plan[0].target, null);
+  assert.equal(plan[0].targetId, null);
 });
