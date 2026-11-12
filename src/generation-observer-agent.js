@@ -1,5 +1,5 @@
 const STAGE_ORDER = ["promptInput", "promptParsing", "storyPlanning", "storyboardValidation", "imageGeneration", "videoGeneration", "voiceGeneration", "lipSync", "export"];
-const OPTIONAL_STAGES = new Set(["voiceGeneration", "lipSync"]);
+const OPTIONAL_STAGES = new Set(["imageGeneration", "voiceGeneration", "lipSync"]);
 const record = value => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const text = value => typeof value === "string" ? value.trim() : "";
 const normalize = value => text(value).toLocaleLowerCase().normalize("NFKC").replace(/[’']/g, "'").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
