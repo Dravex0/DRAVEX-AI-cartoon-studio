@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCharacterRigTimelineFromActionTimeline } from '../src/character-rig-action-planner.js';
 import { sampleCharacterRigTimeline } from '../src/character-rig-timeline.js';
+import { applyCharacterRigPose } from '../src/character-rig.js';
 
 const rig = (characterId = 'Foxy') => ({
   schemaVersion: 1,
