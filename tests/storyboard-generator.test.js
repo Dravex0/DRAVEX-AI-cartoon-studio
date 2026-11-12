@@ -194,7 +194,6 @@ test('creates a single action phase for explicit movement without inventing othe
   assert.equal(timeline.phases[0].evidence, 'Foxy runs through the forest.');
 });
 
-\n
 test('splits an explicitly written attack and target stagger into ordered grounded phases', () => {
   const result = buildStoryboardFromText(
     'Characters:\\nKael — a young warrior.\\nGuard — an armored guard.\\n\\nScene 1: Clash\\nKael strikes the guard, and the guard stumbles backward.',
