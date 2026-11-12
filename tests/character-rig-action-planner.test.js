@@ -49,7 +49,19 @@ test('maps grounded dodge action into an articulated rig timeline in scene time'
   assert.equal(result.timeline.keyframes.at(-1).time, 1);
 });
 
-test('maps jump action and preserves neutral poses outside its scene-time interval', () => {
+test('maps a grounded opponent recoil to a distinct stagger rig motion', () => {
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('recoils and stumbles backward from the strike'), [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.mappedActions[0].preset, 'stagger');
+  const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+  assert.ok(middle.root.x < 0, 'the torso should shift backward during the recoil');
+  assert.ok(Math.abs(middle.leftArm.rotation) > 0.3);
+  assert.ok(Math.abs(middle.rightArm.rotation) > 0.3);
+  const end = sampleCharacterRigTimeline(result.timeline, 0.8).Foxy || {};
+  assert.ok(Math.abs(end.root?.x || 0) < 1e-9, 'the rig should return to neutral after the reaction interval');
+});
+
+test('maps jump action and preserves neutral poses outside its scene-time interval', () =>
   const result = createCharacterRigTimelineFromActionTimeline(makeScene('jumps over the stone'), [rig()]);
   assert.equal(result.status, 'generated');
   const before = sampleCharacterRigTimeline(result.timeline, 0.1).Foxy || {};
