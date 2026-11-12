@@ -9,7 +9,7 @@ function propKind(name) {
   if (/star|звезд|зірк|estrella/.test(value)) return 'star';
   if (/key|ключ|ключик|llave/.test(value)) return 'key';
   if (/book|книг|книж|libro/.test(value)) return 'book';
-  if (/ball|мяч|куля|pelota/.test(value)) return 'ball';
+  if (/ball|м[’']?яч|куля|pelota/.test(value)) return 'ball';
   if (/apple|яблок|яблук|manzana/.test(value)) return 'apple';
   return 'generic';
 }
