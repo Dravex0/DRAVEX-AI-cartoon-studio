@@ -118,13 +118,13 @@ function drawStar(context, size) {
 
 function ballPalette(prop) {
   const source = key(prop?.id) + ' ' + key(prop?.evidence);
-  if (/(?:red\\s+ball|красн\\p{L}*\\s+мяч|червон\\p{L}*\\s+м[’']?яч|pelota\\s+roja)/iu.test(source)) {
+  if (/(?:red\s+ball|красн\p{L}*\s+мяч|червон\p{L}*\s+м[’']?яч|pelota\s+roja)/iu.test(source)) {
     return { fill: '#e74b4b', stroke: '#7a2020' };
   }
-  if (/(?:blue\\s+ball|син\\p{L}*\\s+мяч|син\\p{L}*\\s+куля|pelota\\s+azul)/iu.test(source)) {
+  if (/(?:blue\s+ball|син\p{L}*\s+мяч|син\p{L}*\s+куля|pelota\s+azul)/iu.test(source)) {
     return { fill: '#72c6df', stroke: '#24566c' };
   }
-  if (/(?:green\\s+ball|зел[её]н\\p{L}*\\s+мяч|зелен\\p{L}*\\s+куля|pelota\\s+verde)/iu.test(source)) {
+  if (/(?:green\s+ball|зел[её]н\p{L}*\s+мяч|зелен\p{L}*\s+куля|pelota\s+verde)/iu.test(source)) {
     return { fill: '#55a96a', stroke: '#28533f' };
   }
   // Preserve the original blue appearance when the story does not name a ball color.
