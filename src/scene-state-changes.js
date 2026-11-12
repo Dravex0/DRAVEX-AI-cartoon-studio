@@ -5,7 +5,7 @@
  */
 const VERBS = {
   en: [
-    { re: /(?:picks up|takes|grabs|holds)/iu, property: 'holder', value: 'actor' },
+    { re: /(?:lifts?|picks up|takes|grabs|holds)/iu, property: 'holder', value: 'actor' },
     { re: /(?:drops|puts down|leaves behind)/iu, property: 'holder', value: null },
     { re: /(?:frees|releases|unties)/iu, property: 'state', value: 'free' },
     { re: /(?:traps|imprisons)/iu, property: 'state', value: 'trapped' },
