@@ -55,6 +55,8 @@ test('does not draw a human procedural stand-in for an explicitly non-human char
  assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Foxy', profile: { visualDescription: 'a small orange fox' } }), false);
  assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Blue Robot', profile: { species: 'robot' } }), false);
  assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Bluebird', profile: { visualDescription: 'a small blue bird' } }), false);
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Foxy' }), false);
+ assert.equal(shouldDrawProceduralStoryCharacter({ characterId: 'Лисёнок' }), false);
 });
 
 test('uses explicit human species as the authoritative fallback type', () => {
