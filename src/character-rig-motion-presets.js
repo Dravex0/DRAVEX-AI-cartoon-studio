@@ -155,8 +155,8 @@ function reachArmChainFor(rig, side, rawRigInput) {
     || lower.parentId?.toLowerCase() !== upper.id.toLowerCase()
     || !Number.isFinite(rawPart.gripOffsetX) || !Number.isFinite(rawPart.gripOffsetY)) return null;
   const grip = {
-    x: part.x + part.gripOffsetX * part.width,
-    y: part.y + part.gripOffsetY * part.height
+    x: part.x + part.gripOffsetX,
+    y: part.y + part.gripOffsetY
   };
   const upperLength = Math.hypot(lower.pivotX - upper.pivotX, lower.pivotY - upper.pivotY);
   const lowerLength = Math.hypot(grip.x - lower.pivotX, grip.y - lower.pivotY);
