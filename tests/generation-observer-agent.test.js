@@ -25,6 +25,19 @@ test("missing evidence is never treated as success", () => {
   assert.equal(report.stageResults[0].verdict, "not-verifiable");
 });
 
+test("an explicitly skipped image stage is optional for text-to-video workflows", () => {
+  const observer = createGenerationObserver();
+  observer.recordStage("imageGeneration", {
+    status: "skipped",
+    output: { sceneCount: 3, generatedImageSceneCount: 0, reason: "Text-to-video does not require still images." }
+  });
+  const report = observer.report();
+  const stage = report.stageResults.find(item => item.stage === "imageGeneration");
+  assert.equal(stage.verdict, "optional");
+  assert.equal(stage.status, "skipped");
+  assert.equal(report.summary.unverifiedStages, 8);
+});
+
 test("unknown voice and lip-sync provenance remains unverified rather than successful", () => {
   const observer = createGenerationObserver();
   observer.recordStage("voiceGeneration", { status: "unknown", output: { trackCount: 2, includedInExport: true, provenance: "not-tracked" } });
