@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildScenePropRenderPlan, drawSceneProps } from '../src/scene-prop-renderer.js';
 import { inferStoryboardStateChanges } from '../src/scene-state-changes.js';
 import { normalizeScene } from '../src/scene-model.js';
+import { buildStoryboardFromText } from '../src/storyboard-generator.js';
 
 const scene = {
   stateChanges: [{
@@ -308,4 +309,42 @@ test('integrates discovery, obstacle lift, and bird release through normalized C
   const birdAfter = buildScenePropRenderPlan(scenes[2], [], 0.9)[0];
   assert.equal(birdBefore.state, 'free');
   assert.ok(birdAfter.y < birdBefore.y);
+});
+
+
+test('keeps the rescued bird visible and the branch held across later storyboard scenes', () => {
+  const storyboard = buildStoryboardFromText(
+    'Characters:\nKel — a young forest adventurer.\n\nScene 1: Discovery\nKel sees the small mechanical bird trapped under a fallen branch.\n\nScene 2: Lifting the branch\nKel lifts the fallen branch.\n\nScene 3: Freedom\nKel frees the small mechanical bird.',
+    'en',
+    'Kel'
+  );
+  assert.equal(storyboard.scenes.length, 3);
+  const anchors = [
+    { 'small mechanical bird': { x: 0.44, y: 0.72 }, 'fallen branch': { x: 0.68, y: 0.79 } },
+    { 'small mechanical bird': { x: 0.44, y: 0.72 }, 'fallen branch': { x: 0.68, y: 0.79 } },
+    { 'small mechanical bird': { x: 0.44, y: 0.72 }, 'fallen branch': { x: 0.68, y: 0.79 } }
+  ];
+  const scenes = storyboard.scenes.map((scene, index) =>
+    normalizeScene({ ...scene, propAnchors: anchors[index] }, index)
+  );
+
+  assert.ok(scenes[1].propStates.some(state =>
+    state.entityId === 'small mechanical bird' && state.property === 'state' && state.value === 'trapped'
+  ));
+  assert.ok(scenes[2].propStates.some(state =>
+    state.entityId === 'fallen branch' && state.property === 'holder' && state.value === 'Kel'
+  ));
+
+  const scenePlans = scenes.map((scene, index) =>
+    buildScenePropRenderPlan(scene, [{ characterId: 'Kel', x: 0.4, y: 0.7 }], index === 1 ? 0.46 : index === 2 ? 0.9 : 0.1)
+  );
+  assert.deepEqual(scenePlans.map(plan => plan.map(prop => prop.id).sort()), [
+    ['fallen branch', 'small mechanical bird'],
+    ['fallen branch', 'small mechanical bird'],
+    ['fallen branch', 'small mechanical bird']
+  ]);
+  assert.equal(scenePlans[1].find(prop => prop.id === 'fallen branch').held, true);
+  assert.equal(scenePlans[1].find(prop => prop.id === 'small mechanical bird').state, 'trapped');
+  assert.equal(scenePlans[2].find(prop => prop.id === 'fallen branch').held, true);
+  assert.equal(scenePlans[2].find(prop => prop.id === 'small mechanical bird').state, 'free');
 });
