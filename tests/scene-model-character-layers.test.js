@@ -105,3 +105,14 @@ test('scene normalization preserves only bounded anchors for explicitly tracked 
 test('legacy scenes without prop anchors normalize to an empty anchor map', () => {
   assert.deepEqual(normalizeScene({ title: 'Legacy scene' }).propAnchors, {});
 });
+
+
+test('scene normalization preserves explicit background-only character composition', () => {
+  assert.equal(normalizeScene({ characterCompositionMode: 'background-only' }).characterCompositionMode, 'background-only');
+});
+
+test('scene normalization preserves full-frame composition and defaults unknown values safely', () => {
+  assert.equal(normalizeScene({ characterCompositionMode: 'full-frame' }).characterCompositionMode, 'full-frame');
+  assert.equal(normalizeScene({ characterCompositionMode: 'overlay-everything' }).characterCompositionMode, 'auto');
+  assert.equal(normalizeScene({}).characterCompositionMode, 'auto');
+});
