@@ -41,23 +41,24 @@ function collectLockedProps(scene) {
  * director-authored coordinates exist. It never creates a new prop ID.
  */
 export function buildDeterministicScenePropAnchors(scene = {}) {
-  if (scene?.propAnchors && typeof scene.propAnchors === 'object' && !Array.isArray(scene.propAnchors)) {
-    const supplied = Object.entries(scene.propAnchors).filter(([id, point]) =>
-      collectLockedProps(scene).some(locked => normalize(locked) === normalize(id))
-      && point && Number.isFinite(point.x) && Number.isFinite(point.y)
-      && point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1
-    );
-    if (supplied.length) return Object.fromEntries(supplied.map(([id, point]) => [id, { x: point.x, y: point.y }]));
-  }
-
   const props = collectLockedProps(scene);
   if (!props.length) return {};
+  const anchors = {};
+  if (scene?.propAnchors && typeof scene.propAnchors === 'object' && !Array.isArray(scene.propAnchors)) {
+    for (const [id, point] of Object.entries(scene.propAnchors)) {
+      const lockedId = props.find(locked => normalize(locked) === normalize(id));
+      if (!lockedId || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)
+        || point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1) continue;
+      anchors[lockedId] = { x: point.x, y: point.y };
+    }
+  }
+  const missingProps = props.filter(id => !anchors[id]);
+  if (!missingProps.length) return anchors;
   const kinds = new Map(props.map(id => [normalize(id), propKind(id)]));
   const hasBird = props.some(id => kinds.get(normalize(id)) === 'bird');
   const hasBranch = props.some(id => kinds.get(normalize(id)) === 'branch');
-  const anchors = {};
 
-  for (const [index, entityId] of props.entries()) {
+  for (const [index, entityId] of missingProps.entries()) {
     const kind = kinds.get(normalize(entityId));
     let point;
     if (hasBird && hasBranch && kind === 'bird') {
