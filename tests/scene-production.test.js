@@ -27,6 +27,35 @@ test('image prompt builder includes scene, setting, camera, character bible and 
   assert.match(prompt, /No extra characters/);
 });
 
+test('background-only image prompt excludes the cast and character-aware story prompt', () => {
+  const prompt = buildImageGenerationPrompt({
+    characterCompositionMode: 'background-only',
+    environmentDescription: 'A moonlit forest clearing with a fallen oak and a small stream.',
+    location: 'Northern forest',
+    timeOfDay: 'Moonlit night',
+    imagePrompt: 'Kel stands beside the stream.',
+    characters: ['Kel'],
+    visibleAction: 'Kel lifts a branch.',
+    continuityLock: 'Keep Kel wearing a green cloak.'
+  }, [{ characterId: 'Kel', visualDescription: 'Young forest explorer' }], { visualStyle: 'Anime-inspired' });
+
+  assert.match(prompt, /environment-only background plate/i);
+  assert.match(prompt, /moonlit forest clearing/);
+  assert.match(prompt, /anime artwork/i);
+  assert.match(prompt, /Do not render people, characters, animals/);
+  assert.doesNotMatch(prompt, /Kel|green cloak|Young forest explorer|lifts a branch/);
+});
+
+test('background-only image prompt refuses to fall back when environment details are missing', () => {
+  const prompt = buildImageGenerationPrompt({
+    characterCompositionMode: 'background-only',
+    imagePrompt: 'Kel stands in a forest.',
+    characters: ['Kel']
+  }, [{ characterId: 'Kel', visualDescription: 'Young forest explorer' }]);
+
+  assert.equal(prompt, '');
+});
+
 test('image prompt explicitly requires every declared scene character to be visible', () => {
   const prompt = buildImageGenerationPrompt({
     imagePrompt: 'A magical forest at dusk.',
