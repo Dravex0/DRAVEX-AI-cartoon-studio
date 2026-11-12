@@ -46,6 +46,28 @@ const PASSIVE_TRAPPED_PATTERNS = {
   es: /(?:ve|encuentra|nota|descubre)\s+(?:el|la|los|las|un|una)\s+(.+?)\s+(?:atrapad[oa]s?|aprisionad[oa]s?)\b/iu
 };
 
+const FALLEN_OBSTACLE_PATTERNS = {
+  en: /\btrapped\s+(?:under|beneath)\s+(?:the|a|an)\s+(fallen\s+[\p{L}\p{N} -]{2,80})/iu,
+  ru: /(?:застрявш\p{L}*|зажат\p{L}*|придавлен\p{L}*)\s+под\s+(упавш\p{L}*\s+[\p{L}\p{N} -]{2,80})/iu,
+  uk: /(?:застрягл\p{L}*|затиснут\p{L}*|притиснут\p{L}*)\s+під\s+(упал\p{L}*\s+[\p{L}\p{N} -]{2,80})/iu,
+  es: /(?:atrapad[oa]s?|aprisionad[oa]s?)\s+bajo\s+(?:el|la|un|una)\s+([\p{L}\p{N} -]{2,80}?\s+caíd[oa])/iu
+};
+
+const LIFT_VERBS = {
+  en: /(?:lifts?|raises?)/iu,
+  ru: /поднимает/iu,
+  uk: /піднімає/iu,
+  es: /(?:levanta|alza)/iu
+};
+
+function canonicalPropEntityId(language, value) {
+  const entity = clean(value, 100).replace(/^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu, '');
+  if (language === 'ru' && /ветк/iu.test(entity) && /упавш/iu.test(entity)) return 'упавшая ветка';
+  if (language === 'uk' && /гілк/iu.test(entity) && /упал/iu.test(entity)) return 'упала гілка';
+  if (language === 'es' && /caíd[oa]/iu.test(entity) && /ram[ao]/iu.test(entity)) return 'rama caída';
+  return entity;
+}
+
 const LOCATION_VERBS = {
   en: [
     { re: /(?:enters|goes into|walks into)/iu, value: 'inside' },
@@ -125,11 +147,15 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
           changes.push({ entityType: 'prop', entityId, property, previousValue, value, actorId, evidence: found.evidence });
           knownStates.set(key, value);
         }
-        // Recognize a directly observed trapped state without inventing a trapping action.
-        // The named actor must explicitly see/find/notice the prop in this same sentence.
+        const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
+        const actorMatch = actor.exec(sentence);
+        if (!actorMatch) continue;
+
+        // Recognize a directly observed trapped state only when this named actor
+        // explicitly sees/finds/notices the prop in the same source sentence.
         const passiveTrap = PASSIVE_TRAPPED_PATTERNS[locale].exec(sentence);
         if (passiveTrap) {
-          const entityId = clean(passiveTrap[1], 100).replace(/^(?:the|a|an|этот|эта|это|el|la|los|las|un|una)\\s+/iu, '');
+          const entityId = canonicalPropEntityId(locale, passiveTrap[1]);
           const key = 'prop:' + entityId.toLocaleLowerCase() + ':state';
           const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
           if (entityId && previousValue !== 'trapped') {
@@ -140,9 +166,38 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
             knownStates.set(key, 'trapped');
           }
         }
-        const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
-        const actorMatch = actor.exec(sentence);
-        if (!actorMatch) continue;
+
+        // A trapped object explicitly described beneath a fallen obstacle also
+        // establishes that obstacle as a visible fallen prop in the same scene.
+        const fallenObstacle = FALLEN_OBSTACLE_PATTERNS[locale].exec(sentence);
+        if (fallenObstacle) {
+          const entityId = canonicalPropEntityId(locale, fallenObstacle[1]);
+          const key = 'prop:' + entityId.toLocaleLowerCase() + ':state';
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          if (entityId && previousValue !== 'fallen') {
+            changes.push({
+              entityType: 'prop', entityId, property: 'state', previousValue,
+              value: 'fallen', actorId, evidence: clean(sentence, 1_200)
+            });
+            knownStates.set(key, 'fallen');
+          }
+        }
+
+        // When the actor lifts a previously described prop, retain both the
+        // ownership transition and its explicit physical state transition.
+        const liftedProp = findEntity(sentence, actorId, { re: LIFT_VERBS[locale] });
+        if (liftedProp) {
+          const entityId = canonicalPropEntityId(locale, liftedProp.entity);
+          const key = 'prop:' + entityId.toLocaleLowerCase() + ':state';
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          if (previousValue !== 'lifted') {
+            changes.push({
+              entityType: 'prop', entityId, property: 'state', previousValue,
+              value: 'lifted', actorId, evidence: liftedProp.evidence
+            });
+            knownStates.set(key, 'lifted');
+          }
+        }
         const afterActor = sentence.slice(actorMatch.index + actorMatch[0].length);
         for (const verb of LOCATION_VERBS[locale]) {
           const verbMatch = verb.re.exec(afterActor);
