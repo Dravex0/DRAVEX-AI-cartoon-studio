@@ -90,6 +90,8 @@ export function drawProceduralCharacterStandIn(context, {
     ? [(heldTarget.x * width - originX) / scale, (heldTarget.y * height - originY) / scale]
     : [0.12, -0.075];
 
+  let drawnHandLocal = handTarget;
+  let secondaryHandLocal = [-0.11, -0.005];
   context.save();
   try {
     context.translate(originX, originY + bob * scale);
@@ -133,6 +135,8 @@ export function drawProceduralCharacterStandIn(context, {
       : [-0.11, -0.005 + Math.sin(t * strideRate) * 0.025];
     limb(context, [-0.045, -0.08], leftArmEnd, cloak, 0.022);
     const rightArmEnd = held ? heldPoint : handTarget;
+    drawnHandLocal = rightArmEnd;
+    secondaryHandLocal = leftArmEnd;
     line(context, [[0.045, -0.08], [0.055, -0.035], rightArmEnd], cloak, 0.023);
     context.fillStyle = skin;
     context.beginPath();
@@ -188,7 +192,7 @@ export function drawProceduralCharacterStandIn(context, {
     characterId: clean(characterId, 120),
     origin: { x: originX / width, y: originY / height },
     handTarget: { x: originX / width + handTarget[0] * scale / width, y: originY / height + handTarget[1] * scale / height },
-    drawnHand: { x: originX / width + rightArmEnd[0] * scale / width, y: originY / height + rightArmEnd[1] * scale / height },
-    secondaryHand: { x: originX / width + leftArmEnd[0] * scale / width, y: originY / height + leftArmEnd[1] * scale / height }
+    drawnHand: { x: originX / width + drawnHandLocal[0] * scale / width, y: originY / height + drawnHandLocal[1] * scale / height },
+    secondaryHand: { x: originX / width + secondaryHandLocal[0] * scale / width, y: originY / height + secondaryHandLocal[1] * scale / height }
   };
 }
