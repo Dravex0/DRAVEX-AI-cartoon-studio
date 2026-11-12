@@ -92,3 +92,16 @@ test('recognizes a Russian object named before the push verb when the phrase aft
   assert.equal(changes[0][0].property, 'motion');
   assert.equal(changes[0][0].value, 'rolling');
 });
+
+test('treats Ukrainian kopaye as rolling only when the explicit object is a ball', () => {
+  const ball = inferStoryboardStateChanges([
+    { storyDetail: "Foxy копає червоний м'яч.", characters: ['Foxy'] }
+  ], 'uk');
+  const pit = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy копає яму.', characters: ['Foxy'] }
+  ], 'uk');
+  assert.equal(ball[0][0].entityId, "червоний м'яч");
+  assert.equal(ball[0][0].property, 'motion');
+  assert.equal(ball[0][0].value, 'rolling');
+  assert.deepEqual(pit, [[]]);
+});
