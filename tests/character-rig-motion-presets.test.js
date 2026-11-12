@@ -220,6 +220,22 @@ describe('procedural character rig motion presets', () => {
     assert.ok(wave.warnings.some(message => message.includes('No right-arm')));
   });
 
+  it('animates a reach with a left-arm-only rig and bends its forearm', () => {
+    const candidate = rig();
+    candidate.bones = candidate.bones.filter(bone => !['rightArm', 'rightLeg', 'leftLeg', 'head'].includes(bone.id));
+    candidate.bones.push({ id: 'leftLowerArm', parentId: 'leftArm' });
+    candidate.parts = candidate.parts.filter(part => !['arm-r', 'leg-l', 'leg-r', 'head-part'].includes(part.id));
+    candidate.parts.push({ id: 'left-forearm-part', boneId: 'leftLowerArm', imageUrl: 'https://assets.example/left-forearm.png' });
+
+    const result = createCharacterRigMotionPreset(candidate, 'reach');
+    assert.equal(result.status, 'ready');
+    const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+    assert.ok(middle.leftArm.rotation < -0.8, 'left upper arm should extend toward the target');
+    assert.ok(middle.leftLowerArm.rotation > 0.2, 'left forearm should articulate at the elbow');
+    assert.ok(result.animatedBoneIds.includes('leftArm'));
+    assert.ok(result.animatedBoneIds.includes('leftLowerArm'));
+  });
+
   it('rejects an invalid rig and an unknown preset', () => {
     assert.equal(createCharacterRigMotionPreset({}, 'walk').status, 'invalid-rig');
     assert.equal(createCharacterRigMotionPreset(rig(), 'moonwalk').status, 'unknown-preset');
