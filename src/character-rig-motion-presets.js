@@ -143,6 +143,8 @@ function applyPlantedGaitPose(rig, pose, phase, preset, rootBob, chains) {
 }
 
 function poseFor(rig, preset, phase) {
+  const hasRightArm = rig.bones.some(bone => roleOf(bone.id) === 'rightArm');
+  const hasLeftArm = rig.bones.some(bone => roleOf(bone.id) === 'leftArm');
   const pose = {};
   const cycle = Math.sin(phase * Math.PI * 2);
   const lift = Math.max(0, Math.sin(phase * Math.PI * 2));
@@ -223,9 +225,12 @@ function poseFor(rig, preset, phase) {
       // The prop renderer independently animates the named object toward its holder.
       const extension = Math.sin(Math.PI * phase);
       if (role === 'root') { x = 0.018 * extension; rotation = -0.025 * extension; }
-      if (role === 'rightArm' || role === 'arm') rotation = -0.92 * extension;
+      // Prefer the right arm when available; fall back to the left arm on
+      // one-sided rigs instead of silently producing almost no reach motion.
+      if (role === 'rightArm' || (role === 'arm' && !hasRightArm && !hasLeftArm)) rotation = -0.92 * extension;
       if (role === 'rightLowerArm') rotation = -0.24 * extension;
-      if (role === 'leftArm') rotation = 0.08 * extension;
+      if (role === 'leftArm' && !hasRightArm) rotation = -0.92 * extension;
+      if (role === 'leftLowerArm' && !hasRightArm) rotation = 0.24 * extension;
       if (role === 'head') rotation = -0.045 * extension;
     } else if (preset === 'attack') {
       const strike = Math.sin(Math.PI * phase);
