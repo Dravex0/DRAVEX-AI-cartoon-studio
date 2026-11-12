@@ -77,6 +77,16 @@ export function sceneHasSavedCharacterImageReference(scene = {}, characterBible 
 
 /** Creates a provider-neutral still-image prompt without calling a paid or remote service. */
 export function buildImageGenerationPrompt(scene = {}, characterBible = [], options = {}) {
+  if (scene.characterCompositionMode === 'background-only') {
+    const backgroundPlan = buildSceneBackgroundPrompt({
+      ...scene,
+      environmentStyle: safe(scene.environmentStyle, 300)
+        || VISUAL_STYLE_PROMPTS[safe(options.visualStyle, 80)]
+        || ''
+    });
+    // An explicit background-only request must never silently fall back to a character-aware prompt.
+    return backgroundPlan.ready ? backgroundPlan.prompt : '';
+  }
   const characterLock = characterDetails(scene, characterBible);
   const visibleCast = list(scene.characters);
   return [
