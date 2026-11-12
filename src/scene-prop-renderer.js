@@ -170,7 +170,7 @@ function drawProp(context, prop, x, y, time) {
   context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
   context.lineWidth = 2.5;
   context.lineJoin = 'round';
-  } else if (prop.kind === 'bird') {
+  if (prop.kind === 'bird') {
     context.fillStyle = prop.state === 'trapped' ? '#91a7b1' : '#a9dce5'; context.strokeStyle = '#365966';
     context.beginPath(); context.ellipse(0, 0.002, 0.022, 0.014, 0, 0, Math.PI * 2); context.fill(); context.stroke();
     context.beginPath(); context.ellipse(-0.004, -0.006, 0.011, 0.006, -0.35, 0, Math.PI * 2); context.fill(); context.stroke();
