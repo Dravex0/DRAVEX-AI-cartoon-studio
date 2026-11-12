@@ -1077,7 +1077,7 @@ async function loadCharacterReferenceImagesForScene(scene){
 }
 function updateProductionPreview(){
 const meta=sceneMetadata[sceneIndex]||{};
-const scene={...meta,title:titles[sceneIndex],characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),imagePrompt:$('sceneImagePrompt').value,motionPrompt:$('sceneMotionPrompt').value,camera:$('sceneCamera').value,startState:$('sceneStartState').value,endState:$('sceneEndState').value,negativePrompt:$('sceneNegativePrompt').value,continuityLock:$('sceneContinuityLock').value};
+const scene={...meta,title:titles[sceneIndex],characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),characterCompositionMode:$('sceneCompositionMode').value,environmentDescription:$('sceneEnvironmentDescription').value,imagePrompt:$('sceneImagePrompt').value,motionPrompt:$('sceneMotionPrompt').value,camera:$('sceneCamera').value,startState:$('sceneStartState').value,endState:$('sceneEndState').value,negativePrompt:$('sceneNegativePrompt').value,continuityLock:$('sceneContinuityLock').value};
 const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;
 const readiness=validateSceneProductionReadiness(scene,characterBible);
 $('sceneReadiness').textContent=readiness.ready?t.ready:t.incomplete+readiness.issues.map(issue=>t.missing[issue.code]||issue.field).join(', ');
@@ -1443,6 +1443,8 @@ $('sceneCharacters').value=(Array.isArray(meta.characters)?meta.characters:[]).j
 $('sceneDialogue').value=formatDialogueLines(meta.dialogue);
 $('sceneCamera').value=meta.camera||'';
 $('sceneImagePrompt').value=meta.imagePrompt||meta.prompt||descriptions[sceneIndex]||'';
+$('sceneCompositionMode').value=meta.characterCompositionMode==='background-only'?'background-only':'auto';
+$('sceneEnvironmentDescription').value=meta.environmentDescription||'';
 $('sceneMotionPrompt').value=meta.motionPrompt||meta.visibleAction||descriptions[sceneIndex]||'';
 $('sceneStartState').value=meta.startState||'';
 $('sceneEndState').value=meta.endState||'';
@@ -1494,10 +1496,24 @@ function invalidateCurrentSceneVideoForEdit(){
    .finally(()=>pendingSceneVideoInvalidations.delete(key));
  pendingSceneVideoInvalidations.set(key,pending);
 }
-['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock','sceneCharacters'].forEach(id=>$(id).addEventListener('input',()=>{
+['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock','sceneCharacters','sceneEnvironmentDescription'].forEach(id=>$(id).addEventListener('input',()=>{
+ if(id==='sceneEnvironmentDescription')sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),environmentDescription:$(id).value};
  invalidateCurrentSceneVideoForEdit();
  updateProductionPreview();
 }));
+$('sceneCompositionMode').addEventListener('change',()=>{
+ const key=String(sceneMetadata[sceneIndex]?.id||'');
+ sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),characterCompositionMode:$('sceneCompositionMode').value,environmentDescription:$('sceneEnvironmentDescription').value.trim()};
+ invalidateCurrentSceneVideoForEdit();
+ if($('sceneCompositionMode').value==='background-only'){
+  sceneMetadata[sceneIndex]={...sceneMetadata[sceneIndex],generatedImageUrl:null,generatedImageSeed:null,generatedImageModel:null,generatedImageWorker:null};
+  renderGeneratedSceneImage();
+  if(!playing)draw();
+  $('status').textContent=uiLang==='ru'?'Режим фона включён: старое изображение очищено. Добавь описание окружения и создай новый фон.':'Background-only mode enabled: the previous image was cleared. Add environment details and generate a new background.';
+ }
+ updateProductionPreview();
+ writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
+});
 $("facialPartSelect").addEventListener("change",syncFacialRigEditor);
 $("facialPartImageFile").addEventListener("change",async event=>{
 const file=event.target.files?.[0];if(!file)return;const status=$("facialAssetUploadStatus");
@@ -2638,7 +2654,7 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
  if(button.disabled)return;
  const targetIndex=sceneIndex,meta=sceneMetadata[targetIndex]||{};
  const targetId=String(meta.id||('scene_'+(targetIndex+1)));
- const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
+ const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),characterCompositionMode:$('sceneCompositionMode').value,environmentDescription:$('sceneEnvironmentDescription').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
  const plans=buildCharacterSpriteAssetPlan(scene,characterBible);
  const ready=plans.filter(plan=>plan.status==='ready');
  if(!ready.length){status.textContent=uiLang==='ru'?'Нет готовых планов. Проверь состав сцены, справочник внешности и действия персонажей.':'No ready sprite plans. Check the scene cast, character appearance references, and character actions.';return}
@@ -2846,7 +2862,7 @@ if(!$('hordeConsent').checked){status.textContent=uiLang==='ru'?'Сначала 
 if(button.disabled)return;
 const targetIndex=sceneIndex,meta=sceneMetadata[targetIndex]||{};
 const targetId=String(meta.id||('scene_'+(targetIndex+1)+'_'+Date.now()));
-const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),prompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),location:meta.location,timeOfDay:meta.timeOfDay,characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
+const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),prompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),location:meta.location,timeOfDay:meta.timeOfDay,characterCompositionMode:$('sceneCompositionMode').value,environmentDescription:$('sceneEnvironmentDescription').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
 titles[targetIndex]=scene.title;descriptions[targetIndex]=scene.description;
 sceneMetadata[targetIndex]=scene;
 const prompt=buildImageGenerationPrompt(scene,characterBible,{includeNegative:false,visualStyle:$('style').value});
