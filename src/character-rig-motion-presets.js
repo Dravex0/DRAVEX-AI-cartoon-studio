@@ -9,6 +9,7 @@ const PRESETS = Object.freeze({
   jump: { label: 'Jump / Прыжок', frames: 5 },
   dodge: { label: 'Dodge / Уклонение', frames: 5 },
   wave: { label: 'Wave / Приветствие', frames: 5 },
+  reach: { label: 'Reach / Взаимодействие с предметом', frames: 5 },
   dance: { label: 'Dance / Танец', frames: 9 },
   attack: { label: 'Attack / Атака', frames: 5 },
   defend: { label: 'Defend / Защита', frames: 5 }
@@ -217,6 +218,15 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightLeg') rotation = 0.2 * beat;
       if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = 0.12 * bounce;
       if (role === 'rightLowerLeg' && bone.pivotEnabled) rotation = 0.12 * (1 - bounce);
+    } else if (preset === 'reach') {
+      // A brief, readable arm extension for source-grounded prop interactions.
+      // The prop renderer independently animates the named object toward its holder.
+      const extension = Math.sin(Math.PI * phase);
+      if (role === 'root') { x = 0.018 * extension; rotation = -0.025 * extension; }
+      if (role === 'rightArm' || role === 'arm') rotation = -0.92 * extension;
+      if (role === 'rightLowerArm') rotation = -0.24 * extension;
+      if (role === 'leftArm') rotation = 0.08 * extension;
+      if (role === 'head') rotation = -0.045 * extension;
     } else if (preset === 'attack') {
       const strike = Math.sin(Math.PI * phase);
       if (role === 'root') { x = 0.055 * strike; rotation = -0.035 * strike; }
@@ -255,7 +265,7 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
   const report = validateCharacterRig(rigInput);
   if (!report.passed) return { status: 'invalid-rig', preset: presetName, timeline: null, issues: report.issues };
   const preset = PRESETS[presetName];
-  if (!preset) return { status: 'unknown-preset', preset: presetName, timeline: null, issues: [{ code: 'motion-preset-unknown', message: 'Choose idle, walk, run, jump, dodge, wave, dance, attack, or defend.' }] };
+  if (!preset) return { status: 'unknown-preset', preset: presetName, timeline: null, issues: [{ code: 'motion-preset-unknown', message: 'Choose idle, walk, run, jump, dodge, wave, reach, dance, attack, or defend.' }] };
   const rig = report.rig;
   const roles = new Set(rig.bones.map(bone => roleOf(bone.id)));
   const warnings = [];
@@ -273,7 +283,7 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
     if (![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) warnings.push('No arm-like bone IDs found; the protective arm pose will be omitted.');
     if (![...roles].some(role => role === 'leftLeg' || role === 'rightLeg' || role === 'leg')) warnings.push('No leg-like bone IDs found; the crouch pose will be omitted.');
   }
-  if (['attack', 'defend'].includes(presetName) && ![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) {
+  if (['attack', 'defend', 'reach'].includes(presetName) && ![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) {
     warnings.push('No arm-like bone IDs found; the action gesture cannot be represented by this rig.');
   }
   if (presetName === 'dance') {
