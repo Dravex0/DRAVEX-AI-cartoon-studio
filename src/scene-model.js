@@ -60,6 +60,9 @@ export function normalizeScene(input = {}, index = 0) {
       ? scene.characterCastProvided
       : Array.isArray(scene.characters) || Boolean(scene.characterId),
     characterLayers: normalizeCharacterLayers(scene.characterLayers),
+    // Only explicit background plates may receive character sprites over generated media.
+    characterCompositionMode: ['background-only', 'full-frame'].includes(scene.characterCompositionMode)
+      ? scene.characterCompositionMode : 'auto',
     // Rig metadata is separate from whole-character sprites until segmented assets are supplied.
     characterRigs: Array.isArray(scene.characterRigs) ? scene.characterRigs.slice(0, 20).map(normalizeCharacterRig) : [],
     characterRigPoses: normalizeCharacterRigPoses(scene.characterRigPoses),
