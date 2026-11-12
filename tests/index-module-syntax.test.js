@@ -192,3 +192,10 @@ test('cinematic camera transform covers generated media, props, and rigged chara
   assert.ok(cameraRestore > characterDraw);
   assert.ok(titleDraw > cameraRestore);
 });
+
+test('generation observer records a cancelled video batch as cancelled, not completed', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const record = app.match(/activeGenerationObserver\?\.recordStage\('videoGeneration',[^;]+;/)?.[0] || '';
+  assert.match(record, /status:report\.cancelled\?'cancelled':report\.failed\?'failed':'completed'/);
+  assert.match(record, /cancelled:Boolean\(report\.cancelled\)/);
+});
