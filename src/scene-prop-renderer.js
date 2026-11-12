@@ -77,6 +77,25 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   const actionPhase = actionPhases.find(phase => phase.phase === 'action') || null;
   const latestHolders = new Map();
   const latestStates = new Map();
+  const snapshots = Array.isArray(scene?.propStates) ? scene.propStates : [];
+  const sourceStates = snapshots.length ? snapshots : changes;
+  for (const state of sourceStates) {
+    if (!state || state.entityType !== 'prop') continue;
+    const entityId = clean(state.entityId);
+    if (!entityId) continue;
+    const stableRecord = {
+      ...state,
+      previousValue: state.changedThisScene === true
+        ? (state.startValue ?? state.previousValue ?? null)
+        : (state.value ?? null)
+    };
+    if (state.property === 'holder') latestHolders.set(key(entityId), stableRecord);
+    if (state.property === 'state' && ['trapped', 'free', 'fallen', 'lifted'].includes(key(state.value))) {
+      latestStates.set(key(entityId), stableRecord);
+    }
+  }
+  // Scene-local events take precedence over the carried snapshot so their authored
+  // previousValue and action timing drive transitions in this shot.
   for (const change of changes) {
     if (!change || change.entityType !== 'prop') continue;
     const entityId = clean(change.entityId);
