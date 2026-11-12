@@ -67,14 +67,12 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   const changes = Array.isArray(scene?.stateChanges) ? scene.stateChanges : [];
   const layers = Array.isArray(characterLayers) ? characterLayers : [];
   const p = clamp(Number.isFinite(progress) ? progress : 1, 0, 1);
-  const actionPhase = Array.isArray(scene?.actionTimeline?.phases)
-    ? scene.actionTimeline.phases.find(phase => phase?.phase === 'action'
-      && Number.isFinite(phase.start) && Number.isFinite(phase.end)
+  const actionPhases = Array.isArray(scene?.actionTimeline?.phases)
+    ? scene.actionTimeline.phases.filter(phase =>
+      Number.isFinite(phase?.start) && Number.isFinite(phase?.end)
       && phase.start >= 0 && phase.start < phase.end && phase.end <= 1)
-    : null;
-  // Prefer authored action timing; retain a stable fallback for older scenes.
-  const transitionStart = actionPhase ? actionPhase.start : 0.52;
-  const transitionEnd = actionPhase ? actionPhase.end : 0.8;
+    : [];
+  const actionPhase = actionPhases.find(phase => phase.phase === 'action') || null;
   const transition = clamp((p - transitionStart) / (transitionEnd - transitionStart), 0, 1);
   const eased = transition * transition * (3 - 2 * transition);
   const latest = new Map();
@@ -96,6 +94,11 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     const hand = rigAnchor
       ? { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation }
       : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96), y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
+    const propPhase = actionPhases.find(phase => key(phase.targetId) === key(change.entityId)) || actionPhase;
+    const transitionStart = propPhase ? propPhase.start : 0.52;
+    const transitionEnd = propPhase ? propPhase.end : 0.8;
+    const transition = clamp((p - transitionStart) / (transitionEnd - transitionStart), 0, 1);
+    const eased = transition * transition * (3 - 2 * transition);
     const from = wasHeldByActor ? hand : ground;
     const to = heldByActor ? hand : ground;
     const x = from.x + (to.x - from.x) * eased;
