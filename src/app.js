@@ -903,11 +903,7 @@ if(useProceduralStandIn){
  standInPhase=(Array.isArray(currentSceneData.actionTimeline?.phases)?currentSceneData.actionTimeline.phases:[])
   .find(phase=>String(phase?.actorId||'').toLocaleLowerCase()===standInActor.toLocaleLowerCase()
    &&sceneMotionProgress>=Number(phase.start||0)&&sceneMotionProgress<=Number(phase.end??1))||null;
- const detectedStandInAction=getSceneAction(sceneIndex);
- const standInAction=standInPhase?.targetId
-  &&['reach','lift','free','rescue','open','pickup','push','pull','grab'].includes(detectedStandInAction)
-    ?detectedStandInAction
-    :detectedStandInAction;
+ const standInAction=getSceneAction(sceneIndex);
  const stateRecords=[...(Array.isArray(currentSceneData.stateChanges)?currentSceneData.stateChanges:[]),...(Array.isArray(currentSceneData.propStates)?currentSceneData.propStates:[])];
  const heldRecord=stateRecords.find(change=>change?.entityType==='prop'&&change?.property==='holder'
   &&String(change.value??'').toLocaleLowerCase()===standInActor.toLocaleLowerCase());
