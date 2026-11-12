@@ -28,7 +28,7 @@ const rig = () => ({
 
 describe('procedural character rig motion presets', () => {
   it('exposes the supported starter movement library', () => {
-    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'wave', 'dance', 'attack', 'defend']);
+    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'stagger', 'wave', 'dance', 'attack', 'defend']);
   });
 
   it('creates a validated walk cycle with explicit start and end frames', () => {
@@ -201,7 +201,24 @@ describe('procedural character rig motion presets', () => {
     assert.deepEqual(result.warnings, []);
   });
 
-  it('creates a jump with vertical root movement and a greeting with arm motion', () => {
+  it('creates a full-body stagger reaction and returns to a neutral pose', () => {
+    const result = createCharacterRigMotionPreset(rig(), 'stagger');
+    assert.equal(result.status, 'ready');
+    assert.equal(result.timeline.keyframes.length, 5);
+    const start = sampleCharacterRigTimeline(result.timeline, 0).Foxy;
+    const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+    const end = sampleCharacterRigTimeline(result.timeline, 1).Foxy;
+    assert.ok(middle.root.x < 0, 'root should recoil backward');
+    assert.ok(middle.root.y > 0, 'root should dip during the stumble');
+    assert.ok(Math.abs(middle.head.rotation) > 0.05);
+    assert.ok(Math.abs(middle.leftArm.rotation) > 0.3);
+    assert.ok(Math.abs(middle.rightArm.rotation) > 0.3);
+    assert.equal(start.root?.x || 0, 0);
+    assert.equal(end.root?.x || 0, 0);
+    assert.equal(end.rightArm?.rotation || 0, 0);
+  });
+
+  it('creates a jump with vertical root movement and a greeting with arm motion', () =>
     const jump = createCharacterRigMotionPreset(rig(), 'jump');
     const wave = createCharacterRigMotionPreset(rig(), 'wave');
     assert.ok(jump.timeline.keyframes.some(frame => frame.poses.Foxy?.root?.y < 0));
