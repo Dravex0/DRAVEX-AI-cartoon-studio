@@ -147,6 +147,14 @@ test('wires landscape and portrait formats through canvas preview and export', (
 });
 
 
+test('image generation observer requires every scene image or an explicit text-to-video skip', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes('const generatedImageScenes=sceneMetadata.filter(scene=>Boolean(scene.generatedImageUrl))'));
+  assert.ok(app.includes("generatedImageScenes.length===scenes.length?'completed'"));
+  assert.ok(app.includes("generatedImageScenes.length===0&&mode==='comfyui'?'skipped':'unknown'"));
+  assert.ok(app.includes("generatedImageSceneCount:generatedImageScenes.length"));
+});
+
 test('applying scene edits persists background-only composition and environment description', () => {
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   const applyStart = app.indexOf("$('applyScene').onclick=()=>{");
