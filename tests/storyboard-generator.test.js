@@ -222,3 +222,21 @@ test('semantic reveal creates a source-grounded action instead of a passive idle
   assert.equal(scene.actionTimeline.phases[0].actorId, 'Nox');
   assert.match(scene.motionGenerationPrompt, /reveal/);
 });
+
+test('keeps Kel branch-lift and mechanical-bird release as ordered, separately targeted action phases', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\\nKel — a young forest adventurer.\\n\\nScene 1: Rescue\\nKel lifts the fallen branch and frees the small mechanical bird.',
+    'en',
+    'Kel'
+  );
+  const scene = result.scenes[0];
+  assert.deepEqual(scene.stateChanges.map(change => [change.entityId, change.property, change.value]), [
+    ['fallen branch', 'holder', 'Kel'],
+    ['small mechanical bird', 'state', 'free']
+  ]);
+  assert.deepEqual(scene.actionTimeline.phases.map(phase => [phase.phase, phase.targetId, phase.actorId]), [
+    ['preparation', 'fallen branch', 'Kel'],
+    ['action', 'small mechanical bird', 'Kel']
+  ]);
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+});
