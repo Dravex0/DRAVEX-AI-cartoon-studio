@@ -77,6 +77,20 @@ export function normalizeScene(input = {}, index = 0) {
           evidence: text(scene.causalLink.evidence, 1_200)
         }
       : null,
+    propStates: Array.isArray(scene.propStates) ? scene.propStates
+      .filter(state => state && typeof state === 'object' && !Array.isArray(state)
+        && text(state.entityType, 20) === 'prop' && text(state.entityId, 120) && text(state.property, 40))
+      .slice(0, 60).map(state => ({
+        entityType: 'prop',
+        entityId: text(state.entityId, 120),
+        property: text(state.property, 40),
+        previousValue: state.previousValue == null ? null : text(state.previousValue, 160),
+        startValue: state.startValue == null ? null : text(state.startValue, 160),
+        value: state.value == null ? null : text(state.value, 160),
+        actorId: text(state.actorId, 120),
+        evidence: text(state.evidence, 1_200),
+        changedThisScene: state.changedThisScene === true
+      })) : [],
     stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => ({
       entityType: text(change.entityType, 20),
       entityId: text(change.entityId, 120),
