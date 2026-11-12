@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildScenePropRenderPlan, drawSceneProps } from '../src/scene-prop-renderer.js';
+import { inferStoryboardStateChanges } from '../src/scene-state-changes.js';
+import { normalizeScene } from '../src/scene-model.js';
 
 const scene = {
   stateChanges: [{
@@ -258,4 +260,52 @@ test('renders an explicitly observed fallen branch at its authored anchor', () =
   assert.equal(plan[0].state, 'fallen');
   assert.equal(plan[0].x, 0.68);
   assert.equal(plan[0].y, 0.79);
+});
+
+
+test('integrates discovery, obstacle lift, and bird release through normalized Canvas prop plans', () => {
+  const storyScenes = [
+    { id: 'discovery', storyDetail: 'Kel sees the small mechanical bird trapped under a fallen branch.', characters: ['Kel'] },
+    { id: 'lift', storyDetail: 'Kel lifts the fallen branch.', characters: ['Kel'] },
+    { id: 'release', storyDetail: 'Kel frees the small mechanical bird.', characters: ['Kel'] }
+  ];
+  const stateChanges = inferStoryboardStateChanges(storyScenes, 'en');
+  const anchors = [
+    { 'small mechanical bird': { x: 0.44, y: 0.72 }, 'fallen branch': { x: 0.68, y: 0.79 } },
+    { 'fallen branch': { x: 0.68, y: 0.79 } },
+    { 'small mechanical bird': { x: 0.44, y: 0.72 } }
+  ];
+  const scenes = storyScenes.map((source, index) => normalizeScene({
+    ...source,
+    stateChanges: stateChanges[index],
+    propAnchors: anchors[index],
+    actionTimeline: index === 1
+      ? { schemaVersion: 1, phases: [
+          { phase: 'preparation', start: 0.12, end: 0.46, actorId: 'Kel', targetId: 'fallen branch', description: 'Kel lifts the fallen branch.', evidence: 'Kel lifts the fallen branch.' },
+          { phase: 'action', start: 0.54, end: 0.9, actorId: 'Kel', targetId: 'small mechanical bird', description: 'Kel frees the bird.', evidence: 'Kel lifts the fallen branch.' }
+        ] }
+      : index === 2
+        ? { schemaVersion: 1, phases: [
+            { phase: 'action', start: 0.54, end: 0.9, actorId: 'Kel', targetId: 'small mechanical bird', description: 'Kel frees the small mechanical bird.', evidence: 'Kel frees the small mechanical bird.' }
+          ] }
+        : null
+  }, index));
+
+  assert.deepEqual(scenes.map(scene => Object.keys(scene.propAnchors)), [
+    ['small mechanical bird', 'fallen branch'],
+    ['fallen branch'],
+    ['small mechanical bird']
+  ]);
+  const discoveryPlan = buildScenePropRenderPlan(scenes[0], [], 0.1);
+  assert.deepEqual(discoveryPlan.map(prop => [prop.id, prop.kind, prop.state]).sort(), [
+    ['fallen branch', 'branch', 'fallen'],
+    ['small mechanical bird', 'bird', 'trapped']
+  ]);
+  const liftedBranch = buildScenePropRenderPlan(scenes[1], [{ characterId: 'Kel', x: 0.4, y: 0.7 }], 0.46)[0];
+  assert.equal(liftedBranch.id, 'fallen branch');
+  assert.equal(liftedBranch.held, true);
+  const birdBefore = buildScenePropRenderPlan(scenes[2], [], 0.54)[0];
+  const birdAfter = buildScenePropRenderPlan(scenes[2], [], 0.9)[0];
+  assert.equal(birdBefore.state, 'free');
+  assert.ok(birdAfter.y < birdBefore.y);
 });
