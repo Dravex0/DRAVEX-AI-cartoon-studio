@@ -39,3 +39,21 @@ test("does not claim export verified without file metadata", () => {
   const report = auditProductionRun({ stages: { export: { status: "completed", output: { url: "blob:example" } } } });
   assert.ok(report.issues.some(issue => issue.code === "export-file-not-independently-verified"));
 });
+
+test("an explicit text-to-video path may skip still-image generation", () => {
+  const report = auditProductionRun({ stages: {
+    promptInput: { status: "completed", output: "A fox runs through a forest" },
+    promptParsing: { status: "completed", output: { prompt: "A fox runs through a forest" } },
+    storyPlanning: { status: "completed", output: [{ id: "s1" }] },
+    storyboardValidation: { status: "completed", output: { ok: true } },
+    imageGeneration: { status: "skipped", output: { reason: "ComfyUI text-to-video path did not require generated still images." } },
+    videoGeneration: { status: "completed", output: { clipId: "clip-1" } },
+    voiceGeneration: { status: "skipped" },
+    lipSync: { status: "not-configured" },
+    export: { status: "completed", output: { filename: "film.webm", sizeBytes: 1024 } }
+  }});
+  const imageStage = report.results.find(item => item.stage === "imageGeneration");
+  assert.equal(imageStage.verdict, "optional");
+  assert.match(imageStage.message, /not needed for the explicitly identified text-to-video path/);
+  assert.equal(report.summary.complete, true);
+});
