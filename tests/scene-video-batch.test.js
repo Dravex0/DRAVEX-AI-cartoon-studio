@@ -158,3 +158,31 @@ test("passes the last successfully generated scene to the next scene as continui
   assert.equal(received[2].previousSceneId, "a");
   assert.equal(received[2].previousResult.size, 1);
 });
+
+
+test("uses a cached previous clip as continuity context after skipping a generated scene", async () => {
+  const cachedVideo = new Blob(["cached"], { type: "video/webm" });
+  const received = [];
+  const report = await generateStoryboardVideos({
+    scenes: [{ id: "cached-scene" }, { id: "next-scene" }],
+    hasVideo: scene => scene.id === "cached-scene",
+    getCachedResult: async scene => scene.id === "cached-scene"
+      ? { status: "completed", video: cachedVideo }
+      : null,
+    generateScene: async (scene, index, context) => {
+      received.push({
+        previousSceneId: context.previousScene?.id ?? null,
+        previousVideo: context.previousResult?.video ?? null,
+        continuity: context.continuity
+      });
+      return { status: "completed", video: new Blob(["next"], { type: "video/webm" }) };
+    }
+  });
+
+  assert.equal(report.skipped, 1);
+  assert.equal(report.completed, 1);
+  assert.equal(received.length, 1);
+  assert.equal(received[0].previousSceneId, "cached-scene");
+  assert.equal(received[0].previousVideo, cachedVideo);
+  assert.deepEqual(received[0].continuity, { available: true, sourceSceneId: "cached-scene" });
+});
