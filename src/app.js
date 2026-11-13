@@ -68,6 +68,7 @@ import { projectFaceLandmarkOverlay } from "./face-landmark-overlay.js";
 import { analyzeFaceVideoFrames } from "./face-video-analysis.js";
 import { createVideoFrameCapture } from "./video-frame-capture.js";
 import { captureLastFrameImage } from "./video-last-frame.js";
+import { prepareSceneContinuityInput } from "./scene-continuity-input.js";
 import { getAudioTimelineOffsetMs, getScheduledAudioStartAtMs } from "./audio-clock-alignment.js";
 import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js";
 import { createAudioExportSession } from "./audio-export.js";
@@ -3516,17 +3517,15 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     let prompt=taskType==='text-to-video'
      ?[buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(meta,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
      :buildMotionGenerationPrompt(meta,characterBible);
-    let continuityFrameUsed=false;
-    const expectedPreviousScene=scenes[index-1];
-    const previousSceneIsAdjacent=Boolean(previousScene&&expectedPreviousScene&&String(previousScene.id||'')===String(expectedPreviousScene.id||''));
-    if(mode==='huggingface'&&taskType==='image-to-video'&&previousSceneIsAdjacent&&previousResult?.video instanceof Blob){
-     status.textContent='Извлекаем последний кадр предыдущей сцены для сохранения непрерывности…';
-     imageInput=await captureLastFrameImage(previousResult.video,{signal});
-     continuityFrameUsed=true;
-     const previousEndState=String(previousScene.endState||previousScene.visibleAction||previousScene.description||'').trim();
-     const currentStartState=String(meta.startState||meta.description||'').trim();
-     prompt+='\n\nSCENE CONTINUITY: The supplied source image is the exact final decoded frame of the immediately preceding scene. Continue forward from this moment. Preserve the same character identity, face, body proportions, clothing, colors, carried objects, and environment layout. Do not restart, redesign, or replace the character. Previous scene ending: '+previousEndState+'. Current scene beginning: '+currentStartState+'.';
-    }
+    status.textContent='Проверяем визуальную непрерывность предыдущей сцены…';
+    const continuityInput=await prepareSceneContinuityInput({
+     mode,taskType,index,scenes,previousScene,previousResult,imageInput,prompt,signal,
+     extractLastFrame:captureLastFrameImage
+    });
+    imageInput=continuityInput.imageInput;
+    prompt=continuityInput.prompt;
+    const continuityFrameUsed=continuityInput.continuityFrameUsed;
+    const continuitySourceSceneId=continuityInput.continuitySourceSceneId;
     const requestedDuration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
     const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
@@ -3568,13 +3567,13 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     if(sceneIndex===index)renderComfySceneVideo();
     renderScenes();
     if(!playing)draw();
-    return {...result,continuityFrameUsed,...(!persistence.persisted?{storageWarning:persistence.error}:{})};
+    return {...result,continuityFrameUsed,continuitySourceSceneId,...(!persistence.persisted?{storageWarning:persistence.error}:{})};
    }
   });
   const finalGeneratedImageScenes=sceneMetadata.filter(scene=>Boolean(scene.generatedImageUrl));
   const finalImageStageStatus=finalGeneratedImageScenes.length===scenes.length?'completed':finalGeneratedImageScenes.length===0&&mode==='comfyui'?'skipped':'unknown';
   activeGenerationObserver?.recordStage('imageGeneration',{status:finalImageStageStatus,output:{sceneCount:scenes.length,generatedImageSceneCount:finalGeneratedImageScenes.length,scenes:finalGeneratedImageScenes.map(scene=>({sceneId:scene.id,imageUrl:scene.generatedImageUrl})),reason:finalImageStageStatus==='skipped'?'ComfyUI text-to-video path did not require generated still images.':null}});
-  activeGenerationObserver?.recordStage('videoGeneration',{status:report.cancelled?'cancelled':report.failed?'failed':'completed',output:{total:report.total,completed:report.completed,skipped:report.skipped,failed:report.failed,cancelled:Boolean(report.cancelled),results:report.results.map(item=>({index:item.index,status:item.status,error:item.error||null,continuityFrameUsed:Boolean(item.result?.continuityFrameUsed)}))},error:report.failed?report.results.filter(item=>item.status==='failed').map(item=>item.error).join('; '):''});
+  activeGenerationObserver?.recordStage('videoGeneration',{status:report.cancelled?'cancelled':report.failed?'failed':'completed',output:{total:report.total,completed:report.completed,skipped:report.skipped,failed:report.failed,cancelled:Boolean(report.cancelled),results:report.results.map(item=>({index:item.index,status:item.status,error:item.error||null,continuityFrameUsed:Boolean(item.result?.continuityFrameUsed),continuitySourceSceneId:item.result?.continuitySourceSceneId??null}))},error:report.failed?report.results.filter(item=>item.status==='failed').map(item=>item.error).join('; '):''});
   refreshGenerationObserverReport();
   if(report.cancelled){
    filmProgressTracking=false;
