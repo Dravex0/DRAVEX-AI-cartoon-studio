@@ -170,3 +170,13 @@ test('cinematic camera transform covers generated media, props, and rigged chara
   assert.ok(cameraRestore > characterDraw);
   assert.ok(titleDraw > cameraRestore);
 });
+
+
+test('full-film generation keeps the scene image input mutable for continuity frames', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const initialImage = app.indexOf('let imageInput=await loadSceneImageBlob(imageSource,{signal});');
+  const continuityImage = app.indexOf('imageInput=continuityInput.imageInput;', initialImage);
+  assert.ok(initialImage >= 0, 'the resolved source image should be loaded as a Blob');
+  assert.ok(continuityImage > initialImage, 'the previous scene continuity frame must be allowed to replace the source image');
+  assert.doesNotMatch(app, /const imageInput=await loadSceneImageBlob\(imageSource,\{signal\}\);/);
+});
