@@ -23,7 +23,7 @@ import { resolveAutomaticSpeechTasks, runOptionalSpeechPreparation } from "./aut
 import { findScenesWithMissingVoiceAudio } from "./voice-artifact-readiness.js";
 import { generateSceneDialogue, selectScenesMissingDialogue } from "./scene-dialogue-generator.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
-import { resolveSceneImageSource } from "./scene-image-source.js";
+import { loadSceneImageBlob, resolveSceneImageSource } from "./scene-image-source.js";
 import { createSceneLocalImageStore } from "./scene-local-image-store.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
@@ -3405,13 +3405,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     assertSceneIdentityCurrent();
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Подготовка к анимации','Preparing animation')});
     status.textContent=imageSource.kind==='missing'&&mode==='comfyui'?'Подготавливаем генерацию видео из текста для сцены '+(index+1)+'…':'Подготавливаем изображение сцены '+(index+1)+' для анимации…';
-    let imageInput=imageSource.kind==='blob'?imageSource.image:imageSource.url;
-    if(mode==='comfyui'&&imageSource.kind==='url'){
-     const imageResponse=await fetch(imageSource.url,{signal});
-     if(!imageResponse.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+imageResponse.status+'). Проверь CORS или загрузи изображение вручную.');
-     imageInput=await imageResponse.blob();
-     if(!imageInput.size)throw new Error('Изображение сцены пустое.');
-    }
+    const imageInput=await loadSceneImageBlob(imageSource,{signal});
     assertSceneIdentityCurrent();
     const taskType=resolveSceneVideoTaskType({mode,imageSourceKind:imageSource.kind});
     const prompt=taskType==='text-to-video'
