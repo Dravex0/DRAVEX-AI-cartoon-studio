@@ -100,6 +100,7 @@ import { normalizeSceneCast } from "./scene-cast.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
 import { buildStoryEventChain } from "./story-event-chain.js";
 import { createGenerationObserver } from "./generation-observer-agent.js";
+import { recordSceneMotionAssessment } from "./generation-observer-media-bridge.js";
 import { buildCharacterPresenceTimeline } from "./character-presence-timeline.js";
 import { auditProductionRun } from "./production-audit-agent.js";
 import { shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
@@ -1664,6 +1665,16 @@ async function runSceneMotionAnalysis(){
           console.warn('Scene frame evidence skipped for scene '+(item.index+1)+':',frameError);
         }
         sceneMotionAnalysisResults.set(item.key,{...result,frameSamples,frameCaptureMessage});
+        if(activeGenerationObserver&&frameSamples.length){
+          const observerRunId=activeGenerationObserver.snapshot().runId;
+          recordSceneMotionAssessment(activeGenerationObserver,{
+            runId:observerRunId,
+            sceneId:item.entry.sceneId||String(item.index+1),
+            result,
+            frameSamples
+          });
+          refreshGenerationObserverReport();
+        }
         sceneMotionAnalysisSummary=summarizeSceneMotionResults(sceneMotionAnalysisResults);
       }catch(error){
         sceneMotionAnalysisResults.set(item.key,{status:'skipped',message:String(error?.message||'Analysis unavailable.')});
