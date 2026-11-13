@@ -20,8 +20,13 @@ export function auditProductionRun(rawRun = {}) {
       else { verdict = "warning"; message = "Stage reports completion but provides no output evidence."; }
     } else if (["failed", "error"].includes(status)) { verdict = "failed"; message = String(stage.error || "Stage reported a failure."); }
     else if (["skipped", "disabled", "not-configured"].includes(status)) {
-      verdict = optional ? "optional" : "warning";
-      message = optional ? "Optional stage was not run." : "Required stage was skipped.";
+      const textToVideoImageSkip = name === "imageGeneration" && status === "skipped"
+        && /text-to-video/i.test(String(stage.output?.reason ?? ""));
+      const isOptional = optional || textToVideoImageSkip;
+      verdict = isOptional ? "optional" : "warning";
+      message = textToVideoImageSkip
+        ? "Image generation was not needed for the explicitly identified text-to-video path."
+        : isOptional ? "Optional stage was not run." : "Required stage was skipped.";
     } else if (["running", "pending"].includes(status)) { verdict = "pending"; message = "Stage has not produced a final result yet."; }
     results.push({ stage: name, status, verdict, message });
     if (verdict === "failed") issues.push({ severity: "error", code: "stage-failed", stage: name, message });
