@@ -1,5 +1,5 @@
 const STAGE_ORDER = ["promptInput", "promptParsing", "storyPlanning", "storyboardValidation", "imageGeneration", "videoGeneration", "voiceGeneration", "lipSync", "export"];
-const OPTIONAL_STAGES = new Set(["imageGeneration", "voiceGeneration", "lipSync"]);
+const OPTIONAL_STAGES = new Set(["voiceGeneration", "lipSync"]);
 const record = value => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const text = value => typeof value === "string" ? value.trim() : "";
 const normalize = value => text(value).toLocaleLowerCase().normalize("NFKC").replace(/[’']/g, "'").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
@@ -104,10 +104,12 @@ export function createGenerationObserver({ runId = "", prompt = "", requirements
       const item = record(run.stages[stage]);
       const status = item.status || "unknown";
       const hasEvidence = hasEvidencePayload(item.output) || (Array.isArray(item.evidenceRefs) && item.evidenceRefs.length > 0);
+      const textToVideoImageSkip = stage === "imageGeneration" && status === "skipped"
+        && /text-to-video/i.test(String(item.output?.reason ?? ""));
       const verdict = ["completed", "success", "passed"].includes(status) && hasEvidence ? "evidence-recorded"
         : ["failed", "error"].includes(status) ? "failed"
         : ["running", "pending"].includes(status) ? "pending"
-        : ["skipped", "disabled", "not-configured"].includes(status) && OPTIONAL_STAGES.has(stage) ? "optional"
+        : (["skipped", "disabled", "not-configured"].includes(status) && OPTIONAL_STAGES.has(stage)) || textToVideoImageSkip ? "optional"
         : "not-verifiable";
       return { stage, status, verdict, error: item.error || null, evidenceRefs: item.evidenceRefs || [] };
     });
