@@ -27,6 +27,30 @@ test('returns no event when participant attribution is ambiguous or incomplete',
   assert.deepEqual(inferCharacterInteractions('Bird helps Bird.', ['Bird', 'Foxy'], 'en'), []);
 });
 
+test('ignores directed interactions whose action verb is explicitly negated', () => {
+  const cases = [
+    ['Kael does not strike Nox.', ['Kael', 'Nox'], 'en'],
+    ['Каэль не атакует Рико.', ['Каэль', 'Рико'], 'ru'],
+    ['Ari не атакує Noa.', ['Ari', 'Noa'], 'uk'],
+    ['Kael no golpea a Nox.', ['Kael', 'Nox'], 'es']
+  ];
+
+  for (const [source, characters, language] of cases) {
+    assert.deepEqual(inferCharacterInteractions(source, characters, language), [], source);
+  }
+});
+
+test('keeps a positive interaction after a contrastive negated action', () => {
+  const events = inferCharacterInteractions(
+    'Kael does not strike Nox, but Nox strikes Kael.',
+    ['Kael', 'Nox'],
+    'en'
+  );
+  assert.deepEqual(events.map(({ type, actorId, targetId }) => ({ type, actorId, targetId })), [
+    { type: 'attack', actorId: 'Nox', targetId: 'Kael' }
+  ]);
+});
+
 test('supports multiple explicit Russian interactions', () => {
   const events = inferCharacterInteractions('Сова помогает Мико. Мико спасает Рэй.', ['Сова', 'Мико', 'Рэй'], 'ru');
   assert.deepEqual(events.map(({ type, actorId, targetId }) => [type, actorId, targetId]), [

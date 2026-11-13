@@ -1,3 +1,5 @@
+import { isNegatedMatch } from './scene-action.js';
+
 const clean = value => String(value ?? '').trim().slice(0, 120);
 const escapeRegExp = value => value.replace(/[.*+?^{}()|[\]\\]/g, '\\$&').replaceAll('$', '\\$');
 
@@ -85,13 +87,15 @@ export function inferCharacterInteractions(detail, characterIds = [], language =
     .map(match => ({ text: match[0], start: match.index, end: match.index + match[0].length }));
   const actions = sentences.flatMap(sentence =>
     RELATIONS[locale].flatMap(([type, pattern]) =>
-      verbOccurrences(sentence.text, type, pattern).map(action => ({
-        ...action,
-        start: action.start + sentence.start,
-        end: action.end + sentence.start,
-        sentenceStart: sentence.start,
-        sentenceEnd: sentence.end
-      }))
+      verbOccurrences(sentence.text, type, pattern)
+        .filter(action => !isNegatedMatch(sentence.text, action.start))
+        .map(action => ({
+          ...action,
+          start: action.start + sentence.start,
+          end: action.end + sentence.start,
+          sentenceStart: sentence.start,
+          sentenceEnd: sentence.end
+        }))
     )
   ).sort((left, right) => left.start - right.start || left.end - right.end);
   const results = [];

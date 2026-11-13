@@ -227,6 +227,16 @@ test('does not assign a stagger reaction to a character other than the attack ta
   assert.equal(result.scenes[0].actionTimeline.phases[0].actorId, 'Kael');
 });
 
+test('does not create an interaction or timeline from an explicitly negated attack', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nKael — a young warrior.\nNox — an armored guard.\n\nScene 1: Standoff\nKael does not strike Nox; they remain still.',
+    'en',
+    'Kael'
+  );
+  assert.deepEqual(result.scenes[0].interactions, []);
+  assert.equal(result.scenes[0].actionTimeline, null);
+});
+
 test('recognizes an explicitly written Russian attack followed by the target stagger', () => {
   const result = buildStoryboardFromText(
     'Characters:\nКаэль — молодой воин.\nРико — воин в доспехах.\n\nScene 1: Столкновение\nКаэль атакует Рико, и Рико отшатывается назад.',

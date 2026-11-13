@@ -17,7 +17,7 @@ const ACTION_PATTERNS = [
 
 // Ignore an action only when a nearby negation governs that exact match.
  // Contrast words start a new clause: "does not walk, but runs" still detects run.
-function isNegatedMatch(text, matchIndex) {
+export function isNegatedMatch(text, matchIndex) {
   const prefix = text.slice(0, matchIndex);
   const clauseStart = Math.max(
     prefix.lastIndexOf(';'), prefix.lastIndexOf('.'), prefix.lastIndexOf(','),
