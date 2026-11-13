@@ -185,3 +185,51 @@ test("a media assessment accepts evidence registered by a generation stage", () 
   assert.deepEqual(report.mediaAssessments[0].evidenceRefs, ["video-frame://scene-1"]);
   assert.deepEqual(report.mediaAssessments[0].unresolvedEvidenceRefs, []);
 });
+
+test("pixel-motion evidence never verifies character identity or semantic action", () => {
+  const observer = createGenerationObserver();
+  observer.attachArtifact({
+    kind: "decoded-frame-samples",
+    reference: "scene-motion://kel/1",
+    evidenceType: "decoded-video-frame-sampling"
+  });
+  observer.recordAssessment({
+    target: "video-motion-kel",
+    method: "browser-local-luminance-frame-difference",
+    verdict: "partial",
+    evidenceRefs: ["scene-motion://kel/1"]
+  });
+  const report = observer.report();
+  assert.equal(report.visualVerification.characterIdentity.status, "not-verified");
+  assert.equal(report.visualVerification.semanticAction.status, "not-verified");
+  assert.equal(report.visualVerification.characterIdentity.assessmentCount, 0);
+});
+
+test("dedicated typed semantic evidence can report identity and action separately", () => {
+  const observer = createGenerationObserver();
+  observer.attachArtifact({
+    kind: "analysis",
+    reference: "identity://kel/1",
+    evidenceType: "semantic-character-identity-analysis"
+  });
+  observer.attachArtifact({
+    kind: "analysis",
+    reference: "action://kel/1",
+    evidenceType: "semantic-action-recognition"
+  });
+  observer.recordAssessment({
+    target: "character-identity-kel",
+    method: "dedicated-identity-analyzer",
+    verdict: "pass",
+    evidenceRefs: ["identity://kel/1"]
+  });
+  observer.recordAssessment({
+    target: "semantic-action-kel-runs",
+    method: "dedicated-action-analyzer",
+    verdict: "pass",
+    evidenceRefs: ["action://kel/1"]
+  });
+  const report = observer.report();
+  assert.equal(report.visualVerification.characterIdentity.status, "pass");
+  assert.equal(report.visualVerification.semanticAction.status, "pass");
+});
