@@ -31,6 +31,12 @@ jobs:
       - name: Run unit and QA tests
         run: npm test
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run desktop and Pixel 7 browser tests
+        run: npm run test:e2e
+
       - name: Build bundled production site
         run: npm run build
 
