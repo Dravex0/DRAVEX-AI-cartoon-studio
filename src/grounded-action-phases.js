@@ -1,7 +1,7 @@
 import { detectSceneAction } from './scene-action.js';
 
 const escapeRegExp = value => String(value).replace(/[.*+?^{}|()[\]\\]/g, '\\$&');
-const CLAUSE_BOUNDARIES = /(?<punctuation>[,;])|(?<sentenceEnd>[.!?。！？])|(?<conjunction>(?<![\p{L}\p{N}])(?:and|then|but|и|а|но|затем|потом|і|й|та|але|потім|y|e|pero|luego|entonces)(?![\p{L}\p{N}]))/giu;
+const CLAUSE_BOUNDARIES = /(?<punctuation>[,;])|(?<sentenceEnd>[.!?。！？])|(?<conjunction>(?<![\p{L}\p{N}])(?:and|then|but|while|и|а|но|затем|потом|і|й|та|але|потім|y|e|pero|luego|entonces)(?![\p{L}\p{N}]))/giu;
 
 function splitGroundedClauses(source) {
   const clauses = [];
