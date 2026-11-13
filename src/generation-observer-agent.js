@@ -66,14 +66,28 @@ export function createGenerationObserver({ runId = "", prompt = "", requirements
     if (!target || !method || !["pass", "partial", "fail", "not-verifiable"].includes(verdict)) {
       throw new TypeError("Assessment needs target, method, and a supported verdict.");
     }
-    const evidenceRefs = unique((Array.isArray(assessment.evidenceRefs) ? assessment.evidenceRefs : []).map(text).filter(Boolean));
+    const requestedEvidenceRefs = unique((Array.isArray(assessment.evidenceRefs) ? assessment.evidenceRefs : []).map(text).filter(Boolean));
+    const knownEvidenceRefs = new Set([
+      ...artifacts.map(item => item.reference).filter(Boolean),
+      ...Object.values(stages).flatMap(stage => stage.evidenceRefs || [])
+    ]);
+    const evidenceRefs = requestedEvidenceRefs.filter(reference => knownEvidenceRefs.has(reference));
+    const unresolvedEvidenceRefs = requestedEvidenceRefs.filter(reference => !knownEvidenceRefs.has(reference));
     const hasEvidence = evidenceRefs.length > 0;
     const summary = text(assessment.summary);
+    const evidenceNote = !requestedEvidenceRefs.length
+      ? "No evidence references supplied; verdict is not verifiable."
+      : !hasEvidence
+        ? "Evidence references do not resolve to registered artifacts or stage evidence; verdict is not verifiable."
+        : unresolvedEvidenceRefs.length
+          ? "Some evidence references could not be resolved and were excluded."
+          : "";
     const item = {
       target, method,
       verdict: hasEvidence ? verdict : "not-verifiable",
-      summary: hasEvidence ? summary : [summary, "No evidence references supplied; verdict is not verifiable."].filter(Boolean).join(" "),
-      evidenceRefs
+      summary: [summary, evidenceNote].filter(Boolean).join(" "),
+      evidenceRefs,
+      unresolvedEvidenceRefs
     };
     assessments.push(item);
     return item;
