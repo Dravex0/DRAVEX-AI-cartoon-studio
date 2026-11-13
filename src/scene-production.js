@@ -2,6 +2,7 @@ import { normalizeScene, SCENE_DURATION_MIN, SCENE_DURATION_MAX } from './scene-
 import { validateCharacterActionTimeline } from './character-action-timeline.js';
 import { buildCharacterSpriteAssetPlan } from './character-sprite-asset-plan.js';
 import { buildSceneBackgroundPrompt } from './scene-background-prompt.js';
+import { buildWorldMotionInstructions } from './world-motion-contract.js';
 
 const safe = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const list = values => Array.isArray(values) ? values.map(value => safe(value, 500)).filter(Boolean) : [];
@@ -76,6 +77,16 @@ export function sceneHasSavedCharacterImageReference(scene = {}, characterBible 
 
 /** Creates a provider-neutral still-image prompt without calling a paid or remote service. */
 export function buildImageGenerationPrompt(scene = {}, characterBible = [], options = {}) {
+  if (scene.characterCompositionMode === 'background-only') {
+    const backgroundPlan = buildSceneBackgroundPrompt({
+      ...scene,
+      environmentStyle: safe(scene.environmentStyle, 300)
+        || VISUAL_STYLE_PROMPTS[safe(options.visualStyle, 80)]
+        || ''
+    });
+    // An explicit background-only request must never silently fall back to a character-aware prompt.
+    return backgroundPlan.ready ? backgroundPlan.prompt : '';
+  }
   const characterLock = characterDetails(scene, characterBible);
   const visibleCast = list(scene.characters);
   return [
@@ -119,12 +130,24 @@ function actionTimelineInstructions(scene = {}) {
 
 /** Creates a motion-only instruction and keeps the still image description separate. */
 export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
+  if (scene.characterCompositionMode === 'background-only') {
+    const environmentMotion = list(scene.environmentMotion);
+    return [
+      safe(scene.backgroundMotionPrompt, 1200),
+      ...environmentMotion.map((motion, index) => `Environment motion ${index + 1}: ${motion}`),
+      safe(scene.camera) && `Camera movement: ${safe(scene.camera, 1000)}`,
+      'Animate only the environment and scenery in this background plate. Do not render, animate, add, or imply people, characters, animals, creatures, figures, silhouettes, or character-shaped shadows.',
+      'Keep the foreground clear for separately composited character sprites. Preserve the background layout, lighting direction, perspective, and object geometry; use subtle continuous environmental movement only.',
+      'Do not invent story actions, physical interactions, props, dialogue, or character reactions in the background layer.'
+    ].filter(Boolean).join('\n');
+  }
   const characterLock = characterDetails(scene, characterBible);
   return [
     safe(scene.motionPrompt) || safe(scene.visibleAction),
     safe(scene.startState) && `Start state: ${safe(scene.startState, 1000)}`,
     safe(scene.endState) && `End state: ${safe(scene.endState, 1000)}`,
     actionTimelineInstructions(scene),
+    buildWorldMotionInstructions(scene),
     safe(scene.camera) && `Camera movement: ${safe(scene.camera, 1000)}`,
     characterLock.length && `Keep these character designs unchanged: ${characterLock.join(' | ')}`,
     safe(scene.continuityLock) && `Continuity lock: ${safe(scene.continuityLock, 2000)}`,
@@ -133,6 +156,10 @@ export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
     'Do not redesign, replace, duplicate, merge, or add characters. Do not change costumes, colors, age, anatomy, or art style between frames. Preserve the source image composition unless the requested camera movement or action requires a controlled change.',
     'Maintain temporal coherence from the first frame to the last: preserve stable facial features, limb count, body shape, clothing details, object geometry, and background layout; avoid flicker, morphing, wobble, texture crawling, and unintended identity changes.',
     'Use smooth, physically plausible motion with consistent speed and clear anticipation, action, and settling. Avoid sudden pose resets, teleporting, frame jumps, or abrupt camera changes unless explicitly requested.',
+    'Character action is the primary motion: visibly animate the named actor\'s body, limbs, head, and orientation as required by the described action. A camera pan, zoom, shake, or background movement is not a substitute for character movement.',
+    'Keep the actor recognizably visible while the action happens. Show distinct intermediate poses and a readable change from the start state to the end state; do not satisfy an action request by holding one still pose.',
+    'For actor-object interactions, show the actor approaching or reaching the exact object, making visible contact, applying force, and completing the requested result in that order. Keep the object attached to or supported by the correct actor when the story requires it.',
+    'Separate subject motion, object motion, environment motion, and camera motion. Each must follow its own explicit instruction; do not let camera motion fake a walk, reach, jump, turn, or interaction.',
     'Keep the camera fixed when no camera movement is specified. When camera movement is specified, execute only that movement smoothly and keep the subject readable in frame.',
     'Animate only the described action. Preserve scene continuity and do not introduce new objects or characters.'
   ].filter(Boolean).join('\n\n');

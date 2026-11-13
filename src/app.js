@@ -23,12 +23,13 @@ import { resolveAutomaticSpeechTasks, runOptionalSpeechPreparation } from "./aut
 import { findScenesWithMissingVoiceAudio } from "./voice-artifact-readiness.js";
 import { generateSceneDialogue, selectScenesMissingDialogue } from "./scene-dialogue-generator.js";
 import { generateImageWithHorde } from "./ai-horde-image-provider.js";
-import { resolveSceneImageSource } from "./scene-image-source.js";
+import { loadSceneImageBlob, resolveSceneImageSource } from "./scene-image-source.js";
 import { createSceneLocalImageStore } from "./scene-local-image-store.js";
 import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasFormat } from "./canvas-format.js";
 import { getSceneComposition } from "./scene-layout.js";
 import { drawImageCover } from "./image-frame.js";
 import { drawCharacterLayers } from "./scene-character-layers.js";
+import { shouldRenderCharacterLayers } from './scene-character-composition.js';
 import { validateCharacterRigTimeline, sampleCharacterRigTimeline } from "./character-rig-timeline.js";
 import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from "./character-rig-motion-presets.js";
 import { createCharacterRigTimelineFromActionTimeline } from "./character-rig-action-planner.js";
@@ -66,6 +67,8 @@ import { sampleFaceLandmarkTimeline } from "./face-landmark-timeline.js";
 import { projectFaceLandmarkOverlay } from "./face-landmark-overlay.js";
 import { analyzeFaceVideoFrames } from "./face-video-analysis.js";
 import { createVideoFrameCapture } from "./video-frame-capture.js";
+import { captureLastFrameImage } from "./video-last-frame.js";
+import { prepareSceneContinuityInput } from "./scene-continuity-input.js";
 import { getAudioTimelineOffsetMs, getScheduledAudioStartAtMs } from "./audio-clock-alignment.js";
 import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js";
 import { createAudioExportSession } from "./audio-export.js";
@@ -96,10 +99,48 @@ import { prepareStoryCharacterContext } from "./story-character-context.js";
 import { normalizeSceneCast } from "./scene-cast.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
 import { buildStoryEventChain } from "./story-event-chain.js";
+import { createGenerationObserver } from "./generation-observer-agent.js";
+import { recordSceneMotionAssessment } from "./generation-observer-media-bridge.js";
+import { buildCharacterPresenceTimeline } from "./character-presence-timeline.js";
+import { auditProductionRun } from "./production-audit-agent.js";
 import { shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
 import { drawProceduralDemoFox } from './demo-character-renderer.js';
+import { drawProceduralCharacterStandIn } from './procedural-character-stand-in.js';
+import { buildProceduralStandInScenePlan } from './procedural-stand-in-scene-plan.js';
 const localTextRuntime = createLocalTransformersRuntime();
 let activeUniversalPlanController = null;
+let activeGenerationObserver = null;
+function refreshGenerationObserverReport(){
+ if(!activeGenerationObserver)return;
+ const host=document.getElementById('qaReport');
+ if(!host)return;
+ let panel=host.querySelector('[data-generation-observer]');
+ if(!panel){
+  panel=document.createElement('details');
+  panel.dataset.generationObserver='true';
+  panel.className='qa-report__observer';
+  const heading=document.createElement('summary');
+  heading.textContent=uiLang==='ru'?'Отчёт наблюдателя генерации':'Generation Observer report';
+  const summary=document.createElement('p');summary.dataset.observerSummary='true';
+  const pre=document.createElement('pre');pre.dataset.observerDetails='true';pre.style.whiteSpace='pre-wrap';pre.style.overflowWrap='anywhere';
+  panel.append(heading,summary,pre);host.appendChild(panel);
+ }
+ const observerSnapshot=activeGenerationObserver.snapshot();
+ const report=activeGenerationObserver.report({interpretation:{parsedBrief:currentStoryboardPlan?.brief??null,plannedScenes:currentStoryboardPlan?.scenes||[]},scenes:sceneMetadata,characterPresenceTimeline:buildCharacterPresenceTimeline(sceneMetadata)});
+ report.productionAudit=auditProductionRun({runId:observerSnapshot.runId,stages:observerSnapshot.stages});
+ const summary=panel.querySelector('[data-observer-summary]');
+  if(summary){
+   const identityStatus=report.visualVerification?.characterIdentity?.status||'not-verified';
+   const actionStatus=report.visualVerification?.semanticAction?.status||'not-verified';
+   summary.textContent=(uiLang==='ru'?'Текстовые требования: ':'Text requirements: ')+report.summary.textEvidenceFound+'/'+report.summary.requirementCount
+    +' · '+(uiLang==='ru'?'ошибок этапов: ':'failed stages: ')+report.summary.failedStages
+    +' · '+(uiLang==='ru'?'непроверенных этапов: ':'unverified stages: ')+report.summary.unverifiedStages
+    +' · '+(uiLang==='ru'?'внешность персонажа: ':'character identity: ')+identityStatus
+    +' · '+(uiLang==='ru'?'действия: ':'actions: ')+actionStatus
+    +' · '+report.summary.overall;
+  }
+ const pre=panel.querySelector('[data-observer-details]');if(pre)pre.textContent=JSON.stringify(report,null,2);
+}
 const translations={
 en:{freeTag:'FREE · LOCAL-FIRST',previewTag:'CARTOON WORKSPACE · EARLY PREVIEW',headline:'Turn your idea<br>into a story.',intro:'Create a storyboard, generate short AI scene clips through the optional free Hugging Face ZeroGPU queue or local ComfyUI, and assemble a WebM with timed dialogue and optional local music. Free cloud GPU is quota-limited; production voice and lip-sync are still in development.',createTitle:'01 · Create a story',ideaLabel:'Story idea',ideaPlaceholder:'A curious fox discovers a glowing star in the forest...',characterLabel:'Main character',styleLabel:'Visual style',durationLabel:'Scene duration',seconds3:'3 seconds',seconds5:'5 seconds',seconds8:'8 seconds',storyLanguageLabel:'Story language',createButton:'Start working',qualityLabel:'AI still-image quality',qualityNote:'Controls optional AI-generated scene images only. It does not change the exported video resolution.',styleStorybook:'Storybook',styleAnime:'2D Anime',styleFlat2D:'Flat 2D',stylePixelArt:'Pixel Art',style3DAnimated:'3D Animation',style3DRealistic:'Realistic 3D',styleClay3D:'Clay 3D',styleWatercolor:'Watercolor',styleManga:'Comic / Manga',stylePaperCutout:'Paper Cutout',styleStopMotion:'Stop-motion',qualityStandard:'Standard · 640×384',qualityHigh:'High · 768×448',qualityUltra:'Maximum · 1024×576',saveButton:'Save draft',readyStatus:'Ready. Your idea stays in this browser unless you export it.',previewTitle:'02 · Preview',playButton:'Play preview',pauseButton:'Pause preview',exportButton:'Export WebM with dialogue',previewDisclaimer:'Generated scene video clips are used when available; scenes without clips use the still-image/canvas preview. WebM combines the clips with timed dialogue and optional local music. Lip-sync is still in development.',footer:'DRAVEX AI Cartoon Studio · Prototype · No paid API required · Use only media you have rights to',sceneTitles:['A discovery','A closer look','A new adventure'],sceneDescriptions:['The fox spots a glowing star.','The little star floats nearby.','The fox follows the light.'],sceneLabel:'Scene',ready:'Ready. Your idea stays in this browser unless you export it.',emptyIdea:'Add a story idea first.',created:'Local DRAVEX storyboard created.',saved:'Draft saved in this browser.',storageError:'Browser storage is unavailable; you can still keep this page open.',restored:'Restored draft from this browser.',recording:'Recording a short preview…',exported:'WebM storyboard exported.',unsupported:'WebM recording is not supported by this browser.',exportFailed:'Export failed in this browser. Try Play preview first.'},
 ru:{freeTag:'БЕСПЛАТНО · ЛОКАЛЬНАЯ РАБОТА',previewTag:'РАБОЧЕЕ ПРОСТРАНСТВО МУЛЬТФИЛЬМОВ · РАННИЙ ПРЕДПРОСМОТР',headline:'Преврати идею<br>в историю.',intro:'Создавай раскадровку, генерируй короткие AI-видеосцены через бесплатную очередь Hugging Face ZeroGPU или локальный ComfyUI и собирай WebM с диалогами и локальной музыкой. Бесплатная облачная квота ограничена; профессиональная озвучка и синхронизация губ ещё разрабатываются.',createTitle:'01 · Создание истории',ideaLabel:'Идея истории',ideaPlaceholder:'Любопытный лисёнок находит светящуюся звезду в лесу…',characterLabel:'Главный персонаж',styleLabel:'Визуальный стиль',durationLabel:'Длительность сцены',seconds3:'3 секунды',seconds5:'5 секунд',seconds8:'8 секунд',storyLanguageLabel:'Язык истории',createButton:'Начать работу',qualityLabel:'Качество AI-изображений',qualityNote:'Настройка влияет только на дополнительные AI-изображения сцен. Она не меняет разрешение итогового видео.',styleStorybook:'Книжная иллюстрация',styleAnime:'2D-аниме',styleFlat2D:'Плоский 2D',stylePixelArt:'Пиксель-арт',style3DAnimated:'3D-анимация',style3DRealistic:'Реалистичный 3D',styleClay3D:'Пластилиновая 3D-анимация',styleWatercolor:'Акварель',styleManga:'Комикс / манга',stylePaperCutout:'Бумажная аппликация',styleStopMotion:'Покадровая анимация',qualityStandard:'Стандарт · 640×384',qualityHigh:'Высокое · 768×448',qualityUltra:'Максимум · 1024×576',saveButton:'Сохранить черновик',readyStatus:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',previewTitle:'02 · Предпросмотр',playButton:'Воспроизвести',pauseButton:'Пауза',exportButton:'Экспорт WebM с диалогами',previewDisclaimer:'Готовые видеоклипы сцен используются при наличии; для остальных сцен остаётся предпросмотр изображения и холста. WebM объединяет клипы, диалоги по таймлайну и необязательную локальную музыку. Синхронизация губ ещё разрабатывается.',footer:'DRAVEX AI Cartoon Studio · Прототип · Платный API не требуется · Используй только материалы, на которые у тебя есть права',sceneTitles:['Открытие','Поближе','Новое приключение'],sceneDescriptions:['Лисёнок замечает светящуюся звезду.','Маленькая звезда парит рядом.','Лисёнок следует за светом.'],sceneLabel:'Сцена',ready:'Готово. Идея хранится в этом браузере, пока ты не экспортируешь её.',emptyIdea:'Сначала добавь идею истории.',created:'Раскадровка создана локальным движком DRAVEX.',saved:'Черновик сохранён в этом браузере.',storageError:'Хранилище браузера недоступно; можно оставить страницу открытой.',restored:'Черновик восстановлен из этого браузера.',recording:'Записываем короткий предпросмотр…',exported:'Раскадровка экспортирована в WebM.',unsupported:'Этот браузер не поддерживает запись WebM.',exportFailed:'Не удалось экспортировать видео. Сначала попробуй запустить предпросмотр.'}
@@ -865,7 +906,34 @@ else if(generatedFrame){drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
 const sampledRigPoses=currentSceneData.characterRigTimeline?.keyframes?.length
  ? sampleCharacterRigTimeline(currentSceneData.characterRigTimeline,rigAnimationProgress)
  : currentSceneData.characterRigPoses;
-drawSceneProps(ctx,currentSceneData,currentSceneData.characterLayers,sceneMotionProgress,w,h,t,{characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);ctx.restore();
+const sceneLayers=Array.isArray(currentSceneData.characterLayers)?currentSceneData.characterLayers:[];
+const renderedCharacterIds=[
+ ...sceneLayers.map(layer=>layer?.characterId),
+ ...(Array.isArray(currentSceneData.characterRigs)?currentSceneData.characterRigs.map(rig=>rig?.characterId):[])
+];
+const standInPlans=!showDemoFox&&!hasGeneratedMedia
+ ?buildProceduralStandInScenePlan(currentSceneData,{renderedCharacterIds,progress:sceneMotionProgress})
+ :[];
+for(const standInPlan of standInPlans){
+ const profile=Array.isArray(characterBible)
+  ?characterBible.find(item=>String(item?.characterId||'').toLocaleLowerCase()===standInPlan.characterId.toLocaleLowerCase())||{}
+  :{};
+ drawProceduralCharacterStandIn(ctx,{
+  ...standInPlan,profile,width:w,height:h,time:t,progress:sceneMotionProgress,
+  badgeText:uiLang==='ru'?'ЛОКАЛЬНЫЙ ОБРАЗЕЦ':'LOCAL STAND-IN'
+ });
+}
+canvas.dataset.characterRenderMode=standInPlans.length?'procedural-stand-in'
+ :hasGeneratedMedia?'generated-media'
+ :renderedCharacterIds.some(Boolean)?'character-assets'
+ :showDemoFox?'built-in-demo-character':'no-character-visual';
+const propCharacterLayers=[
+ ...sceneLayers,
+ ...standInPlans.map(actor=>({characterId:actor.characterId,x:actor.x,y:actor.y,visible:true}))
+];
+drawSceneProps(ctx,currentSceneData,propCharacterLayers,sceneMotionProgress,w,h,t,{characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});
+const allowCharacterOverlay=shouldRenderCharacterLayers({hasGeneratedMedia,characterCompositionMode:currentSceneData.characterCompositionMode});
+drawCharacterLayers(ctx,allowCharacterOverlay?currentSceneData.characterLayers:[],getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);ctx.restore();
 updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGeneratedVideo,motionTransform,viewportWidth:w,viewportHeight:h,cameraPlan,focusX,focusY});
 try {
  captureCharacterMotionAuditFrame({
@@ -894,8 +962,8 @@ es:{titles:['El comienzo','Un giro','El siguiente paso'],middle:'Un nuevo detall
 const storyLabels={en:'Scene',ru:'Сцена',uk:'Сцена',es:'Escena'};
 function storyLanguage(){return $('language').value||'en'}
 const sceneEditorLabels={
-en:{title:'Selected scene title',description:'Selected scene description',cast:'Characters in this scene · comma-separated',apply:'Apply scene edits',add:'Add scene',del:'Delete scene',titlePlaceholder:'Scene title',descriptionPlaceholder:'Describe what happens in this scene',limit:'You can add up to 12 scenes in this prototype.',minimum:'Keep at least one scene.',updated:'Scene updated.',added:'New scene added.',deleted:'Scene deleted.',production:'Scene production instructions',camera:'Camera / composition',image:'Image prompt · what the still frame must show',motion:'Motion prompt · what changes over time',start:'Start state',end:'End state',negative:'Avoid / negative prompt',continuity:'Continuity lock · details that must not change',compiled:'Preview of the final AI instructions',imagePreview:'Image generation instruction',motionPreview:'Animation instruction',characters:'Character consistency reference',noCharacters:'No character bible was returned. Add character details in the story brief or edit the scene prompts manually.',ready:'Scene is ready for image and motion generation.',incomplete:'Production brief incomplete: ',missing:{'missing-image-prompt':'image prompt','missing-motion-prompt':'motion prompt','missing-camera-plan':'camera plan','missing-start-state':'start state','missing-end-state':'end state'}},
-ru:{title:'Название выбранной сцены',description:'Описание выбранной сцены',cast:'Персонажи в этой сцене · имена через запятую',apply:'Применить изменения',add:'Добавить сцену',del:'Удалить сцену',titlePlaceholder:'Название сцены',descriptionPlaceholder:'Опиши, что происходит в этой сцене',limit:'В этой версии можно добавить не более 12 сцен.',minimum:'Нужно оставить хотя бы одну сцену.',updated:'Сцена обновлена.',added:'Новая сцена добавлена.',deleted:'Сцена удалена.',production:'Инструкции для создания сцены',camera:'Камера и композиция',image:'Промпт изображения · что должно быть на кадре',motion:'Промпт движения · что меняется во времени',start:'Начальное состояние',end:'Конечное состояние',negative:'Чего избегать · negative prompt',continuity:'Фиксация постоянства · что нельзя менять',compiled:'Предпросмотр итоговых инструкций для AI',imagePreview:'Инструкция для генерации изображения',motionPreview:'Инструкция для анимации',characters:'Постоянство внешности персонажей',noCharacters:'Character Bible не получен. Добавь описание персонажей в сюжет или заполни промпты сцены вручную.',ready:'Сцена подготовлена для генерации изображения и движения.',incomplete:'Не хватает данных для подготовки сцены: ',missing:{'missing-image-prompt':'промпт изображения','missing-motion-prompt':'промпт движения','missing-camera-plan':'план камеры','missing-start-state':'начальное состояние','missing-end-state':'конечное состояние'}}
+en:{title:'Selected scene title',description:'Selected scene description',cast:'Characters in this scene · comma-separated',apply:'Apply scene edits',add:'Add scene',del:'Delete scene',titlePlaceholder:'Scene title',descriptionPlaceholder:'Describe what happens in this scene',limit:'You can add up to 12 scenes in this prototype.',minimum:'Keep at least one scene.',updated:'Scene updated.',added:'New scene added.',deleted:'Scene deleted.',production:'Scene production instructions',camera:'Camera / composition',image:'Image prompt · what the still frame must show',motion:'Motion prompt · what changes over time',composition:'Character composition',compositionAuto:'Characters included in generated image/video',compositionBackground:'Background only · overlay character sprites',environment:'Background description · required for background-only mode',environmentPlaceholder:'Describe only the location, scenery, weather and lighting.',start:'Start state',end:'End state',negative:'Avoid / negative prompt',continuity:'Continuity lock · details that must not change',compiled:'Preview of the final AI instructions',imagePreview:'Image generation instruction',motionPreview:'Animation instruction',characters:'Character consistency reference',noCharacters:'No character bible was returned. Add character details in the story brief or edit the scene prompts manually.',ready:'Scene is ready for image and motion generation.',incomplete:'Production brief incomplete: ',missing:{'missing-image-prompt':'image prompt','missing-motion-prompt':'motion prompt','missing-camera-plan':'camera plan','missing-start-state':'start state','missing-end-state':'end state'}},
+ru:{title:'Название выбранной сцены',description:'Описание выбранной сцены',cast:'Персонажи в этой сцене · имена через запятую',apply:'Применить изменения',add:'Добавить сцену',del:'Удалить сцену',titlePlaceholder:'Название сцены',descriptionPlaceholder:'Опиши, что происходит в этой сцене',limit:'В этой версии можно добавить не более 12 сцен.',minimum:'Нужно оставить хотя бы одну сцену.',updated:'Сцена обновлена.',added:'Новая сцена добавлена.',deleted:'Сцена удалена.',production:'Инструкции для создания сцены',camera:'Камера и композиция',image:'Промпт изображения · что должно быть на кадре',motion:'Промпт движения · что меняется во времени',composition:'Размещение персонажей',compositionAuto:'Персонажи внутри сгенерированного изображения/видео',compositionBackground:'Только фон · отдельные спрайты персонажей поверх',environment:'Описание фона · обязательно для режима «Только фон»',environmentPlaceholder:'Опиши только место, окружение, погоду и освещение.',start:'Начальное состояние',end:'Конечное состояние',negative:'Чего избегать · negative prompt',continuity:'Фиксация постоянства · что нельзя менять',compiled:'Предпросмотр итоговых инструкций для AI',imagePreview:'Инструкция для генерации изображения',motionPreview:'Инструкция для анимации',characters:'Постоянство внешности персонажей',noCharacters:'Character Bible не получен. Добавь описание персонажей в сюжет или заполни промпты сцены вручную.',ready:'Сцена подготовлена для генерации изображения и движения.',incomplete:'Не хватает данных для подготовки сцены: ',missing:{'missing-image-prompt':'промпт изображения','missing-motion-prompt':'промпт движения','missing-camera-plan':'план камеры','missing-start-state':'начальное состояние','missing-end-state':'конечное состояние'}}
 };
 function applySceneEditorLanguage(){
 const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;
@@ -909,6 +977,7 @@ const dialogue=dialogueLabels[storyLanguage()]||dialogueLabels.en;
 $('dialogueSummary').textContent=dialogue.summary;$('sceneDialogueLabel').textContent=dialogue.label;$('sceneDialogueHint').textContent=dialogue.hint;
 $('sceneTitleLabel').textContent=t.title;$('sceneDescriptionLabel').textContent=t.description;$('sceneCharactersLabel').textContent=t.cast;$('applyScene').textContent=t.apply;$('addScene').textContent=t.add;$('deleteScene').textContent=t.del;
 $('sceneTitle').placeholder=t.titlePlaceholder;$('sceneDescription').placeholder=t.descriptionPlaceholder;
+$('sceneCompositionModeLabel').textContent=t.composition;$('sceneCompositionAuto').textContent=t.compositionAuto;$('sceneCompositionBackgroundOnly').textContent=t.compositionBackground;$('sceneEnvironmentDescriptionLabel').textContent=t.environment;$('sceneEnvironmentDescription').placeholder=t.environmentPlaceholder;
 const labels={production:'productionSummary',camera:'sceneCameraLabel',image:'sceneImagePromptLabel',motion:'sceneMotionPromptLabel',start:'sceneStartStateLabel',end:'sceneEndStateLabel',negative:'sceneNegativePromptLabel',continuity:'sceneContinuityLockLabel',compiled:'compiledPromptSummary',imagePreview:'imagePromptPreviewLabel',motionPreview:'motionPromptPreviewLabel',characters:'characterBibleSummary'};
 for(const [key,id] of Object.entries(labels))$(id).textContent=t[key];
 }
@@ -1021,7 +1090,7 @@ async function loadCharacterReferenceImagesForScene(scene){
 }
 function updateProductionPreview(){
 const meta=sceneMetadata[sceneIndex]||{};
-const scene={...meta,title:titles[sceneIndex],characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),imagePrompt:$('sceneImagePrompt').value,motionPrompt:$('sceneMotionPrompt').value,camera:$('sceneCamera').value,startState:$('sceneStartState').value,endState:$('sceneEndState').value,negativePrompt:$('sceneNegativePrompt').value,continuityLock:$('sceneContinuityLock').value};
+const scene={...meta,title:titles[sceneIndex],characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),characterCompositionMode:$('sceneCompositionMode').value,environmentDescription:$('sceneEnvironmentDescription').value,imagePrompt:$('sceneImagePrompt').value,motionPrompt:$('sceneMotionPrompt').value,camera:$('sceneCamera').value,startState:$('sceneStartState').value,endState:$('sceneEndState').value,negativePrompt:$('sceneNegativePrompt').value,continuityLock:$('sceneContinuityLock').value};
 const t=sceneEditorLabels[uiLang]||sceneEditorLabels.en;
 const readiness=validateSceneProductionReadiness(scene,characterBible);
 $('sceneReadiness').textContent=readiness.ready?t.ready:t.incomplete+readiness.issues.map(issue=>t.missing[issue.code]||issue.field).join(', ');
@@ -1387,6 +1456,8 @@ $('sceneCharacters').value=(Array.isArray(meta.characters)?meta.characters:[]).j
 $('sceneDialogue').value=formatDialogueLines(meta.dialogue);
 $('sceneCamera').value=meta.camera||'';
 $('sceneImagePrompt').value=meta.imagePrompt||meta.prompt||descriptions[sceneIndex]||'';
+$('sceneCompositionMode').value=meta.characterCompositionMode==='background-only'?'background-only':'auto';
+$('sceneEnvironmentDescription').value=meta.environmentDescription||'';
 $('sceneMotionPrompt').value=meta.motionPrompt||meta.visibleAction||descriptions[sceneIndex]||'';
 $('sceneStartState').value=meta.startState||'';
 $('sceneEndState').value=meta.endState||'';
@@ -1438,10 +1509,24 @@ function invalidateCurrentSceneVideoForEdit(){
    .finally(()=>pendingSceneVideoInvalidations.delete(key));
  pendingSceneVideoInvalidations.set(key,pending);
 }
-['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock','sceneCharacters'].forEach(id=>$(id).addEventListener('input',()=>{
+['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock','sceneCharacters','sceneEnvironmentDescription'].forEach(id=>$(id).addEventListener('input',()=>{
+ if(id==='sceneEnvironmentDescription')sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),environmentDescription:$(id).value};
  invalidateCurrentSceneVideoForEdit();
  updateProductionPreview();
 }));
+$('sceneCompositionMode').addEventListener('change',()=>{
+ sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),characterCompositionMode:$('sceneCompositionMode').value,environmentDescription:$('sceneEnvironmentDescription').value.trim()};
+ invalidateCurrentSceneVideoForEdit();
+ if($('sceneCompositionMode').value==='background-only'){
+  sceneMetadata[sceneIndex]={...sceneMetadata[sceneIndex],generatedImageUrl:null,generatedImageSeed:null,generatedImageModel:null,generatedImageWorker:null};
+  renderGeneratedSceneImage();
+  if(!playing)draw();
+  $('status').textContent=uiLang==='ru'?'Режим фона включён: старое изображение очищено. Добавь описание окружения и создай новый фон.':'Background-only mode enabled: the previous image was cleared. Add environment details and generate a new background.';
+ }
+ updateProductionPreview();
+ if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
+ writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
+});
 $("facialPartSelect").addEventListener("change",syncFacialRigEditor);
 $("facialPartImageFile").addEventListener("change",async event=>{
 const file=event.target.files?.[0];if(!file)return;const status=$("facialAssetUploadStatus");
@@ -1551,7 +1636,7 @@ const imagePrompt=$('sceneImagePrompt').value.trim()||description;
 const motionPrompt=$('sceneMotionPrompt').value.trim()||description;
 const characters=normalizeSceneCast($('sceneCharacters').value,sceneMetadata[sceneIndex]?.characters);
 titles[sceneIndex]=title;descriptions[sceneIndex]=description;
-const previousDialogue=formatDialogueLines(sceneMetadata[sceneIndex]?.dialogue);const nextDialogue=$('sceneDialogue').value.trim();const dialogueChanged=previousDialogue!==nextDialogue;sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),title,description,characters,dialogue:parseDialogueLines($('sceneDialogue').value,storyLanguage()),voiceCues:dialogueChanged?[]:(sceneMetadata[sceneIndex]?.voiceCues||[]),voiceTimeline:dialogueChanged?null:(sceneMetadata[sceneIndex]?.voiceTimeline||null),prompt:imagePrompt,imagePrompt,visibleAction:motionPrompt,motionPrompt,camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim()};if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
+const previousDialogue=formatDialogueLines(sceneMetadata[sceneIndex]?.dialogue);const nextDialogue=$('sceneDialogue').value.trim();const dialogueChanged=previousDialogue!==nextDialogue;sceneMetadata[sceneIndex]={...(sceneMetadata[sceneIndex]||{}),title,description,characters,dialogue:parseDialogueLines($('sceneDialogue').value,storyLanguage()),voiceCues:dialogueChanged?[]:(sceneMetadata[sceneIndex]?.voiceCues||[]),voiceTimeline:dialogueChanged?null:(sceneMetadata[sceneIndex]?.voiceTimeline||null),prompt:imagePrompt,imagePrompt,visibleAction:motionPrompt,motionPrompt,camera:$('sceneCamera').value.trim(),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),characterCompositionMode:$('sceneCompositionMode').value,environmentDescription:$('sceneEnvironmentDescription').value.trim()};if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,eventChain:buildStoryEventChain(sceneMetadata)};
 $('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+title;
 renderScenes();syncSceneEditor();updateStoryQA();if(!playing)draw();$('status').textContent=(sceneEditorLabels[uiLang]||sceneEditorLabels.en).updated
 };
@@ -1589,6 +1674,16 @@ async function runSceneMotionAnalysis(){
           console.warn('Scene frame evidence skipped for scene '+(item.index+1)+':',frameError);
         }
         sceneMotionAnalysisResults.set(item.key,{...result,frameSamples,frameCaptureMessage});
+        if(activeGenerationObserver&&frameSamples.length){
+          const observerRunId=activeGenerationObserver.snapshot().runId;
+          recordSceneMotionAssessment(activeGenerationObserver,{
+            runId:observerRunId,
+            sceneId:item.entry.sceneId||String(item.index+1),
+            result,
+            frameSamples
+          });
+          refreshGenerationObserverReport();
+        }
         sceneMotionAnalysisSummary=summarizeSceneMotionResults(sceneMotionAnalysisResults);
       }catch(error){
         sceneMotionAnalysisResults.set(item.key,{status:'skipped',message:String(error?.message||'Analysis unavailable.')});
@@ -2369,6 +2464,10 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
   const stateChanges=inferStoryboardStateChanges(preparedScenes,lang,character);
   sceneMetadata=ensureSceneIds(preparedScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]})));
   currentStoryboardPlan={...plan,eventChain:buildStoryEventChain(sceneMetadata),sourceText:idea,sourceLanguage:lang,sourceCharacter:character,characterSelectionWarning,proceduralDemoCharacter,scenes:sceneMetadata};
+  activeGenerationObserver=createGenerationObserver({runId:'dravex-'+Date.now(),prompt:idea,requirements:[{id:'original-prompt',category:'prompt-fidelity',text:idea}]});
+  activeGenerationObserver.recordStage('promptInput',{status:'completed',output:idea});
+  activeGenerationObserver.recordStage('promptParsing',{status:'completed',input:idea,output:{brief:plan.brief??null,protagonist:character,sceneCount:Array.isArray(plan.scenes)?plan.scenes.length:0}});
+  activeGenerationObserver.recordStage('storyPlanning',{status:'completed',output:sceneMetadata});
   titles=plan.titles;
   descriptions=plan.descriptions;
   sceneIndex=0;
@@ -2378,6 +2477,9 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
   renderScenes();
   syncSceneEditor();
   updateStoryQA();
+  const initialStoryAudit=validateStoryScenes(sceneMetadata);
+  activeGenerationObserver?.recordStage('storyboardValidation',{status:initialStoryAudit.ok?'completed':'failed',output:initialStoryAudit});
+  refreshGenerationObserverReport();
   if(characterSelectionWarning){
    const warning=document.createElement('p');
    warning.className='qa-report__item qa-report__item--warning';
@@ -2575,7 +2677,7 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
  if(button.disabled)return;
  const targetIndex=sceneIndex,meta=sceneMetadata[targetIndex]||{};
  const targetId=String(meta.id||('scene_'+(targetIndex+1)));
- const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
+ const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),characterCompositionMode:$('sceneCompositionMode').value,environmentDescription:$('sceneEnvironmentDescription').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
  const plans=buildCharacterSpriteAssetPlan(scene,characterBible);
  const ready=plans.filter(plan=>plan.status==='ready');
  if(!ready.length){status.textContent=uiLang==='ru'?'Нет готовых планов. Проверь состав сцены, справочник внешности и действия персонажей.':'No ready sprite plans. Check the scene cast, character appearance references, and character actions.';return}
@@ -2783,10 +2885,14 @@ if(!$('hordeConsent').checked){status.textContent=uiLang==='ru'?'Сначала 
 if(button.disabled)return;
 const targetIndex=sceneIndex,meta=sceneMetadata[targetIndex]||{};
 const targetId=String(meta.id||('scene_'+(targetIndex+1)+'_'+Date.now()));
-const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),prompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),location:meta.location,timeOfDay:meta.timeOfDay,characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
+const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),prompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),location:meta.location,timeOfDay:meta.timeOfDay,characterCompositionMode:$('sceneCompositionMode').value,environmentDescription:$('sceneEnvironmentDescription').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
 titles[targetIndex]=scene.title;descriptions[targetIndex]=scene.description;
 sceneMetadata[targetIndex]=scene;
 const prompt=buildImageGenerationPrompt(scene,characterBible,{includeNegative:false,visualStyle:$('style').value});
+if(!prompt){
+ status.textContent=uiLang==='ru'?'Для фона без персонажей сначала укажи описание окружения сцены.':'Add an environment description before generating a background-only scene.';
+ return;
+}
 const hasSavedPhotoReference=sceneHasSavedCharacterImageReference(scene,characterBible);
 const referenceNotice=hasSavedPhotoReference?(uiLang==='ru'?'Фото-референсы не отправляются; AI Horde использует текстовое описание. ':'Photo references are not uploaded; AI Horde uses text descriptions only. '):'';
 renderScenes();
@@ -3350,10 +3456,23 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   renderFilmSceneProgress();
   setFilmProgress(0,filmProgressText('Подготовка сцен','Preparing scenes'),filmProgressText('Сцен: ','Scenes: ')+scenes.length);
   status.textContent='Подготовка '+scenes.length+' сцен к генерации…';
+  const generatedImageScenes=sceneMetadata.filter(scene=>Boolean(scene.generatedImageUrl));
+   const imageStageStatus=generatedImageScenes.length===scenes.length?'completed':generatedImageScenes.length===0&&mode==='comfyui'?'skipped':'running';
+   activeGenerationObserver?.recordStage('imageGeneration',{status:imageStageStatus,output:{sceneCount:scenes.length,generatedImageSceneCount:generatedImageScenes.length,scenes:generatedImageScenes.map(scene=>({sceneId:scene.id,imageUrl:scene.generatedImageUrl})),reason:imageStageStatus==='skipped'?'ComfyUI text-to-video path did not require generated still images.':null}});
+  activeGenerationObserver?.recordStage('videoGeneration',{status:'running',input:{mode,sceneCount:scenes.length}});
   const report=await generateStoryboardVideos({
    scenes,
    signal:controller.signal,
    hasVideo:(scene,index)=>sceneVideoCache.has(sceneVideoKey(index,scene)),
+   getCachedResult:async(scene,index,{signal}={})=>{
+    const cachedEntry=sceneVideoCache.get(sceneVideoKey(index,scene));
+    if(!cachedEntry?.url)return null;
+    const cachedResponse=await fetch(cachedEntry.url,{signal});
+    if(!cachedResponse.ok)return null;
+    const cachedVideo=await cachedResponse.blob();
+    if(!cachedVideo.size||!String(cachedVideo.type||'').toLowerCase().startsWith('video/'))return null;
+    return {status:'completed',video:cachedVideo};
+   },
    onProgress:state=>{
     const index=state.currentIndex;
     if(Number.isInteger(index)&&filmProgressSceneStates[index]){
@@ -3370,7 +3489,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const stage=state.stage==='completed'?'Готово':state.stage==='failed'?'Ошибка':state.stage==='skipped'?'Уже готово':state.stage==='starting'?'Запуск':'Обработка';
     status.textContent=stage+current+' · '+finished+'/'+state.total;
    },
-   generateScene:async(scene,index,{signal})=>{
+   generateScene:async(scene,index,{signal,previousScene,previousResult})=>{
     const generationSceneId=String(scene.id||sceneMetadata[index]?.id||('scene_'+(index+1)));
     const generationToken=sceneGenerationGuard.capture(generationSceneId);
     const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Параметры сцены изменились во время генерации. Устаревший результат отброшен — запусти создание этой сцены повторно.');};
@@ -3388,6 +3507,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
      updateFilmVideoProgress(null,filmProgressText('Подготовка изображений сцен','Preparing scene images'));
      status.textContent='Создаём изображение сцены '+(index+1)+' из '+scenes.length+' в AI Horde…';
      const imagePrompt=buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value});
+     if(!imagePrompt)throw new Error('Background-only generation requires an explicit environment description for scene '+(index+1)+'.');
      const referenceNotice=sceneHasSavedCharacterImageReference(meta,characterBible)?(uiLang==='ru'?'Фото-референсы не отправляются; AI Horde использует текстовые описания. ':'Photo references are not uploaded; AI Horde uses text descriptions only. '):'';
      status.textContent=referenceNotice+'Создаём изображение сцены '+(index+1)+' из '+scenes.length+' в AI Horde…';
      const imageResult=await generateImageWithHorde({prompt:imagePrompt,negativePrompt:meta.negativePrompt||'',...quality,seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),signal,onProgress:queue=>{
@@ -3405,18 +3525,20 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     assertSceneIdentityCurrent();
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Подготовка к анимации','Preparing animation')});
     status.textContent=imageSource.kind==='missing'&&mode==='comfyui'?'Подготавливаем генерацию видео из текста для сцены '+(index+1)+'…':'Подготавливаем изображение сцены '+(index+1)+' для анимации…';
-    let imageInput=imageSource.kind==='blob'?imageSource.image:imageSource.url;
-    if(mode==='comfyui'&&imageSource.kind==='url'){
-     const imageResponse=await fetch(imageSource.url,{signal});
-     if(!imageResponse.ok)throw new Error('Не удалось получить изображение сцены (HTTP '+imageResponse.status+'). Проверь CORS или загрузи изображение вручную.');
-     imageInput=await imageResponse.blob();
-     if(!imageInput.size)throw new Error('Изображение сцены пустое.');
-    }
+    let imageInput=await loadSceneImageBlob(imageSource,{signal});
     assertSceneIdentityCurrent();
     const taskType=resolveSceneVideoTaskType({mode,imageSourceKind:imageSource.kind});
-    const prompt=taskType==='text-to-video'
+    let prompt=taskType==='text-to-video'
      ?[buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(meta,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
      :buildMotionGenerationPrompt(meta,characterBible);
+    const continuityInput=await prepareSceneContinuityInput({
+     mode,taskType,index,scenes,previousScene,previousResult,imageInput,prompt,signal,
+     extractLastFrame:captureLastFrameImage
+    });
+    imageInput=continuityInput.imageInput;
+    prompt=continuityInput.prompt;
+    const continuityFrameUsed=continuityInput.continuityFrameUsed;
+    const continuitySourceSceneId=continuityInput.continuitySourceSceneId;
     const requestedDuration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
     const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
@@ -3458,9 +3580,14 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     if(sceneIndex===index)renderComfySceneVideo();
     renderScenes();
     if(!playing)draw();
-    return persistence.persisted?result:{...result,storageWarning:persistence.error};
+    return {...result,continuityFrameUsed,continuitySourceSceneId,...(!persistence.persisted?{storageWarning:persistence.error}:{})};
    }
   });
+  const finalGeneratedImageScenes=sceneMetadata.filter(scene=>Boolean(scene.generatedImageUrl));
+  const finalImageStageStatus=finalGeneratedImageScenes.length===scenes.length?'completed':finalGeneratedImageScenes.length===0&&mode==='comfyui'?'skipped':'unknown';
+  activeGenerationObserver?.recordStage('imageGeneration',{status:finalImageStageStatus,output:{sceneCount:scenes.length,generatedImageSceneCount:finalGeneratedImageScenes.length,scenes:finalGeneratedImageScenes.map(scene=>({sceneId:scene.id,imageUrl:scene.generatedImageUrl})),reason:finalImageStageStatus==='skipped'?'ComfyUI text-to-video path did not require generated still images.':null}});
+  activeGenerationObserver?.recordStage('videoGeneration',{status:report.cancelled?'cancelled':report.failed?'failed':'completed',output:{total:report.total,completed:report.completed,skipped:report.skipped,failed:report.failed,cancelled:Boolean(report.cancelled),results:report.results.map(item=>({index:item.index,status:item.status,error:item.error||null,continuityFrameUsed:Boolean(item.result?.continuityFrameUsed),continuitySourceSceneId:item.result?.continuitySourceSceneId??null}))},error:report.failed?report.results.filter(item=>item.status==='failed').map(item=>item.error).join('; '):''});
+  refreshGenerationObserverReport();
   if(report.cancelled){
    filmProgressTracking=false;
    setFilmProgress(Math.floor(((report.completed+report.skipped)/report.total)*85),filmProgressText('Создание остановлено','Generation cancelled'),filmProgressText('Готовые сцены сохранены. Можно продолжить позже.','Completed scenes are saved. You can resume later.'));
@@ -3774,6 +3901,15 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
         anchor.href=url;
         anchor.download=$('finalFilmDownload').download||'dravex-cartoon-film.webm';
         if(download){document.body.appendChild(anchor);anchor.click();anchor.remove();}
+        // Existing voice tracks are confirmed in the exported mix, but this observer
+        // does not yet know whether they were synthesized in this run or restored.
+        activeGenerationObserver?.recordStage('voiceGeneration',{status:voiceTracks.length?'unknown':'not-configured',output:voiceTracks.length?{trackCount:voiceTracks.length,includedInExport:true,provenance:'not-tracked'}:null});
+        // Lip-sync is complete only when analyzed mouth tracks were actually available
+        // to the export renderer; eligibility alone is not evidence of applied lip-sync.
+        activeGenerationObserver?.recordStage('lipSync',{status:exportMouthTracks.length?'completed':lipSyncEligibleTrackCount?'unknown':'not-configured',output:lipSyncEligibleTrackCount?{eligibleTrackCount:lipSyncEligibleTrackCount,analyzedTrackCount:exportMouthTracks.length,appliedTrackCount:exportMouthTracks.length,skippedTrackCount:lipSyncSkippedTracks,appliedToExport:exportMouthTracks.length>0}:null});
+        activeGenerationObserver?.recordStage('export',{status:'completed',output:{filename:anchor.download,mimeType:blob.type||'video/webm',sizeBytes:blob.size,durationMs:timeline.totalDurationMs,width:decoded.width,height:decoded.height}});
+        activeGenerationObserver?.attachArtifact({kind:'video',name:anchor.download,mimeType:blob.type||'video/webm',sizeBytes:blob.size,durationSeconds:timeline.totalDurationSeconds,reference:'final-film-object-url',evidenceType:'metadata-and-browser-decode'});
+        refreshGenerationObserverReport();
         const lipSyncReport=buildLipSyncQualityReport({voiceTracks,eligibleTrackCount:lipSyncEligibleTrackCount,analyzedTracks:exportMouthTracks,skippedTracks:lipSyncSkippedTracks});
         const lipSyncWarnings=[];
         if(lipSyncReport.skippedTrackCount)lipSyncWarnings.push(uiLang==='ru'

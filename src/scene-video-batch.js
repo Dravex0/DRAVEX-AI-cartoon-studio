@@ -53,6 +53,7 @@ export async function generateStoryboardVideos({
   scenes,
   generateScene,
   hasVideo = () => false,
+  getCachedResult = () => null,
   onProgress = () => {},
   signal
 } = {}) {
@@ -62,9 +63,12 @@ export async function generateStoryboardVideos({
   if (typeof generateScene !== "function") {
     throw new TypeError("generateScene must be a function.");
   }
-  if (typeof hasVideo !== "function" || typeof onProgress !== "function") {
-    throw new TypeError("hasVideo and onProgress must be functions.");
+  if (typeof hasVideo !== "function" || typeof getCachedResult !== "function" || typeof onProgress !== "function") {
+    throw new TypeError("hasVideo, getCachedResult, and onProgress must be functions.");
   }
+
+  let previousCompletedScene = null;
+  let previousCompletedResult = null;
 
   const report = {
     total: scenes.length,
@@ -96,15 +100,43 @@ export async function generateStoryboardVideos({
 
     const scene = scenes[index];
     if (hasVideo(scene, index)) {
+      let cachedResult = null;
+      try {
+        cachedResult = await getCachedResult(scene, index, { signal });
+      } catch (error) {
+        if (error?.name === "AbortError" || signal?.aborted) {
+          report.cancelled = true;
+          break;
+        }
+        report.progressErrors.push({
+          index,
+          stage: "cached-result",
+          error: String(error?.message || error || "Unable to read cached scene video")
+        });
+      }
+      if (cachedResult?.status === "completed" &&
+          cachedResult.video instanceof Blob &&
+          cachedResult.video.size > 0 &&
+          String(cachedResult.video.type || "").toLowerCase().startsWith("video/")) {
+        previousCompletedScene = scene;
+        previousCompletedResult = cachedResult;
+      }
       report.skipped += 1;
-      report.results.push({ index, status: "skipped" });
+      report.results.push({ index, status: "skipped", result: cachedResult || undefined });
       emitProgress(index, "skipped");
       continue;
     }
 
     emitProgress(index, "starting");
     try {
-      const result = await generateScene(scene, index, { signal });
+      const result = await generateScene(scene, index, {
+        signal,
+        previousScene: previousCompletedScene,
+        previousResult: previousCompletedResult,
+        continuity: previousCompletedResult
+          ? { available: true, sourceSceneId: previousCompletedScene?.id ?? null }
+          : { available: false, reason: index === 0 ? "first-scene" : "no-previous-generated-clip" }
+      });
       if (signal?.aborted) throw abortError();
       if (!result || result.status !== "completed") {
         throw new Error("Scene provider did not return a completed video.");
@@ -117,6 +149,8 @@ export async function generateStoryboardVideos({
         throw new Error("Scene provider reported completion with an artifact that has no video MIME type.");
       }
       report.completed += 1;
+      previousCompletedScene = scene;
+      previousCompletedResult = result;
       report.results.push({ index, status: "completed", result });
       emitProgress(index, "completed");
     } catch (error) {

@@ -67,3 +67,120 @@ test('keeps location evidence inside the sentence that names the moving characte
   assert.equal(changes[0][0].value, 'inside:stone castle');
   assert.equal(changes[0][0].evidence, 'Mira enters the stone castle.');
 });
+
+
+test('tracks an explicitly freed prop state across scenes in Russian', () => {
+  const changes = inferStoryboardStateChanges([
+    { id: 's1', storyDetail: 'Кель освобождает маленькую механическую птицу.', characters: ['Кель'] },
+    { id: 's2', storyDetail: 'Кель наблюдает, как птица летит над поляной.', characters: ['Кель'] }
+  ], 'ru');
+  assert.equal(changes[0].length, 1);
+  assert.equal(changes[0][0].entityType, 'prop');
+  assert.match(changes[0][0].entityId, /маленькую механическую птицу/);
+  assert.equal(changes[0][0].property, 'state');
+  assert.equal(changes[0][0].value, 'free');
+  assert.deepEqual(changes[1], []);
+});
+
+test('tracks explicit trapped and freed prop state transitions in English', () => {
+  const changes = inferStoryboardStateChanges([
+    { id: 's1', storyDetail: 'Kel traps the small mechanical bird.', characters: ['Kel'] },
+    { id: 's2', storyDetail: 'Kel frees the small mechanical bird.', characters: ['Kel'] }
+  ], 'en');
+  assert.equal(changes[0][0].value, 'trapped');
+  assert.equal(changes[1][0].previousValue, 'trapped');
+  assert.equal(changes[1][0].value, 'free');
+});
+
+
+test('carries an observed trapped bird state through branch lifting and explicit release', () => {
+  const changes = inferStoryboardStateChanges([
+    {
+      id: 'discovery',
+      storyDetail: 'Kel sees the small mechanical bird trapped under a fallen branch.',
+      characters: ['Kel']
+    },
+    {
+      id: 'lift',
+      storyDetail: 'Kel lifts the fallen branch.',
+      characters: ['Kel']
+    },
+    {
+      id: 'release',
+      storyDetail: 'Kel frees the small mechanical bird.',
+      characters: ['Kel']
+    },
+    {
+      id: 'aftermath',
+      storyDetail: 'The small mechanical bird flies above the clearing.',
+      characters: ['Kel']
+    }
+  ], 'en');
+  assert.deepEqual(changes[0].map(change => [change.entityId, change.property, change.value]), [
+    ['small mechanical bird', 'state', 'trapped'],
+    ['fallen branch', 'state', 'fallen']
+  ]);
+  assert.deepEqual(changes[1].map(change => [change.entityId, change.property, change.previousValue, change.value]), [
+    ['fallen branch', 'holder', null, 'Kel'],
+    ['fallen branch', 'state', 'fallen', 'lifted']
+  ]);
+  assert.deepEqual(changes[2].map(change => [
+    change.entityId, change.property, change.previousValue, change.value
+  ]), [
+    ['small mechanical bird', 'state', 'trapped', 'free']
+  ]);
+  assert.deepEqual(changes[3], []);
+});
+
+test('recognizes an explicitly observed trapped bird in Russian', () => {
+  const changes = inferStoryboardStateChanges([
+    {
+      storyDetail: 'Кель замечает маленькую механическую птицу, застрявшую под упавшей веткой.',
+      characters: ['Кель']
+    },
+    {
+      storyDetail: 'Кель освобождает маленькую механическую птицу.',
+      characters: ['Кель']
+    }
+  ], 'ru');
+  assert.equal(changes[0][0].value, 'trapped');
+  assert.equal(changes[1][0].previousValue, 'trapped');
+  assert.equal(changes[1][0].value, 'free');
+});
+
+
+test('does not attribute a passive trapped observation to a cast member who is absent from the sentence', () => {
+  const changes = inferStoryboardStateChanges([
+    {
+      storyDetail: 'Mira sees the small mechanical bird trapped under a fallen branch.',
+      characters: ['Kel']
+    }
+  ], 'en');
+  assert.deepEqual(changes, [[]]);
+});
+
+test('tracks a fallen branch and its lift as a continuous state in Russian', () => {
+  const changes = inferStoryboardStateChanges([
+    {
+      storyDetail: 'Кель замечает маленькую механическую птицу, застрявшую под упавшей веткой.',
+      characters: ['Кель']
+    },
+    {
+      storyDetail: 'Кель поднимает упавшую ветку.',
+      characters: ['Кель']
+    }
+  ], 'ru');
+
+  assert.deepEqual(changes[0].map(change => [change.entityId, change.property, change.value]), [
+    ['маленькую механическую птицу', 'state', 'trapped'],
+    ['упавшая ветка', 'state', 'fallen']
+  ]);
+  assert.equal(changes[1][0].entityId, 'упавшая ветка');
+  assert.equal(changes[1][0].property, 'holder');
+  assert.ok(changes[1].some(change =>
+    change.entityId === 'упавшая ветка' &&
+    change.property === 'state' &&
+    change.previousValue === 'fallen' &&
+    change.value === 'lifted'
+  ));
+});

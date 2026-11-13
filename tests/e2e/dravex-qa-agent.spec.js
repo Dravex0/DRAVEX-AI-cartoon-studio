@@ -19,7 +19,7 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
     agent: 'DRAVEX Browser QA Agent',
     runAt: new Date().toISOString(),
     browserProject: testInfo.project.name,
-    prompt: 'A small blue robot walks through a park, meets a little red bird, waves, and they become friends. Duration: 0.25 seconds.',
+    prompt: 'Characters:\nKel — a young forest adventurer in a dark green cloak.\n\nScene 1: Discovery\nKel notices the small mechanical bird trapped under a fallen branch.\n\nScene 2: Lifting the branch\nKel carefully lifts the fallen branch while watching the bird.\n\nScene 3: Freedom\nKel frees the small mechanical bird, and it flutters above the clearing.\n\nDuration: 0.25 seconds',
     steps: [],
     provider: { selectedMode: null, classification: 'not-verified-yet', externalVideoRequests: [] },
     browserErrors: [],
@@ -48,6 +48,7 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
 
   try {
     await page.goto('/');
+    await page.locator('#language').selectOption('en');
     await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);
     report.steps.push({ id: 'site-open', status: 'passed', title: await page.title() });
 
@@ -72,6 +73,11 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
 
     await expect(page.locator('#fullFilmProgressPanel')).toBeVisible({ timeout: 20_000 });
     report.steps.push({ id: 'render-progress-visible', status: 'passed' });
+
+    await expect(page.locator('#scenes button.scene')).toHaveCount(3, { timeout: 30_000 });
+    const sceneLabels = await page.locator('#scenes button.scene').allTextContents();
+    report.steps.push({ id: 'kel-rescue-storyboard-created', status: 'passed', sceneCount: sceneLabels.length, sceneLabels });
+    await expect(page.locator('#character')).toHaveValue('Kel');
 
     await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 140_000 });
     await expect(page.locator('#finalFilmDownload')).toHaveAttribute('download', 'dravex-cartoon-film.webm');
@@ -176,7 +182,8 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
     '  async view_api() { return { named_endpoints: { "/generate_video": {} } }; }',
     '  submit(endpoint, args) {',
     '    const id = ++callId;',
-    '    window.__dravexWanCalls = (window.__dravexWanCalls || []).concat([{ endpoint, image: args[0] && args[0].__dravexFile, prompt: args[1], steps: args[2], duration: args[4] }]);',
+    '    const sourceImage = args[0] && args[0].__dravexFile;',
+    '    window.__dravexWanCalls = (window.__dravexWanCalls || []).concat([{ endpoint, imageType: sourceImage && sourceImage.type, imageBytes: sourceImage && sourceImage.size, prompt: args[1], steps: args[2], duration: args[4] }]);',
     '    return { event_id: "mock-wan-" + id, cancel() {}, async *[Symbol.asyncIterator]() {',
     '      yield { type: "status", stage: "pending", position: 0, eta: 1 };',
     '      yield { type: "status", stage: "generating", progress_data: [{ progress: 1 }] };',
@@ -316,6 +323,9 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
   expect(providerEvidence.wanCalls.length).toBeGreaterThan(0);
   expect(providerEvidence.wanCalls.length).toBe(hordeSubmissions);
   expect(providerEvidence.wanCalls.every(call => call.endpoint === '/generate_video' && call.steps === 4 && String(call.prompt).length > 0)).toBe(true);
+  expect(providerEvidence.wanCalls.every(call => call.imageType === 'image/png' && call.imageBytes > 0)).toBe(true);
+  expect(providerEvidence.wanCalls.slice(1).every(call => String(call.prompt).includes('exact final decoded frame'))).toBe(true);
+  expect(providerEvidence.wanCalls.slice(1).every(call => String(call.prompt).includes('Preserve the same character identity'))).toBe(true);
   expect(providerEvidence.previewSource.startsWith('blob:')).toBe(true);
   expect(providerEvidence.sceneReport).toMatch(/Generated video scenes:\s*5\/5/);
 
@@ -351,12 +361,103 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
       browserProject: testInfo.project.name,
       hordeImageRequests: hordeSubmissions,
       wanVideoRequests: providerEvidence.wanCalls.length,
+      continuityFrameRequests: providerEvidence.wanCalls.slice(1).filter(call => call.imageType === 'image/png' && String(call.prompt).includes('exact final decoded frame')).length,
+      continuityPromptAssertions: providerEvidence.wanCalls.slice(1).every(call => String(call.prompt).includes('Preserve the same character identity')),
       providerMode: 'huggingface',
       sceneReport: providerEvidence.sceneReport,
       finalFilm: playback,
       downloadedBytes: downloaded.byteLength,
       webmSignature: [...downloaded.subarray(0, 4)]
     }, null, 2)),
+    contentType: 'application/json'
+  });
+});
+
+
+test('DRAVEX Visual QA Agent: keeps rescue props visible through discovery, lift, and release shots', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.goto('/');
+  await page.locator('#language').selectOption('en');
+  await page.locator('#idea').fill(
+    'Characters:\nKel — a young forest adventurer in a dark green cloak.\n\nScene 1: Discovery\nKel notices the small mechanical bird trapped under a fallen branch.\n\nScene 2: Lifting the branch\nKel carefully lifts the fallen branch while watching the bird.\n\nScene 3: Freedom\nKel frees the small mechanical bird.'
+  );
+  await page.locator('#make').click();
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await expect(page.locator('#scenes button.scene')).toHaveCount(3);
+  await expect(page.locator('#character')).toHaveValue('Kel');
+
+  // Creating a storyboard updates the scene model; selecting the first card
+  // asks the paused preview renderer to draw that newly created scene.
+  await page.locator('#scenes button.scene').first().click();
+  await page.waitForTimeout(150);
+
+  const inspectCanvas = async () => page.locator('#canvas').evaluate(canvas => {
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('Local canvas context is unavailable.');
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const targets = {
+      trappedBird: [0x91, 0xa7, 0xb1],
+      freedBird: [0xa9, 0xdc, 0xe5],
+      branch: [0x77, 0x54, 0x35],
+      greenCloak: [0x31, 0x5d, 0x43]
+    };
+    const counts = { trappedBird: 0, freedBird: 0, branch: 0, greenCloak: 0 };
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index + 3] < 220) continue;
+      for (const name of Object.keys(targets)) {
+        const target = targets[name];
+        const distance = Math.abs(pixels[index] - target[0])
+          + Math.abs(pixels[index + 1] - target[1])
+          + Math.abs(pixels[index + 2] - target[2]);
+        if (distance <= 12) counts[name] += 1;
+      }
+    }
+    return { ...counts, characterRenderMode: canvas.dataset.characterRenderMode || 'missing' };
+  });
+
+  await page.waitForTimeout(250);
+  const discovery = await inspectCanvas();
+  expect(discovery.characterRenderMode).toBe('procedural-stand-in');
+  expect(discovery.greenCloak).toBeGreaterThan(150);
+  expect(discovery.trappedBird).toBeGreaterThan(10);
+  expect(discovery.branch).toBeGreaterThan(10);
+  await testInfo.attach('kel-rescue-discovery-canvas.png', {
+    body: await page.locator('#canvas').screenshot(),
+    contentType: 'image/png'
+  });
+  await testInfo.attach('kel-rescue-discovery-canvas.json', {
+    body: Buffer.from(JSON.stringify(discovery, null, 2)),
+    contentType: 'application/json'
+  });
+
+  await page.locator('#scenes button.scene').nth(1).click();
+  await page.waitForTimeout(200);
+  const lifting = await inspectCanvas();
+  expect(lifting.characterRenderMode).toBe('procedural-stand-in');
+  expect(lifting.greenCloak).toBeGreaterThan(150);
+  expect(lifting.trappedBird).toBeGreaterThan(10);
+  expect(lifting.branch).toBeGreaterThan(10);
+  await testInfo.attach('kel-rescue-lifting-canvas.png', {
+    body: await page.locator('#canvas').screenshot(),
+    contentType: 'image/png'
+  });
+
+  await page.locator('#scenes button.scene').nth(2).click();
+  await page.waitForTimeout(200);
+  const freedom = await inspectCanvas();
+  expect(freedom.characterRenderMode).toBe('procedural-stand-in');
+  expect(freedom.greenCloak).toBeGreaterThan(150);
+  expect(freedom.freedBird).toBeGreaterThan(10);
+  expect(freedom.branch).toBeGreaterThan(10);
+  await testInfo.attach('kel-rescue-freedom-canvas.png', {
+    body: await page.locator('#canvas').screenshot(),
+    contentType: 'image/png'
+  });
+  expect(pageErrors).toEqual([]);
+  await testInfo.attach('kel-rescue-prop-continuity.json', {
+    body: Buffer.from(JSON.stringify({ discovery, lifting, freedom }, null, 2)),
     contentType: 'application/json'
   });
 });

@@ -251,3 +251,19 @@ test('rejects a causal link when its claimed marker is absent from the effect ev
   assert.equal(graph.nodes[1].consequence, null);
   assert.equal(graph.edges.some(edge => edge.type === 'causes'), false);
 });
+
+
+test('records a source-grounded prop condition change from trapped to free', () => {
+  const graph = buildStoryEventChain([
+    { id: 's1', storyDetail: 'Kel traps the small mechanical bird.', characters: ['Kel'],
+      stateChanges: [{ entityType: 'prop', entityId: 'small mechanical bird', property: 'state',
+        previousValue: null, value: 'trapped', actorId: 'Kel', evidence: 'Kel traps the small mechanical bird.' }] },
+    { id: 's2', storyDetail: 'Kel frees the small mechanical bird.', characters: ['Kel'],
+      stateChanges: [{ entityType: 'prop', entityId: 'small mechanical bird', property: 'state',
+        previousValue: 'trapped', value: 'free', actorId: 'Kel', evidence: 'Kel frees the small mechanical bird.' }] }
+  ]);
+  assert.equal(graph.nodes[0].stateChanges[0].value, 'trapped');
+  assert.equal(graph.nodes[1].stateChanges[0].previousValue, 'trapped');
+  assert.equal(graph.nodes[1].stateChanges[0].value, 'free');
+  assert.equal(graph.edges.filter(edge => edge.type === 'changes_state').length, 2);
+});

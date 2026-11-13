@@ -147,6 +147,26 @@ test('wires landscape and portrait formats through canvas preview and export', (
 });
 
 
+test('image generation observer requires every scene image or an explicit text-to-video skip', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes('const generatedImageScenes=sceneMetadata.filter(scene=>Boolean(scene.generatedImageUrl))'));
+  assert.ok(app.includes("generatedImageScenes.length===scenes.length?'completed'"));
+  assert.ok(app.includes("generatedImageScenes.length===0&&mode==='comfyui'?'skipped':'running'"));
+  assert.ok(app.includes("generatedImageSceneCount:generatedImageScenes.length"));
+  assert.ok(app.includes('const finalGeneratedImageScenes=sceneMetadata.filter(scene=>Boolean(scene.generatedImageUrl))'));
+  assert.ok(app.includes('const finalImageStageStatus=finalGeneratedImageScenes.length===scenes.length'));
+});
+test('applying scene edits persists background-only composition and environment description', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const applyStart = app.indexOf("$('applyScene').onclick=()=>{");
+  const applyEnd = app.indexOf("$('addScene').onclick=", applyStart);
+  const applyHandler = app.slice(applyStart, applyEnd);
+  assert.ok(applyStart >= 0);
+  assert.ok(applyEnd > applyStart);
+  assert.match(applyHandler, /characterCompositionMode:\$\('sceneCompositionMode'\)\.value/);
+  assert.match(applyHandler, /environmentDescription:\$\('sceneEnvironmentDescription'\)\.value\.trim\(\)/);
+});
+
 test('does not publish a successful WebM after MediaRecorder reports an error', () => {
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   assert.ok(app.includes('recorderFailed=false'));
@@ -160,13 +180,21 @@ test('cinematic camera transform covers generated media, props, and rigged chara
   const cameraStart = app.indexOf('ctx.save();ctx.translate(w/2,h/2+cameraPlan.offsetY);');
   const mediaDraw = app.indexOf('drawImageCover(ctx,generatedVideo,w,h,motionTransform)', cameraStart);
   const propsDraw = app.indexOf('drawSceneProps(ctx,currentSceneData', cameraStart);
-  const characterDraw = app.indexOf('drawCharacterLayers(ctx,currentSceneData.characterLayers', cameraStart);
+  const overlayGuard = app.indexOf('shouldRenderCharacterLayers({hasGeneratedMedia,characterCompositionMode:currentSceneData.characterCompositionMode})', cameraStart);
+  const characterDraw = app.indexOf('drawCharacterLayers(ctx,allowCharacterOverlay?currentSceneData.characterLayers:[]', cameraStart);
   const cameraRestore = app.indexOf('ctx.restore();', characterDraw);
   const titleDraw = app.indexOf("ctx.fillText($('character').value", cameraRestore);
   assert.ok(cameraStart >= 0);
   assert.ok(mediaDraw > cameraStart);
   assert.ok(propsDraw > mediaDraw);
-  assert.ok(characterDraw > propsDraw);
+  assert.ok(overlayGuard > propsDraw);
+  assert.ok(characterDraw > overlayGuard);
   assert.ok(cameraRestore > characterDraw);
   assert.ok(titleDraw > cameraRestore);
+});
+
+test('generation observer records a cancelled video batch as cancelled, not completed', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.match(app, /recordStage\('videoGeneration',\{status:report\.cancelled\?'cancelled':report\.failed\?'failed':'completed'/);
+  assert.match(app, /cancelled:Boolean\(report\.cancelled\)/);
 });

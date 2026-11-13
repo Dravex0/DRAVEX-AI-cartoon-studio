@@ -12,6 +12,25 @@ import { normalizeCharacterFacialRig, normalizeCharacterFacialExpressions } from
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
 
+function normalizePropAnchors(input, rawStateChanges, rawPropStates) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const allowed = new Set([...(Array.isArray(rawStateChanges) ? rawStateChanges : []), ...(Array.isArray(rawPropStates) ? rawPropStates : [])]
+    .filter(change => change && typeof change === 'object' && !Array.isArray(change)
+      && change.entityType === 'prop' && text(change.entityId, 120))
+    .map(change => text(change.entityId, 120).toLocaleLowerCase()));
+  const result = {};
+  for (const [rawId, point] of Object.entries(input).slice(0, 12)) {
+    const entityId = text(rawId, 120);
+    if (!entityId || !allowed.has(entityId.toLocaleLowerCase())
+      || !point || typeof point !== 'object' || Array.isArray(point)) continue;
+    if (typeof point.x !== 'number' || !Number.isFinite(point.x)
+      || typeof point.y !== 'number' || !Number.isFinite(point.y)
+      || point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1) continue;
+    result[entityId] = { x: point.x, y: point.y };
+  }
+  return result;
+}
+
 /** Normalize both current and legacy prototype scene shapes without dropping production prompts. */
 export function normalizeScene(input = {}, index = 0) {
   const scene = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
@@ -41,6 +60,9 @@ export function normalizeScene(input = {}, index = 0) {
       ? scene.characterCastProvided
       : Array.isArray(scene.characters) || Boolean(scene.characterId),
     characterLayers: normalizeCharacterLayers(scene.characterLayers),
+    // Only explicit background plates may receive character sprites over generated media.
+    characterCompositionMode: ['background-only', 'full-frame'].includes(scene.characterCompositionMode)
+      ? scene.characterCompositionMode : 'auto',
     // Rig metadata is separate from whole-character sprites until segmented assets are supplied.
     characterRigs: Array.isArray(scene.characterRigs) ? scene.characterRigs.slice(0, 20).map(normalizeCharacterRig) : [],
     characterRigPoses: normalizeCharacterRigPoses(scene.characterRigPoses),
@@ -58,6 +80,20 @@ export function normalizeScene(input = {}, index = 0) {
           evidence: text(scene.causalLink.evidence, 1_200)
         }
       : null,
+    propStates: Array.isArray(scene.propStates) ? scene.propStates
+      .filter(state => state && typeof state === 'object' && !Array.isArray(state)
+        && text(state.entityType, 20) === 'prop' && text(state.entityId, 120) && text(state.property, 40))
+      .slice(0, 60).map(state => ({
+        entityType: 'prop',
+        entityId: text(state.entityId, 120),
+        property: text(state.property, 40),
+        previousValue: state.previousValue == null ? null : text(state.previousValue, 160),
+        startValue: state.startValue == null ? null : text(state.startValue, 160),
+        value: state.value == null ? null : text(state.value, 160),
+        actorId: text(state.actorId, 120),
+        evidence: text(state.evidence, 1_200),
+        changedThisScene: state.changedThisScene === true
+      })) : [],
     stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => ({
       entityType: text(change.entityType, 20),
       entityId: text(change.entityId, 120),
@@ -67,6 +103,7 @@ export function normalizeScene(input = {}, index = 0) {
       actorId: text(change.actorId, 120),
       evidence: text(change.evidence, 1_200)
     })) : [],
+    propAnchors: normalizePropAnchors(scene.propAnchors, scene.stateChanges, scene.propStates),
     interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
       type: text(item.type, 40), actorId: text(item.actorId, 120), targetId: text(item.targetId, 120),
       evidence: text(item.evidence, 500),
@@ -83,6 +120,8 @@ export function normalizeScene(input = {}, index = 0) {
       : null,
     location: text(scene.location, 500),
     environmentDescription: text(scene.environmentDescription, 2_000),
+    // Explicit non-character motion cues are kept separate from camera movement.
+    environmentMotion: uniqueStrings(scene.environmentMotion),
     weather: text(scene.weather, 200),
     environmentLighting: text(scene.environmentLighting, 300),
     environmentStyle: text(scene.environmentStyle, 300),
