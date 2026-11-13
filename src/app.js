@@ -3517,9 +3517,6 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     let prompt=taskType==='text-to-video'
      ?[buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(meta,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
      :buildMotionGenerationPrompt(meta,characterBible);
-    if(mode==='huggingface'&&taskType==='image-to-video'&&previousScene&&previousResult?.video instanceof Blob){
-     status.textContent='Проверяем визуальную непрерывность предыдущей сцены…';
-    }
     const continuityInput=await prepareSceneContinuityInput({
      mode,taskType,index,scenes,previousScene,previousResult,imageInput,prompt,signal,
      extractLastFrame:captureLastFrameImage
