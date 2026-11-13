@@ -124,3 +124,37 @@ test("isolates progress callback errors from scene generation", async () => {
     [2, "completed", "UI progress failed: completed"]
   ]);
 });
+
+
+test("passes the last successfully generated scene to the next scene as continuity context", async () => {
+  const received = [];
+  const scenes = [{ id: "a", endState: "Kel holds the key" }, { id: "b" }, { id: "c" }];
+  const report = await generateStoryboardVideos({
+    scenes,
+    generateScene: async (scene, index, context) => {
+      received.push({
+        id: scene.id,
+        previousSceneId: context.previousScene?.id ?? null,
+        previousResult: context.previousResult?.video ?? null,
+        continuity: context.continuity
+      });
+      if (scene.id === "b") throw new Error("temporary provider failure");
+      return {
+        status: "completed",
+        video: new Blob([scene.id], { type: "video/webm" })
+      };
+    }
+  });
+
+  assert.equal(report.completed, 2);
+  assert.equal(report.failed, 1);
+  assert.deepEqual(received.map(item => item.id), ["a", "b", "c"]);
+  assert.equal(received[0].previousSceneId, null);
+  assert.equal(received[0].continuity.available, false);
+  assert.equal(received[1].previousSceneId, "a");
+  assert.equal(received[1].previousResult.size, 1);
+  assert.deepEqual(received[1].continuity, { available: true, sourceSceneId: "a" });
+  // A failed scene must not replace the last valid continuity source.
+  assert.equal(received[2].previousSceneId, "a");
+  assert.equal(received[2].previousResult.size, 1);
+});
