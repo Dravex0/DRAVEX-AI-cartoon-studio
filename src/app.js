@@ -129,7 +129,16 @@ function refreshGenerationObserverReport(){
  const report=activeGenerationObserver.report({interpretation:{parsedBrief:currentStoryboardPlan?.brief??null,plannedScenes:currentStoryboardPlan?.scenes||[]},scenes:sceneMetadata,characterPresenceTimeline:buildCharacterPresenceTimeline(sceneMetadata)});
  report.productionAudit=auditProductionRun({runId:observerSnapshot.runId,stages:observerSnapshot.stages});
  const summary=panel.querySelector('[data-observer-summary]');
- if(summary)summary.textContent=(uiLang==='ru'?'Проверено текстовых требований: ':'Text requirements: ')+report.summary.textEvidenceFound+'/'+report.summary.requirementCount+' · '+(uiLang==='ru'?'ошибок этапов: ':'failed stages: ')+report.summary.failedStages+' · '+(uiLang==='ru'?'непроверенных этапов: ':'unverified stages: ')+report.summary.unverifiedStages+' · '+report.summary.overall;
+  if(summary){
+   const identityStatus=report.visualVerification?.characterIdentity?.status||'not-verified';
+   const actionStatus=report.visualVerification?.semanticAction?.status||'not-verified';
+   summary.textContent=(uiLang==='ru'?'Текстовые требования: ':'Text requirements: ')+report.summary.textEvidenceFound+'/'+report.summary.requirementCount
+    +' · '+(uiLang==='ru'?'ошибок этапов: ':'failed stages: ')+report.summary.failedStages
+    +' · '+(uiLang==='ru'?'непроверенных этапов: ':'unverified stages: ')+report.summary.unverifiedStages
+    +' · '+(uiLang==='ru'?'внешность персонажа: ':'character identity: ')+identityStatus
+    +' · '+(uiLang==='ru'?'действия: ':'actions: ')+actionStatus
+    +' · '+report.summary.overall;
+  }
  const pre=panel.querySelector('[data-observer-details]');if(pre)pre.textContent=JSON.stringify(report,null,2);
 }
 const translations={
