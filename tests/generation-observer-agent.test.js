@@ -38,6 +38,16 @@ test("an explicitly skipped image stage is optional for text-to-video workflows"
   assert.equal(report.summary.unverifiedStages, 8);
 });
 
+test("a skipped image stage is not optional without explicit text-to-video evidence", () => {
+  const observer = createGenerationObserver();
+  observer.recordStage("imageGeneration", { status: "skipped", output: { reason: "Image provider was unavailable." } });
+  const report = observer.report();
+  const stage = report.stageResults.find(item => item.stage === "imageGeneration");
+  assert.equal(stage.verdict, "not-verifiable");
+  assert.equal(report.summary.unverifiedStages, 9);
+  assert.equal(report.summary.overall, "incomplete-evidence");
+});
+
 test("unknown voice and lip-sync provenance remains unverified rather than successful", () => {
   const observer = createGenerationObserver();
   observer.recordStage("voiceGeneration", { status: "unknown", output: { trackCount: 2, includedInExport: true, provenance: "not-tracked" } });
