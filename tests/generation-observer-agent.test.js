@@ -57,6 +57,7 @@ test("visual claims require explicit assessments and artifact metadata is not vi
   let report = observer.report();
   assert.equal(report.mediaAssessments.length, 0);
   assert.equal(report.summary.overall, "incomplete-evidence");
+  observer.attachArtifact({ kind: "frame-samples", name: "sampled-frames.json", reference: "frame-samples://1", evidenceType: "frame-sampling" });
   observer.recordAssessment({ target: "video-motion", method: "frame-sampling", verdict: "pass", summary: "Movement observed", evidenceRefs: ["frame-samples://1"] });
   report = observer.report();
   assert.equal(report.mediaAssessments[0].verdict, "pass");
@@ -137,4 +138,40 @@ test("a media pass without evidence references is downgraded to not-verifiable",
   assert.equal(report.mediaAssessments[0].verdict, "not-verifiable");
   assert.match(report.mediaAssessments[0].summary, /No evidence references supplied/);
   assert.equal(report.summary.overall, "incomplete-evidence");
+});
+
+test("a media pass with an unregistered evidence reference is not verifiable", () => {
+  const observer = createGenerationObserver();
+  observer.recordAssessment({
+    target: "character-motion",
+    method: "frame-sampling",
+    verdict: "pass",
+    summary: "The character moved",
+    evidenceRefs: ["frame-samples://missing"]
+  });
+  const report = observer.report();
+  assert.equal(report.mediaAssessments[0].verdict, "not-verifiable");
+  assert.deepEqual(report.mediaAssessments[0].evidenceRefs, []);
+  assert.deepEqual(report.mediaAssessments[0].unresolvedEvidenceRefs, ["frame-samples://missing"]);
+  assert.match(report.mediaAssessments[0].summary, /do not resolve to registered artifacts or stage evidence/);
+  assert.equal(report.summary.overall, "incomplete-evidence");
+});
+
+test("a media assessment accepts evidence registered by a generation stage", () => {
+  const observer = createGenerationObserver();
+  observer.recordStage("videoGeneration", {
+    status: "completed",
+    output: { clipCount: 1 },
+    evidenceRefs: ["video-frame://scene-1"]
+  });
+  observer.recordAssessment({
+    target: "video-motion",
+    method: "decoded-frame-difference",
+    verdict: "pass",
+    evidenceRefs: ["video-frame://scene-1"]
+  });
+  const report = observer.report();
+  assert.equal(report.mediaAssessments[0].verdict, "pass");
+  assert.deepEqual(report.mediaAssessments[0].evidenceRefs, ["video-frame://scene-1"]);
+  assert.deepEqual(report.mediaAssessments[0].unresolvedEvidenceRefs, []);
 });
