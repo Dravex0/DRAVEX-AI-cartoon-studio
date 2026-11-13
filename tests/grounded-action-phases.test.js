@@ -45,3 +45,14 @@ test('splits an explicitly described reaction in a following sentence', () => {
   const scene = makeScene('en', 'Kael', 'Nox', 'Kael strikes Nox. Nox stumbles backward.');
   assertGroundedAttackThenReaction(scene, 'Kael', 'Nox', 'Nox stumbles backward.');
 });
+
+test('matches a reaction to the latest preceding attack against that character', () => {
+  const scene = makeScene(
+    'en',
+    'Nox',
+    'Kael',
+    'Kael strikes Nox, then Nox strikes Kael, and Kael stumbles backward.'
+  );
+  assertGroundedAttackThenReaction(scene, 'Nox', 'Kael', 'and Kael stumbles backward.');
+});
+
