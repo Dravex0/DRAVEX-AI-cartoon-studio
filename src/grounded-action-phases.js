@@ -38,22 +38,31 @@ function mentionedCharacters(text, characterIds) {
 export function inferGroundedAttackReaction(source, characterIds, interactions) {
   const text = String(source ?? '');
   if (!text || !Array.isArray(characterIds) || !Array.isArray(interactions)) return null;
-  const attack = interactions.find(item => item?.type === 'attack'
+  const attacks = interactions.filter(item => item?.type === 'attack'
     && item.actorId && item.targetId
     && Number.isInteger(item.sourceStart) && Number.isInteger(item.sourceEnd));
-  if (!attack) return null;
+  if (!attacks.length) return null;
 
   const clauses = splitGroundedClauses(text);
-  const reaction = clauses.find(clause => {
-    const trimmed = clause.text.trim();
-    return clause.start >= attack.sourceEnd && detectSceneAction(trimmed) === 'stagger';
-  });
-  if (!reaction) return null;
+  let pair = null;
+  for (const reaction of clauses) {
+    const trimmed = reaction.text.trim();
+    if (detectSceneAction(trimmed) !== 'stagger') continue;
+    const reactionEvidence = trimmed;
+    const reactionMentions = mentionedCharacters(reactionEvidence, characterIds);
+    const reactionActor = reactionMentions.at(-1)?.name;
+    if (!reactionActor) continue;
+    const attack = attacks
+      .filter(item => item.sourceEnd <= reaction.start
+        && item.targetId.toLocaleLowerCase() === reactionActor.toLocaleLowerCase())
+      .sort((left, right) => right.sourceEnd - left.sourceEnd)[0];
+    if (!attack) continue;
+    pair = { attack, reactionEvidence, reactionActor };
+    break;
+  }
+  if (!pair) return null;
 
-  const reactionEvidence = reaction.text.trim();
-  const reactionMentions = mentionedCharacters(reactionEvidence, characterIds);
-  const reactionActor = reactionMentions.at(-1)?.name;
-  if (!reactionActor || reactionActor.toLocaleLowerCase() !== attack.targetId.toLocaleLowerCase()) return null;
+  const { attack, reactionEvidence, reactionActor } = pair;
   if (!text.includes(attack.evidence) || !text.includes(reactionEvidence)) return null;
 
   return {
@@ -79,3 +88,4 @@ export function inferGroundedAttackReaction(source, characterIds, interactions) 
     ]
   };
 }
+
