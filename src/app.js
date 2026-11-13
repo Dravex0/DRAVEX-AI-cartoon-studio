@@ -3405,7 +3405,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     assertSceneIdentityCurrent();
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Подготовка к анимации','Preparing animation')});
     status.textContent=imageSource.kind==='missing'&&mode==='comfyui'?'Подготавливаем генерацию видео из текста для сцены '+(index+1)+'…':'Подготавливаем изображение сцены '+(index+1)+' для анимации…';
-    let imageInput=await loadSceneImageBlob(imageSource,{signal});
+    const imageInput=await loadSceneImageBlob(imageSource,{signal});
     assertSceneIdentityCurrent();
     const taskType=resolveSceneVideoTaskType({mode,imageSourceKind:imageSource.kind});
     const prompt=taskType==='text-to-video'
