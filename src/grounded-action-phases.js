@@ -1,6 +1,24 @@
 import { detectSceneAction } from './scene-action.js';
 
 const escapeRegExp = value => String(value).replace(/[.*+?^{}|()[\]\\]/g, '\\$&');
+const CLAUSE_BOUNDARIES = /(?<punctuation>[,;])|(?<sentenceEnd>[.!?。！？])|(?<conjunction>(?<![\p{L}\p{N}])(?:and|then|but|и|а|но|затем|потом|і|й|та|але|потім|y|e|pero|luego|entonces)(?![\p{L}\p{N}]))/giu;
+
+function splitGroundedClauses(source) {
+  const clauses = [];
+  let start = 0;
+  for (const match of source.matchAll(CLAUSE_BOUNDARIES)) {
+    const conjunction = Boolean(match.groups?.conjunction);
+    const includeSentenceEnd = Boolean(match.groups?.sentenceEnd);
+    const end = includeSentenceEnd ? match.index + match[0].length : match.index;
+    const text = source.slice(start, end);
+    if (text.trim()) clauses.push({ text, start, end });
+    // Keep conjunctions attached to the following clause so its evidence stays verbatim.
+    start = conjunction ? match.index : match.index + match[0].length;
+  }
+  const text = source.slice(start);
+  if (text.trim()) clauses.push({ text, start, end: source.length });
+  return clauses;
+}
 
 function mentionedCharacters(text, characterIds) {
   const matches = [];
@@ -25,11 +43,7 @@ export function inferGroundedAttackReaction(source, characterIds, interactions) 
     && Number.isInteger(item.sourceStart) && Number.isInteger(item.sourceEnd));
   if (!attack) return null;
 
-  const clauses = [...text.matchAll(/[^,;]+/gu)].map(match => ({
-    text: match[0],
-    start: match.index,
-    end: match.index + match[0].length
-  }));
+  const clauses = splitGroundedClauses(text);
   const reaction = clauses.find(clause => {
     const trimmed = clause.text.trim();
     return clause.start >= attack.sourceEnd && detectSceneAction(trimmed) === 'stagger';
