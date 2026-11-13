@@ -3443,6 +3443,15 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
    scenes,
    signal:controller.signal,
    hasVideo:(scene,index)=>sceneVideoCache.has(sceneVideoKey(index,scene)),
+   getCachedResult:async(scene,index,{signal}={})=>{
+    const cachedEntry=sceneVideoCache.get(sceneVideoKey(index,scene));
+    if(!cachedEntry?.url)return null;
+    const cachedResponse=await fetch(cachedEntry.url,{signal});
+    if(!cachedResponse.ok)return null;
+    const cachedVideo=await cachedResponse.blob();
+    if(!cachedVideo.size||!String(cachedVideo.type||'').toLowerCase().startsWith('video/'))return null;
+    return {status:'completed',video:cachedVideo};
+   },
    onProgress:state=>{
     const index=state.currentIndex;
     if(Number.isInteger(index)&&filmProgressSceneStates[index]){
