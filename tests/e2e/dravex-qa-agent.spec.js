@@ -182,7 +182,8 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
     '  async view_api() { return { named_endpoints: { "/generate_video": {} } }; }',
     '  submit(endpoint, args) {',
     '    const id = ++callId;',
-    '    window.__dravexWanCalls = (window.__dravexWanCalls || []).concat([{ endpoint, image: args[0] && args[0].__dravexFile, prompt: args[1], steps: args[2], duration: args[4] }]);',
+    '    const sourceImage = args[0] && args[0].__dravexFile;',
+    '    window.__dravexWanCalls = (window.__dravexWanCalls || []).concat([{ endpoint, imageType: sourceImage && sourceImage.type, imageBytes: sourceImage && sourceImage.size, prompt: args[1], steps: args[2], duration: args[4] }]);',
     '    return { event_id: "mock-wan-" + id, cancel() {}, async *[Symbol.asyncIterator]() {',
     '      yield { type: "status", stage: "pending", position: 0, eta: 1 };',
     '      yield { type: "status", stage: "generating", progress_data: [{ progress: 1 }] };',
@@ -322,6 +323,9 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
   expect(providerEvidence.wanCalls.length).toBeGreaterThan(0);
   expect(providerEvidence.wanCalls.length).toBe(hordeSubmissions);
   expect(providerEvidence.wanCalls.every(call => call.endpoint === '/generate_video' && call.steps === 4 && String(call.prompt).length > 0)).toBe(true);
+  expect(providerEvidence.wanCalls.every(call => call.imageType === 'image/png' && call.imageBytes > 0)).toBe(true);
+  expect(providerEvidence.wanCalls.slice(1).every(call => String(call.prompt).includes('exact final decoded frame'))).toBe(true);
+  expect(providerEvidence.wanCalls.slice(1).every(call => String(call.prompt).includes('Preserve the same character identity'))).toBe(true);
   expect(providerEvidence.previewSource.startsWith('blob:')).toBe(true);
   expect(providerEvidence.sceneReport).toMatch(/Generated video scenes:\s*5\/5/);
 
@@ -357,6 +361,8 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
       browserProject: testInfo.project.name,
       hordeImageRequests: hordeSubmissions,
       wanVideoRequests: providerEvidence.wanCalls.length,
+      continuityFrameRequests: providerEvidence.wanCalls.slice(1).filter(call => call.imageType === 'image/png' && String(call.prompt).includes('exact final decoded frame')).length,
+      continuityPromptAssertions: providerEvidence.wanCalls.slice(1).every(call => String(call.prompt).includes('Preserve the same character identity')),
       providerMode: 'huggingface',
       sceneReport: providerEvidence.sceneReport,
       finalFilm: playback,
