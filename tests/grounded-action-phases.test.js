@@ -56,3 +56,13 @@ test('matches a reaction to the latest preceding attack against that character',
   assertGroundedAttackThenReaction(scene, 'Nox', 'Kael', 'and Kael stumbles backward.');
 });
 
+test('does not let a following while-clause steal the reaction character', () => {
+  const scene = makeScene(
+    'en',
+    'Kael',
+    'Nox',
+    'Kael strikes Nox, and Nox stumbles backward while Kael watches.'
+  );
+  assertGroundedAttackThenReaction(scene, 'Kael', 'Nox', 'and Nox stumbles backward');
+});
+
