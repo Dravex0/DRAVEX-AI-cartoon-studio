@@ -14,7 +14,7 @@ test('LIVE: Wan 2.2 generates and the browser decodes a real video clip', async 
   await page.goto('/');
   const report = await page.evaluate(async accessToken => {
     const spaceId = 'zerogpu-aoti/wan2-2-fp8da-aoti-faster';
-    const [{ Client, handle_file }, { createHuggingFaceZeroGPUVideoProvider }] = await Promise.all([
+    const [{ Client, handle_file: handleFile }, { createHuggingFaceZeroGPUVideoProvider }] = await Promise.all([
       import('https://cdn.jsdelivr.net/npm/@gradio/client@2.7.2/dist/index.min.js'),
       import('/src/huggingface-zerogpu-video-provider.js')
     ]);
