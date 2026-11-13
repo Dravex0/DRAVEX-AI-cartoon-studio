@@ -114,6 +114,21 @@ export function createGenerationObserver({ runId = "", prompt = "", requirements
       return { stage, status, verdict, error: item.error || null, evidenceRefs: item.evidenceRefs || [] };
     });
     const visualChecks = run.assessments.filter(item => /image|video|motion|character|visual|frame|playback|audio|lip.?sync/i.test(item.target));
+    const capabilityStatus = (targetPattern, evidenceType) => {
+      const matching = run.assessments.filter(item => targetPattern.test(item.target));
+      if (!matching.length) return { status: "not-verified", assessmentCount: 0, reason: "No dedicated assessment was recorded." };
+      const supported = matching.filter(item => item.evidenceRefs.length > 0
+        && item.unresolvedEvidenceRefs.length === 0
+        && item.evidenceRefs.every(reference => run.artifacts.some(artifact =>
+          artifact.reference === reference && artifact.evidenceType === evidenceType)));
+      if (!supported.length) return { status: "not-verified", assessmentCount: matching.length, reason: "Evidence is not tagged with the required dedicated analysis type." };
+      const verdict = supported.some(item => item.verdict === "fail") ? "fail"
+        : supported.some(item => item.verdict === "partial") ? "partial"
+        : supported.every(item => item.verdict === "pass") ? "pass" : "not-verified";
+      return { status: verdict, assessmentCount: supported.length, reason: null };
+    };
+    const visualIdentity = capabilityStatus(/character-identity|visual-identity/i, "semantic-character-identity-analysis");
+    const semanticAction = capabilityStatus(/semantic-action|action-recognition/i, "semantic-action-recognition");
     const failures = textEvidence.filter(item => item.status === "no-text-evidence");
     const partial = textEvidence.filter(item => item.status === "partial-text-evidence");
     return {
@@ -123,6 +138,7 @@ export function createGenerationObserver({ runId = "", prompt = "", requirements
       artifacts: run.artifacts,
       characterPresenceTimeline: Array.isArray(characterPresenceTimeline) ? characterPresenceTimeline : [],
       mediaAssessments: visualChecks,
+      visualVerification: { characterIdentity: visualIdentity, semanticAction },
       summary: {
         requirementCount: textEvidence.length,
         textEvidenceFound: textEvidence.filter(item => item.status === "text-evidence-found").length,
