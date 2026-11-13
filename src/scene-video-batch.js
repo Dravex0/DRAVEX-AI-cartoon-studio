@@ -53,6 +53,7 @@ export async function generateStoryboardVideos({
   scenes,
   generateScene,
   hasVideo = () => false,
+  getCachedResult = () => null,
   onProgress = () => {},
   signal
 } = {}) {
@@ -62,8 +63,8 @@ export async function generateStoryboardVideos({
   if (typeof generateScene !== "function") {
     throw new TypeError("generateScene must be a function.");
   }
-  if (typeof hasVideo !== "function" || typeof onProgress !== "function") {
-    throw new TypeError("hasVideo and onProgress must be functions.");
+  if (typeof hasVideo !== "function" || typeof getCachedResult !== "function" || typeof onProgress !== "function") {
+    throw new TypeError("hasVideo, getCachedResult, and onProgress must be functions.");
   }
 
   let previousCompletedScene = null;
@@ -99,8 +100,29 @@ export async function generateStoryboardVideos({
 
     const scene = scenes[index];
     if (hasVideo(scene, index)) {
+      let cachedResult = null;
+      try {
+        cachedResult = await getCachedResult(scene, index, { signal });
+      } catch (error) {
+        if (error?.name === "AbortError" || signal?.aborted) {
+          report.cancelled = true;
+          break;
+        }
+        report.progressErrors.push({
+          index,
+          stage: "cached-result",
+          error: String(error?.message || error || "Unable to read cached scene video")
+        });
+      }
+      if (cachedResult?.status === "completed" &&
+          cachedResult.video instanceof Blob &&
+          cachedResult.video.size > 0 &&
+          String(cachedResult.video.type || "").toLowerCase().startsWith("video/")) {
+        previousCompletedScene = scene;
+        previousCompletedResult = cachedResult;
+      }
       report.skipped += 1;
-      report.results.push({ index, status: "skipped" });
+      report.results.push({ index, status: "skipped", result: cachedResult || undefined });
       emitProgress(index, "skipped");
       continue;
     }
