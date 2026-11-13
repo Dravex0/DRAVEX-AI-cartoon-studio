@@ -66,6 +66,9 @@ export async function generateStoryboardVideos({
     throw new TypeError("hasVideo and onProgress must be functions.");
   }
 
+  let previousCompletedScene = null;
+  let previousCompletedResult = null;
+
   const report = {
     total: scenes.length,
     completed: 0,
@@ -104,7 +107,14 @@ export async function generateStoryboardVideos({
 
     emitProgress(index, "starting");
     try {
-      const result = await generateScene(scene, index, { signal });
+      const result = await generateScene(scene, index, {
+        signal,
+        previousScene: previousCompletedScene,
+        previousResult: previousCompletedResult,
+        continuity: previousCompletedResult
+          ? { available: true, sourceSceneId: previousCompletedScene?.id ?? null }
+          : { available: false, reason: index === 0 ? "first-scene" : "no-previous-generated-clip" }
+      });
       if (signal?.aborted) throw abortError();
       if (!result || result.status !== "completed") {
         throw new Error("Scene provider did not return a completed video.");
@@ -117,6 +127,8 @@ export async function generateStoryboardVideos({
         throw new Error("Scene provider reported completion with an artifact that has no video MIME type.");
       }
       report.completed += 1;
+      previousCompletedScene = scene;
+      previousCompletedResult = result;
       report.results.push({ index, status: "completed", result });
       emitProgress(index, "completed");
     } catch (error) {
