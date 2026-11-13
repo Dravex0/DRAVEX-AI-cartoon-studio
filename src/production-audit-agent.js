@@ -43,7 +43,7 @@ export function auditProductionRun(rawRun = {}) {
   const failedCount = results.filter(item => item.verdict === "failed").length;
   const warningCount = issues.filter(item => item.severity === "warning").length;
   const unknownCount = results.filter(item => ["unknown", "pending"].includes(item.verdict)).length;
-  const complete = results.every(item => OPTIONAL_STAGES.has(item.stage) || item.verdict === "passed")
+  const complete = results.every(item => item.verdict === "optional" || item.verdict === "passed")
     && failedCount === 0 && unknownCount === 0 && warningCount === 0;
   return {
     schemaVersion: 1, runId: String(run.runId ?? "").slice(0, 120), stageCount: STAGES.length,
