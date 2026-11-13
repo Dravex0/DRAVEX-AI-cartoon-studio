@@ -67,6 +67,7 @@ import { sampleFaceLandmarkTimeline } from "./face-landmark-timeline.js";
 import { projectFaceLandmarkOverlay } from "./face-landmark-overlay.js";
 import { analyzeFaceVideoFrames } from "./face-video-analysis.js";
 import { createVideoFrameCapture } from "./video-frame-capture.js";
+import { captureLastFrameImage } from "./video-last-frame.js";
 import { getAudioTimelineOffsetMs, getScheduledAudioStartAtMs } from "./audio-clock-alignment.js";
 import { buildVisemeTimeline, sampleVisemeTimeline } from "./viseme-timeline.js";
 import { createAudioExportSession } from "./audio-export.js";
@@ -3458,7 +3459,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const stage=state.stage==='completed'?'Готово':state.stage==='failed'?'Ошибка':state.stage==='skipped'?'Уже готово':state.stage==='starting'?'Запуск':'Обработка';
     status.textContent=stage+current+' · '+finished+'/'+state.total;
    },
-   generateScene:async(scene,index,{signal})=>{
+   generateScene:async(scene,index,{signal,previousScene,previousResult})=>{
     const generationSceneId=String(scene.id||sceneMetadata[index]?.id||('scene_'+(index+1)));
     const generationToken=sceneGenerationGuard.capture(generationSceneId);
     const assertGenerationCurrent=()=>{if(!sceneGenerationGuard.isCurrent(generationToken))throw new Error('Параметры сцены изменились во время генерации. Устаревший результат отброшен — запусти создание этой сцены повторно.');};
@@ -3503,9 +3504,20 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     }
     assertSceneIdentityCurrent();
     const taskType=resolveSceneVideoTaskType({mode,imageSourceKind:imageSource.kind});
-    const prompt=taskType==='text-to-video'
+    let prompt=taskType==='text-to-video'
      ?[buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(meta,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
      :buildMotionGenerationPrompt(meta,characterBible);
+    let continuityFrameUsed=false;
+    const expectedPreviousScene=scenes[index-1];
+    const previousSceneIsAdjacent=Boolean(previousScene&&expectedPreviousScene&&String(previousScene.id||'')===String(expectedPreviousScene.id||''));
+    if(mode==='huggingface'&&taskType==='image-to-video'&&previousSceneIsAdjacent&&previousResult?.video instanceof Blob){
+     status.textContent='Извлекаем последний кадр предыдущей сцены для сохранения непрерывности…';
+     imageInput=await captureLastFrameImage(previousResult.video,{signal});
+     continuityFrameUsed=true;
+     const previousEndState=String(previousScene.endState||previousScene.visibleAction||previousScene.description||'').trim();
+     const currentStartState=String(meta.startState||meta.description||'').trim();
+     prompt+='\n\nSCENE CONTINUITY: The supplied source image is the exact final decoded frame of the immediately preceding scene. Continue forward from this moment. Preserve the same character identity, face, body proportions, clothing, colors, carried objects, and environment layout. Do not restart, redesign, or replace the character. Previous scene ending: '+previousEndState+'. Current scene beginning: '+currentStartState+'.';
+    }
     const requestedDuration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
     const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
