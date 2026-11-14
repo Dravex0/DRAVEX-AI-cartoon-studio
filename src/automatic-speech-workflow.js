@@ -23,15 +23,18 @@ function voiceArtifactsMatchDialogue(scene, language = null) {
 }
 
 /**
- * Detect speech work only when the user's prompt explicitly requests it.
- * Existing dialogue and matching generated voice artifacts are preserved.
+ * Respect explicit speech requests and automatically synthesize any dialogue
+ * already present in the storyboard. Existing matching voice artifacts remain
+ * untouched, so ordinary visual-only stories do not acquire unwanted audio.
  */
 export function resolveAutomaticSpeechTasks({ request = '', scenes = [], language = null } = {}) {
   const source = clean(request).toLocaleLowerCase();
   const speechSource = source.replace(/\bspeech\s+bubbles?\b/giu, '');
   const dialogueRequested = /lip.?sync|mouth.?sync|синхрон.{0,12}губ|губ.{0,12}синхрон|dialogue|spoken|speech|voice.?over|narrat|script|talking|speak|реплик|диалог|голос|озвуч|говор|разговор|реч|диктор|закадр|діалог|розмов|мовлен|реплік|dialogo|diálogo|conversacion|conversación|hablar|hablando/iu.test(speechSource);
-  const voiceRequested = /lip.?sync|mouth.?sync|синхрон.{0,12}губ|губ.{0,12}синхрон|voice|spoken|speech|voice.?over|narrat|talking|speak|озвуч|голос|реч|говор|диктор|закадр|звук|озвуч|голос|мовлен|voz|voces|locucion|locución|narracion|narración|hablar|hablando/iu.test(speechSource);
+  const explicitVoiceRequest = /lip.?sync|mouth.?sync|синхрон.{0,12}губ|губ.{0,12}синхрон|voice|spoken|speech|voice.?over|narrat|talking|speak|озвуч|голос|реч|говор|диктор|закадр|звук|озвуч|голос|мовлен|voz|voces|locucion|locución|narracion|narración|hablar|hablando/iu.test(speechSource);
   const list = Array.isArray(scenes) ? scenes : [];
+  const storyboardContainsDialogue = list.some(hasDialogue);
+  const voiceRequested = explicitVoiceRequest || storyboardContainsDialogue;
   const scenesMissingDialogue = dialogueRequested
     ? list.map((scene, index) => ({ scene, index })).filter(item => !hasDialogue(item.scene))
     : [];
