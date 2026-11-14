@@ -16,6 +16,44 @@ test('does not add dialogue or voice when the prompt does not request speech', (
   assert.deepEqual(result.scenesMissingVoice, []);
 });
 
+test('automatically requests voice generation when storyboard scenes already contain dialogue', () => {
+  const scenes = [{
+    id: 'automatic-voice',
+    dialogue: [{ characterId: 'Fox', text: 'Добро пожаловать!' }],
+    voiceCues: []
+  }];
+  const result = resolveAutomaticSpeechTasks({
+    request: 'Лисёнок входит в лес на рассвете.',
+    scenes,
+    language: 'ru'
+  });
+  assert.equal(result.dialogueRequested, false);
+  assert.equal(result.voiceRequested, true);
+  assert.deepEqual(result.scenesMissingDialogue, []);
+  assert.deepEqual(result.scenesMissingVoice, [{ sceneId: 'automatic-voice', index: 0 }]);
+});
+
+test('does not regenerate voice when existing dialogue already has a matching voice artifact', () => {
+  const scenes = [{
+    id: 'already-spoken',
+    dialogue: [{ characterId: 'Fox', text: 'Добро пожаловать!' }],
+    voiceCues: [{
+      characterId: 'Fox',
+      text: 'Добро пожаловать!',
+      language: 'ru',
+      audioHash: hash,
+      durationMs: 850
+    }]
+  }];
+  const result = resolveAutomaticSpeechTasks({
+    request: 'Лисёнок входит в лес на рассвете.',
+    scenes,
+    language: 'ru'
+  });
+  assert.equal(result.voiceRequested, true);
+  assert.deepEqual(result.scenesMissingVoice, []);
+});
+
 test('recognizes Russian dialogue and voice requests', () => {
   const result = resolveAutomaticSpeechTasks({
     request: 'Сделай мультфильм с диалогами и озвучкой персонажей.',
