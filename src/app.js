@@ -3733,9 +3733,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
       }
     }
     if(musicFile||voiceTracks.length){
-      const audioElement=musicFile?new Audio(selectedMusicUrl):null;
-      if(audioElement){audioElement.loop=true;audioElement.preload='auto';}
-      audioSession=await createAudioExportSession({videoStream:stream,audioElement,volume:Number($('audioVolume').value)/100,voiceTracks,voiceVolume:0.9});
+      audioSession=await createAudioExportSession({videoStream:stream,musicBlob:musicFile,volume:Number($('audioVolume').value)/100,voiceTracks,voiceVolume:0.9});
       checkAbort();
       stream=audioSession.stream;
       const audioStartInfo=await audioSession.start();
