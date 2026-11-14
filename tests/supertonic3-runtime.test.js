@@ -80,7 +80,8 @@ test("Supertonic voice style loader validates tensor shape and uses the selected
   const style = await engine.loadVoiceStyle("f2");
   assert.equal(style.voiceId, "F2");
   assert.deepEqual(style.styleTtl.dims, [1, 1, 2]);
-  assert.deepEqual(Array.from(style.styleDp.data), [0.3, 0.4]);
+  assert.ok(Math.abs(style.styleDp.data[0] - 0.3) < 1e-6);
+  assert.ok(Math.abs(style.styleDp.data[1] - 0.4) < 1e-6);
   await engine.close();
 });
 
