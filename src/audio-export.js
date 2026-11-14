@@ -26,7 +26,7 @@ function validateVoiceTracks(tracks) {
 
 /**
  * Mixes local music and/or pre-generated dialogue WAVs into a canvas recording.
- * Dialogue is decoded before recording and scheduled against the export clock.
+ * Music and dialogue are scheduled against the same AudioContext clock.
  * Audio is routed only to the recording destination, not back to speakers.
  */
 export async function createAudioExportSession({
@@ -57,6 +57,7 @@ export async function createAudioExportSession({
 
   const context = new AudioContextClass();
   let audioTrack = null;
+  let musicGain = null;
   let closed = false;
   let startPromise = null;
   const voiceSources = [];
@@ -64,10 +65,12 @@ export async function createAudioExportSession({
     const destination = context.createMediaStreamDestination();
     if (audioElement) {
       const source = context.createMediaElementSource(audioElement);
-      const gain = context.createGain();
-      gain.gain.value = clampVolume(volume);
-      source.connect(gain);
-      gain.connect(destination);
+      musicGain = context.createGain();
+      // Start muted. The element may begin playing while the recorder is being
+      // prepared, but its samples must not enter the export before clockStart.
+      musicGain.gain.value = 0;
+      source.connect(musicGain);
+      musicGain.connect(destination);
     }
 
     const voiceGain = context.createGain();
@@ -107,6 +110,15 @@ export async function createAudioExportSession({
           const scheduledStartAtMs = typeof performance !== 'undefined' && typeof performance.now === 'function'
             ? performance.now() + Math.max(0, (clockStart - context.currentTime) * 1000)
             : null;
+          if (musicGain) {
+            if (typeof musicGain.gain.setValueAtTime === 'function') {
+              musicGain.gain.setValueAtTime(0, context.currentTime);
+              musicGain.gain.setValueAtTime(clampVolume(volume), clockStart);
+            } else {
+              // Compatibility fallback for non-standard AudioParam test doubles.
+              musicGain.gain.value = clampVolume(volume);
+            }
+          }
           for (const track of decodedVoices) {
             const source = context.createBufferSource();
             source.buffer = track.buffer;
