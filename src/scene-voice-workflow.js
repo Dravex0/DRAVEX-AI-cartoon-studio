@@ -37,20 +37,35 @@ export function assignCharacterVoices({
     .filter(Boolean))];
   const validVoiceSet = new Set(voices);
   const assignments = Object.create(null);
+  const used = new Set();
   for (const [speaker, voice] of Object.entries(existingAssignments)) {
     const key = normalizeSpeakerKey(speaker);
     const id = typeof voice === "string" ? voice.trim() : "";
-    if (key && id && (!voices.length || validVoiceSet.has(id))) assignments[key] = id;
+    const isValid = id && (!voices.length || validVoiceSet.has(id));
+    if (key && isValid && !used.has(id)) {
+      assignments[key] = id;
+      used.add(id);
+    }
   }
 
   const speakerKeys = [...new Set(speakers.map(normalizeSpeakerKey).filter(Boolean))].sort();
-  const used = new Set(Object.values(assignments));
+  const capacity = voices.length || 1;
+  if (speakerKeys.length > capacity) {
+    throw new RangeError(
+      `The selected speech engine provides only ${capacity} distinct voice(s) for ${speakerKeys.length} characters. Choose a multi-voice engine or reduce the cast.`
+    );
+  }
+
   for (const key of speakerKeys) {
     if (assignments[key]) continue;
     if (!voices.length) {
-      if (typeof fallbackVoiceId === "string" && fallbackVoiceId.trim()) {
-        assignments[key] = fallbackVoiceId.trim();
+      assignments[key] = typeof fallbackVoiceId === "string" && fallbackVoiceId.trim()
+        ? fallbackVoiceId.trim()
+        : "default";
+      if (used.has(assignments[key])) {
+        throw new RangeError("The selected speech engine cannot provide a separate voice for every character.");
       }
+      used.add(assignments[key]);
       continue;
     }
     const start = stableHash(key) % voices.length;
@@ -62,9 +77,13 @@ export function assignCharacterVoices({
         break;
       }
     }
-    // If the cast is larger than the voice catalog, reuse deterministically.
-    assignments[key] = selected || voices[start];
-    used.add(assignments[key]);
+    if (!selected) {
+      throw new RangeError(
+        `No unused voice remains for character "${key}". Choose a multi-voice engine with enough voices for the cast.`
+      );
+    }
+    assignments[key] = selected;
+    used.add(selected);
   }
   return assignments;
 }
