@@ -124,6 +124,13 @@ export function createSupertonic3Runtime({
         for (const path of JSON_ASSETS) {
           const buffer = await fetchResponse(assets.get(path), signal, onProgress, path);
           json[path] = JSON.parse(new TextDecoder().decode(buffer));
+          if (path === "onnx/unicode_indexer.json") {
+            const indexer = json[path];
+            if (!Array.isArray(indexer) || indexer.length < 0x10000 ||
+                indexer.some(token => !Number.isInteger(token) || token < -1)) {
+              throw new Error("Supertonic Unicode indexer is truncated or contains invalid token IDs.");
+            }
+          }
           report(onProgress, { phase: "prepared", asset: path });
         }
 

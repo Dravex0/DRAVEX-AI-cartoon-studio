@@ -11,12 +11,14 @@ function jsonResponse(value) {
 function fakeOrt() {
   const created = [];
   const runs = [];
+  const textTokenRows = [];
   class Tensor {
     constructor(type, data, dims) { Object.assign(this, { type, data, dims }); }
   }
   return {
     created,
     runs,
+    textTokenRows,
     Tensor,
     InferenceSession: {
       async create(bytes, options) {
@@ -26,6 +28,7 @@ function fakeOrt() {
           async run(inputs) {
             if (index === 0) {
               runs.push(Number(inputs.style_dp.data[0]));
+              textTokenRows.push(Array.from(inputs.text_ids.data, Number));
               return { duration: new Tensor("float32", new Float32Array([0.02]), [1]) };
             }
             if (index === 1) return { text_emb: new Tensor("float32", new Float32Array([0.25]), [1, 1, 1]) };
@@ -45,7 +48,9 @@ function modelFetch(url) {
   if (url.endsWith("tts.json")) {
     return jsonResponse({ ae: { sample_rate: 44100, base_chunk_size: 512 }, ttl: { chunk_compress_factor: 6, latent_dim: 24 } });
   }
-  if (url.endsWith("unicode_indexer.json")) return jsonResponse(new Array(1200).fill(1));
+  if (url.endsWith("unicode_indexer.json")) {
+    return jsonResponse(Array.from({ length: 0x10000 }, (_, codePoint) => codePoint));
+  }
   if (url.endsWith("F2.json") || url.endsWith("M1.json")) {
     const malePreset = url.endsWith("M1.json");
     return jsonResponse({
@@ -94,6 +99,19 @@ test("Supertonic runtime loads pinned ONNX sessions but does not claim real infe
   assert.equal(engine.status.loaded, false);
 });
 
+test("Supertonic runtime rejects a truncated Unicode indexer before loading ONNX sessions", async () => {
+  const ort = fakeOrt();
+  const engine = createSupertonic3Runtime({
+    runtimeFactory: async () => ort,
+    fetchImpl: async url => url.endsWith("unicode_indexer.json")
+      ? jsonResponse(new Array(1200).fill(1))
+      : modelFetch(url)
+  });
+  await assert.rejects(engine.load({ locale: "ru", acceptOpenRailTerms: true }), /Unicode indexer is truncated/);
+  assert.equal(ort.created.length, 0);
+  assert.equal(engine.status.loaded, false);
+});
+
 test("Supertonic voice style loader validates tensor shape and uses the selected preset", async () => {
   const ort = fakeOrt();
   const engine = createSupertonic3Runtime({ runtimeFactory: async () => ort, fetchImpl: modelFetch });
@@ -128,6 +146,8 @@ test("Supertonic synthesis returns a WAV artifact and routes distinct character 
   assert.equal(result.voiceId, "F2");
   assert.equal(result.sampleRate, 44100);
   assert.ok(result.duration > 0);
+  assert.ok(ort.textTokenRows.some(tokens => tokens.includes("П".codePointAt(0))),
+    "Russian Cyrillic characters must be mapped through the full Unicode indexer");
   assert.equal(new TextDecoder().decode(new Uint8Array(result.arrayBuffer, 0, 4)), "RIFF");
   assert.equal(new TextDecoder().decode(new Uint8Array(result.arrayBuffer, 8, 4)), "WAVE");
   assert.ok(progress.some(event => event.phase === "audio-ready"));
