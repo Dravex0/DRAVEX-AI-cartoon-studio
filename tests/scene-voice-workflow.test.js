@@ -26,14 +26,37 @@ test("assigns deterministic distinct voices and keeps existing character assignm
   );
 });
 
-test("falls back safely for single-speaker engines without a voice catalog", () => {
+test("allows one character on a single-speaker engine without a voice catalog", () => {
   const result = assignCharacterVoices({
-    speakers: ["Foxy", "Narrator"],
+    speakers: ["Foxy"],
     availableVoices: [],
     fallbackVoiceId: "default"
   });
   assert.equal(result.foxy, "default");
-  assert.equal(result.narrator, "default");
+});
+
+test("refuses to silently reuse one voice for multiple characters on a single-speaker engine", () => {
+  assert.throws(() => assignCharacterVoices({
+    speakers: ["Foxy", "Narrator"],
+    availableVoices: [],
+    fallbackVoiceId: "default"
+  }), /only 1 distinct voice.*2 characters/i);
+});
+
+test("refuses to reuse voices when the cast is larger than the voice catalog", () => {
+  assert.throws(() => assignCharacterVoices({
+    speakers: ["Foxy", "Bird", "Narrator"],
+    availableVoices: ["voice-a", "voice-b"]
+  }), /only 2 distinct voice\(s\).*3 characters/i);
+});
+
+test("repairs duplicate persisted assignments when an unused catalog voice exists", () => {
+  const result = assignCharacterVoices({
+    speakers: ["Foxy", "Narrator"],
+    availableVoices: ["voice-a", "voice-b"],
+    existingAssignments: { foxy: "voice-a", narrator: "voice-a" }
+  });
+  assert.notEqual(result.foxy, result.narrator);
 });
 
 test("replaces stale voice IDs when the installed voice catalog changes", () => {

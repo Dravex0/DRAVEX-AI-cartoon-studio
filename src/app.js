@@ -1874,6 +1874,19 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
  if(signal?.aborted)throw new DOMException('Voice generation was cancelled.','AbortError');
  let savedMap={};
  try{const parsed=JSON.parse(readLocalStorage('dravex-character-voice-map')||'{}');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))savedMap=parsed}catch{}
+ // Allocate voices once for the entire story cast, not scene-by-scene. Ignore
+ // stale assignments left by unrelated stories in the shared local storage map.
+ const storySpeakers=[...new Set(sceneMetadata.flatMap((_,index)=>sceneDialogueLinesAt(index,locale,currentDialogueText,currentSceneId).map(line=>line.characterId)))];
+ const storySpeakerKeys=new Set(storySpeakers.map(normalizeSpeakerKey));
+ const relevantSavedMap=Object.fromEntries(Object.entries(savedMap).filter(([speaker])=>storySpeakerKeys.has(normalizeSpeakerKey(speaker))));
+ const assignments=assignCharacterVoices({
+  speakers:storySpeakers,
+  availableVoices:engine.availableVoices,
+  existingAssignments:relevantSavedMap,
+  fallbackVoiceId:engine.availableVoices[0]||null
+ });
+ savedMap={...assignments};
+ writeLocalStorage('dravex-character-voice-map',JSON.stringify(savedMap));
  const overallTotal=targets.reduce((total,target)=>total+target.dialogue.length,0);
  let overallIndex=0,lineCount=0,totalDurationMs=0,persistedInDraft=true;
  const sceneIds=[];
@@ -1885,14 +1898,6 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
   const targetMeta={...(sceneMetadata[targetIndex]||{})};
   const dialogue=target.dialogue;
   if(!dialogue.length)continue;
-  const assignments=assignCharacterVoices({
-   speakers:dialogue.map(line=>line.characterId),
-   availableVoices:engine.availableVoices,
-   existingAssignments:savedMap,
-   fallbackVoiceId:engine.availableVoices[0]||null
-  });
-  savedMap={...assignments};
-  writeLocalStorage('dravex-character-voice-map',JSON.stringify(savedMap));
   const voiceIds=dialogue.map(line=>assignments[normalizeSpeakerKey(line.characterId)]||null);
   const checkpointKey='dravex-voice-checkpoint:'+encodeURIComponent(targetId);
   let savedCheckpoint=null;
