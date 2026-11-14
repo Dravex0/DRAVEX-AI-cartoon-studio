@@ -45,7 +45,8 @@ test("pins every model asset to the archived Hugging Face revision", () => {
   assert.ok(assets.some(asset => asset.path === "onnx/vocoder.onnx"));
 });
 
-test("rejects unsupported languages", () => {
-  assert.equal(getSupertonic3Model("de-DE").available, true);
+test("accepts supported languages only after license review and rejects unknown ones", () => {
+  assert.equal(getSupertonic3Model("de-DE").reason, "license-review-required");
+  assert.equal(getSupertonic3Model("de-DE", { acceptOpenRailTerms: true }).available, true);
   assert.equal(getSupertonic3Model("xx").reason, "unsupported-locale");
 });
