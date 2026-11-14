@@ -2112,7 +2112,7 @@ async function ensureLocalTextRuntimeForSpeech(signal,report){
  $('planUniversalTask').disabled=true;
  try{
   report(voiceText('Загружаем локальную текстовую модель после твоего согласия…','Loading the local text model after your consent…'));
-  const result=await localTextRuntime.load({backend:'auto',onProgress:event=>{
+  const result=await localTextRuntime.load({backend:'auto',signal,onProgress:event=>{
    if(signal?.aborted)throw new DOMException('Speech preparation was cancelled.','AbortError');
    if(event.total&&event.loaded){
     const percent=Math.min(100,Math.round(event.loaded/event.total*100));
@@ -2153,7 +2153,7 @@ async function ensureLocalSceneVoiceEngineForSpeech(signal,report){
  try{
   report(voiceText('Загружаем локальную модель голоса после твоего согласия…','Loading the local voice model after your consent…'));
   const engine=getSceneVoiceEngine();
-  await engine.load({locale,allowNonCommercial,backend:'wasm',onProgress:info=>{
+  await engine.load({locale,allowNonCommercial,backend:'wasm',signal,onProgress:info=>{
    if(signal?.aborted)throw new DOMException('Speech preparation was cancelled.','AbortError');
    const percent=Number.isFinite(info.progress)?' '+Math.round(info.progress*100)+'%':'';
    $('sceneVoiceStatus').textContent=voiceText('Загрузка модели: '+info.status+percent,'Model download: '+info.status+percent);
@@ -3345,78 +3345,47 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   const speechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata});
   const needsDialogue=(speechTasks.dialogueRequested||speechTasks.voiceRequested)
    &&selectScenesMissingDialogue(sceneMetadata).length>0;
-  if(needsDialogue){
-   if(!localTextRuntime.status.loaded){
-    if(!$('localModelConsent')?.checked){
-     throw new Error(uiLang==='ru'
-      ?'Для создания реплик нужно разрешить загрузку локальной текстовой модели (~117 МБ). Отметь согласие в разделе «Дополнительный локальный ИИ» и запусти создание снова.'
-      :'Dialogue generation needs the local text model (~117 MB). Confirm its download in Optional local AI tools, then start creation again.');
+  // Speech is an optional production layer. Missing consent or a local model must
+  // not abort otherwise-valid video rendering; cancellation still stops the film.
+  const speechPreparation=await runOptionalSpeechPreparation({
+   requested:speechTasks.dialogueRequested||speechTasks.voiceRequested,
+   prepare:async()=>{
+    if(needsDialogue){
+     if(!localTextRuntime.status.loaded)await ensureLocalTextRuntimeForSpeech(controller.signal,detail=>{status.textContent=String(detail||'Loading local text model…');});
+     status.textContent=uiLang==='ru'?'Создаём реплики для всех сцен…':'Writing dialogue for all scenes…';
+     setFilmProgress(1,filmProgressText('Создание реплик','Writing dialogue'),filmProgressText('Локальная модель обрабатывает сцены по очереди.','The local model is processing scenes sequentially.'));
+     const handlers=universalCapabilityRegistry.createHandlers();
+     await handlers['dialogue.generate']({
+      plan:{sourceRequest:$('idea').value},
+      step:{id:'prompt-film-dialogue',action:'Write dialogue for all scenes',purpose:'Prepare requested spoken lines',inputs:['allScenes'],outputs:['scene-dialogue'],dependsOn:[],requiredCapabilities:['dialogue.generate']},
+      signal:controller.signal,
+      reportProgress:detail=>{status.textContent=String(detail||'Writing scene dialogue…');}
+     });
     }
-    status.textContent=uiLang==='ru'?'Загружаем локальную текстовую модель…':'Loading the local text model…';
-    setFilmProgress(1,filmProgressText('Загрузка локального ИИ','Loading local AI'),filmProgressText('Модель загружается на устройство. Текст запроса не отправляется в облачный inference API.','The model is downloading to this device. Your prompt is not sent to a cloud inference API.'));
-    await localTextRuntime.load({
-     backend:'auto',
-     signal:controller.signal,
-     onProgress:event=>{
-      const percent=Number.isFinite(event?.progress)?' '+Math.round(event.progress*100)+'%':'';
-      status.textContent=uiLang==='ru'?'Загрузка локального ИИ: '+String(event?.status||'загрузка')+percent:'Local AI download: '+String(event?.status||'loading')+percent;
-     }
-    });
-   }
-   status.textContent=uiLang==='ru'?'Создаём реплики для всех сцен…':'Writing dialogue for all scenes…';
-   setFilmProgress(1,filmProgressText('Создание реплик','Writing dialogue'),filmProgressText('Локальная модель обрабатывает сцены по очереди.','The local model is processing scenes sequentially.'));
-   const handlers=universalCapabilityRegistry.createHandlers();
-   await handlers['dialogue.generate']({
-    plan:{sourceRequest:$('idea').value},
-    step:{id:'prompt-film-dialogue',action:'Write dialogue for all scenes',purpose:'Prepare requested spoken lines',inputs:['allScenes'],outputs:['scene-dialogue'],dependsOn:[],requiredCapabilities:['dialogue.generate']},
-    signal:controller.signal,
-    reportProgress:detail=>{status.textContent=String(detail||'Writing scene dialogue…');}
-   });
-  }
-  const refreshedSpeechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata});
-  if(refreshedSpeechTasks.voiceRequested&&refreshedSpeechTasks.scenesMissingVoice.length){
-   const voiceStep={id:'prompt-film-voice',action:'Generate voices for all scenes',purpose:'Synthesize requested spoken dialogue',inputs:['allScenes'],outputs:['voice-audio'],dependsOn:['prompt-film-dialogue'],requiredCapabilities:['voice.generate']};
-   if(!isLocalSceneVoiceEngineLoaded()){
-    const loadPlan=resolvePromptVoiceModelLoad({
-     locale:storyLanguage(),
-     engineChoice:$('sceneVoiceEngineChoice')?.value||'standard',
-     nonCommercialConsent:$('voiceNonCommercialConsent')?.checked===true
-    });
-    if(!loadPlan.ok){
-     const reason=loadPlan.reason==='non-commercial-consent-required'
-      ?(uiLang==='ru'?'Для выбранного языка отметь подтверждение некоммерческого использования локальной модели голоса в разделе «Диалоги».':'Confirm non-commercial use of the local voice model in the Dialogue section before continuing.')
-      :loadPlan.reason==='timestamped-english-only'
-       ?(uiLang==='ru'?'Timestamped Kokoro поддерживает только английский. Выбери стандартный движок голоса.':'Timestamped Kokoro supports English only. Choose the standard voice engine.')
-       :(uiLang==='ru'?'Не удалось определить язык или движок локального голоса.':'Could not resolve the local voice language or engine.');
-     throw new Error(reason);
+    const refreshedSpeechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata});
+    if(refreshedSpeechTasks.voiceRequested&&refreshedSpeechTasks.scenesMissingVoice.length){
+     const voiceStep={id:'prompt-film-voice',action:'Generate voices for all scenes',purpose:'Synthesize requested spoken dialogue',inputs:['allScenes'],outputs:['voice-audio'],dependsOn:['prompt-film-dialogue'],requiredCapabilities:['voice.generate']};
+     if(!isLocalSceneVoiceEngineLoaded())await ensureLocalSceneVoiceEngineForSpeech(controller.signal,detail=>{status.textContent=String(detail||'Loading local voice model…');});
+     if(!isLocalSceneVoiceReady({step:voiceStep}))throw new Error(uiLang==='ru'
+      ?'Не все сцены готовы к озвучке. Проверь реплики и выбранный язык.'
+      :'Not all scenes are ready for voice synthesis. Check dialogue and the selected language.');
+     status.textContent=uiLang==='ru'?'Создаём голоса для всех сцен…':'Generating voices for all scenes…';
+     setFilmProgress(3,filmProgressText('Озвучивание','Generating voices'),filmProgressText('Озвучка выполняется локально на устройстве.','Voice synthesis runs locally on this device.'));
+     const handlers=universalCapabilityRegistry.createHandlers();
+     await handlers['voice.generate']({
+      plan:{sourceRequest:$('idea').value},
+      step:voiceStep,
+      signal:controller.signal,
+      reportProgress:detail=>{status.textContent=String(detail||'Generating scene voices…');}
+     });
     }
-    status.textContent=uiLang==='ru'?'Загружаем локальную модель голоса…':'Loading the local voice model…';
-    setFilmProgress(2,filmProgressText('Загрузка модели голоса','Loading voice model'),filmProgressText('Модель загружается на устройство. Обработка речи останется локальной.','The model is downloading to this device. Speech inference stays local.'));
-    const voiceEngine=getSceneVoiceEngine();
-    await voiceEngine.load({
-     locale:loadPlan.locale,
-     allowNonCommercial:loadPlan.allowNonCommercial,
-     backend:loadPlan.backend,
-     signal:controller.signal,
-     onProgress:info=>{
-      const percent=Number.isFinite(info?.progress)?' '+Math.round(info.progress*100)+'%':'';
-      status.textContent=uiLang==='ru'?'Загрузка модели голоса: '+String(info?.status||'обработка')+percent:'Voice model download: '+String(info?.status||'loading')+percent;
-     }
-    });
-    refreshSceneVoiceControls();
    }
-   if(!isLocalSceneVoiceReady({step:voiceStep}))throw new Error(uiLang==='ru'
-    ?'Не все сцены готовы к озвучке. Проверь реплики и выбранный язык.'
-    :'Not all scenes are ready for voice synthesis. Check dialogue and the selected language.');
-   status.textContent=uiLang==='ru'?'Создаём голоса для всех сцен…':'Generating voices for all scenes…';
-   setFilmProgress(3,filmProgressText('Озвучивание','Generating voices'),filmProgressText('Озвучка выполняется локально на устройстве.','Voice synthesis runs locally on this device.'));
-   const handlers=universalCapabilityRegistry.createHandlers();
-   await handlers['voice.generate']({
-    plan:{sourceRequest:$('idea').value},
-    step:voiceStep,
-    signal:controller.signal,
-    reportProgress:detail=>{status.textContent=String(detail||'Generating scene voices…');}
-   });
+  });
+  if(speechPreparation.status==='cancelled'||controller.signal.aborted)throw new DOMException('Film generation was cancelled.','AbortError');
+  if(speechPreparation.status==='skipped'){
+   const message=(uiLang==='ru'?'Видео продолжится без диалогов/озвучки: ':'Video will continue without dialogue/voice: ')+speechPreparation.reason;
+   $('sceneVoiceStatus').textContent=message;
+   status.textContent=message;
   }
   if(mode==='huggingface'){
    const tooShortIndex=scenes.findIndex(scene=>{
