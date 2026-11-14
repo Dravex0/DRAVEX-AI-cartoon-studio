@@ -134,7 +134,7 @@ test("Supertonic synthesis returns a WAV artifact and routes distinct character 
   await engine.synthesize({ text: "Ещё реплика.", voiceId: "F2", totalStep: 1 });
   await engine.synthesize({ text: "Другой персонаж.", voiceId: "M1", totalStep: 1 });
   assert.equal(fetchedStyles.length, 2, "each voice style should be downloaded once and cached");
-  assert.ok(ort.runs.includes(0.3) && ort.runs.includes(0.7), "different voice profiles must reach the duration model");
+  assert.ok(ort.runs.some(value => Math.abs(value - 0.3) < 1e-6) && ort.runs.some(value => Math.abs(value - 0.7) < 1e-6), "different voice profiles must reach the duration model");
   await engine.close();
 });
 
