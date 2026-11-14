@@ -164,7 +164,7 @@ test("Supertonic runtime stops before creating more sessions when its signal is 
   let count = 0;
   const fetchImpl = async url => {
     count += 1;
-    if (count === 3) controller.abort();
+    if (url.endsWith("unicode_indexer.json")) controller.abort();
     if (url.endsWith("tts.json")) return jsonResponse({});
     if (url.endsWith("unicode_indexer.json")) return jsonResponse([0]);
     return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1]).buffer };
