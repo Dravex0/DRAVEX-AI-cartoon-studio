@@ -10,18 +10,44 @@ function jsonResponse(value) {
 
 function fakeOrt() {
   const created = [];
+  class Tensor {
+    constructor(type, data, dims) { Object.assign(this, { type, data, dims }); }
+  }
   return {
     created,
-    Tensor: class Tensor {
-      constructor(type, data, dims) { Object.assign(this, { type, data, dims }); }
-    },
+    Tensor,
     InferenceSession: {
       async create(bytes, options) {
-        created.push({ byteLength: bytes.byteLength, options });
-        return { released: false, async release() { this.released = true; } };
+        const index = created.length;
+        const session = {
+          released: false,
+          async run(inputs) {
+            if (index === 0) return { duration: new Tensor("float32", new Float32Array([0.02]), [1]) };
+            if (index === 1) return { text_emb: new Tensor("float32", new Float32Array([0.25]), [1, 1, 1]) };
+            if (index === 2) return { denoised_latent: new Tensor("float32", Float32Array.from(inputs.noisy_latent.data), inputs.noisy_latent.dims) };
+            return { wav_tts: new Tensor("float32", new Float32Array([0, 0.2, -0.2, 0]), [1, 1, 4]) };
+          },
+          async release() { this.released = true; }
+        };
+        created.push({ byteLength: bytes.byteLength, options, session });
+        return session;
       }
     }
   };
+}
+
+function modelFetch(url) {
+  if (url.endsWith("tts.json")) {
+    return jsonResponse({ ae: { sample_rate: 44100, base_chunk_size: 512 }, ttl: { chunk_compress_factor: 6, latent_dim: 24 } });
+  }
+  if (url.endsWith("unicode_indexer.json")) return jsonResponse(new Array(1200).fill(1));
+  if (url.endsWith("F2.json") || url.endsWith("M1.json")) {
+    return jsonResponse({
+      style_ttl: { dims: [1, 1, 2], data: [[[0.1, 0.2]]] },
+      style_dp: { dims: [1, 1, 2], data: [[[0.3, 0.4]]] }
+    });
+  }
+  return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
 }
 
 test("Supertonic runtime refuses to download model assets before explicit license acceptance", async () => {
@@ -38,13 +64,10 @@ test("Supertonic runtime refuses to download model assets before explicit licens
 test("Supertonic runtime loads pinned ONNX sessions sequentially and reports inference is not yet wired", async () => {
   const ort = fakeOrt();
   const fetched = [];
-  const fetchImpl = async url => {
-    fetched.push(url);
-    if (url.endsWith("tts.json")) return jsonResponse({ ae: { sample_rate: 44100 } });
-    if (url.endsWith("unicode_indexer.json")) return jsonResponse([0, 1, 2]);
-    return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
-  };
-  const engine = createSupertonic3Runtime({ runtimeFactory: async () => ort, fetchImpl });
+  const engine = createSupertonic3Runtime({
+    runtimeFactory: async () => ort,
+    fetchImpl: async url => { fetched.push(url); return modelFetch(url); }
+  });
   const progress = [];
   const status = await engine.load({
     locale: "ru-RU",
@@ -66,22 +89,43 @@ test("Supertonic runtime loads pinned ONNX sessions sequentially and reports inf
 
 test("Supertonic voice style loader validates tensor shape and uses the selected preset", async () => {
   const ort = fakeOrt();
-  const fetchImpl = async url => {
-    if (url.endsWith("tts.json")) return jsonResponse({});
-    if (url.endsWith("unicode_indexer.json")) return jsonResponse([0]);
-    if (url.endsWith("F2.json")) return jsonResponse({
-      style_ttl: { dims: [1, 1, 2], data: [[[0.1, 0.2]]] },
-      style_dp: { dims: [1, 1, 2], data: [[[0.3, 0.4]]] }
-    });
-    return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1]).buffer };
-  };
-  const engine = createSupertonic3Runtime({ runtimeFactory: async () => ort, fetchImpl });
+  const engine = createSupertonic3Runtime({ runtimeFactory: async () => ort, fetchImpl: modelFetch });
   await engine.load({ locale: "uk", acceptOpenRailTerms: true });
   const style = await engine.loadVoiceStyle("f2");
   assert.equal(style.voiceId, "F2");
   assert.deepEqual(style.styleTtl.dims, [1, 1, 2]);
   assert.ok(Math.abs(style.styleDp.data[0] - 0.3) < 1e-6);
   assert.ok(Math.abs(style.styleDp.data[1] - 0.4) < 1e-6);
+  await engine.close();
+});
+
+test("Supertonic synthesis returns a real WAV artifact for the selected character voice", async () => {
+  const ort = fakeOrt();
+  const fetchedStyles = [];
+  const engine = createSupertonic3Runtime({
+    runtimeFactory: async () => ort,
+    fetchImpl: async url => {
+      if (url.includes("/voice_styles/")) fetchedStyles.push(url);
+      return modelFetch(url);
+    }
+  });
+  await engine.load({ locale: "ru", acceptOpenRailTerms: true });
+  const progress = [];
+  const result = await engine.synthesize({
+    text: "Привет, мир!",
+    voiceId: "F2",
+    totalStep: 2,
+    onProgress: event => progress.push(event)
+  });
+  assert.equal(result.mimeType, "audio/wav");
+  assert.equal(result.voiceId, "F2");
+  assert.equal(result.sampleRate, 44100);
+  assert.ok(result.duration > 0);
+  assert.equal(new TextDecoder().decode(new Uint8Array(result.arrayBuffer, 0, 4)), "RIFF");
+  assert.equal(new TextDecoder().decode(new Uint8Array(result.arrayBuffer, 8, 4)), "WAVE");
+  assert.ok(progress.some(event => event.phase === "audio-ready"));
+  await engine.synthesize({ text: "Ещё реплика.", voiceId: "F2", totalStep: 1 });
+  assert.equal(fetchedStyles.length, 1, "voice style should be cached after first download");
   await engine.close();
 });
 

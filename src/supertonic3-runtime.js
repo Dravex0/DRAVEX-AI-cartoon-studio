@@ -1,3 +1,4 @@
+import { synthesizeSupertonic3Speech } from "./supertonic3-inference.js";
 import {
   SUPERTONIC3_MODEL,
   getSupertonic3Model,
@@ -142,7 +143,9 @@ export function createSupertonic3Runtime({
             report(onProgress, { phase: "session-ready", asset: path, current: index + 1, total: SESSION_ORDER.length });
           }
         } catch (error) {
-          await Promise.all(Object.values(sessions).map(session => session?.release?.().catch?.(() => {})));
+          await Promise.all(Object.values(sessions).map(async session => {
+            try { await session?.release?.(); } catch { /* Best-effort partial cleanup. */ }
+          }));
           throw error;
         }
 
@@ -153,7 +156,8 @@ export function createSupertonic3Runtime({
           ort,
           sessions,
           config: json["onnx/tts.json"],
-          unicodeIndexer: json["onnx/unicode_indexer.json"]
+          unicodeIndexer: json["onnx/unicode_indexer.json"],
+        voiceStyles: new Map()
         };
         report(onProgress, { phase: "runtime-ready", inferenceReady: false });
         return this.status;
@@ -170,16 +174,29 @@ export function createSupertonic3Runtime({
     async loadVoiceStyle(voiceId, { signal, onProgress } = {}) {
       assertNotAborted(signal);
       if (!loaded) throw new Error("Load the Supertonic 3 ONNX sessions first.");
-      const url = getSupertonic3VoiceStyleUrl(voiceId);
-      const buffer = await fetchResponse(url, signal, onProgress, "voice_styles/" + String(voiceId).toUpperCase() + ".json");
+      const key = String(voiceId).trim().toUpperCase();
+      if (loaded.voiceStyles.has(key)) return loaded.voiceStyles.get(key);
+      const url = getSupertonic3VoiceStyleUrl(key);
+      const buffer = await fetchResponse(url, signal, onProgress, "voice_styles/" + key + ".json");
       const parsed = JSON.parse(new TextDecoder().decode(buffer));
       const ttl = validateStylePart(parsed.style_ttl, "style_ttl");
       const dp = validateStylePart(parsed.style_dp, "style_dp");
       assertNotAborted(signal);
-      return Object.freeze({
-        voiceId: String(voiceId).trim().toUpperCase(),
+      const style = Object.freeze({
+        voiceId: key,
         styleTtl: new loaded.ort.Tensor("float32", ttl.data, ttl.dims),
         styleDp: new loaded.ort.Tensor("float32", dp.data, dp.dims)
+      });
+      loaded.voiceStyles.set(key, style);
+      return style;
+    },
+
+    async synthesize(options = {}) {
+      if (!loaded) throw new Error("Load the Supertonic 3 ONNX sessions first.");
+      return synthesizeSupertonic3Speech({
+        state: loaded,
+        ...options,
+        loadVoiceStyle: (voiceId, styleOptions) => this.loadVoiceStyle(voiceId, styleOptions)
       });
     },
 
