@@ -67,7 +67,7 @@ test("Supertonic runtime refuses to download model assets before explicit licens
   assert.equal(engine.status.loaded, false);
 });
 
-test("Supertonic runtime loads pinned ONNX sessions and marks the inference adapter ready", async () => {
+test("Supertonic runtime loads pinned ONNX sessions but does not claim real inference readiness", async () => {
   const ort = fakeOrt();
   const fetched = [];
   const engine = createSupertonic3Runtime({

@@ -56,8 +56,8 @@ function validateStylePart(part, label) {
 
 /**
  * Loads pinned Supertonic 3 ONNX sessions locally in the browser.
- * This is a model/session loader only: speech inference is deliberately not
- * advertised as ready until the separate inference adapter is connected.
+ * The inference adapter is wired, but readiness stays false until a real-weight
+ * smoke test confirms valid, audible speech from the pinned model.
  */
 export function createSupertonic3Runtime({
   runtimeFactory = () => import("onnxruntime-web"),
