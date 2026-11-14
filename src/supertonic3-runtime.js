@@ -109,6 +109,9 @@ export function createSupertonic3Runtime({
       if (!["wasm", "webgpu"].includes(backend)) throw new TypeError("backend must be wasm or webgpu.");
       const key = model.locale + "|" + backend;
       if (loaded?.key === key) return this.status;
+      if (loaded) {
+        throw new Error("Close the currently loaded Supertonic 3 runtime before switching language or backend.");
+      }
       if (loading) {
         if (loading.key !== key) throw new Error("Another Supertonic 3 load is already in progress.");
         return loading.promise;

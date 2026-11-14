@@ -177,3 +177,24 @@ test("Supertonic runtime stops before creating more sessions when its signal is 
   }), { name: "AbortError" });
   assert.equal(ort.created.length, 0);
 });
+
+test("Supertonic runtime refuses to replace loaded sessions without closing them first", async () => {
+  const ort = fakeOrt();
+  const engine = createSupertonic3Runtime({
+    runtimeFactory: async () => ort,
+    fetchImpl: modelFetch
+  });
+  await engine.load({ locale: "ru", acceptOpenRailTerms: true, backend: "wasm" });
+  const firstSessions = [...ort.created];
+  await assert.rejects(
+    engine.load({ locale: "uk", acceptOpenRailTerms: true, backend: "wasm" }),
+    /Close the currently loaded Supertonic 3 runtime/
+  );
+  assert.equal(ort.created.length, 4, "a second set of ONNX sessions must not be allocated");
+  assert.ok(firstSessions.every(item => item.session.released === false),
+    "the active runtime must remain usable after a rejected switch");
+  assert.equal(engine.status.locale, "ru");
+  await engine.close();
+  assert.ok(firstSessions.every(item => item.session.released === true),
+    "close must release every session from the active runtime");
+});
