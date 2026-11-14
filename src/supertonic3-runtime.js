@@ -123,6 +123,7 @@ export function createSupertonic3Runtime({
         const json = Object.create(null);
         for (const path of JSON_ASSETS) {
           const buffer = await fetchResponse(assets.get(path), signal, onProgress, path);
+          assertNotAborted(signal);
           json[path] = JSON.parse(new TextDecoder().decode(buffer));
           if (path === "onnx/unicode_indexer.json") {
             const indexer = json[path];
