@@ -87,6 +87,7 @@ export function createSupertonic3Runtime({
         modelId: SUPERTONIC3_MODEL.modelId,
         modelRevision: SUPERTONIC3_MODEL.revision,
         sessionNames: Object.keys(loaded.sessions),
+        inferenceAdapterAvailable: true,
         inferenceReady: false
       } : { loaded: false, inferenceReady: false };
     },
@@ -157,9 +158,9 @@ export function createSupertonic3Runtime({
           sessions,
           config: json["onnx/tts.json"],
           unicodeIndexer: json["onnx/unicode_indexer.json"],
-        voiceStyles: new Map()
+          voiceStyles: new Map()
         };
-        report(onProgress, { phase: "runtime-ready", inferenceReady: false });
+        report(onProgress, { phase: "runtime-ready", inferenceAdapterAvailable: true, inferenceReady: false });
         return this.status;
       })();
 

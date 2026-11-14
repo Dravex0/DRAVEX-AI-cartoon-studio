@@ -83,7 +83,8 @@ test("Supertonic runtime loads pinned ONNX sessions and marks the inference adap
   });
   assert.equal(status.loaded, true);
   assert.equal(status.locale, "ru");
-  assert.equal(status.inferenceReady, true);
+  assert.equal(status.inferenceAdapterAvailable, true);
+  assert.equal(status.inferenceReady, false, "real model inference still needs a smoke test with downloaded weights");
   assert.equal(status.sessionNames.length, 4);
   assert.equal(ort.created.length, 4);
   assert.ok(ort.created.every(item => item.options.executionProviders[0] === "wasm"));
