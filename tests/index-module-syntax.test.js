@@ -56,6 +56,10 @@ test('scene editor exposes local voice generation and explicitly labels export l
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   assert.match(html, /createBrowserLocalTtsEngine/);
   assert.match(html, /createVoiceAudioStorage/);
+  assert.match(html, /const storySpeakers=\[\.\.\.new Set\(sceneMetadata\.flatMap/);
+  assert.match(html, /const relevantSavedMap=Object\.fromEntries/);
+  assert.match(html, /speakers:storySpeakers/);
+  assert.match(html, /const voiceIds=dialogue\.map\(line=>assignments\[normalizeSpeakerKey\(line\.characterId\)\]\|\|null\)/);
   assert.match(html, /assignCharacterVoices/);
   assert.match(html, /buildSceneVoiceTimeline/);
   assert.match(html, /id="loadSceneVoiceModel"/);
