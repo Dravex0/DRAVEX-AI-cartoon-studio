@@ -168,8 +168,12 @@ universalCapabilityRegistry.register({
  privacy:'local',
  isAvailable:context=>isLocalDialogueGenerationReady(context),
  run:async({plan,step,signal,reportProgress})=>{
-  if(!/(dialogue|speech|spoken|voice|voiceover|narrat|script|реплик|диалог|голос|озвуч|текст)/i.test(String(plan?.sourceRequest||''))){
-   const error=new Error('The dialogue writer only accepts explicit dialogue, speech, narration, or voice requests.');
+  const sourceRequest=String(plan?.sourceRequest||'');
+  const explicitSpeechRequest=/(dialogue|speech|spoken|voice|voiceover|narrat|script|реплик|диалог|голос|озвуч|текст)/i.test(sourceRequest);
+  const hasAssignedCast=sceneMetadata.some(meta=>Array.isArray(meta?.characters)
+   &&meta.characters.some(character=>typeof character==='string'&&character.trim()));
+  if(!sourceRequest.trim()||(!explicitSpeechRequest&&!hasAssignedCast)){
+   const error=new Error('Dialogue generation requires a non-empty story request and either an explicit speech request or assigned storyboard characters.');
    error.code='CAPABILITY_REQUEST_MISMATCH';
    throw error;
   }
