@@ -69,11 +69,11 @@ export function createSupertonic3Runtime({
   let activeLoadController = null;
 
   async function fetchResponse(url, signal, onProgress, assetName) {
-    assertNotAborted(loadSignal);
+    assertNotAborted(signal);
     const response = await fetchImpl(url, { signal, cache: "force-cache" });
     if (!response?.ok) throw new Error("Could not download " + assetName + " (HTTP " + (response?.status ?? "unknown") + ").");
     const buffer = await response.arrayBuffer();
-    assertNotAborted(loadSignal);
+    assertNotAborted(signal);
     if (!buffer.byteLength) throw new Error(assetName + " downloaded as an empty file.");
     report(onProgress, { phase: "downloaded", asset: assetName, bytes: buffer.byteLength });
     return buffer;
@@ -100,7 +100,7 @@ export function createSupertonic3Runtime({
       signal,
       onProgress
     } = {}) {
-      assertNotAborted(loadSignal);
+      assertNotAborted(signal);
       const model = getSupertonic3Model(locale, { acceptOpenRailTerms });
       if (!model.available) {
         throw new Error(model.reason === "license-review-required"
@@ -195,7 +195,7 @@ export function createSupertonic3Runtime({
     },
 
     async loadVoiceStyle(voiceId, { signal, onProgress } = {}) {
-      assertNotAborted(loadSignal);
+      assertNotAborted(signal);
       if (!loaded) throw new Error("Load the Supertonic 3 ONNX sessions first.");
       const key = String(voiceId).trim().toUpperCase();
       if (loaded.voiceStyles.has(key)) return loaded.voiceStyles.get(key);
@@ -204,7 +204,7 @@ export function createSupertonic3Runtime({
       const parsed = JSON.parse(new TextDecoder().decode(buffer));
       const ttl = validateStylePart(parsed.style_ttl, "style_ttl");
       const dp = validateStylePart(parsed.style_dp, "style_dp");
-      assertNotAborted(loadSignal);
+      assertNotAborted(signal);
       const style = Object.freeze({
         voiceId: key,
         styleTtl: new loaded.ort.Tensor("float32", ttl.data, ttl.dims),
