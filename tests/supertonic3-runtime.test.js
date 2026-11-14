@@ -10,11 +10,13 @@ function jsonResponse(value) {
 
 function fakeOrt() {
   const created = [];
+  const runs = [];
   class Tensor {
     constructor(type, data, dims) { Object.assign(this, { type, data, dims }); }
   }
   return {
     created,
+    runs,
     Tensor,
     InferenceSession: {
       async create(bytes, options) {
@@ -22,7 +24,10 @@ function fakeOrt() {
         const session = {
           released: false,
           async run(inputs) {
-            if (index === 0) return { duration: new Tensor("float32", new Float32Array([0.02]), [1]) };
+            if (index === 0) {
+              runs.push(Number(inputs.style_dp.data[0]));
+              return { duration: new Tensor("float32", new Float32Array([0.02]), [1]) };
+            }
             if (index === 1) return { text_emb: new Tensor("float32", new Float32Array([0.25]), [1, 1, 1]) };
             if (index === 2) return { denoised_latent: new Tensor("float32", Float32Array.from(inputs.noisy_latent.data), inputs.noisy_latent.dims) };
             return { wav_tts: new Tensor("float32", new Float32Array([0, 0.2, -0.2, 0]), [1, 1, 4]) };
@@ -42,9 +47,10 @@ function modelFetch(url) {
   }
   if (url.endsWith("unicode_indexer.json")) return jsonResponse(new Array(1200).fill(1));
   if (url.endsWith("F2.json") || url.endsWith("M1.json")) {
+    const malePreset = url.endsWith("M1.json");
     return jsonResponse({
-      style_ttl: { dims: [1, 1, 2], data: [[[0.1, 0.2]]] },
-      style_dp: { dims: [1, 1, 2], data: [[[0.3, 0.4]]] }
+      style_ttl: { dims: [1, 1, 2], data: [malePreset ? [[0.7, 0.8]] : [[0.1, 0.2]]] },
+      style_dp: { dims: [1, 1, 2], data: [malePreset ? [[0.7, 0.8]] : [[0.3, 0.4]]] }
     });
   }
   return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
@@ -61,7 +67,7 @@ test("Supertonic runtime refuses to download model assets before explicit licens
   assert.equal(engine.status.loaded, false);
 });
 
-test("Supertonic runtime loads pinned ONNX sessions sequentially and reports inference is not yet wired", async () => {
+test("Supertonic runtime loads pinned ONNX sessions and marks the inference adapter ready", async () => {
   const ort = fakeOrt();
   const fetched = [];
   const engine = createSupertonic3Runtime({
@@ -77,7 +83,7 @@ test("Supertonic runtime loads pinned ONNX sessions sequentially and reports inf
   });
   assert.equal(status.loaded, true);
   assert.equal(status.locale, "ru");
-  assert.equal(status.inferenceReady, false);
+  assert.equal(status.inferenceReady, true);
   assert.equal(status.sessionNames.length, 4);
   assert.equal(ort.created.length, 4);
   assert.ok(ort.created.every(item => item.options.executionProviders[0] === "wasm"));
@@ -99,7 +105,7 @@ test("Supertonic voice style loader validates tensor shape and uses the selected
   await engine.close();
 });
 
-test("Supertonic synthesis returns a real WAV artifact for the selected character voice", async () => {
+test("Supertonic synthesis returns a WAV artifact and routes distinct character profiles", async () => {
   const ort = fakeOrt();
   const fetchedStyles = [];
   const engine = createSupertonic3Runtime({
@@ -125,7 +131,9 @@ test("Supertonic synthesis returns a real WAV artifact for the selected characte
   assert.equal(new TextDecoder().decode(new Uint8Array(result.arrayBuffer, 8, 4)), "WAVE");
   assert.ok(progress.some(event => event.phase === "audio-ready"));
   await engine.synthesize({ text: "Ещё реплика.", voiceId: "F2", totalStep: 1 });
-  assert.equal(fetchedStyles.length, 1, "voice style should be cached after first download");
+  await engine.synthesize({ text: "Другой персонаж.", voiceId: "M1", totalStep: 1 });
+  assert.equal(fetchedStyles.length, 2, "each voice style should be downloaded once and cached");
+  assert.ok(ort.runs.includes(0.3) && ort.runs.includes(0.7), "different voice profiles must reach the duration model");
   await engine.close();
 });
 
