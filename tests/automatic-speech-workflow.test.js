@@ -16,6 +16,23 @@ test('does not add dialogue or voice when the prompt does not request speech', (
   assert.deepEqual(result.scenesMissingVoice, []);
 });
 
+test('automatically creates dialogue and requests voices for ordinary stories with assigned characters', () => {
+  const scenes = [
+    { id: 'fox-scene', characters: ['Fox'], dialogue: [], voiceCues: [] },
+    { id: 'bird-scene', characters: ['Bird'], dialogue: [], voiceCues: [] },
+    { id: 'establishing-shot', characters: [], dialogue: [], voiceCues: [] }
+  ];
+  const result = resolveAutomaticSpeechTasks({
+    request: 'A fox meets a bird in a quiet forest.',
+    scenes,
+    language: 'en'
+  });
+  assert.equal(result.dialogueRequested, true);
+  assert.equal(result.voiceRequested, true);
+  assert.deepEqual(result.scenesMissingDialogue.map(item => item.scene.id), ['fox-scene', 'bird-scene']);
+  assert.deepEqual(result.scenesMissingVoice, []);
+});
+
 test('automatically requests voice generation when storyboard scenes already contain dialogue', () => {
   const scenes = [{
     id: 'automatic-voice',
