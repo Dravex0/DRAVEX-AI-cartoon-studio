@@ -47,7 +47,7 @@ test("refuses to reuse voices when the cast is larger than the voice catalog", (
   assert.throws(() => assignCharacterVoices({
     speakers: ["Foxy", "Bird", "Narrator"],
     availableVoices: ["voice-a", "voice-b"]
-  }), /only 2 distinct voices.*3 characters/i);
+  }), /only 2 distinct voice\(s\).*3 characters/i);
 });
 
 test("repairs duplicate persisted assignments when an unused catalog voice exists", () => {
