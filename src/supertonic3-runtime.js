@@ -66,13 +66,14 @@ export function createSupertonic3Runtime({
   if (typeof fetchImpl !== "function") throw new TypeError("A fetch implementation is required.");
   let loaded = null;
   let loading = null;
+  let activeLoadController = null;
 
   async function fetchResponse(url, signal, onProgress, assetName) {
-    assertNotAborted(signal);
+    assertNotAborted(loadSignal);
     const response = await fetchImpl(url, { signal, cache: "force-cache" });
     if (!response?.ok) throw new Error("Could not download " + assetName + " (HTTP " + (response?.status ?? "unknown") + ").");
     const buffer = await response.arrayBuffer();
-    assertNotAborted(signal);
+    assertNotAborted(loadSignal);
     if (!buffer.byteLength) throw new Error(assetName + " downloaded as an empty file.");
     report(onProgress, { phase: "downloaded", asset: assetName, bytes: buffer.byteLength });
     return buffer;
@@ -99,7 +100,7 @@ export function createSupertonic3Runtime({
       signal,
       onProgress
     } = {}) {
-      assertNotAborted(signal);
+      assertNotAborted(loadSignal);
       const model = getSupertonic3Model(locale, { acceptOpenRailTerms });
       if (!model.available) {
         throw new Error(model.reason === "license-review-required"
@@ -117,16 +118,24 @@ export function createSupertonic3Runtime({
         return loading.promise;
       }
 
+      const loadController = new AbortController();
+      const abortFromCaller = () => loadController.abort(signal?.reason);
+      if (signal?.aborted) abortFromCaller();
+      else signal?.addEventListener?.("abort", abortFromCaller, { once: true });
+      const loadSignal = loadController.signal;
+      activeLoadController = loadController;
+
       const promise = (async () => {
         const ort = await runtimeFactory();
+        assertNotAborted(loadSignal);
         if (!ort?.InferenceSession?.create || !ort?.Tensor) {
           throw new Error("ONNX Runtime Web did not expose the required browser API.");
         }
         const assets = new Map(getSupertonic3AssetUrls().map(asset => [asset.path, asset.url]));
         const json = Object.create(null);
         for (const path of JSON_ASSETS) {
-          const buffer = await fetchResponse(assets.get(path), signal, onProgress, path);
-          assertNotAborted(signal);
+          const buffer = await fetchResponse(assets.get(path), loadSignal, onProgress, path);
+          assertNotAborted(loadSignal);
           json[path] = JSON.parse(new TextDecoder().decode(buffer));
           if (path === "onnx/unicode_indexer.json") {
             const indexer = json[path];
@@ -141,17 +150,17 @@ export function createSupertonic3Runtime({
         const sessions = Object.create(null);
         try {
           for (let index = 0; index < SESSION_ORDER.length; index += 1) {
-            assertNotAborted(signal);
+            assertNotAborted(loadSignal);
             const [name, path] = SESSION_ORDER[index];
             if (!ONNX_ASSETS.has(path)) throw new Error("Unregistered ONNX asset: " + path);
             report(onProgress, { phase: "loading-session", asset: path, current: index + 1, total: SESSION_ORDER.length });
-            const buffer = await fetchResponse(assets.get(path), signal, onProgress, path);
-            assertNotAborted(signal);
+            const buffer = await fetchResponse(assets.get(path), loadSignal, onProgress, path);
+            assertNotAborted(loadSignal);
             sessions[name] = await ort.InferenceSession.create(new Uint8Array(buffer), {
               executionProviders: [backend],
               graphOptimizationLevel: "all"
             });
-            assertNotAborted(signal);
+            assertNotAborted(loadSignal);
             report(onProgress, { phase: "session-ready", asset: path, current: index + 1, total: SESSION_ORDER.length });
           }
         } catch (error) {
@@ -179,12 +188,14 @@ export function createSupertonic3Runtime({
       try {
         return await promise;
       } finally {
-        loading = null;
+        signal?.removeEventListener?.("abort", abortFromCaller);
+        if (loading?.promise === promise) loading = null;
+        if (activeLoadController === loadController) activeLoadController = null;
       }
     },
 
     async loadVoiceStyle(voiceId, { signal, onProgress } = {}) {
-      assertNotAborted(signal);
+      assertNotAborted(loadSignal);
       if (!loaded) throw new Error("Load the Supertonic 3 ONNX sessions first.");
       const key = String(voiceId).trim().toUpperCase();
       if (loaded.voiceStyles.has(key)) return loaded.voiceStyles.get(key);
@@ -193,7 +204,7 @@ export function createSupertonic3Runtime({
       const parsed = JSON.parse(new TextDecoder().decode(buffer));
       const ttl = validateStylePart(parsed.style_ttl, "style_ttl");
       const dp = validateStylePart(parsed.style_dp, "style_dp");
-      assertNotAborted(signal);
+      assertNotAborted(loadSignal);
       const style = Object.freeze({
         voiceId: key,
         styleTtl: new loaded.ort.Tensor("float32", ttl.data, ttl.dims),
@@ -213,6 +224,11 @@ export function createSupertonic3Runtime({
     },
 
     async close() {
+      const pendingLoad = loading?.promise;
+      activeLoadController?.abort();
+      if (pendingLoad) {
+        try { await pendingLoad; } catch { /* Closing intentionally cancels an in-flight load. */ }
+      }
       const previous = loaded;
       loaded = null;
       if (previous) {

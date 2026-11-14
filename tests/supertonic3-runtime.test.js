@@ -198,3 +198,28 @@ test("Supertonic runtime refuses to replace loaded sessions without closing them
   assert.ok(firstSessions.every(item => item.session.released === true),
     "close must release every session from the active runtime");
 });
+
+test("Supertonic runtime close cancels an in-flight load before it can allocate sessions", async () => {
+  const ort = fakeOrt();
+  let markStarted;
+  let resolveRuntime;
+  const started = new Promise(resolve => { markStarted = resolve; });
+  const engine = createSupertonic3Runtime({
+    runtimeFactory: () => {
+      markStarted();
+      return new Promise(resolve => { resolveRuntime = resolve; });
+    },
+    fetchImpl: modelFetch
+  });
+
+  const loadPromise = engine.load({ locale: "ru", acceptOpenRailTerms: true });
+  await started;
+  const closePromise = engine.close();
+  resolveRuntime(ort);
+
+  await assert.rejects(loadPromise, { name: "AbortError" });
+  const status = await closePromise;
+  assert.equal(status.loaded, false);
+  assert.equal(ort.created.length, 0, "cancelled loading must not allocate ONNX sessions");
+  assert.equal(engine.status.loaded, false);
+});
