@@ -42,6 +42,9 @@ const MODEL_ASSETS = Object.freeze([
 const normalizeLocale = value =>
   String(value ?? "").trim().toLowerCase().split(/[-_]/)[0];
 
+const modelRevisionRoot = () =>
+  `https://huggingface.co/${SUPERTONIC3_MODEL.modelId}/resolve/${SUPERTONIC3_MODEL.revision}/`;
+
 export function getSupertonic3Model(locale, { acceptOpenRailTerms = false } = {}) {
   const key = normalizeLocale(locale);
   if (!SUPERTONIC3_MODEL.languages.includes(key)) {
@@ -66,8 +69,24 @@ export function getSupertonic3Model(locale, { acceptOpenRailTerms = false } = {}
 }
 
 export function getSupertonic3AssetUrls() {
-  const root = `https://huggingface.co/${SUPERTONIC3_MODEL.modelId}/resolve/${SUPERTONIC3_MODEL.revision}/`;
+  const root = modelRevisionRoot();
   return MODEL_ASSETS.map(path => ({ path, url: root + path }));
+}
+
+/** Return a pinned voice-style URL; arbitrary paths and IDs are rejected. */
+export function getSupertonic3VoiceStyleUrl(voiceId) {
+  const key = String(voiceId ?? "").trim().toUpperCase();
+  if (!SUPERTONIC3_MODEL.voicePresets.includes(key)) {
+    throw new RangeError("Unsupported Supertonic 3 voice preset.");
+  }
+  return modelRevisionRoot() + `voice_styles/${key}.json`;
+}
+
+export function getSupertonic3VoiceStyleUrls() {
+  return SUPERTONIC3_MODEL.voicePresets.map(voiceId => ({
+    voiceId,
+    url: getSupertonic3VoiceStyleUrl(voiceId)
+  }));
 }
 
 export function listSupertonic3Voices() {

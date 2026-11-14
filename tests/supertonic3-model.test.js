@@ -4,6 +4,8 @@ import {
   SUPERTONIC3_MODEL,
   getSupertonic3Model,
   getSupertonic3AssetUrls,
+  getSupertonic3VoiceStyleUrl,
+  getSupertonic3VoiceStyleUrls,
   listSupertonic3Voices
 } from "../src/supertonic3-model.js";
 
@@ -37,12 +39,22 @@ test("publishes ten fixed voice presets for deterministic character assignment",
   assert.equal(getSupertonic3Model("uk", { acceptOpenRailTerms: true }).voicePresets.length, 10);
 });
 
-test("pins every model asset to the archived Hugging Face revision", () => {
+test("pins every ONNX asset to the archived Hugging Face revision", () => {
   const assets = getSupertonic3AssetUrls();
   assert.equal(assets.length, 6);
   assert.ok(assets.every(asset => asset.url.includes(SUPERTONIC3_MODEL.revision)));
   assert.ok(assets.some(asset => asset.path === "onnx/vector_estimator.onnx"));
   assert.ok(assets.some(asset => asset.path === "onnx/vocoder.onnx"));
+});
+
+test("pins all ten voice style assets and rejects arbitrary voice IDs", () => {
+  const styles = getSupertonic3VoiceStyleUrls();
+  assert.equal(styles.length, 10);
+  assert.deepEqual(styles.map(style => style.voiceId), listSupertonic3Voices());
+  assert.ok(styles.every(style => style.url.includes("/voice_styles/")));
+  assert.ok(styles.every(style => style.url.includes(SUPERTONIC3_MODEL.revision)));
+  assert.match(getSupertonic3VoiceStyleUrl("f3"), /voice_styles\/F3\.json$/);
+  assert.throws(() => getSupertonic3VoiceStyleUrl("../../secret"), /Unsupported/);
 });
 
 test("accepts supported languages only after license review and rejects unknown ones", () => {
