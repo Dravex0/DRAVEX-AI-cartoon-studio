@@ -3342,7 +3342,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   const scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
   // Prepare requested dialogue and speech before spending time/quota on video generation.
   // Existing user dialogue and matching voice artifacts are preserved by the workflow.
-  const speechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata});
+  const speechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata,language:storyLanguage()});
   const needsDialogue=(speechTasks.dialogueRequested||speechTasks.voiceRequested)
    &&selectScenesMissingDialogue(sceneMetadata).length>0;
   // Speech is an optional production layer. Missing consent or a local model must
@@ -3362,7 +3362,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
       reportProgress:detail=>{status.textContent=String(detail||'Writing scene dialogue…');}
      });
     }
-    const refreshedSpeechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata});
+    const refreshedSpeechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata,language:storyLanguage()});
     if(refreshedSpeechTasks.voiceRequested&&refreshedSpeechTasks.scenesMissingVoice.length){
      const voiceStep={id:'prompt-film-voice',action:'Generate voices for all scenes',purpose:'Synthesize requested spoken dialogue',inputs:['allScenes'],outputs:['voice-audio'],dependsOn:['prompt-film-dialogue'],requiredCapabilities:['voice.generate']};
      if(!isLocalSceneVoiceEngineLoaded())await ensureLocalSceneVoiceEngineForSpeech(controller.signal,detail=>{status.textContent=String(detail||'Loading local voice model…');});
