@@ -15,6 +15,49 @@ export const RUSSIAN_VITS_MODEL = Object.freeze({
 
 const MAX_TEXT_LENGTH = 10_000;
 
+export const RUSSIAN_VITS_VOCAB_URL = "https://huggingface.co/utrobinmv/tts_ru_free_hf_vits_low_multispeaker/resolve/0e9a395/vocab.json";
+
+/** Build the character-level tokenizer used by this VITS checkpoint.
+ * The repository ships vocab.json (not tokenizer.json); add_blank=true
+ * inserts token 0 at both ends and between every character, matching HF VitsTokenizer.
+ */
+export function createRussianVitsTokenizer(vocab) {
+  if (!vocab || typeof vocab !== "object" || Array.isArray(vocab)) {
+    throw new TypeError("Russian VITS vocab.json must contain a character-to-ID object.");
+  }
+  const entries = Object.entries(vocab);
+  if (!entries.length || entries.some(([token, id]) => !token || !Number.isInteger(id) || id < 0)) {
+    throw new TypeError("Russian VITS vocabulary contains invalid token IDs.");
+  }
+  const ids = new Map(entries);
+  const unknownId = ids.get("<unk>");
+  if (!Number.isInteger(unknownId)) throw new Error("Russian VITS vocabulary is missing <unk>.");
+  if (ids.get("<pad>") !== 42 || ids.get(" ") !== 0) {
+    throw new Error("Russian VITS vocabulary does not match the pinned model format.");
+  }
+  return async text => {
+    const normalized = normalizeText(text);
+    const characters = Array.from(normalized);
+    const tokenIds = [0];
+    for (const character of characters) {
+      tokenIds.push(ids.get(character) ?? unknownId, 0);
+    }
+    return {
+      input_ids: { data: BigInt64Array.from(tokenIds, value => BigInt(value)), dims: [1, tokenIds.length] },
+      attention_mask: { data: BigInt64Array.from(tokenIds, () => 1n), dims: [1, tokenIds.length] }
+    };
+  };
+}
+
+export async function loadRussianVitsTokenizer({ fetchImpl = globalThis.fetch, signal } = {}) {
+  if (typeof fetchImpl !== "function") throw new TypeError("fetch is required to load the Russian VITS vocabulary.");
+  const response = await fetchImpl(RUSSIAN_VITS_VOCAB_URL, { signal });
+  if (!response?.ok) throw new Error("Russian VITS vocabulary download failed (HTTP " + (response?.status ?? "unknown") + ").");
+  const vocab = await response.json();
+  assertNotAborted(signal);
+  return createRussianVitsTokenizer(vocab);
+}
+
 function assertNotAborted(signal) {
   if (signal?.aborted) {
     const error = new Error("Russian speech generation was cancelled.");
