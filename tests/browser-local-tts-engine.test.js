@@ -61,36 +61,44 @@ test("uses local Kokoro runtime and persists verified English speech", async () 
   assert.equal((await engine.get(result.audioHash)).blob.size, result.byteSize);
 });
 
-test("uses Transformers.js VITS path for Russian and persists actual sample rate", async () => {
+test("uses the local Russian multi-speaker VITS runtime and persists real WAV artifacts", async () => {
   const storage = makeStorage();
-  let loadedModel;
+  const calls = { model: null, load: null, synthesize: null };
   const engine = createBrowserLocalTtsEngine({
     storage, cryptoRef: webcrypto, environment,
-    transformersPipelineFactory: async (id, options) => {
-      loadedModel = { id, options };
-      return async text => {
-        assert.equal(text, "Привет");
-        return validOutput(16000);
+    russianVitsFactory: async model => {
+      calls.model = model;
+      return {
+        availableVoices: ["ru-female", "ru-male"],
+        async load(options) { calls.load = options; return { loaded: true }; },
+        async synthesize(options) {
+          calls.synthesize = options;
+          return { audio: validOutput(16000).audio, sampleRate: 16000, speakerId: 1, voiceId: options.voiceId };
+        }
       };
     }
   });
-  await assert.rejects(engine.load({ locale: "ru" }), /Explicit opt-in/);
-  await engine.load({ locale: "ru", allowNonCommercial: true });
-  assert.equal(loadedModel.id, "Xenova/mms-tts-rus");
-  const result = await engine.synthesize({ text: "Привет" });
+  await engine.load({ locale: "ru" });
+  assert.equal(calls.model.runtime, "russian-vits-onnx");
+  assert.deepEqual(engine.availableVoices, ["ru-female", "ru-male"]);
+  const result = await engine.synthesize({ text: "Привет", voiceId: "ru-male" });
+  assert.equal(calls.synthesize.voiceId, "ru-male");
   assert.equal(result.sampleRate, 16000);
   assert.equal(result.locale, "ru");
+  assert.equal(result.voiceId, "ru-male");
+  assert.equal(result.localInference, true);
+  assert.equal(result.remoteInference, false);
   assert.equal(storage.records.size, 1);
 });
 
 test("rejects unsupported locale, missing load, empty text and invalid provider audio", async () => {
   const engine = createBrowserLocalTtsEngine({
     storage: makeStorage(), cryptoRef: webcrypto, environment,
-    transformersPipelineFactory: async () => async () => ({ audio: new Float32Array(0), sampling_rate: 16000 })
+    russianVitsFactory: async () => ({ load: async () => {}, synthesize: async () => ({ audio: new Float32Array(0), sampleRate: 16000 }) })
   });
   await assert.rejects(engine.load({ locale: "de" }), /No local TTS model/);
   await assert.rejects(engine.synthesize({ text: "Hi" }), /Load a local TTS model/);
-  await engine.load({ locale: "ru", allowNonCommercial: true });
+  await engine.load({ locale: "ru" });
   await assert.rejects(engine.synthesize({ text: " " }), /must not be empty/);
   await assert.rejects(engine.synthesize({ text: "broken" }), /no Float32 audio/);
 });
