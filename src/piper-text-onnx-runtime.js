@@ -152,7 +152,8 @@ export function createPiperTextOnnxRuntime({ ort, fetchImpl = globalThis.fetch }
         error.name = "AbortError";
         throw error;
       }
-      const samples = result?.output?.data;
+      const outputName = loaded.session.outputNames?.[0] || "output";
+      const samples = result?.[outputName]?.data;
       assert(samples instanceof Float32Array && samples.length > 0,
         "Piper ONNX returned no audio samples.");
       return {
