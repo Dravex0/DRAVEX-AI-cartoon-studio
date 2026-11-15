@@ -128,3 +128,23 @@ test('limits scene-specific reference profiles to the two provider input slots',
     ['Foxy', 'Mira']
   );
 });
+
+test('fills empty placeholder fields from story extraction without replacing saved character details', () => {
+  const merged = mergeCharacterReferences(
+    [{ characterId: 'Foxy', clothing: 'User-approved blue scarf' }],
+    [{
+      characterId: 'foxy',
+      visualDescription: 'Small orange fox with amber eyes',
+      clothing: 'Automatically inferred green jacket',
+      colors: 'Orange and cream',
+      distinctiveFeatures: 'White tail tip'
+    }]
+  );
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].characterId, 'Foxy');
+  assert.equal(merged[0].visualDescription, 'Small orange fox with amber eyes');
+  assert.equal(merged[0].clothing, 'User-approved blue scarf');
+  assert.equal(merged[0].colors, 'Orange and cream');
+  assert.equal(merged[0].distinctiveFeatures, 'White tail tip');
+});
