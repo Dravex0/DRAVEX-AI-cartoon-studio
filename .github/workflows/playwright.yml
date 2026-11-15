@@ -11,6 +11,11 @@ on:
         required: false
         type: boolean
         default: false
+      real_russian_vits:
+        description: Download real Russian VITS weights (~50.8 MB), synthesize two voices and verify final WebM audio
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -55,17 +60,17 @@ jobs:
         run: npx playwright test tests/e2e/piper-real-inference.spec.js --project=chromium-desktop --workers=1
 
       - name: Build local ONNX WASM assets for real Russian VITS smoke
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/russian-vits-two-speaker-local-tts-20261115'
+        if: (github.event_name == 'workflow_dispatch' && inputs.real_russian_vits) || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'feat/russian-vits-two-speaker-local-tts-20261115' || github.event.pull_request.head.ref == 'test/russian-vits-webm-export-20261116'))
         run: npm run build
 
       - name: Run real Russian VITS weights inference test on Desktop Chromium
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/russian-vits-two-speaker-local-tts-20261115'
+        if: (github.event_name == 'workflow_dispatch' && inputs.real_russian_vits) || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'feat/russian-vits-two-speaker-local-tts-20261115' || github.event.pull_request.head.ref == 'test/russian-vits-webm-export-20261116'))
         env:
           DRAVEX_REAL_RUSSIAN_VITS: "1"
         run: npx playwright test tests/e2e/russian-vits-real-inference.spec.js --project=chromium-desktop --workers=1
 
       - name: Run real Russian VITS weights inference test on Pixel 7 profile
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/russian-vits-two-speaker-local-tts-20261115'
+        if: (github.event_name == 'workflow_dispatch' && inputs.real_russian_vits) || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'feat/russian-vits-two-speaker-local-tts-20261115' || github.event.pull_request.head.ref == 'test/russian-vits-webm-export-20261116'))
         env:
           DRAVEX_REAL_RUSSIAN_VITS: "1"
         run: npx playwright test tests/e2e/russian-vits-real-inference.spec.js --project=chromium-pixel-7 --workers=1
