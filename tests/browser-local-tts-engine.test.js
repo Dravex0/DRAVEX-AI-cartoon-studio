@@ -275,7 +275,7 @@ test("switches between Russian VITS and Ukrainian Piper without reusing stale vo
       async load() {},
       async synthesize(options) {
         calls.russianVoice = options.voiceId;
-        return { audio: validOutput(16000).audio, sampleRate: 16000, voiceId: options.voiceId };
+        return { audio: Float32Array.from(options.voiceId === "ru-male" ? [0.1, 0.2, -0.3, 0.4] : [0.2, -0.1, 0.3, -0.4]), sampleRate: 16000, voiceId: options.voiceId };
       },
       dispose() { calls.russianDisposed++; }
     }),
