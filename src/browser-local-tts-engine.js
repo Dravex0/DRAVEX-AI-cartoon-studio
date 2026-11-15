@@ -2,6 +2,7 @@ import { getLocalTtsModel } from "./local-tts-model-registry.js";
 import { createVerifiedVoiceArtifactStore } from "./verified-voice-artifact.js";
 import { detectDeviceCapabilities } from "./device-capabilities.js";
 import { createPiperTextOnnxRuntime } from "./piper-text-onnx-runtime.js";
+import { createRussianVitsOnnxRuntime } from "./russian-multispeaker-vits-runtime.js";
 
 const DEFAULT_KOKORO_VOICE = "af_heart";
 const MAX_TEXT_LENGTH = 10_000;
@@ -96,6 +97,22 @@ async function defaultKokoroFactory(modelId, options) {
   return KokoroTTS.from_pretrained(modelId, options);
 }
 
+async function defaultRussianVitsFactory(model, { environment = globalThis } = {}) {
+  const ort = await import("onnxruntime-web/wasm");
+  if (ort.env?.wasm) {
+    ort.env.wasm.numThreads = 1;
+    const pageUrl = environment?.location?.href || "https://localhost/";
+    const baseUrl = import.meta.env?.BASE_URL || "./";
+    ort.env.wasm.wasmPaths = new URL(`${baseUrl}vendor/onnxruntime/`, pageUrl).href;
+  }
+  const { AutoTokenizer } = await import("@huggingface/transformers");
+  return createRussianVitsOnnxRuntime({
+    ort,
+    model,
+    tokenizerFactory: (modelId, options) => AutoTokenizer.from_pretrained(modelId, options)
+  });
+}
+
 async function defaultPiperFactory(model, { environment = globalThis } = {}) {
   const ort = await import("onnxruntime-web/wasm");
   if (ort.env?.wasm) {
@@ -119,7 +136,8 @@ export function createBrowserLocalTtsEngine({
   environment = globalThis,
   transformersPipelineFactory = defaultTransformersPipelineFactory,
   kokoroFactory = defaultKokoroFactory,
-  piperFactory = defaultPiperFactory
+  piperFactory = defaultPiperFactory,
+  russianVitsFactory = defaultRussianVitsFactory
 } = {}) {
   if (!storage) throw new TypeError("A local voice storage adapter is required.");
   const artifacts = createVerifiedVoiceArtifactStore({ storage, cryptoRef });
@@ -130,7 +148,7 @@ export function createBrowserLocalTtsEngine({
     get availableVoices() {
       if (!loaded) return [];
       if (loaded.model.runtime === "kokoro-js") return getKokoroVoiceIds(loaded.instance);
-      if (loaded.model.runtime === "piper-onnx") return loaded.instance.availableVoices;
+      if (loaded.model.runtime === "piper-onnx" || loaded.model.runtime === "russian-vits-onnx") return loaded.instance.availableVoices;
       return [];
     },
 
@@ -199,6 +217,14 @@ export function createBrowserLocalTtsEngine({
             throw new Error("Piper ONNX runtime did not provide load and synthesize functions.");
           }
           await modelInstance.load({ modelUrl: model.modelUrl, configUrl: model.configUrl, signal });
+        } else if (model.runtime === "russian-vits-onnx") {
+          if (backend !== "wasm") throw new Error("Russian VITS currently supports the local WASM backend only.");
+          engine = "onnxruntime-web";
+          modelInstance = await russianVitsFactory(model, { environment });
+          if (typeof modelInstance?.load !== "function" || typeof modelInstance?.synthesize !== "function") {
+            throw new Error("Russian VITS ONNX runtime did not provide load and synthesize functions.");
+          }
+          await modelInstance.load({ signal, onProgress: progress });
         } else {
           engine = "@huggingface/transformers";
           modelInstance = await transformersPipelineFactory(model.modelId, {
@@ -214,6 +240,7 @@ export function createBrowserLocalTtsEngine({
         if (model.runtime === "transformers-js" && typeof modelInstance !== "function") {
           throw new Error("Transformers.js did not provide a text-to-speech pipeline.");
         }
+        loaded?.instance?.dispose?.();
         loaded = { key, model, engine, backend, instance: modelInstance };
         return this.status;
       })();
@@ -234,7 +261,7 @@ export function createBrowserLocalTtsEngine({
       let output;
       let phonemeChunks = [];
       let selectedVoiceId = null;
-      if (loaded.model.runtime === "piper-onnx") {
+      if (loaded.model.runtime === "piper-onnx" || loaded.model.runtime === "russian-vits-onnx") {
         selectedVoiceId = typeof voiceId === "string" ? voiceId.trim() : "";
         output = await loaded.instance.synthesize({ text: cleanText, voiceId: selectedVoiceId, signal });
       } else if (loaded.model.runtime === "kokoro-js") {
