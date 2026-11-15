@@ -41,6 +41,7 @@ import { attachCharacterSpriteToSceneLayers } from "./scene-character-layers.js"
 import { createSceneId, ensureSceneIds } from "./scene-identity.js";
 import { formatDialogueLines, parseDialogueLines } from "./dialogue-lines.js";
 import { createBrowserLocalTtsEngine } from "./browser-local-tts-engine.js";
+import { getLocalTtsModel } from "./local-tts-model-registry.js";
 import { createTimestampedKokoroEngine } from "./timestamped-kokoro-engine.js";
 import { createVoiceAudioStorage } from "./voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./scene-voice-workflow.js";
@@ -1966,12 +1967,13 @@ async function generateSceneVoicesForCurrentScene({signal,onProgress=()=>{},step
  return {type:'local-voice-artifacts',sceneIds,lineCount,durationMs:totalDurationMs,persistedInDraft,local:true,allScenes:allScenes===true};
 }
 function voiceText(ru,en){return uiLang==='ru'?ru:en}
+function sceneVoiceConsentRequired(locale){return getLocalTtsModel(locale).reason==='non-commercial-license-requires-opt-in'}
 function refreshSceneVoiceControls(){
  const locale=storyLanguage();
  const timestamped=$('sceneVoiceEngineChoice')?.value==='timestamped';
- const restricted=locale!=='en'&&!timestamped;
+ const restricted=sceneVoiceConsentRequired(locale)&&!timestamped;
  $('voiceConsentRow').hidden=!restricted;
- $('voiceConsentLabel').textContent=voiceText('Подтверждаю некоммерческое использование этой модели (обязательно для русского, украинского и испанского).','I confirm non-commercial use of this model (required for Russian, Ukrainian and Spanish).');
+ $('voiceConsentLabel').textContent=voiceText('Подтверждаю некоммерческое использование этой модели (обязательно только для моделей с такой лицензией).','I confirm non-commercial use of this model (required only for models with that license).');
  $('loadSceneVoiceModel').textContent=voiceText('Загрузить локальную модель голоса','Load local voice model');
  $('generateSceneVoices').textContent=voiceText('Озвучить эту сцену','Generate voices for this scene');
  const expectedEngine=timestamped?'headtts-timestamped-kokoro':null;
@@ -2037,7 +2039,7 @@ $('loadSceneVoiceModel').addEventListener('click',async()=>{
   $('sceneVoiceStatus').textContent=voiceText('Timestamped Kokoro доступен только для английского.','Timestamped Kokoro is available for English only.');
   return;
  }
- if(!timestamped&&locale!=='en'&&!allowNonCommercial){
+ if(!timestamped&&sceneVoiceConsentRequired(locale)&&!allowNonCommercial){
   $('sceneVoiceStatus').textContent=voiceText('Для этой модели требуется явное подтверждение некоммерческого использования.','This model requires explicit non-commercial-use consent.');
   return;
  }
