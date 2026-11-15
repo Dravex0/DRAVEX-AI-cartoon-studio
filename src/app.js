@@ -2142,7 +2142,7 @@ async function ensureLocalSceneVoiceEngineForSpeech(signal,report){
  if(timestamped&&locale!=='en'){
   throw new Error(voiceText('Выбранный экспериментальный движок поддерживает только английский. Выбери стандартный движок для этого языка.','The selected experimental engine supports English only. Choose the standard engine for this language.'));
  }
- if(!timestamped&&locale!=='en'&&!allowNonCommercial){
+ if(!timestamped&&sceneVoiceConsentRequired(locale)&&!allowNonCommercial){
   $('voiceConsentRow').hidden=false;
   $('voiceNonCommercialConsent')?.scrollIntoView({behavior:'smooth',block:'center'});
   throw new Error(voiceText('Для загрузки этой голосовой модели подтверди некоммерческое использование. После согласия нажми «Создать готовое видео» ещё раз.','Confirm non-commercial use to download this voice model. After consenting, press Create film again.'));
@@ -2163,7 +2163,7 @@ async function ensureLocalSceneVoiceEngineForSpeech(signal,report){
   const count=engine.availableVoices.length;
   $('sceneVoiceStatus').textContent=locale==='en'
    ?voiceText('Локальная модель готова. Доступно голосов: '+count+'.','Local voice model ready. Available voices: '+count+'.')
-   :voiceText('Локальная модель готова. Для этого языка доступен один голос.','Local voice model ready. This language model currently provides one voice.');
+   :voiceText('Локальная модель готова. Доступно голосов: '+count+'.','Local voice model ready. Available voices: '+count+'.');
   return engine;
  }catch(error){
   $('sceneVoiceStatus').textContent=(error?.message||'Voice model loading failed.');
