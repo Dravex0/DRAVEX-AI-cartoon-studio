@@ -70,6 +70,18 @@ export function createPiperTextOnnxRuntime({ ort, fetchImpl = globalThis.fetch }
   let loaded = null;
 
   return Object.freeze({
+    get availableVoices() {
+      if (!loaded) return [];
+      const map = loaded.config?.speaker_id_map;
+      if (!map || typeof map !== "object" || Array.isArray(map)) return [];
+      return Object.entries(map)
+        .filter(([id, speakerId]) => typeof id === "string" && id.trim()
+          && Number.isInteger(speakerId) && speakerId >= 0
+          && speakerId < Number(loaded.config.num_speakers ?? 1))
+        .sort((a, b) => a[1] - b[1])
+        .map(([id]) => id);
+    },
+
     get status() {
       return loaded ? {
         loaded: true,
