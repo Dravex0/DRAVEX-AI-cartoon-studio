@@ -26,17 +26,20 @@ const MODEL_REGISTRY = Object.freeze({
     notes: "Non-commercial model; one speaker. Requires explicit non-commercial-use opt-in."
   }),
   uk: Object.freeze({
-    id: "mms-uk",
-    runtime: "transformers-js",
-    modelId: "payam1394/traxlate-mms-tts-ukr",
+    id: "piper-uk-ukrainian-tts-medium",
+    runtime: "piper-onnx",
+    modelId: "piper-uk-ukrainian-tts-medium",
+    modelUrl: "https://huggingface.co/rhasspy/piper-voices/resolve/main/uk/uk_UA/ukrainian_tts/medium/uk_UA-ukrainian_tts-medium.onnx",
+    configUrl: "https://huggingface.co/rhasspy/piper-voices/resolve/main/uk/uk_UA/ukrainian_tts/medium/uk_UA-ukrainian_tts-medium.onnx.json",
     locale: "uk",
     languages: Object.freeze(["uk"]),
-    license: "CC-BY-NC-4.0",
-    commercialUse: false,
-    dtype: "q8",
-    approximateQuantizedWeightBytes: null,
-    voiceMode: "single-speaker",
-    notes: "Community ONNX conversion of Meta MMS Ukrainian; non-commercial license; one speaker. Requires explicit non-commercial-use opt-in."
+    license: "MIT",
+    commercialUse: true,
+    dtype: "fp32",
+    approximateQuantizedWeightBytes: 76_735_663,
+    voiceMode: "multi-speaker",
+    voices: Object.freeze(["lada", "mykyta", "tetiana"]),
+    notes: "Ukrainian Piper medium ONNX model; three named speakers. The model is downloaded only after explicit load and inference runs locally through ONNX Runtime Web."
   }),
   es: Object.freeze({
     id: "mms-es",
