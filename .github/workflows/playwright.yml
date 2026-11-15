@@ -45,11 +45,11 @@ jobs:
         run: npm run test:e2e
 
       - name: Build local ONNX WASM assets for real Piper smoke
-        if: github.event_name == 'workflow_dispatch' && inputs.real_piper
+        if: (github.event_name == 'workflow_dispatch' && inputs.real_piper) || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'test/piper-real-weights-smoke-20261115')
         run: npm run build
 
       - name: Run opt-in real Piper weights inference test
-        if: github.event_name == 'workflow_dispatch' && inputs.real_piper
+        if: (github.event_name == 'workflow_dispatch' && inputs.real_piper) || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'test/piper-real-weights-smoke-20261115')
         env:
           DRAVEX_REAL_PIPER: "1"
         run: npx playwright test tests/e2e/piper-real-inference.spec.js --project=chromium-desktop --workers=1
