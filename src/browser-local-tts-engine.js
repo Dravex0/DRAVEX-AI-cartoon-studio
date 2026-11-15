@@ -1,6 +1,7 @@
 import { getLocalTtsModel } from "./local-tts-model-registry.js";
 import { createVerifiedVoiceArtifactStore } from "./verified-voice-artifact.js";
 import { detectDeviceCapabilities } from "./device-capabilities.js";
+import { createPiperTextOnnxRuntime } from "./piper-text-onnx-runtime.js";
 
 const DEFAULT_KOKORO_VOICE = "af_heart";
 const MAX_TEXT_LENGTH = 10_000;
@@ -95,6 +96,18 @@ async function defaultKokoroFactory(modelId, options) {
   return KokoroTTS.from_pretrained(modelId, options);
 }
 
+async function defaultPiperFactory(model, { environment = globalThis } = {}) {
+  const ort = await import("onnxruntime-web/wasm");
+  if (ort.env?.wasm) {
+    // The target Android browser may not expose cross-origin-isolated WASM threads.
+    ort.env.wasm.numThreads = 1;
+    const pageUrl = environment?.location?.href || "https://localhost/";
+    const baseUrl = import.meta.env?.BASE_URL || "./";
+    ort.env.wasm.wasmPaths = new URL(`${baseUrl}vendor/onnxruntime/`, pageUrl).href;
+  }
+  return createPiperTextOnnxRuntime({ ort });
+}
+
 /**
  * Browser-local TTS adapter.
  * Models are downloaded only after explicit load() invocation. Inference stays
@@ -105,7 +118,8 @@ export function createBrowserLocalTtsEngine({
   cryptoRef = globalThis.crypto,
   environment = globalThis,
   transformersPipelineFactory = defaultTransformersPipelineFactory,
-  kokoroFactory = defaultKokoroFactory
+  kokoroFactory = defaultKokoroFactory,
+  piperFactory = defaultPiperFactory
 } = {}) {
   if (!storage) throw new TypeError("A local voice storage adapter is required.");
   const artifacts = createVerifiedVoiceArtifactStore({ storage, cryptoRef });
@@ -114,8 +128,10 @@ export function createBrowserLocalTtsEngine({
 
   return Object.freeze({
     get availableVoices() {
-      if (!loaded || loaded.model.runtime !== "kokoro-js") return [];
-      return getKokoroVoiceIds(loaded.instance);
+      if (!loaded) return [];
+      if (loaded.model.runtime === "kokoro-js") return getKokoroVoiceIds(loaded.instance);
+      if (loaded.model.runtime === "piper-onnx") return loaded.instance.availableVoices;
+      return [];
     },
 
     get status() {
@@ -124,6 +140,7 @@ export function createBrowserLocalTtsEngine({
         locale: loaded.model.locale,
         modelId: loaded.model.modelId,
         engine: loaded.engine,
+        voiceId: selectedVoiceId,
         backend: loaded.backend,
         localInference: true
       } : { loaded: false, localInference: true };
@@ -175,6 +192,14 @@ export function createBrowserLocalTtsEngine({
             device: backend,
             progress_callback: progress
           });
+        } else if (model.runtime === "piper-onnx") {
+          if (backend !== "wasm") throw new Error("Ukrainian Piper currently supports the local WASM backend only.");
+          engine = "onnxruntime-web";
+          modelInstance = await piperFactory(model, { environment });
+          if (typeof modelInstance?.load !== "function" || typeof modelInstance?.synthesize !== "function") {
+            throw new Error("Piper ONNX runtime did not provide load and synthesize functions.");
+          }
+          await modelInstance.load({ modelUrl: model.modelUrl, configUrl: model.configUrl, signal });
         } else {
           engine = "@huggingface/transformers";
           modelInstance = await transformersPipelineFactory(model.modelId, {
@@ -187,7 +212,7 @@ export function createBrowserLocalTtsEngine({
         if (model.runtime === "kokoro-js" && typeof modelInstance?.generate !== "function") {
           throw new Error("Kokoro did not provide a speech generation function.");
         }
-        if (model.runtime !== "kokoro-js" && typeof modelInstance !== "function") {
+        if (model.runtime === "transformers-js" && typeof modelInstance !== "function") {
           throw new Error("Transformers.js did not provide a text-to-speech pipeline.");
         }
         loaded = { key, model, engine, backend, instance: modelInstance };
@@ -209,7 +234,11 @@ export function createBrowserLocalTtsEngine({
       if (cleanText.length > MAX_TEXT_LENGTH) throw new RangeError("Dialogue text exceeds 10000 characters.");
       let output;
       let phonemeChunks = [];
-      if (loaded.model.runtime === "kokoro-js") {
+      let selectedVoiceId = null;
+      if (loaded.model.runtime === "piper-onnx") {
+        selectedVoiceId = typeof voiceId === "string" ? voiceId.trim() : "";
+        output = await loaded.instance.synthesize({ text: cleanText, voiceId: selectedVoiceId, signal });
+      } else if (loaded.model.runtime === "kokoro-js") {
         const availableVoices = getKokoroVoiceIds(loaded.instance);
         const requestedVoice = typeof voiceId === "string" ? voiceId.trim() : "";
         if (requestedVoice && availableVoices.length && !availableVoices.includes(requestedVoice)) {
@@ -220,6 +249,7 @@ export function createBrowserLocalTtsEngine({
             ? DEFAULT_KOKORO_VOICE
             : availableVoices[0]))
           : (requestedVoice || DEFAULT_KOKORO_VOICE);
+        selectedVoiceId = selectedVoice;
         if (typeof loaded.instance.stream === "function") {
           const audioParts = [];
           let streamSampleRate = null;
@@ -269,6 +299,7 @@ export function createBrowserLocalTtsEngine({
         blob,
         filename,
         engineUsed: loaded.engine + ":" + loaded.model.modelId,
+        voiceId: selectedVoiceId,
         expectedDurationMs,
         expectedSampleRate: sampleRate
       });
