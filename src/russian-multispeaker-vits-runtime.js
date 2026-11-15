@@ -122,7 +122,7 @@ export function createRussianVitsOnnxRuntime({
       if (loading) return loading;
       loading = (async () => {
         const [nextTokenizer, response] = await Promise.all([
-          tokenizerFactory(model.modelId, { revision: model.revision, progress_callback: onProgress }),
+          tokenizerFactory(model.modelId, { revision: model.revision, progress_callback: onProgress, signal }),
           fetchImpl(model.modelUrl, { signal })
         ]);
         assertNotAborted(signal);
