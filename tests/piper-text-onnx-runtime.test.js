@@ -50,7 +50,7 @@ function createHarness({ output = new Float32Array([0.1, -0.1, 0.2]) } = {}) {
 }
 
 test("encodes Ukrainian text directly from the model character map", () => {
-  assert.deepEqual(piperTextToIds("аб", config), [1, 0, 12, 0, 13, 0, 2]);
+  assert.deepEqual(piperTextToIds("АБ", config), [1, 0, 12, 0, 13, 0, 2]);
   assert.throws(() => piperTextToIds("ї", config), /does not support text symbol/);
 });
 
