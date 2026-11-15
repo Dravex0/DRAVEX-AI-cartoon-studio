@@ -211,3 +211,48 @@ test("captures Kokoro stream phonemes with measured PCM chunk boundaries", async
   assert.equal(result.phonemeChunks[1].endMs, 5 / 24000 * 1000);
   assert.equal(storage.records.size, 1);
 });
+
+
+test("routes Ukrainian character speech through the selected Piper speaker and stores verified WAV", async () => {
+  const storage = makeStorage();
+  const calls = { loaded: null, generated: null };
+  const engine = createBrowserLocalTtsEngine({
+    storage, cryptoRef: webcrypto, environment,
+    piperFactory: async model => {
+      assert.equal(model.runtime, "piper-onnx");
+      return {
+        availableVoices: ["lada", "mykyta", "tetiana"],
+        async load(options) { calls.loaded = options; return { loaded: true }; },
+        async synthesize(options) {
+          calls.generated = options;
+          return {
+            audio: Float32Array.from([0.1, -0.1, 0.2, -0.2]),
+            sampleRate: 22050,
+            speakerId: 1,
+            durationMs: 4 / 22050 * 1000
+          };
+        }
+      };
+    }
+  });
+
+  await engine.load({ locale: "uk-UA", backend: "wasm" });
+  assert.deepEqual(engine.availableVoices, ["lada", "mykyta", "tetiana"]);
+  assert.match(calls.loaded.modelUrl, /uk_UA-ukrainian_tts-medium\\.onnx$/);
+  assert.match(calls.loaded.configUrl, /uk_UA-ukrainian_tts-medium\\.onnx\\.json$/);
+
+  const result = await engine.synthesize({ text: "Привіт!", voiceId: "mykyta" });
+  assert.equal(calls.generated.text, "Привіт!");
+  assert.equal(calls.generated.voiceId, "mykyta");
+  assert.equal(result.voiceId, "mykyta");
+  assert.equal(result.sampleRate, 22050);
+  assert.equal(result.locale, "uk");
+  assert.equal(result.engine, "onnxruntime-web");
+  assert.equal(result.localInference, true);
+  assert.equal(result.remoteInference, false);
+  assert.equal(storage.records.size, 1);
+  const saved = await engine.get(result.audioHash);
+  const wav = await readWavPcmMetadata(saved.blob);
+  assert.equal(wav.sampleRate, 22050);
+  assert.equal(wav.channels, 1);
+});
