@@ -36,6 +36,9 @@ test("real Ukrainian Piper weights synthesize distinct non-silent audio for all 
     expect(result.sampleRate).toBe(22_050);
     expect(result.peak).toBeGreaterThan(0.001);
     expect(result.rms).toBeGreaterThan(0.0001);
+    expect(result.mouthEnvelopeFrames).toBeGreaterThan(0);
+    expect(result.mouthActiveFrames).toBeGreaterThan(0);
+    expect(result.visemeSource).toBe("text-grapheme-fallback");
     expect(result.wavBytes).toBeGreaterThan(44);
   }
 
