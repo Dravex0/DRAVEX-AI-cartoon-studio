@@ -2,6 +2,8 @@ import * as ort from "onnxruntime-web/wasm";
 import { getLocalTtsModel } from "./local-tts-model-registry.js";
 import { createPiperTextOnnxRuntime } from "./piper-text-onnx-runtime.js";
 import { encodePcm16Wav } from "./browser-local-tts-engine.js";
+import { buildAudioMouthEnvelope } from "./audio-mouth-envelope.js";
+import { buildVisemeTimeline } from "./viseme-timeline.js";
 
 const TEST_DIALOGUE = "Привіт! Сьогодні ми створюємо мультфільм.";
 const EXPECTED_VOICES = ["lada", "mykyta", "tetiana"];
@@ -77,6 +79,23 @@ export async function runPiperRealInferenceSmoke({ onProgress, downloadWavs = fa
       });
       const metrics = measure(output.audio);
       const durationMs = output.audio.length / output.sampleRate * 1000;
+      // Exercise the same decoded-dialogue energy envelope and Ukrainian
+      // text-guided fallback used by WebM export when Piper has no phoneme times.
+      const mouthEnvelope = buildAudioMouthEnvelope({
+        channels: [output.audio],
+        sampleRate: output.sampleRate,
+        fps: 24
+      });
+      const mouthActiveFrames = mouthEnvelope.frames.filter(value => value > 0.025).length;
+      const visemeTimeline = buildVisemeTimeline({
+        text: TEST_DIALOGUE,
+        durationMs: mouthEnvelope.durationMs,
+        language: "uk",
+        fps: 24
+      });
+      if (mouthActiveFrames === 0 || visemeTimeline.frames.length !== mouthEnvelope.frameCount) {
+        throw new Error("Piper audio could not produce usable audio-reactive mouth timing for " + voiceId + ".");
+      }
       if (durationMs < 250 || durationMs > 15_000) {
         throw new Error("Piper generated an implausible speech duration for " + voiceId + ".");
       }
@@ -93,6 +112,9 @@ export async function runPiperRealInferenceSmoke({ onProgress, downloadWavs = fa
         durationMs,
         peak: metrics.peak,
         rms: metrics.rms,
+        mouthEnvelopeFrames: mouthEnvelope.frameCount,
+        mouthActiveFrames,
+        visemeSource: visemeTimeline.source,
         wavBytes: wav.size,
         sha256
       });
