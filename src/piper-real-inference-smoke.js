@@ -25,12 +25,25 @@ function measure(samples) {
   return { peak, rms };
 }
 
+function triggerWavDownload(blob, voiceId) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `uk-piper-${voiceId}.wav`;
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Let the browser's download manager acquire the Blob before revoking it.
+  globalThis.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 /**
  * Explicit, opt-in real-weight smoke test. Downloads the actual Ukrainian
  * Piper ONNX weights and runs each configured speaker locally in the browser.
  * This is intentionally not called by the application or ordinary CI tests.
  */
-export async function runPiperRealInferenceSmoke({ onProgress } = {}) {
+export async function runPiperRealInferenceSmoke({ onProgress, downloadWavs = false } = {}) {
   const model = getLocalTtsModel("uk");
   if (!model.available || model.runtime !== "piper-onnx") {
     throw new Error("The Ukrainian Piper model is not registered.");
@@ -68,9 +81,10 @@ export async function runPiperRealInferenceSmoke({ onProgress } = {}) {
         throw new Error("Piper generated an implausible speech duration for " + voiceId + ".");
       }
       const wav = encodePcm16Wav(output.audio, output.sampleRate);
-      const wavBytes = new Uint8Array(await wav.arrayBuffer());
+      const wavBytes = await wav.arrayBuffer();
       const digest = await globalThis.crypto.subtle.digest("SHA-256", wavBytes);
       const sha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+      if (downloadWavs) triggerWavDownload(wav, voiceId);
       results.push({
         voiceId,
         speakerId: output.speakerId,
@@ -79,7 +93,7 @@ export async function runPiperRealInferenceSmoke({ onProgress } = {}) {
         durationMs,
         peak: metrics.peak,
         rms: metrics.rms,
-        wavBytes: Array.from(wavBytes),
+        wavBytes: wav.size,
         sha256
       });
     }
@@ -87,6 +101,10 @@ export async function runPiperRealInferenceSmoke({ onProgress } = {}) {
     const speakerIds = new Set(results.map(result => result.speakerId));
     if (speakerIds.size !== EXPECTED_VOICES.length) {
       throw new Error("The three configured voices did not resolve to three distinct ONNX speaker IDs.");
+    }
+    const audioHashes = new Set(results.map(result => result.sha256));
+    if (audioHashes.size !== EXPECTED_VOICES.length) {
+      throw new Error("Different Piper speaker IDs produced identical WAV audio.");
     }
     return {
       modelId: model.modelId,
