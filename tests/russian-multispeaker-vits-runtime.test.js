@@ -51,7 +51,7 @@ test("encodes Russian text with the pinned character vocabulary and VITS blank t
     ".": 36, "!": 37, "?": 38, ",": 39, "+": 40, "<unk>": 41, "<pad>": 42
   });
   const encoded = await tokenizer("ПРИВЕТ!");
-  assert.deepEqual(Array.from(encoded.input_ids.data), [0n, 20n, 0n, 20n, 0n, 12n, 0n, 5n, 0n, 8n, 0n, 22n, 0n, 37n, 0n]);
+  assert.deepEqual(Array.from(encoded.input_ids.data), [0n, 19n, 0n, 20n, 0n, 12n, 0n, 5n, 0n, 8n, 0n, 22n, 0n, 37n, 0n]);
   assert.deepEqual(Array.from(encoded.attention_mask.data), Array(15).fill(1n));
   assert.deepEqual(encoded.input_ids.dims, [1, 15]);
 });
