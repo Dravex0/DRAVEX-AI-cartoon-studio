@@ -12,7 +12,7 @@ test("selects the permissively licensed English model by locale",()=>{
  assert.equal(model.consentRequired,false);
 });
 test("blocks non-commercial models unless explicitly opted in",()=>{
- for(const locale of ["ru","uk","es"]){
+ for(const locale of ["ru","es"]){
   const blocked=getLocalTtsModel(locale);
   assert.equal(blocked.available,false);
   assert.equal(blocked.reason,"non-commercial-license-requires-opt-in");
@@ -34,4 +34,16 @@ test("returns safe catalog metadata without exposing mutable registry arrays",()
  assert.equal(first.length,4);
  first[0].languages?.push?.("xx");
  assert.deepEqual(listLocalTtsModels()[0].languages,["en"]);
+});
+
+test("selects the permissively licensed Ukrainian three-speaker Piper model", () => {
+ const model = getLocalTtsModel("uk-UA");
+ assert.equal(model.available, true);
+ assert.equal(model.runtime, "piper-onnx");
+ assert.equal(model.license, "MIT");
+ assert.equal(model.commercialUse, true);
+ assert.equal(model.voiceMode, "multi-speaker");
+ assert.deepEqual(model.voices, ["lada", "mykyta", "tetiana"]);
+ assert.match(model.modelUrl, /uk_UA-ukrainian_tts-medium\\.onnx$/);
+ assert.match(model.configUrl, /uk_UA-ukrainian_tts-medium\\.onnx\\.json$/);
 });
