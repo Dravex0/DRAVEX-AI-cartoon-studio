@@ -13,7 +13,7 @@ const config = {
   speaker_id_map: { lada: 0, mykyta: 1, tetiana: 2 },
   phoneme_id_map: {
     "_": [0], "^": [1], "$": [2], " ": [3],
-    "а": [12], "б": [13], "в": [14], "і": [23], "т": [34]
+    "а": [12], "б": [13], "в": [14], "і": [23], "т": [34], "\\u0308": [35]
   }
 };
 
@@ -54,7 +54,7 @@ test("encodes Ukrainian text directly from the model character map", () => {
   assert.throws(() => piperTextToIds("ї", config), /does not support text symbol/);
 });
 
-test("resolves and validates all three exact speaker IDs", () => {
+test("normalizes decomposed Unicode text without losing combining code points", () => {\n  assert.deepEqual(piperTextToIds("і\\u0308", config), [1, 0, 23, 0, 35, 0, 2]);\n});\n\ntest("resolves and validates all three exact speaker IDs", () => {
   assert.equal(resolvePiperRuntimeSpeakerId(config, "lada"), 0);
   assert.equal(resolvePiperRuntimeSpeakerId(config, "mykyta"), 1);
   assert.equal(resolvePiperRuntimeSpeakerId(config, "tetiana"), 2);
