@@ -1,6 +1,6 @@
 import { validateCharacterRig } from './character-rig.js';
 import { validateCharacterRigTimeline } from './character-rig-timeline.js';
-import { solveCharacterRigLimbPose } from './character-rig-ik.js';
+import { solveCharacterRigLimbPose, solveTwoBoneIK } from './character-rig-ik.js';
 
 const PRESETS = Object.freeze({
   idle: { label: 'Idle / Ожидание', frames: 4 },
@@ -9,6 +9,7 @@ const PRESETS = Object.freeze({
   jump: { label: 'Jump / Прыжок', frames: 5 },
   dodge: { label: 'Dodge / Уклонение', frames: 5 },
   wave: { label: 'Wave / Приветствие', frames: 5 },
+  reach: { label: 'Reach / Взаимодействие с предметом', frames: 5 },
   dance: { label: 'Dance / Танец', frames: 9 },
   attack: { label: 'Attack / Атака', frames: 5 },
   defend: { label: 'Defend / Защита', frames: 5 }
@@ -141,7 +142,64 @@ function applyPlantedGaitPose(rig, pose, phase, preset, rootBob, chains) {
   return true;
 }
 
-function poseFor(rig, preset, phase) {
+function reachArmChainFor(rig, side, rawRigInput) {
+  const upperRole = side === 'right' ? 'rightArm' : 'leftArm';
+  const lowerRole = side === 'right' ? 'rightLowerArm' : 'leftLowerArm';
+  const upper = rig.bones.find(bone => roleOf(bone.id) === upperRole);
+  const lower = rig.bones.find(bone => roleOf(bone.id) === lowerRole);
+  const rawParts = Array.isArray(rawRigInput?.parts) ? rawRigInput.parts : [];
+  const rawPart = rawParts.find(part => String(part?.boneId ?? '').toLowerCase() === String(lower?.id ?? '').toLowerCase());
+  const part = rig.parts.find(item => String(item.boneId).toLowerCase() === String(lower?.id ?? '').toLowerCase());
+  if (!upper || !lower || !part || !rawPart
+    || !upper.pivotEnabled || !lower.pivotEnabled
+    || lower.parentId?.toLowerCase() !== upper.id.toLowerCase()
+    || !Number.isFinite(rawPart.gripOffsetX) || !Number.isFinite(rawPart.gripOffsetY)) return null;
+  const grip = {
+    x: part.x + part.gripOffsetX,
+    y: part.y + part.gripOffsetY
+  };
+  const upperLength = Math.hypot(lower.pivotX - upper.pivotX, lower.pivotY - upper.pivotY);
+  const lowerLength = Math.hypot(grip.x - lower.pivotX, grip.y - lower.pivotY);
+  if (!upperLength || !lowerLength || upperLength > 2 || lowerLength > 2) return null;
+  const cross = (lower.pivotX - upper.pivotX) * (grip.y - upper.pivotY)
+    - (lower.pivotY - upper.pivotY) * (grip.x - upper.pivotX);
+  return {
+    upper, lower, grip, upperLength, lowerLength,
+    bendDirection: cross >= 0 ? 1 : -1,
+    restUpperAngle: Math.atan2(lower.pivotY - upper.pivotY, lower.pivotX - upper.pivotX),
+    restLowerAngle: Math.atan2(grip.y - lower.pivotY, grip.x - lower.pivotX)
+  };
+}
+
+function solveReachContactPose(chain, target, phase) {
+  const extension = phase * phase * (3 - 2 * phase);
+  const desired = {
+    x: chain.grip.x + (target.x - chain.grip.x) * extension,
+    y: chain.grip.y + (target.y - chain.grip.y) * extension
+  };
+  const solved = solveTwoBoneIK({
+    root: { x: chain.upper.pivotX, y: chain.upper.pivotY },
+    target: desired,
+    upperLength: chain.upperLength,
+    lowerLength: chain.lowerLength,
+    bendDirection: chain.bendDirection
+  });
+  if (solved.status !== 'solved' || solved.reachable !== true) return null;
+  let upperDelta = solved.angles.upper - chain.restUpperAngle;
+  while (upperDelta > Math.PI) upperDelta -= Math.PI * 2;
+  while (upperDelta < -Math.PI) upperDelta += Math.PI * 2;
+  let lowerDelta = solved.angles.lower - chain.restLowerAngle - upperDelta;
+  while (lowerDelta > Math.PI) lowerDelta -= Math.PI * 2;
+  while (lowerDelta < -Math.PI) lowerDelta += Math.PI * 2;
+  return {
+    [chain.upper.id]: { rotation: round(upperDelta) },
+    [chain.lower.id]: { rotation: round(lowerDelta) }
+  };
+}
+
+function poseFor(rig, preset, phase, reachContactPose = null) {
+  const hasRightArm = rig.bones.some(bone => roleOf(bone.id) === 'rightArm');
+  const hasLeftArm = rig.bones.some(bone => roleOf(bone.id) === 'leftArm');
   const pose = {};
   const cycle = Math.sin(phase * Math.PI * 2);
   const lift = Math.max(0, Math.sin(phase * Math.PI * 2));
@@ -217,6 +275,18 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightLeg') rotation = 0.2 * beat;
       if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = 0.12 * bounce;
       if (role === 'rightLowerLeg' && bone.pivotEnabled) rotation = 0.12 * (1 - bounce);
+    } else if (preset === 'reach') {
+      // A brief, readable arm extension for source-grounded prop interactions.
+      // The prop renderer independently animates the named object toward its holder.
+      const extension = Math.sin(Math.PI * phase);
+      if (role === 'root' && !reachContactPose) { x = 0.018 * extension; rotation = -0.025 * extension; }
+      // Prefer the right arm when available; fall back to the left arm on
+      // one-sided rigs instead of silently producing almost no reach motion.
+      if (role === 'rightArm' || (role === 'arm' && !hasRightArm && !hasLeftArm)) rotation = -0.92 * extension;
+      if (role === 'rightLowerArm') rotation = -0.24 * extension;
+      if (role === 'leftArm' && !hasRightArm) rotation = -0.92 * extension;
+      if (role === 'leftLowerArm' && !hasRightArm) rotation = 0.24 * extension;
+      if (role === 'head') rotation = -0.045 * extension;
     } else if (preset === 'attack') {
       const strike = Math.sin(Math.PI * phase);
       if (role === 'root') { x = 0.055 * strike; rotation = -0.035 * strike; }
@@ -246,16 +316,17 @@ function poseFor(rig, preset, phase) {
     if (!gaitChains && (role === 'leftFoot' || role === 'rightFoot' || role === 'foot')) y = -rootBob;
     if (x || y || rotation) pose[bone.id] = { x: round(clamp(x, -0.5, 0.5)), y: round(clamp(y, -0.5, 0.5)), rotation: round(clamp(rotation, -1.5, 1.5)) };
   }
+  if (reachContactPose) Object.assign(pose, reachContactPose);
   if (gaitChains) applyPlantedGaitPose(rig, pose, phase, preset, rootBob, gaitChains);
   return pose;
 }
 
 /** Build an explicit, bounded keyframe timeline from a validated segmented character rig. */
-export function createCharacterRigMotionPreset(rigInput, presetName) {
+export function createCharacterRigMotionPreset(rigInput, presetName, options = {}) {
   const report = validateCharacterRig(rigInput);
   if (!report.passed) return { status: 'invalid-rig', preset: presetName, timeline: null, issues: report.issues };
   const preset = PRESETS[presetName];
-  if (!preset) return { status: 'unknown-preset', preset: presetName, timeline: null, issues: [{ code: 'motion-preset-unknown', message: 'Choose idle, walk, run, jump, dodge, wave, dance, attack, or defend.' }] };
+  if (!preset) return { status: 'unknown-preset', preset: presetName, timeline: null, issues: [{ code: 'motion-preset-unknown', message: 'Choose idle, walk, run, jump, dodge, wave, reach, dance, attack, or defend.' }] };
   const rig = report.rig;
   const roles = new Set(rig.bones.map(bone => roleOf(bone.id)));
   const warnings = [];
@@ -273,7 +344,7 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
     if (![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) warnings.push('No arm-like bone IDs found; the protective arm pose will be omitted.');
     if (![...roles].some(role => role === 'leftLeg' || role === 'rightLeg' || role === 'leg')) warnings.push('No leg-like bone IDs found; the crouch pose will be omitted.');
   }
-  if (['attack', 'defend'].includes(presetName) && ![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) {
+  if (['attack', 'defend', 'reach'].includes(presetName) && ![...roles].some(role => role === 'leftArm' || role === 'rightArm' || role === 'arm')) {
     warnings.push('No arm-like bone IDs found; the action gesture cannot be represented by this rig.');
   }
   if (presetName === 'dance') {
@@ -284,6 +355,25 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
     warnings.push('No right-arm or generic arm bone found; the greeting gesture cannot be represented by this rig.');
   }
   const gaitChains = ['walk', 'run'].includes(presetName) ? plantedGaitChains(rig) : null;
+  let reachContactFrames = null;
+  if (presetName === 'reach' && options?.target !== undefined) {
+    const target = options.target;
+    if (!target || typeof target.x !== 'number' || !Number.isFinite(target.x)
+      || typeof target.y !== 'number' || !Number.isFinite(target.y)
+      || Math.abs(target.x) > 2 || Math.abs(target.y) > 2) {
+      warnings.push('Reach contact was not applied: target must be a finite normalized scene point within -2..2.');
+    } else {
+      const chain = reachArmChainFor(rig, 'right', rigInput) || reachArmChainFor(rig, 'left', rigInput);
+      if (!chain) {
+        warnings.push('Reach contact was not applied: this rig needs a connected upper-arm/forearm chain with enabled pivots and an explicitly authored gripOffsetX/gripOffsetY hand anchor.');
+      } else {
+        const frames = Array.from({ length: preset.frames }, (_, index) =>
+          solveReachContactPose(chain, target, index / (preset.frames - 1)));
+        if (frames.every(Boolean)) reachContactFrames = frames;
+        else warnings.push('Reach contact target is outside the arm reach at one or more keyframes; the legacy reach gesture was kept instead.');
+      }
+    }
+  }
   const keyframes = Array.from({ length: preset.frames }, (_, index) => {
     const time = index / (preset.frames - 1);
     return {
@@ -291,7 +381,7 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
       // Cyclic motions must keep moving through intermediate frames; easing each
       // segment independently introduces an artificial stop at every keyframe.
       easing: presetName === 'jump' && index > 0 ? 'ease-in-out' : 'linear',
-      poses: { [rig.characterId]: poseFor(rig, presetName, time) }
+      poses: { [rig.characterId]: poseFor(rig, presetName, time, reachContactFrames?.[index] || null) }
     };
   });
   if (gaitChains && keyframes.some(frame => (

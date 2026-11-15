@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { inferStoryboardStateChanges } from '../src/scene-state-changes.js';
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildProductionScene, buildSceneIdentitySeed, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from '../src/scene-production.js';
 
 const scene = {
@@ -24,6 +25,53 @@ test('image prompt builder includes scene, setting, camera, character bible and 
   assert.match(prompt, /Medium close-up/);
   assert.match(prompt, /Small orange fox/);
   assert.match(prompt, /No extra characters/);
+});
+
+test('background-only image prompt excludes the cast and character-aware story prompt', () => {
+  const prompt = buildImageGenerationPrompt({
+    characterCompositionMode: 'background-only',
+    environmentDescription: 'A moonlit forest clearing with a fallen oak and a small stream.',
+    location: 'Northern forest',
+    timeOfDay: 'Moonlit night',
+    imagePrompt: 'Kel stands beside the stream.',
+    characters: ['Kel'],
+    visibleAction: 'Kel lifts a branch.',
+    continuityLock: 'Keep Kel wearing a green cloak.'
+  }, [{ characterId: 'Kel', visualDescription: 'Young forest explorer' }], { visualStyle: 'Anime-inspired' });
+
+  assert.match(prompt, /environment-only background plate/i);
+  assert.match(prompt, /moonlit forest clearing/);
+  assert.match(prompt, /anime artwork/i);
+  assert.match(prompt, /Do not render people, characters, animals/);
+  assert.doesNotMatch(prompt, /Kel|green cloak|Young forest explorer|lifts a branch/);
+});
+
+test('background-only image prompt refuses to fall back when environment details are missing', () => {
+  const prompt = buildImageGenerationPrompt({
+    characterCompositionMode: 'background-only',
+    imagePrompt: 'Kel stands in a forest.',
+    characters: ['Kel']
+  }, [{ characterId: 'Kel', visualDescription: 'Young forest explorer' }]);
+
+  assert.equal(prompt, '');
+});
+
+test('background-only motion prompt animates scenery without character actions or interactions', () => {
+  const prompt = buildMotionGenerationPrompt({
+    characterCompositionMode: 'background-only',
+    motionPrompt: 'Kel lifts a branch and frees a mechanical bird.',
+    visibleAction: 'Kel frees the bird.',
+    characters: ['Kel'],
+    environmentMotion: ['Clouds drift across the moon.', 'Leaves sway in the wind.'],
+    interactions: [{ type: 'free', actorId: 'Kel', targetId: 'mechanical bird', evidence: 'Kel frees the mechanical bird.' }],
+    camera: 'Slow static wide shot'
+  }, [{ characterId: 'Kel', visualDescription: 'Young forest explorer in a green cloak' }]);
+
+  assert.match(prompt, /Environment motion 1: Clouds drift across the moon/);
+  assert.match(prompt, /Environment motion 2: Leaves sway in the wind/);
+  assert.match(prompt, /Slow static wide shot/);
+  assert.match(prompt, /Animate only the environment and scenery/);
+  assert.doesNotMatch(prompt, /Kel|mechanical bird|green cloak|lifts a branch|Physical interaction \\d+:/i);
 });
 
 test('image prompt explicitly requires every declared scene character to be visible', () => {
@@ -59,6 +107,59 @@ test('motion prompt builder separates temporal action and preserves continuity',
   assert.match(prompt, /End state/);
   assert.match(prompt, /Blue scarf/);
   assert.match(prompt, /do not introduce new objects/i);
+});
+
+test('motion prompt forwards explicit environment motion and physical prop interactions', () => {
+  const prompt = buildMotionGenerationPrompt({
+    motionPrompt: 'Kel frees the mechanical bird.',
+    characters: ['Kel'],
+    environmentMotion: ['Clouds drift across the sky.', 'Wind shakes the tree branches.'],
+    interactions: [{
+      type: 'free',
+      actorId: 'Kel',
+      targetId: 'mechanical bird',
+      evidence: 'Kel carefully frees the mechanical bird.'
+    }]
+  }, [{ characterId: 'Kel', visualDescription: 'A young forest explorer' }]);
+
+  assert.match(prompt, /Environment motion 1: Clouds drift across the sky/);
+  assert.match(prompt, /Environment motion 2: Wind shakes the tree branches/);
+  assert.match(prompt, /Actor "Kel" performs "free" with target "mechanical bird"/);
+  assert.match(prompt, /Show cause and effect visibly/);
+  assert.match(prompt, /background motion spatially coherent and independent from camera motion/i);
+});
+
+test('production scene preserves explicit prop state changes through normalization into motion prompt', () => {
+  const prepared = buildProductionScene({
+    id: 'prop-state-scene',
+    title: 'Kel frees the bird',
+    imagePrompt: 'Kel kneels beside a fallen branch and a mechanical bird.',
+    motionPrompt: 'Kel lifts the branch and frees the bird.',
+    characters: ['Kel'],
+    stateChanges: [{
+      entityType: 'prop',
+      entityId: 'fallen branch',
+      property: 'holder',
+      previousValue: null,
+      value: 'Kel',
+      actorId: 'Kel',
+      evidence: 'Kel lifts the fallen branch.'
+    }]
+  }, [{ characterId: 'Kel', visualDescription: 'A young forest explorer' }]);
+
+  assert.equal(prepared.stateChanges.length, 1);
+  assert.equal(prepared.stateChanges[0].entityId, 'fallen branch');
+  assert.match(prepared.motionGenerationPrompt, /Prop "fallen branch" changes holder to "Kel"/);
+});
+
+test('motion prompt does not invent world motion or prop interactions when no evidence exists', () => {
+  const prompt = buildMotionGenerationPrompt({
+    motionPrompt: 'Kel stands in a quiet clearing.',
+    characters: ['Kel']
+  });
+  assert.doesNotMatch(prompt, /World and object motion contract/);
+  assert.doesNotMatch(prompt, /Environment motion \\d+:/);
+  assert.doesNotMatch(prompt, /Physical interaction \\d+:/);
 });
 
 test('motion prompt adds temporal stability and controlled camera constraints', () => {
@@ -410,4 +511,63 @@ test('changes the scene-image seed when the canonical character design or visual
 
 test('does not force a seed when a scene has no saved character identity', () => {
   assert.equal(buildSceneIdentitySeed({ characters: ['unknown'] }, []), undefined);
+});
+
+test('motion prompt includes explicit world movement and object interaction contracts', () => {
+  const prompt = buildMotionGenerationPrompt({
+    visibleAction: 'Kel frees the mechanical bird.',
+    environmentMotion: ['Clouds drift across the sky.', 'Wind shakes the tree branches.'],
+    interactions: [{ type: 'rescue', actorId: 'Kel', targetId: 'mechanical bird', evidence: 'Kel frees the mechanical bird.' }],
+    stateChanges: [{ entityType: 'prop', entityId: 'fallen branch', property: 'holder', value: 'Kel', actorId: 'Kel' }]
+  });
+  assert.match(prompt, /Clouds drift across the sky/);
+  assert.match(prompt, /Wind shakes the tree branches/);
+  assert.match(prompt, /Kel.*rescue.*mechanical bird/);
+  assert.match(prompt, /fallen branch.*holder.*Kel/);
+});
+
+
+test('production prompt carries an inferred prop release from story text through scene normalization', () => {
+  const storyScenes = [
+    { id: 'kel-rescue', storyDetail: 'Kel frees the small mechanical bird.', characters: ['Kel'] },
+    { id: 'kel-after-rescue', storyDetail: 'Kel watches the small mechanical bird fly above the clearing.', characters: ['Kel'] }
+  ];
+  const changes = inferStoryboardStateChanges(storyScenes, 'en');
+  assert.equal(changes[0][0].property, 'state');
+  assert.equal(changes[0][0].value, 'free');
+  assert.deepEqual(changes[1], []);
+
+  const prepared = buildProductionScene({
+    id: 'kel-rescue',
+    title: 'Kel frees the bird',
+    storyDetail: storyScenes[0].storyDetail,
+    visibleAction: storyScenes[0].storyDetail,
+    motionPrompt: storyScenes[0].storyDetail,
+    imagePrompt: 'Kel beside a small mechanical bird under a fallen branch.',
+    camera: 'Medium shot',
+    startState: 'The mechanical bird is trapped beneath a fallen branch.',
+    endState: 'The mechanical bird is free.',
+    characters: ['Kel'],
+    stateChanges: changes[0]
+  }, [{ characterId: 'Kel', visualDescription: 'Small adventurer with a green jacket' }]);
+
+  assert.equal(prepared.stateChanges[0].entityId, 'small mechanical bird');
+  assert.equal(prepared.stateChanges[0].previousValue, null);
+  assert.equal(prepared.stateChanges[0].value, 'free');
+  assert.match(prepared.motionGenerationPrompt, /Prop "small mechanical bird" changes state to "free" through actor "Kel"/);
+});
+
+test('motion prompt separates character body action from camera and background motion', () => {
+  const prompt = buildMotionGenerationPrompt({
+    motionPrompt: 'Kel kneels, reaches beneath the fallen branch, lifts it with both hands, and frees the mechanical bird.',
+    characters: ['Kel'],
+    startState: 'Kel is standing beside the fallen branch; the bird is trapped.',
+    endState: 'Kel holds the raised branch; the bird is free.'
+  }, [{ characterId: 'Kel', visualDescription: 'Young forest explorer with a green jacket' }]);
+
+  assert.match(prompt, /Character action is the primary motion/i);
+  assert.match(prompt, /camera pan, zoom, shake, or background movement is not a substitute/i);
+  assert.match(prompt, /distinct intermediate poses/i);
+  assert.match(prompt, /visible contact, applying force, and completing the requested result/i);
+  assert.match(prompt, /Separate subject motion, object motion, environment motion, and camera motion/i);
 });

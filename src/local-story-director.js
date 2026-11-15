@@ -141,6 +141,24 @@ function buildStructuredStateMemory(modelScenes, baselineScenes) {
     return { supplied: true, report: { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-memory-error', severity: 'error' }] } };
   }
 }
+/** Keep only finite, normalized anchors for props already present in locked scene state. */
+export function normalizeScenePropAnchors(input, lockedStateChanges = []) {
+  if (!isRecord(input)) return {};
+  const allowed = new Set((Array.isArray(lockedStateChanges) ? lockedStateChanges : [])
+    .filter(change => isRecord(change) && change.entityType === 'prop' && clean(change.entityId, 120))
+    .map(change => clean(change.entityId, 120).toLocaleLowerCase()));
+  const result = {};
+  for (const [entityId, point] of Object.entries(input).slice(0, 12)) {
+    const name = clean(entityId, 120);
+    if (!name || !allowed.has(name.toLocaleLowerCase()) || !isRecord(point)) continue;
+    if (typeof point.x !== 'number' || !Number.isFinite(point.x)
+      || typeof point.y !== 'number' || !Number.isFinite(point.y)
+      || point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1) continue;
+    result[name] = { x: point.x, y: point.y };
+  }
+  return result;
+}
+
 function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null }) {
   const requiredDetails = basePlan.scenes.map((scene, index) => ({
     scene: index + 1,
@@ -149,12 +167,13 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     assignedCharacters: Array.isArray(scene.characters) ? scene.characters : [],
     lockedInteraction: scene.interaction || null,
     lockedCausalLink: scene.causalLink || null,
-    lockedStateChanges: scene.stateChanges || []
+    lockedStateChanges: scene.stateChanges || [],
+    lockedPropStates: scene.propStates || []
   }));
   return [
     'You are DRAVEX, a careful animation film director.',
     'Create a scene-by-scene visual direction for the supplied story.',
-    'Return ONLY valid JSON with this exact top-level shape: {"scenes":[{"title":"...","purpose":"...","visibleAction":"...","camera":"...","imagePrompt":"...","motionPrompt":"...","startState":"...","endState":"...","actionTimeline":null}]}.',
+    'Return ONLY valid JSON with this exact top-level shape: {"scenes":[{"title":"...","purpose":"...","visibleAction":"...","camera":"...","imagePrompt":"...","motionPrompt":"...","startState":"...","endState":"...","actionTimeline":null,"propAnchors":{}}]}.',
     'Return exactly ' + basePlan.scenes.length + ' scenes, in the same order as the supplied source details.',
     'Each visibleAction must describe one concrete, filmable physical action, not a vague feeling or a static pose.',
     'Make every scene action and camera plan distinct. Use specific shot size, angle, and camera movement.',
@@ -168,6 +187,7 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'Main character reference: ' + clean(character, 120) + '.',
     'Write all scene text in ' + clean(language, 30) + '.',
     'Keep imagePrompt focused on one still frame; keep motionPrompt focused on movement.',
+    'For each scene, propAnchors may contain normalized canvas coordinates {"exact prop name":{"x":0.5,"y":0.7}} only for prop entity IDs present in that scene\'s locked state changes or carried prop-state snapshot. Coordinates must be finite fractions from 0 to 1; place an interacted prop in a plausible visible position within the assigned actor\'s reach. Omit uncertain anchors; never invent props or target IDs.',
     'For each scene, provide actionTimeline.phases in normalized scene time from 0 to 1. Include only phases supported by the scene: preparation, action, reaction, result. Any supplied timeline must include one central action phase; preparation ends before action, reaction starts after action, and result starts after the action and any reaction. Every phase needs an assigned actorId, a concrete description, and evidence copied exactly from locked storyDetail or sourceEvents. Use only characters assigned to that scene. Do not invent reactions or targets; targetId may be null. If the scene is an establishing shot with no character action, set actionTimeline to null.',
     'Build a strict scene-to-scene hand-off: scene N+1 startState must continue scene N endState. Preserve the exact positions and states of characters, props, clothing, lighting, weather, and location unless the supplied story explicitly changes them.',
     'Do not teleport characters or objects. If a character holds an object at the end of one scene, begin the next scene with that same character still holding it. Carry unresolved actions forward before starting a new action.',
@@ -256,7 +276,8 @@ export async function directStoryboardWithLocalAI({
       motionPrompt: clean(scene.motionPrompt, 3_000),
       startState: clean(scene.startState, 1_000),
       endState: clean(scene.endState, 1_000),
-      actionTimeline: scene.actionTimeline ?? null
+      actionTimeline: scene.actionTimeline ?? null,
+      propAnchors: normalizeScenePropAnchors(scene.propAnchors, [...(Array.isArray(base.stateChanges) ? base.stateChanges : []), ...(Array.isArray(base.propStates) ? base.propStates : [])])
     };
   }));
 

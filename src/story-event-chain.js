@@ -47,10 +47,11 @@ export function buildStoryEventChain(scenes = []) {
       };
       const actorKnown = characters.some(name => name.toLocaleLowerCase() === change.actorId.toLocaleLowerCase());
       const holderKnown = change.value === null || characters.some(name => name.toLocaleLowerCase() === String(change.value).toLocaleLowerCase());
-      const validProperty = (change.entityType === 'prop' && ['holder', 'openState'].includes(change.property))
+      const validProperty = (change.entityType === 'prop' && ['holder', 'openState', 'state'].includes(change.property))
         || (change.entityType === 'character' && change.property === 'location');
       const validValue = (change.property === 'holder' && holderKnown)
         || (change.property === 'openState' && ['open', 'closed'].includes(change.value))
+        || (change.property === 'state' && ['free', 'trapped'].includes(change.value))
         || (change.property === 'location' && /^(inside|outside):/u.test(String(change.value ?? '')));
       const key = change.entityType + ':' + change.entityId.toLocaleLowerCase() + ':' + change.property;
       const previousMatches = knownStates.has(key)

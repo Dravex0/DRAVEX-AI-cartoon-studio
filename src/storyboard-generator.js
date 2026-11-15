@@ -10,6 +10,9 @@ import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
 import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
+import { inferEnvironmentMotion } from './environment-motion.js';
+import { inferPropInteractions } from './scene-prop-interactions.js';
+import { buildDeterministicScenePropAnchors } from './scene-prop-layout.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -98,8 +101,10 @@ function distributeStoryDetails(sentences, beatCount) {
  */
 export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   const locale = Object.hasOwn(BEATS, lang) ? lang : 'en';
-  const subject = String(character ?? '').trim().slice(0, 120) || (locale === 'ru' || locale === 'uk' ? 'Персонаж' : locale === 'es' ? 'Personaje' : 'Character');
   const brief = parseStoryBrief(idea);
+  const subject = String(character ?? '').trim().slice(0, 120)
+    || String(brief.characters?.[0] ?? '').trim().slice(0, 120)
+    || (locale === 'ru' || locale === 'uk' ? 'Персонаж' : locale === 'es' ? 'Personaje' : 'Character');
   const source = brief.storyText;
   const explicitScenes = Array.isArray(brief.sceneBlocks) ? brief.sceneBlocks : [];
   const sentences = source ? (source.match(/[^.!?。！？]+[.!?。！？]?/gu) || []).map(part => part.trim()).filter(Boolean) : [FALLBACK[locale]];
@@ -141,26 +146,56 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   });
 
   const causalLinks = inferSceneCausalLinks(scenes, locale);
-  const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
   const explicitSubject = !explicitScenes.length && String(character ?? '').trim() ? subject : '';
   const knownCharacters = [...new Set([explicitSubject, ...brief.characters].filter(Boolean))];
   const characterMention = (name, sourceText) => {
     const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
     return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
   };
-  scenes.forEach((scene, index) => {
-    scene.causalLink = causalLinks[index];
-    scene.stateChanges = stateChanges[index];
+  scenes.forEach(scene => {
     scene.characters = [...new Set([
       ...(explicitSubject ? [explicitSubject] : []),
       ...knownCharacters.filter(name => name !== explicitSubject && (scene.storyDetail
         ? characterMention(name, scene.storyDetail)
         : name.toLocaleLowerCase() === subject.toLocaleLowerCase()))
     ])];
+  });
+
+  const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
+  // Build an end-of-scene prop snapshot so props that do not change in a cut
+  // remain available to the renderer and the next scene's continuity prompts.
+  const propStateMemory = new Map();
+  const propStateSnapshots = stateChanges.map(sceneChanges => {
+    const startStates = new Map(propStateMemory);
+    const changedKeys = new Set();
+    for (const change of sceneChanges) {
+      if (change?.entityType !== 'prop' || !change.entityId || !change.property) continue;
+      const stateKey = String(change.entityId).toLocaleLowerCase() + ':' + String(change.property);
+      propStateMemory.set(stateKey, { ...change });
+      changedKeys.add(stateKey);
+    }
+    return [...propStateMemory.entries()].map(([stateKey, state]) => ({
+      ...state,
+      startValue: startStates.get(stateKey)?.value ?? null,
+      changedThisScene: changedKeys.has(stateKey)
+    }));
+  });
+  scenes.forEach((scene, index) => {
+    scene.causalLink = causalLinks[index];
+    scene.stateChanges = stateChanges[index];
+    scene.propStates = propStateSnapshots[index];
+    scene.propAnchors = buildDeterministicScenePropAnchors(scene);
     // Keep interaction inference source-grounded and limited to characters assigned to this scene.
-    scene.interactions = scene.storyDetail
+    const characterInteractions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
       : [];
+    const propInteractions = scene.storyDetail
+      ? inferPropInteractions(scene.storyDetail, scene.characters, locale)
+      : [];
+    scene.interactions = [...characterInteractions, ...propInteractions];
+
+    // Extract only explicitly written non-character movement; never add default weather or crowd motion.
+    scene.environmentMotion = inferEnvironmentMotion(scene.storyDetail, locale);
     // Semantic story intent is separate from renderer movement presets and is now
     // carried into the actual motion prompt and validated action timeline.
     const semanticIntent = inferSceneActionIntent(scene.storyDetail);
@@ -181,12 +216,30 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     const actionTarget = primaryInteraction?.targetId ||
       (semanticNeedsPair && scene.characters.length > 1 ? scene.characters[1] : null);
     const canRepresentSemanticPair = !semanticNeedsPair || Boolean(actionTarget);
-    if (actionActor && actionEvidence && canRepresentSemanticPair &&
+    const orderedPropInteractions = [...propInteractions]
+      .filter(interaction => stateChanges[index]?.some(change =>
+        change?.entityType === 'prop' &&
+        String(change.entityId).toLocaleLowerCase() === String(interaction.targetId).toLocaleLowerCase()
+      ))
+      .sort((a, b) => (a.sourceStart ?? 0) - (b.sourceStart ?? 0));
+    if (orderedPropInteractions.length >= 2) {
+      // Preserve a two-step physical sequence (e.g. lift the branch, then free the bird)
+      // as preparation + action. Each target must already exist in locked scene state.
+      const first = orderedPropInteractions[0];
+      const decisive = orderedPropInteractions[1];
+      scene.actionTimeline = {
+        schemaVersion: 1,
+        phases: [
+          { phase: 'preparation', start: 0.12, end: 0.46, actorId: first.actorId, targetId: first.targetId, description: first.evidence, evidence: first.evidence },
+          { phase: 'action', start: 0.54, end: 0.9, actorId: decisive.actorId, targetId: decisive.targetId, description: decisive.evidence, evidence: decisive.evidence }
+        ]
+      };
+    } else if (actionActor && actionEvidence && canRepresentSemanticPair &&
         (sourceAction !== 'idle' || primaryInteraction || semanticIsActionable)) {
       const semanticDescription = semanticIsActionable
         ? semanticNeedsPair
-          ? `${scene.characters[0]} and ${actionTarget} combine their powers as described in the source event: ${scene.storyDetail}`
-          : `Perform the ${semanticIntent.intent} event: ${scene.storyDetail}`
+          ? scene.characters[0] + ' and ' + actionTarget + ' combine their powers as described in the source event: ' + scene.storyDetail
+          : 'Perform the ' + semanticIntent.intent + ' event: ' + scene.storyDetail
         : scene.visibleAction || scene.storyDetail;
       scene.actionTimeline = {
         schemaVersion: 1,

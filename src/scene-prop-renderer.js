@@ -11,6 +11,8 @@ function propKind(name) {
   if (/book|книг|книж|libro/.test(value)) return 'book';
   if (/ball|мяч|куля|pelota/.test(value)) return 'ball';
   if (/apple|яблок|яблук|manzana/.test(value)) return 'apple';
+  if (/bird|птиц|пташ|pájaro|ave/.test(value)) return 'bird';
+  if (/branch|ветк|гілк|rama/.test(value)) return 'branch';
   return 'generic';
 }
 
@@ -44,6 +46,20 @@ export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}
   return { x, y, rotation, partId: anchor.id };
 }
 
+
+/** Resolve only explicitly authored normalized scene coordinates for a named prop. */
+export function resolveScenePropAnchor(scene = {}, entityId) {
+  const anchors = scene?.propAnchors;
+  if (!anchors || typeof anchors !== 'object' || Array.isArray(anchors)) return null;
+  const wanted = key(entityId);
+  if (!wanted) return null;
+  const entry = Object.entries(anchors).find(([id]) => key(id) === wanted)?.[1];
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)
+    || !Number.isFinite(entry.x) || !Number.isFinite(entry.y)
+    || entry.x < 0 || entry.x > 1 || entry.y < 0 || entry.y > 1) return null;
+  return { x: entry.x, y: entry.y };
+}
+
 /**
  * Builds a deterministic visual plan from explicit, source-grounded prop holder changes.
  * Uses the authored action phase when available; older scenes use a deterministic
@@ -53,35 +69,60 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   const changes = Array.isArray(scene?.stateChanges) ? scene.stateChanges : [];
   const layers = Array.isArray(characterLayers) ? characterLayers : [];
   const p = clamp(Number.isFinite(progress) ? progress : 1, 0, 1);
-  const actionPhase = Array.isArray(scene?.actionTimeline?.phases)
-    ? scene.actionTimeline.phases.find(phase => phase?.phase === 'action'
-      && Number.isFinite(phase.start) && Number.isFinite(phase.end)
+  const actionPhases = Array.isArray(scene?.actionTimeline?.phases)
+    ? scene.actionTimeline.phases.filter(phase =>
+      Number.isFinite(phase?.start) && Number.isFinite(phase?.end)
       && phase.start >= 0 && phase.start < phase.end && phase.end <= 1)
-    : null;
-  // Prefer authored action timing; retain a stable fallback for older scenes.
-  const transitionStart = actionPhase ? actionPhase.start : 0.52;
-  const transitionEnd = actionPhase ? actionPhase.end : 0.8;
-  const transition = clamp((p - transitionStart) / (transitionEnd - transitionStart), 0, 1);
-  const eased = transition * transition * (3 - 2 * transition);
-  const latest = new Map();
+    : [];
+  const actionPhase = actionPhases.find(phase => phase.phase === 'action') || null;
+  const latestHolders = new Map();
+  const latestStates = new Map();
+  const snapshots = Array.isArray(scene?.propStates) ? scene.propStates : [];
+  const sourceStates = snapshots.length ? snapshots : changes;
+  for (const state of sourceStates) {
+    if (!state || state.entityType !== 'prop') continue;
+    const entityId = clean(state.entityId);
+    if (!entityId) continue;
+    const stableRecord = {
+      ...state,
+      previousValue: state.changedThisScene === true
+        ? (state.startValue ?? state.previousValue ?? null)
+        : (state.value ?? null)
+    };
+    if (state.property === 'holder') latestHolders.set(key(entityId), stableRecord);
+    if (state.property === 'state' && ['trapped', 'free', 'fallen', 'lifted'].includes(key(state.value))) {
+      latestStates.set(key(entityId), stableRecord);
+    }
+  }
+  // Scene-local events take precedence over the carried snapshot so their authored
+  // previousValue and action timing drive transitions in this shot.
   for (const change of changes) {
-    if (!change || change.entityType !== 'prop' || change.property !== 'holder') continue;
+    if (!change || change.entityType !== 'prop') continue;
     const entityId = clean(change.entityId);
     if (!entityId) continue;
-    latest.set(key(entityId), change);
+    if (change.property === 'holder') latestHolders.set(key(entityId), change);
+    if (change.property === 'state' && ['trapped', 'free', 'fallen', 'lifted'].includes(key(change.value))) {
+      latestStates.set(key(entityId), change);
+    }
   }
-  return [...latest.values()].map(change => {
+
+  const holderPlans = [...latestHolders.values()].map(change => {
     const actorId = clean(change.actorId);
     const actor = layers.find(layer => key(layer?.characterId) === key(actorId));
     const actorX = Number.isFinite(actor?.x) ? actor.x : 0.5;
     const actorY = Number.isFinite(actor?.y) ? actor.y : 0.68;
     const heldByActor = change.value != null && key(change.value) === key(actorId);
     const wasHeldByActor = change.previousValue != null && key(change.previousValue) === key(actorId);
-    const ground = { x: 0.68, y: 0.79 };
+    const ground = resolveScenePropAnchor(scene, change.entityId) || { x: 0.68, y: 0.79 };
     const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
     const hand = rigAnchor
       ? { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation }
       : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96), y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
+    const propPhase = actionPhases.find(phase => key(phase.targetId) === key(change.entityId)) || actionPhase;
+    const transitionStart = propPhase ? propPhase.start : 0.52;
+    const transitionEnd = propPhase ? propPhase.end : 0.8;
+    const transition = clamp((p - transitionStart) / (transitionEnd - transitionStart), 0, 1);
+    const eased = transition * transition * (3 - 2 * transition);
     const from = wasHeldByActor ? hand : ground;
     const to = heldByActor ? hand : ground;
     const x = from.x + (to.x - from.x) * eased;
@@ -97,6 +138,36 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       evidence: clean(change.evidence)
     };
   });
+
+  // A prop whose state changes but is not held still needs a visible representation.
+  // Only render it when the planner/provider supplied an explicit anchor; never guess
+  // where a trapped or released object belongs in the composition.
+  const statePlans = [...latestStates.values()]
+    .filter(change => !latestHolders.has(key(change.entityId)))
+    .flatMap(change => {
+      const anchor = resolveScenePropAnchor(scene, change.entityId);
+      if (!anchor) return [];
+      const propPhase = actionPhases.find(phase => key(phase.targetId) === key(change.entityId)) || actionPhase;
+      const transitionStart = propPhase ? propPhase.start : 0.52;
+      const transitionEnd = propPhase ? propPhase.end : 0.8;
+      const transition = clamp((p - transitionStart) / (transitionEnd - transitionStart), 0, 1);
+      const eased = transition * transition * (3 - 2 * transition);
+      const isFree = key(change.value) === 'free';
+      return [{
+        id: clean(change.entityId),
+        kind: propKind(change.entityId),
+        x: anchor.x,
+        y: anchor.y - (isFree ? 0.045 * eased : 0),
+        rotation: isFree ? -0.12 * eased : 0,
+        held: false,
+        state: key(change.value),
+        visible: true,
+        scale: 1,
+        evidence: clean(change.evidence)
+      }];
+    });
+
+  return [...holderPlans, ...statePlans];
 }
 
 function drawStar(context, size) {
@@ -111,14 +182,32 @@ function drawStar(context, size) {
   context.fill();
 }
 
-function drawProp(context, prop, x, y, time) {
-  const bob = prop.held ? Math.sin(time * 4) * 0.008 : 0;
+function drawProp(context, prop, x, y, time, unitScale = 1) {
+  const bob = prop.held ? Math.sin(time * 4) * 0.008 : prop.state === 'free' ? Math.sin(time * 5) * 0.006 : 0;
   context.save();
   context.translate(x, y + bob);
+  context.scale(unitScale, unitScale);
   context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
-  context.lineWidth = 2.5;
+  context.lineWidth = 2.5 / unitScale;
   context.lineJoin = 'round';
-  if (prop.kind === 'star') {
+  if (prop.kind === 'bird') {
+    context.fillStyle = prop.state === 'trapped' ? '#91a7b1' : '#a9dce5'; context.strokeStyle = '#365966';
+    context.beginPath(); context.ellipse(0, 0.002, 0.022, 0.014, 0, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.beginPath(); context.ellipse(-0.004, -0.006, 0.011, 0.006, -0.35, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.fillStyle = '#d8edf0'; context.beginPath(); context.arc(0.016, -0.009, 0.009, 0, Math.PI * 2); context.fill(); context.stroke();
+    context.fillStyle = '#243b45'; context.beginPath(); context.arc(0.019, -0.011, 0.0022, 0, Math.PI * 2); context.fill();
+    context.fillStyle = '#e5a94f'; context.beginPath(); context.moveTo(0.024, -0.007); context.lineTo(0.035, -0.003); context.lineTo(0.024, 0.001); context.closePath(); context.fill();
+    context.strokeStyle = '#7eabb7'; context.beginPath(); context.moveTo(-0.016, 0.012); context.lineTo(-0.021, 0.019); context.moveTo(-0.006, 0.014); context.lineTo(-0.008, 0.02); context.stroke();
+  } else if (prop.kind === 'branch') {
+    context.strokeStyle = '#775435'; context.lineWidth = 6 / unitScale;
+    context.beginPath(); context.moveTo(-0.04, 0.012); context.lineTo(-0.017, -0.006);
+    context.lineTo(0.005, 0.006); context.lineTo(0.025, -0.014);
+    context.moveTo(-0.017, -0.006); context.lineTo(-0.024, -0.023);
+    context.moveTo(0.005, 0.006); context.lineTo(0.014, 0.026);
+    context.stroke();
+    context.strokeStyle = '#9b754a'; context.lineWidth = 2 / unitScale;
+    context.beginPath(); context.moveTo(-0.035, 0.009); context.lineTo(-0.015, -0.005); context.lineTo(0.005, 0.006); context.stroke();
+  } else if (prop.kind === 'star') {
     context.fillStyle = '#ffe58a'; context.strokeStyle = '#9b6b24';
     drawStar(context, 0.027);
     context.stroke();
@@ -152,6 +241,7 @@ export function drawSceneProps(context, scene, characterLayers, progress, width,
     return { drawn: 0, skipped: 0 };
   }
   const plan = buildScenePropRenderPlan(scene, characterLayers, progress, runtime);
-  for (const prop of plan) drawProp(context, prop, prop.x * width, prop.y * height, Number.isFinite(time) ? time : 0);
+  const unitScale = Math.max(1, Math.min(width, height));
+  for (const prop of plan) drawProp(context, prop, prop.x * width, prop.y * height, Number.isFinite(time) ? time : 0, unitScale);
   return { drawn: plan.length, skipped: 0, props: plan };
 }

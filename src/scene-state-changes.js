@@ -5,30 +5,68 @@
  */
 const VERBS = {
   en: [
-    { re: /(?:picks up|takes|grabs|holds)/iu, property: 'holder', value: 'actor' },
+    { re: /(?:lifts?|picks up|takes|grabs|holds)/iu, property: 'holder', value: 'actor' },
     { re: /(?:drops|puts down|leaves behind)/iu, property: 'holder', value: null },
+    { re: /(?:frees|releases|unties)/iu, property: 'state', value: 'free' },
+    { re: /(?:traps|imprisons)/iu, property: 'state', value: 'trapped' },
     { re: /opens/iu, property: 'openState', value: 'open' },
     { re: /closes/iu, property: 'openState', value: 'closed' }
   ],
   ru: [
     { re: /(?:поднимает|бер[её]т|забирает|держит)/iu, property: 'holder', value: 'actor' },
     { re: /(?:роняет|клад[её]т|оставляет)/iu, property: 'holder', value: null },
+    { re: /(?:освобождает|высвобождает|выпускает)/iu, property: 'state', value: 'free' },
+    { re: /(?:ловит в ловушку|запирает|пленяет)/iu, property: 'state', value: 'trapped' },
     { re: /открывает/iu, property: 'openState', value: 'open' },
     { re: /закрывает/iu, property: 'openState', value: 'closed' }
   ],
   uk: [
     { re: /(?:піднімає|бере|забирає|тримає)/iu, property: 'holder', value: 'actor' },
     { re: /(?:роняє|кладе|залишає)/iu, property: 'holder', value: null },
+    { re: /(?:звільняє|визволяє|випускає)/iu, property: 'state', value: 'free' },
+    { re: /(?:ловить у пастку|замикає|полонить)/iu, property: 'state', value: 'trapped' },
     { re: /відкриває/iu, property: 'openState', value: 'open' },
     { re: /закриває/iu, property: 'openState', value: 'closed' }
   ],
   es: [
     { re: /(?:recoge|toma|agarra|sostiene)/iu, property: 'holder', value: 'actor' },
     { re: /(?:suelta|deja caer|deja)/iu, property: 'holder', value: null },
+    { re: /(?:libera|suelta)/iu, property: 'state', value: 'free' },
+    { re: /(?:atrapa|encierra)/iu, property: 'state', value: 'trapped' },
     { re: /abre/iu, property: 'openState', value: 'open' },
     { re: /cierra/iu, property: 'openState', value: 'closed' }
   ]
 };
+
+
+const PASSIVE_TRAPPED_PATTERNS = {
+  en: /(?:sees?|finds?|notices?|discovers?)\s+(?:the|a|an)\s+(.+?)\s+(?:is\s+)?trapped\b/iu,
+  ru: /(?:видит|замечает|находит|обнаруживает)\s+(.+?)(?:,\s*|\s+)(?:застрявш\p{L}*|зажат\p{L}*|придавлен\p{L}*)/iu,
+  uk: /(?:бачить|помічає|знаходить|виявляє)\s+(.+?)(?:,\s*|\s+)(?:застрягл\p{L}*|затиснут\p{L}*|притиснут\p{L}*)/iu,
+  es: /(?:ve|encuentra|nota|descubre)\s+(?:el|la|los|las|un|una)\s+(.+?)\s+(?:atrapad[oa]s?|aprisionad[oa]s?)\b/iu
+};
+
+const FALLEN_OBSTACLE_PATTERNS = {
+  en: /\btrapped\s+(?:under|beneath)\s+(?:the|a|an)\s+(fallen\s+[\p{L}\p{N} -]{2,80})/iu,
+  ru: /(?:застрявш\p{L}*|зажат\p{L}*|придавлен\p{L}*)\s+под\s+(упавш\p{L}*\s+[\p{L}\p{N} -]{2,80})/iu,
+  uk: /(?:застрягл\p{L}*|затиснут\p{L}*|притиснут\p{L}*)\s+під\s+(упал\p{L}*\s+[\p{L}\p{N} -]{2,80})/iu,
+  es: /(?:atrapad[oa]s?|aprisionad[oa]s?)\s+bajo\s+(?:el|la|un|una)\s+([\p{L}\p{N} -]{2,80}?\s+caíd[oa])/iu
+};
+
+const LIFT_VERBS = {
+  en: /(?:lifts?|raises?)/iu,
+  ru: /поднимает/iu,
+  uk: /піднімає/iu,
+  es: /(?:levanta|alza)/iu
+};
+
+function canonicalPropEntityId(language, value) {
+  const entity = clean(value, 100).replace(/^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu, '');
+  if (language === 'ru' && /ветк/iu.test(entity) && /упавш/iu.test(entity)) return 'упавшая ветка';
+  if (language === 'uk' && /гілк/iu.test(entity) && /упал/iu.test(entity)) return 'упала гілка';
+  if (language === 'es' && /caíd[oa]/iu.test(entity) && /ram[ao]/iu.test(entity)) return 'rama caída';
+  return entity;
+}
 
 const LOCATION_VERBS = {
   en: [
@@ -71,7 +109,9 @@ function findEntity(source, actorId, verb) {
   if (!actorMatch) return null;
   const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
   const verbMatch = verb.re.exec(afterActor);
-  if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) return null;
+  const actionPrefix = afterActor.slice(0, verbMatch?.index ?? 0)
+    .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+/iu).at(-1);
+  if (!verbMatch || !hasOnlyOptionalAdverb(actionPrefix)) return null;
   const entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
   if (!entity || entity.length > 100 || /^(?:it|them|him|her|его|её|ее|их|його|її|їх)$/iu.test(entity)) return null;
   return { entity, evidence: clean(source, 1_200) };
@@ -98,7 +138,7 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
         for (const verb of VERBS[locale]) {
           const found = findEntity(sentence, actorId, verb);
           if (!found) continue;
-          const entityId = found.entity;
+          const entityId = canonicalPropEntityId(locale, found.entity);
           const property = verb.property;
           const key = 'prop:' + entityId.toLocaleLowerCase() + ':' + property;
           const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
@@ -110,6 +150,54 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
         const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
         const actorMatch = actor.exec(sentence);
         if (!actorMatch) continue;
+
+        // Recognize a directly observed trapped state only when this named actor
+        // explicitly sees/finds/notices the prop in the same source sentence.
+        const passiveTrap = PASSIVE_TRAPPED_PATTERNS[locale].exec(sentence);
+        if (passiveTrap) {
+          const entityId = canonicalPropEntityId(locale, passiveTrap[1]);
+          const key = 'prop:' + entityId.toLocaleLowerCase() + ':state';
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          if (entityId && previousValue !== 'trapped') {
+            changes.push({
+              entityType: 'prop', entityId, property: 'state', previousValue,
+              value: 'trapped', actorId, evidence: clean(sentence, 1_200)
+            });
+            knownStates.set(key, 'trapped');
+          }
+        }
+
+        // A trapped object explicitly described beneath a fallen obstacle also
+        // establishes that obstacle as a visible fallen prop in the same scene.
+        const fallenObstacle = FALLEN_OBSTACLE_PATTERNS[locale].exec(sentence);
+        if (fallenObstacle) {
+          const entityId = canonicalPropEntityId(locale, fallenObstacle[1]);
+          const key = 'prop:' + entityId.toLocaleLowerCase() + ':state';
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          if (entityId && previousValue !== 'fallen') {
+            changes.push({
+              entityType: 'prop', entityId, property: 'state', previousValue,
+              value: 'fallen', actorId, evidence: clean(sentence, 1_200)
+            });
+            knownStates.set(key, 'fallen');
+          }
+        }
+
+        // When the actor lifts a previously described prop, retain both the
+        // ownership transition and its explicit physical state transition.
+        const liftedProp = findEntity(sentence, actorId, { re: LIFT_VERBS[locale] });
+        if (liftedProp) {
+          const entityId = canonicalPropEntityId(locale, liftedProp.entity);
+          const key = 'prop:' + entityId.toLocaleLowerCase() + ':state';
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          if (previousValue !== 'lifted') {
+            changes.push({
+              entityType: 'prop', entityId, property: 'state', previousValue,
+              value: 'lifted', actorId, evidence: liftedProp.evidence
+            });
+            knownStates.set(key, 'lifted');
+          }
+        }
         const afterActor = sentence.slice(actorMatch.index + actorMatch[0].length);
         for (const verb of LOCATION_VERBS[locale]) {
           const verbMatch = verb.re.exec(afterActor);

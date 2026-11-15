@@ -3,6 +3,7 @@ import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 import { createCharacterRigMotionPreset } from './character-rig-motion-presets.js';
 import { sampleCharacterRigTimeline, validateCharacterRigTimeline } from './character-rig-timeline.js';
 import { compileDoodleSceneMotion } from './doodle-rig-adapter.js';
+import { resolveScenePropAnchor } from './scene-prop-renderer.js';
 
 const clean = value => String(value ?? '').trim();
 const key = value => clean(value).toLocaleLowerCase();
@@ -13,6 +14,7 @@ function presetForDescription(description) {
   if (intent.intent === 'dodge') return 'dodge';
   if (intent.intent === 'attack') return 'attack';
   if (intent.intent === 'defend') return 'defend';
+  if (intent.intent === 'prop_interaction') return 'reach';
   const action = detectSceneAction(description);
   return PRESET_BY_ACTION[action] || null;
 }
@@ -59,9 +61,27 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
       skipped.push({ actorId, phase: phase.phase, reason: 'actor-rig-missing' });
       continue;
     }
+    const targetIsLockedProp = Boolean(phase.targetId && Array.isArray(scene.stateChanges)
+      && scene.stateChanges.some(change => change?.entityType === 'prop'
+        && key(change.entityId) === key(phase.targetId)));
+    const contactTarget = preset === 'reach' && targetIsLockedProp
+      ? resolveScenePropAnchor(scene, phase.targetId)
+      : null;
     const result = preset
-      ? createCharacterRigMotionPreset(rig, preset)
+      ? createCharacterRigMotionPreset(rig, preset, contactTarget ? { target: contactTarget } : {})
       : compileDoodleSceneMotion({ characters: [actorId], action: doodleAction }, [rig]);
+    if (preset === 'reach' && (!phase.targetId || !contactTarget)) {
+      skipped.push({
+        actorId,
+        phase: phase.phase,
+        targetId: phase.targetId || null,
+        reason: !phase.targetId
+          ? 'explicit-prop-target-missing'
+          : !targetIsLockedProp
+            ? 'explicit-prop-target-not-locked'
+            : 'explicit-prop-anchor-missing'
+      });
+    }
     if (result.status !== 'ready' || !result.timeline) {
       skipped.push({ actorId, phase: phase.phase, reason: 'invalid-rig-or-preset', issues: result.issues || [] });
       continue;
@@ -72,6 +92,14 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
       end: phase.end,
       preset: preset || result.actions?.[0]?.preset || 'idle',
       doodleAction,
+      contactTargetId: contactTarget ? phase.targetId : null,
+      holdUntilEnd: Boolean(contactTarget && scene.stateChanges?.some(change =>
+        change?.entityType === 'prop'
+        && change?.property === 'holder'
+        && key(change.entityId) === key(phase.targetId)
+        && key(change.actorId) === key(actorId)
+        && key(change.value) === key(actorId)
+      )),
       timeline: result.timeline
     });
   }
@@ -107,7 +135,7 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
   const keyframes = orderedTimes.map(time => {
     const poses = {};
     for (const [actorKey, actorSegments] of byActor) {
-      const segment = actorSegments.find(item => time >= item.start && time <= item.end);
+      const segment = [...actorSegments].reverse().find(item => time >= item.start && (time <= item.end || (item.holdUntilEnd && time > item.end)));
       if (!segment) continue;
       const localTime = (time - segment.start) / (segment.end - segment.start);
       const sampled = sampleCharacterRigTimeline(segment.timeline, localTime);
@@ -129,8 +157,11 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     timeline: report.timeline,
     generatedCount: accepted.length,
     skipped,
-    mappedActions: accepted.map(({ actorId, preset, doodleAction, start, end }) => ({
-      actorId, preset, start, end, ...(doodleAction ? { doodleAction } : {})
+    mappedActions: accepted.map(({ actorId, preset, doodleAction, start, end, contactTargetId, holdUntilEnd }) => ({
+      actorId, preset, start, end,
+      ...(doodleAction ? { doodleAction } : {}),
+      ...(contactTargetId ? { contactTargetId, contactTargetResolved: true } : {}),
+      ...(holdUntilEnd ? { holdAfterAction: true } : {})
     }))
   };
 }

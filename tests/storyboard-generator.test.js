@@ -222,3 +222,85 @@ test('semantic reveal creates a source-grounded action instead of a passive idle
   assert.equal(scene.actionTimeline.phases[0].actorId, 'Nox');
   assert.match(scene.motionGenerationPrompt, /reveal/);
 });
+
+test('keeps Kel branch-lift and mechanical-bird release as ordered, separately targeted action phases', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nKel — a young forest adventurer.\n\nScene 1: Rescue\nKel lifts the fallen branch and frees the small mechanical bird.',
+    'en',
+    'Kel'
+  );
+  const scene = result.scenes[0];
+  assert.deepEqual(scene.stateChanges.map(change => [change.entityId, change.property, change.value]), [
+    ['fallen branch', 'holder', 'Kel'],
+    ['small mechanical bird', 'state', 'free'],
+    ['fallen branch', 'state', 'lifted']
+  ]);
+  assert.deepEqual(scene.actionTimeline.phases.map(phase => [phase.phase, phase.targetId, phase.actorId]), [
+    ['preparation', 'fallen branch', 'Kel'],
+    ['action', 'small mechanical bird', 'Kel']
+  ]);
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+});
+
+
+test('keeps Kel rescue state continuous across three explicitly authored scenes', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nKel — a young forest adventurer.\n\nScene 1: Discovery\nKel notices the small mechanical bird trapped under a fallen branch.\n\nScene 2: Lifting the branch\nKel lifts the fallen branch.\n\nScene 3: Freedom\nKel frees the small mechanical bird.',
+    'en',
+    'Kel'
+  );
+
+  assert.equal(result.scenes.length, 3);
+  assert.deepEqual(result.scenes.map(scene => scene.title), [
+    'Discovery',
+    'Lifting the branch',
+    'Freedom'
+  ]);
+
+  const [discovery, lifting, freedom] = result.scenes;
+  assert.ok(discovery.stateChanges.some(change =>
+    change.entityId === 'small mechanical bird' &&
+    change.property === 'state' &&
+    change.value === 'trapped'
+  ));
+  assert.ok(lifting.stateChanges.some(change =>
+    change.entityId === 'fallen branch' &&
+    change.property === 'holder' &&
+    change.value === 'Kel'
+  ));
+  assert.ok(freedom.stateChanges.some(change =>
+    change.entityId === 'small mechanical bird' &&
+    change.property === 'state' &&
+    change.previousValue === 'trapped' &&
+    change.value === 'free'
+  ));
+
+  assert.equal(lifting.actionTimeline.phases[0].targetId, 'fallen branch');
+  assert.equal(freedom.actionTimeline.phases[0].targetId, 'small mechanical bird');
+  assert.ok(result.eventChain.nodes.every(node => node.sceneId));
+});
+
+
+test('uses prompt-defined characters for action and prop-state inference without a separate character field', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nKel — a young forest adventurer in a dark green cloak.\n\nScene 1: Discovery\nKel notices the small mechanical bird trapped under a fallen branch.\n\nScene 2: Lifting the branch\nKel carefully lifts the fallen branch while watching the bird.\n\nScene 3: Freedom\nKel frees the small mechanical bird.',
+    'en',
+    ''
+  );
+
+  assert.equal(result.scenes.length, 3);
+  assert.ok(result.scenes.every(scene => scene.characters.includes('Kel')));
+  assert.match(result.scenes[0].visibleAction, /Kel/i);
+  assert.ok(result.scenes[0].stateChanges.some(change =>
+    change.entityId === 'small mechanical bird' && change.property === 'state' && change.value === 'trapped'
+  ));
+  assert.ok(result.scenes[0].stateChanges.some(change =>
+    change.entityId === 'fallen branch' && change.property === 'state' && change.value === 'fallen'
+  ));
+  assert.ok(result.scenes[1].stateChanges.some(change =>
+    change.entityId === 'fallen branch' && change.property === 'holder' && change.value === 'Kel'
+  ));
+  assert.ok(result.scenes[1].propStates.some(state =>
+    state.entityId === 'small mechanical bird' && state.property === 'state' && state.value === 'trapped'
+  ));
+});

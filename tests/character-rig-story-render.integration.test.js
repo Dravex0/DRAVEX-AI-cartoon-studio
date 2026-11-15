@@ -95,6 +95,52 @@ test('story-generated rig poses reach the character renderer as articulated imag
     'at least one rendered body part must receive the generated dodge rotation');
 });
 
+test('Kel freeing a named prop maps to a reaching arm pose that reaches the canvas renderer', () => {
+  const kelRig = { ...rig, characterId: 'Kel' };
+  const evidence = 'Kel carefully frees the small mechanical bird.';
+  const scene = {
+    characters: ['Kel'],
+    characterCastProvided: true,
+    storyDetail: evidence,
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action',
+        start: 0.2,
+        end: 0.8,
+        actorId: 'Kel',
+        targetId: 'small mechanical bird',
+        description: evidence,
+        evidence
+      }]
+    }
+  };
+  const planned = createCharacterRigTimelineFromActionTimeline(scene, [kelRig]);
+  assert.equal(planned.status, 'generated');
+  assert.equal(planned.mappedActions[0].preset, 'reach');
+
+  const sampledPoses = sampleCharacterRigTimeline(planned.timeline, 0.5);
+  const spy = createCanvasSpy();
+  const rendered = drawCharacterLayers(
+    spy.context,
+    [{ characterId: 'Kel', imageUrl: 'https://assets.example/kel.png' }],
+    () => ({ width: 64, height: 64 }),
+    640,
+    360,
+    {
+      drawRigParts: true,
+      preferRigParts: true,
+      characterRigs: [kelRig],
+      rigPoses: sampledPoses
+    }
+  );
+
+  assert.equal(rendered.rigDrawn, kelRig.parts.length);
+  assert.equal(rendered.rigSkipped, 0);
+  assert.ok(spy.calls.rotations.some(rotation => Math.abs(rotation) > 0.5),
+    'the reaching arm pose must reach an actual rendered rig-part transform');
+});
+
 test('story-generated rig timeline renders neutral parts before the action interval', () => {
   const planned = createCharacterRigTimelineFromActionTimeline(createScene(), [rig]);
   const sampledPoses = sampleCharacterRigTimeline(planned.timeline, 0.1);

@@ -37,6 +37,10 @@ jobs:
 
       - name: Run desktop and Pixel 7 browser tests
         run: npm run test:e2e
+        env:
+          # Optional secret: enables the real, quota-consuming Wan 2.2 smoke tests.
+          # Never echo or otherwise expose this value in logs.
+          DRAVEX_HF_TOKEN: ${{ secrets.DRAVEX_HF_TOKEN }}
 
       - name: Upload Playwright report and failure evidence
         if: always()

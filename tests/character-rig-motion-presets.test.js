@@ -28,7 +28,7 @@ const rig = () => ({
 
 describe('procedural character rig motion presets', () => {
   it('exposes the supported starter movement library', () => {
-    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'wave', 'dance', 'attack', 'defend']);
+    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'wave', 'reach', 'dance', 'attack', 'defend']);
   });
 
   it('creates a validated walk cycle with explicit start and end frames', () => {
@@ -218,6 +218,22 @@ describe('procedural character rig motion presets', () => {
     assert.ok(result.warnings.some(message => message.includes('No leg-like')));
     const wave = createCharacterRigMotionPreset(simpleRig, 'wave');
     assert.ok(wave.warnings.some(message => message.includes('No right-arm')));
+  });
+
+  it('animates a reach with a left-arm-only rig and bends its forearm', () => {
+    const candidate = rig();
+    candidate.bones = candidate.bones.filter(bone => !['rightArm', 'rightLeg', 'leftLeg', 'head'].includes(bone.id));
+    candidate.bones.push({ id: 'leftLowerArm', parentId: 'leftArm' });
+    candidate.parts = candidate.parts.filter(part => !['arm-r', 'leg-l', 'leg-r', 'head-part'].includes(part.id));
+    candidate.parts.push({ id: 'left-forearm-part', boneId: 'leftLowerArm', imageUrl: 'https://assets.example/left-forearm.png' });
+
+    const result = createCharacterRigMotionPreset(candidate, 'reach');
+    assert.equal(result.status, 'ready');
+    const middle = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+    assert.ok(middle.leftArm.rotation < -0.8, 'left upper arm should extend toward the target');
+    assert.ok(middle.leftLowerArm.rotation > 0.2, 'left forearm should articulate at the elbow');
+    assert.ok(result.animatedBoneIds.includes('leftArm'));
+    assert.ok(result.animatedBoneIds.includes('leftLowerArm'));
   });
 
   it('rejects an invalid rig and an unknown preset', () => {
@@ -422,3 +438,60 @@ describe('dance motion preset', () => {
     assert.equal(start.root?.rotation || 0, end.root?.rotation || 0);
   });
 });
+
+
+  it('solves a reachable reach target to the authored hand grip point', () => {
+    const candidate = {
+      schemaVersion: 1,
+      characterId: 'Kel',
+      bones: [
+        { id: 'root', parentId: null, pivotX: 0.5, pivotY: 0.78, pivotEnabled: true },
+        { id: 'torso', parentId: 'root', pivotX: 0.5, pivotY: 0.43, pivotEnabled: true },
+        { id: 'rightArm', parentId: 'torso', pivotX: 0.63, pivotY: 0.39, pivotEnabled: true },
+        { id: 'rightLowerArm', parentId: 'rightArm', pivotX: 0.69, pivotY: 0.47, pivotEnabled: true }
+      ],
+      parts: [
+        { id: 'torso-part', boneId: 'torso', imageUrl: 'https://assets.example/torso.png', x: 0.5, y: 0.52, width: 0.3, height: 0.34 },
+        { id: 'upper-arm-part', boneId: 'rightArm', imageUrl: 'https://assets.example/upper-arm.png', x: 0.65, y: 0.4, width: 0.15, height: 0.23 },
+        { id: 'hand-part', boneId: 'rightLowerArm', imageUrl: 'https://assets.example/hand.png', x: 0.71, y: 0.55, width: 0.14, height: 0.22, gripOffsetX: 0.07, gripOffsetY: 0 }
+      ]
+    };
+    const target = { x: 0.78, y: 0.35 };
+    const result = createCharacterRigMotionPreset(candidate, 'reach', { target });
+    assert.equal(result.status, 'ready');
+    assert.deepEqual(result.warnings, []);
+
+    const middle = sampleCharacterRigTimeline(result.timeline, 1).Kel;
+    const posedParts = applyCharacterRigPose(candidate.parts, candidate, middle);
+    const hand = posedParts.find(part => part.id === 'hand-part');
+    const angle = hand.rotation;
+    const grip = {
+      x: hand.x + Math.cos(angle) * hand.gripOffsetX - Math.sin(angle) * hand.gripOffsetY,
+      y: hand.y + Math.sin(angle) * hand.gripOffsetX + Math.cos(angle) * hand.gripOffsetY
+    };
+    close(grip.x, target.x, 0.001);
+    close(grip.y, target.y, 0.001);
+    assert.ok(Math.abs(middle.rightArm.rotation) > 0.01);
+    assert.ok(Math.abs(middle.rightLowerArm.rotation) > 0.01);
+  });
+
+  it('does not claim hand contact when the target is outside the arm reach', () => {
+    const candidate = {
+      schemaVersion: 1,
+      characterId: 'Kel',
+      bones: [
+        { id: 'root', parentId: null, pivotX: 0.5, pivotY: 0.78, pivotEnabled: true },
+        { id: 'torso', parentId: 'root', pivotX: 0.5, pivotY: 0.43, pivotEnabled: true },
+        { id: 'rightArm', parentId: 'torso', pivotX: 0.63, pivotY: 0.39, pivotEnabled: true },
+        { id: 'rightLowerArm', parentId: 'rightArm', pivotX: 0.69, pivotY: 0.47, pivotEnabled: true }
+      ],
+      parts: [
+        { id: 'torso-part', boneId: 'torso', imageUrl: 'https://assets.example/torso.png', x: 0.5, y: 0.52, width: 0.3, height: 0.34 },
+        { id: 'upper-arm-part', boneId: 'rightArm', imageUrl: 'https://assets.example/upper-arm.png', x: 0.65, y: 0.4, width: 0.15, height: 0.23 },
+        { id: 'hand-part', boneId: 'rightLowerArm', imageUrl: 'https://assets.example/hand.png', x: 0.71, y: 0.55, width: 0.14, height: 0.22, gripOffsetX: 0.07, gripOffsetY: 0 }
+      ]
+    };
+    const result = createCharacterRigMotionPreset(candidate, 'reach', { target: { x: 1.2, y: 0.39 } });
+    assert.equal(result.status, 'ready');
+    assert.ok(result.warnings.some(message => message.includes('outside the arm reach')));
+  });
