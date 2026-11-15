@@ -102,7 +102,7 @@ test("requires local storage and validates WAV encoder input", () => {
 });
 
 
-test("falls back to the first installed Kokoro voice when the requested and default voices are unavailable", async () => {
+test("uses the first installed Kokoro voice only when no voice was explicitly requested", async () => {
   const storage = makeStorage();
   let generatedWithVoice;
   const engine = createBrowserLocalTtsEngine({
@@ -117,10 +117,35 @@ test("falls back to the first installed Kokoro voice when the requested and defa
   });
 
   await engine.load({ locale: "en", backend: "wasm" });
-  await engine.synthesize({ text: "A voice fallback test", voiceId: "missing_voice" });
+  await engine.synthesize({ text: "A default voice selection test" });
 
   assert.equal(generatedWithVoice, "uk_custom_voice");
   assert.equal(storage.records.size, 1);
+});
+
+
+test("rejects an unavailable explicitly assigned Kokoro voice instead of silently changing character identity", async () => {
+  const storage = makeStorage();
+  let generatedWithVoice;
+  const engine = createBrowserLocalTtsEngine({
+    storage, cryptoRef: webcrypto, environment,
+    kokoroFactory: async () => ({
+      list_voices: () => ["uk_custom_voice", "uk_second_voice"],
+      generate: async (text, options) => {
+        generatedWithVoice = options.voice;
+        return validOutput(24000);
+      }
+    })
+  });
+
+  await engine.load({ locale: "en", backend: "wasm" });
+  await assert.rejects(
+    engine.synthesize({ text: "This must not use another character voice", voiceId: "missing_voice" }),
+    /Requested Kokoro voice "missing_voice" is not available/
+  );
+
+  assert.equal(generatedWithVoice, undefined);
+  assert.equal(storage.records.size, 0);
 });
 
 

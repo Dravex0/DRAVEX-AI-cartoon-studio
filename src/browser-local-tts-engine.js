@@ -201,7 +201,7 @@ export function createBrowserLocalTtsEngine({
       }
     },
 
-    async synthesize({ text, voiceId = DEFAULT_KOKORO_VOICE, filename = "scene-voice.wav", signal } = {}) {
+    async synthesize({ text, voiceId, filename = "scene-voice.wav", signal } = {}) {
       assertNotAborted(signal);
       if (!loaded) throw new Error("Load a local TTS model before generating speech.");
       const cleanText = String(text ?? "").trim();
@@ -211,13 +211,15 @@ export function createBrowserLocalTtsEngine({
       let phonemeChunks = [];
       if (loaded.model.runtime === "kokoro-js") {
         const availableVoices = getKokoroVoiceIds(loaded.instance);
+        const requestedVoice = typeof voiceId === "string" ? voiceId.trim() : "";
+        if (requestedVoice && availableVoices.length && !availableVoices.includes(requestedVoice)) {
+          throw new Error(`Requested Kokoro voice "${requestedVoice}" is not available in the loaded model.`);
+        }
         const selectedVoice = availableVoices.length
-          ? (availableVoices.includes(voiceId)
-            ? voiceId
-            : availableVoices.includes(DEFAULT_KOKORO_VOICE)
-              ? DEFAULT_KOKORO_VOICE
-              : availableVoices[0])
-          : voiceId;
+          ? (requestedVoice || (availableVoices.includes(DEFAULT_KOKORO_VOICE)
+            ? DEFAULT_KOKORO_VOICE
+            : availableVoices[0]))
+          : (requestedVoice || DEFAULT_KOKORO_VOICE);
         if (typeof loaded.instance.stream === "function") {
           const audioParts = [];
           let streamSampleRate = null;
