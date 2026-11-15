@@ -13,17 +13,21 @@ const MODEL_REGISTRY = Object.freeze({
     notes: "English Kokoro model. Runs through kokoro-js; the model and voice assets are downloaded on explicit load."
   }),
   ru: Object.freeze({
-    id: "mms-ru",
-    runtime: "transformers-js",
-    modelId: "Xenova/mms-tts-rus",
+    id: "utrobinmv-russian-vits-multispeaker",
+    runtime: "russian-vits-onnx",
+    modelId: "utrobinmv/tts_ru_free_hf_vits_low_multispeaker",
+    modelUrl: "https://huggingface.co/utrobinmv/tts_ru_free_hf_vits_low_multispeaker/resolve/0e9a395/model.onnx",
+    revision: "0e9a395",
     locale: "ru",
     languages: Object.freeze(["ru"]),
-    license: "CC-BY-NC-4.0",
-    commercialUse: false,
-    dtype: "q8",
-    approximateQuantizedWeightBytes: 38_400_000,
-    voiceMode: "single-speaker",
-    notes: "Non-commercial model; one speaker. Requires explicit non-commercial-use opt-in."
+    license: "Apache-2.0",
+    commercialUse: true,
+    dtype: "fp32",
+    approximateQuantizedWeightBytes: null,
+    modelBytes: 50_800_000,
+    voiceMode: "multi-speaker",
+    voices: Object.freeze(["ru-female", "ru-male"]),
+    notes: "Russian VITS ONNX with two explicit speakers. Model is downloaded on explicit load and inference runs locally through ONNX Runtime Web."
   }),
   uk: Object.freeze({
     id: "piper-uk-ukrainian-tts-medium",
