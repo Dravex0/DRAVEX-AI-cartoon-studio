@@ -2,7 +2,7 @@ import { getLocalTtsModel } from "./local-tts-model-registry.js";
 import { createVerifiedVoiceArtifactStore } from "./verified-voice-artifact.js";
 import { detectDeviceCapabilities } from "./device-capabilities.js";
 import { createPiperTextOnnxRuntime } from "./piper-text-onnx-runtime.js";
-import { createRussianVitsOnnxRuntime } from "./russian-multispeaker-vits-runtime.js";
+import { createRussianVitsOnnxRuntime, loadRussianVitsTokenizer } from "./russian-multispeaker-vits-runtime.js";
 
 const DEFAULT_KOKORO_VOICE = "af_heart";
 const MAX_TEXT_LENGTH = 10_000;
@@ -105,11 +105,13 @@ async function defaultRussianVitsFactory(model, { environment = globalThis } = {
     const baseUrl = import.meta.env?.BASE_URL || "./";
     ort.env.wasm.wasmPaths = new URL(`${baseUrl}vendor/onnxruntime/`, pageUrl).href;
   }
-  const { AutoTokenizer } = await import("@huggingface/transformers");
   return createRussianVitsOnnxRuntime({
     ort,
     model,
-    tokenizerFactory: (modelId, options) => AutoTokenizer.from_pretrained(modelId, options)
+    tokenizerFactory: (_modelId, options) => loadRussianVitsTokenizer({
+      fetchImpl: environment?.fetch?.bind(environment) || globalThis.fetch,
+      signal: options?.signal
+    })
   });
 }
 
