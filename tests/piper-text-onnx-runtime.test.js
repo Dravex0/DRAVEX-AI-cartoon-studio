@@ -13,7 +13,7 @@ const config = {
   speaker_id_map: { lada: 0, mykyta: 1, tetiana: 2 },
   phoneme_id_map: {
     "_": [0], "^": [1], "$": [2], " ": [3],
-    "а": [12], "б": [13], "в": [14], "і": [23], "т": [34], "\\u0308": [35]
+    "а": [12], "б": [13], "в": [14], "і": [23], "т": [34], "\u0308": [35]
   }
 };
 
@@ -50,11 +50,15 @@ function createHarness({ output = new Float32Array([0.1, -0.1, 0.2]) } = {}) {
 }
 
 test("encodes Ukrainian text directly from the model character map", () => {
-  assert.deepEqual(piperTextToIds("АБ", config), [1, 0, 12, 0, 13, 0, 2]);
+  assert.deepEqual(piperTextToIds("аб", config), [1, 0, 12, 0, 13, 0, 2]);
   assert.throws(() => piperTextToIds("ї", config), /does not support text symbol/);
 });
 
-test("normalizes decomposed Unicode text without losing combining code points", () => {\n  assert.deepEqual(piperTextToIds("і\\u0308", config), [1, 0, 23, 0, 35, 0, 2]);\n});\n\ntest("resolves and validates all three exact speaker IDs", () => {
+test("normalizes decomposed Unicode text without losing combining code points", () => {
+  assert.deepEqual(piperTextToIds("і\u0308", config), [1, 0, 23, 0, 35, 0, 2]);
+});
+
+test("resolves and validates all three exact speaker IDs", () => {
   assert.equal(resolvePiperRuntimeSpeakerId(config, "lada"), 0);
   assert.equal(resolvePiperRuntimeSpeakerId(config, "mykyta"), 1);
   assert.equal(resolvePiperRuntimeSpeakerId(config, "tetiana"), 2);
@@ -84,7 +88,6 @@ test("does not silently substitute speaker zero for an unknown character voice",
 });
 
 test("rejects empty downloads and models that require eSpeak phonemization", async () => {
-  const { runtime } = createHarness();
   const emptyFetch = async url => url.endsWith(".json")
     ? { ok: true, async json() { return structuredClone(config); } }
     : { ok: true, async arrayBuffer() { return new ArrayBuffer(0); } };
@@ -101,7 +104,6 @@ test("rejects empty downloads and models that require eSpeak phonemization", asy
       : { ok: true, async arrayBuffer() { return new Uint8Array([1]).buffer; } }
   });
   await assert.rejects(espeakRuntime.load({ modelUrl: "/models/ru.onnx", configUrl: "/models/ru.onnx.json" }), /only phoneme_type=text/);
-  runtime.dispose();
 });
 
 test("releases the ONNX session on dispose", async () => {
