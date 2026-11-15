@@ -9,7 +9,8 @@ function resolveCharacterIds(text, config) {
   const map = config?.phoneme_id_map;
   assert(map && typeof map === "object" && !Array.isArray(map),
     "Piper model config is missing phoneme_id_map.");
-  const symbols = Array.from(String(text ?? "").trim().toLowerCase());
+  const normalizedText = String(text ?? "").trim().normalize("NFD");
+  const symbols = Array.from(normalizedText);
   assert(symbols.length > 0, "Dialogue text must not be empty.");
 
   const ids = [];
