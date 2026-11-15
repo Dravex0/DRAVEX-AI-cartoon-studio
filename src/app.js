@@ -1985,7 +1985,7 @@ function refreshSceneVoiceControls(){
  if(timestamped&&locale!=='en'){
   $('sceneVoiceStatus').textContent=voiceText('Экспериментальный timestamped Kokoro поддерживает только английский. Выбери стандартный движок для этого языка.','Experimental timestamped Kokoro currently supports English only. Choose the standard engine for this language.');
  }else if(!loaded&&!sceneVoiceEngine?.status.loaded&&!$('sceneVoiceStatus').dataset.touched){
-  $('sceneVoiceStatus').textContent=voiceText('Модель не загружена. После согласия загрузка начнётся при нажатии Load или запуске мультфильма с диалогами.','No voice model loaded. After consent, download starts when you press Load or create a film that needs speech.');
+  $('sceneVoiceStatus').textContent=voiceText('Модель не загружена. Нажми Load или запусти создание мультфильма с диалогами.','No voice model loaded. Press Load or create a film that needs dialogue.');
  }else if(!loaded&&sceneVoiceEngine?.status.loaded){
   $('sceneVoiceStatus').textContent=voiceText('Загружен другой движок или язык. Нажми Load, чтобы переключить модель.','A different engine or language is loaded. Press Load to switch.');
  }
@@ -2061,7 +2061,7 @@ $('loadSceneVoiceModel').addEventListener('click',async()=>{
    ?voiceText('Timestamped Kokoro готов. Временные метки viseme берутся из длительностей токенов модели.','Timestamped Kokoro ready. Viseme timings come from model token durations.')
    :locale==='en'
     ?voiceText('Английская локальная модель готова. Доступно голосов: '+count+'.','English local model ready. Available voices: '+count+'.')
-    :voiceText('Локальная модель готова. Эта языковая модель использует один голос.','Local model ready. This language model uses a single speaker voice.');
+    :voiceText('Локальная модель готова. Доступно голосов: '+count+'.','Local model ready. Available voices: '+count+'.');
  }catch(error){
   $('sceneVoiceStatus').textContent=(error?.message||'Voice model loading failed.');
  }finally{
