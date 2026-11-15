@@ -1,6 +1,5 @@
 import * as ort from "onnxruntime-web/wasm";
-import { AutoTokenizer } from "@huggingface/transformers";
-import { RUSSIAN_VITS_MODEL, createRussianVitsOnnxRuntime } from "./russian-multispeaker-vits-runtime.js";
+import { RUSSIAN_VITS_MODEL, createRussianVitsOnnxRuntime, loadRussianVitsTokenizer } from "./russian-multispeaker-vits-runtime.js";
 import { encodePcm16Wav } from "./browser-local-tts-engine.js";
 import { buildAudioMouthEnvelope } from "./audio-mouth-envelope.js";
 import { buildVisemeTimeline } from "./viseme-timeline.js";
@@ -42,7 +41,7 @@ export async function runRussianVitsRealInferenceSmoke({ downloadWavs = false, o
   const runtime = createRussianVitsOnnxRuntime({
     ort,
     model: RUSSIAN_VITS_MODEL,
-    tokenizerFactory: (modelId, options) => AutoTokenizer.from_pretrained(modelId, options)
+    tokenizerFactory: (_modelId, options) => loadRussianVitsTokenizer({ fetchImpl: globalThis.fetch, signal: options?.signal })
   });
   try {
     await runtime.load({ onProgress });
