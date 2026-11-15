@@ -70,7 +70,7 @@ export function createRussianVitsOnnxRuntime({
   let loading = null;
 
   return Object.freeze({
-    get availableVoices() { return model.voices.map(voice => voice.id); },
+    get availableVoices() { return session && tokenizer ? model.voices.map(voice => voice.id) : []; },
     get status() { return { loaded: Boolean(session && tokenizer), localInference: true, modelId: model.modelId }; },
 
     async load({ signal, onProgress } = {}) {
