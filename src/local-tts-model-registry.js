@@ -36,7 +36,8 @@ const MODEL_REGISTRY = Object.freeze({
     license: "MIT",
     commercialUse: true,
     dtype: "fp32",
-    approximateQuantizedWeightBytes: 76_735_663,
+    approximateQuantizedWeightBytes: null,
+    modelBytes: 76_735_663,
     voiceMode: "multi-speaker",
     voices: Object.freeze(["lada", "mykyta", "tetiana"]),
     notes: "Ukrainian Piper medium ONNX model; three named speakers. The model is downloaded only after explicit load and inference runs locally through ONNX Runtime Web."
@@ -103,6 +104,7 @@ export function listLocalTtsModels() {
     license: model.license,
     commercialUse: model.commercialUse,
     approximateQuantizedWeightBytes: model.approximateQuantizedWeightBytes,
+    modelBytes: model.modelBytes ?? null,
     voiceMode: model.voiceMode
   }));
 }
