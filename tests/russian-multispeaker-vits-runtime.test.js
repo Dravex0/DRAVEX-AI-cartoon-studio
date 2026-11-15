@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRussianVitsOnnxRuntime, resolveRussianVitsSpeakerId } from "../src/russian-multispeaker-vits-runtime.js";
+import { createRussianVitsOnnxRuntime, createRussianVitsTokenizer, resolveRussianVitsSpeakerId } from "../src/russian-multispeaker-vits-runtime.js";
 
 function makeHarness({ output = Float32Array.from([0.1, -0.2, 0.3, -0.4]) } = {}) {
   const calls = { fetch: [], sessionOptions: null, feeds: null, released: 0, tokenizerOptions: null };
@@ -39,6 +39,22 @@ function makeHarness({ output = Float32Array.from([0.1, -0.2, 0.3, -0.4]) } = {}
   };
   return { calls, runtime: createRussianVitsOnnxRuntime({ ort, tokenizerFactory, fetchImpl }) };
 }
+
+
+test("encodes Russian text with the pinned character vocabulary and VITS blank tokens", async () => {
+  const tokenizer = createRussianVitsTokenizer({
+    " ": 0, "_": 1, ":": 2, "а": 3, "б": 4, "в": 5, "г": 6, "д": 7,
+    "е": 8, "ё": 9, "ж": 10, "з": 11, "и": 12, "й": 13, "к": 14,
+    "л": 15, "м": 16, "н": 17, "о": 18, "п": 19, "р": 20, "с": 21,
+    "т": 22, "у": 23, "ф": 24, "х": 25, "ц": 26, "ч": 27, "ш": 28,
+    "щ": 29, "ъ": 30, "ы": 31, "ь": 32, "э": 33, "ю": 34, "я": 35,
+    ".": 36, "!": 37, "?": 38, ",": 39, "+": 40, "<unk>": 41, "<pad>": 42
+  });
+  const encoded = await tokenizer("ПРИВЕТ!");
+  assert.deepEqual(Array.from(encoded.input_ids.data), [0n, 20n, 0n, 20n, 0n, 12n, 0n, 5n, 0n, 8n, 0n, 22n, 0n, 37n, 0n]);
+  assert.deepEqual(Array.from(encoded.attention_mask.data), Array(15).fill(1n));
+  assert.deepEqual(encoded.input_ids.dims, [1, 15]);
+});
 
 test("exposes exactly two explicit Russian speaker IDs and rejects unknown voices", () => {
   assert.equal(resolveRussianVitsSpeakerId("ru-female"), 0);
