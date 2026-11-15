@@ -264,3 +264,53 @@ test("routes Ukrainian character speech through the selected Piper speaker and s
   assert.equal(wav.sampleRate, 22050);
   assert.equal(wav.channels, 1);
 });
+
+test("switches between Russian VITS and Ukrainian Piper without reusing stale voices", async () => {
+  const storage = makeStorage();
+  const calls = { russianDisposed: 0, ukrainianDisposed: 0, russianVoice: null, ukrainianVoice: null };
+  const engine = createBrowserLocalTtsEngine({
+    storage, cryptoRef: webcrypto, environment,
+    russianVitsFactory: async () => ({
+      availableVoices: ["ru-female", "ru-male"],
+      async load() {},
+      async synthesize(options) {
+        calls.russianVoice = options.voiceId;
+        return { audio: validOutput(16000).audio, sampleRate: 16000, voiceId: options.voiceId };
+      },
+      dispose() { calls.russianDisposed++; }
+    }),
+    piperFactory: async () => ({
+      availableVoices: ["lada", "mykyta", "tetiana"],
+      async load() {},
+      async synthesize(options) {
+        calls.ukrainianVoice = options.voiceId;
+        return { audio: validOutput(22050).audio, sampleRate: 22050, voiceId: options.voiceId };
+      },
+      dispose() { calls.ukrainianDisposed++; }
+    })
+  });
+
+  await engine.load({ locale: "ru", backend: "wasm" });
+  assert.deepEqual(engine.availableVoices, ["ru-female", "ru-male"]);
+  const russian = await engine.synthesize({ text: "Привет!", voiceId: "ru-male" });
+  assert.equal(russian.locale, "ru");
+  assert.equal(russian.voiceId, "ru-male");
+
+  await engine.load({ locale: "uk-UA", backend: "wasm" });
+  assert.equal(calls.russianDisposed, 1);
+  assert.deepEqual(engine.availableVoices, ["lada", "mykyta", "tetiana"]);
+  const ukrainian = await engine.synthesize({ text: "Вітаю!", voiceId: "tetiana" });
+  assert.equal(ukrainian.locale, "uk");
+  assert.equal(ukrainian.voiceId, "tetiana");
+
+  await engine.load({ locale: "ru", backend: "wasm" });
+  assert.equal(calls.ukrainianDisposed, 1);
+  assert.deepEqual(engine.availableVoices, ["ru-female", "ru-male"]);
+  const russianAgain = await engine.synthesize({ text: "Ще раз!", voiceId: "ru-female" });
+  assert.equal(russianAgain.locale, "ru");
+  assert.equal(russianAgain.voiceId, "ru-female");
+  assert.equal(calls.russianVoice, "ru-female");
+  assert.equal(calls.ukrainianVoice, "tetiana");
+  assert.equal(storage.records.size, 3);
+});
+
