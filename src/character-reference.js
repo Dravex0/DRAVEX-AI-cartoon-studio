@@ -41,12 +41,13 @@ export function upsertCharacterReference(references, input) {
 
 /**
  * Merge profiles extracted from a story into the user's character library.
- * Existing entries win so a manually edited visual reference is never overwritten
- * by a weaker text extraction. IDs are de-duplicated case-insensitively.
+ * Existing non-empty fields win so manually edited references are preserved,
+ * while story extraction can enrich empty auto-created placeholders.
+ * IDs are de-duplicated case-insensitively.
  */
 export function mergeCharacterReferences(existing = [], discovered = []) {
   const merged = [];
-  const seen = new Set();
+  const indexes = new Map();
   const sources = [
     ...(Array.isArray(existing) ? existing : []),
     ...(Array.isArray(discovered) ? discovered : [])
@@ -55,9 +56,21 @@ export function mergeCharacterReferences(existing = [], discovered = []) {
   for (const source of sources) {
     const profile = normalizeCharacterReference(source);
     const key = profile.characterId.toLocaleLowerCase();
-    if (!key || seen.has(key)) continue;
-    if (merged.length >= CHARACTER_REFERENCE_LIMIT) break;
-    seen.add(key);
+    if (!key) continue;
+
+    const existingIndex = indexes.get(key);
+    if (existingIndex !== undefined) {
+      const current = merged[existingIndex];
+      const combined = {};
+      for (const field of Object.keys(profile)) {
+        combined[field] = current[field] || profile[field];
+      }
+      merged[existingIndex] = normalizeCharacterReference(combined);
+      continue;
+    }
+
+    if (merged.length >= CHARACTER_REFERENCE_LIMIT) continue;
+    indexes.set(key, merged.length);
     merged.push(profile);
   }
 
