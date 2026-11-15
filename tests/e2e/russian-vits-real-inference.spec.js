@@ -66,6 +66,7 @@ test("real Russian VITS weights synthesize distinct non-silent female and male v
     }
     const sceneId = "real-russian-vits-webm-export";
     const scheduled = buildSceneVoiceTimeline({ sceneId, dialogue, artifacts, fps: 24, gapMs: 120 });
+    const durationSeconds = Math.max(8, Math.ceil((scheduled.timeline.totalDurationMs + 1500) / 1000));
     const titles = ["Два персонажа — два голоса"];
     const descriptions = ["Проверка настоящей русской речи в итоговом WebM"];
     const sceneMetadata = [{
@@ -73,7 +74,7 @@ test("real Russian VITS weights synthesize distinct non-silent female and male v
       title: titles[0],
       description: descriptions[0],
       visibleAction: descriptions[0],
-      durationSeconds: 8,
+      durationSeconds,
       dialogue,
       voiceCues: scheduled.cues,
       voiceTimeline: scheduled.timeline
@@ -85,7 +86,7 @@ test("real Russian VITS weights synthesize distinct non-silent female and male v
       style: "Storybook",
       canvasFormat: "landscape",
       imageQuality: "standard",
-      duration: "8",
+      duration: String(durationSeconds),
       language: "ru",
       uiLanguage: "en",
       titles,
