@@ -140,7 +140,6 @@ export function createBrowserLocalTtsEngine({
         locale: loaded.model.locale,
         modelId: loaded.model.modelId,
         engine: loaded.engine,
-        voiceId: selectedVoiceId,
         backend: loaded.backend,
         localInference: true
       } : { loaded: false, localInference: true };
@@ -309,6 +308,7 @@ export function createBrowserLocalTtsEngine({
         modelId: loaded.model.modelId,
         locale: loaded.model.locale,
         engine: loaded.engine,
+        voiceId: selectedVoiceId,
         backend: loaded.backend,
         localInference: true,
         remoteInference: false,
