@@ -238,8 +238,8 @@ test("routes Ukrainian character speech through the selected Piper speaker and s
 
   await engine.load({ locale: "uk-UA", backend: "wasm" });
   assert.deepEqual(engine.availableVoices, ["lada", "mykyta", "tetiana"]);
-  assert.match(calls.loaded.modelUrl, /uk_UA-ukrainian_tts-medium\\.onnx$/);
-  assert.match(calls.loaded.configUrl, /uk_UA-ukrainian_tts-medium\\.onnx\\.json$/);
+  assert.match(calls.loaded.modelUrl, /uk_UA-ukrainian_tts-medium\.onnx$/);
+  assert.match(calls.loaded.configUrl, /uk_UA-ukrainian_tts-medium\.onnx\.json$/);
 
   const result = await engine.synthesize({ text: "Привіт!", voiceId: "mykyta" });
   assert.equal(calls.generated.text, "Привіт!");
