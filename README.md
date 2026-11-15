@@ -1,6 +1,6 @@
 # DRAVEX AI Cartoon Studio
 
-A free-first cartoon studio for turning story text into a structured storyboard and assembling short animated scenes. It includes an opt-in local language model for experimental scene direction, optional AI still generation, short image-to-video generation through Hugging Face ZeroGPU or local ComfyUI, and a browser-based multi-scene WebM assembly workflow. Production voice synthesis and phoneme-level lip-sync are still in development.
+A free-first cartoon studio for turning story text into a structured storyboard and assembling short animated scenes. It includes an opt-in local language model for experimental scene direction, optional AI still generation, short image-to-video generation through Hugging Face ZeroGPU or local ComfyUI, and a browser-based multi-scene WebM assembly workflow. Browser-local multi-speaker voice synthesis is available for English, Russian, and Ukrainian; generated dialogue WAVs can be mixed into the final WebM. Character mouth movement is approximate, and phoneme-accurate lip-sync remains in development.
 
 ## Storyboard engine foundation
 
@@ -48,10 +48,13 @@ The Vite build is a separate development bundle. The root `index.html` is the pu
 - AI Horde is a remote community queue, not local inference. Anonymous requests have low priority and may be slow; the service shares anonymous requests with LAION and may collect prompt and IP/usage data. The app requires explicit consent before sending a prompt. See the [AI Horde privacy policy](https://horde.aivo.chat/privacy).
 - Generated AI Horde stills are now drawn into the selected scene's canvas preview and are included in the canvas-based WebM capture when the image host permits anonymous CORS access. The preview uses a subtle Ken Burns zoom. If CORS blocks drawing, the side preview remains available and the canvas falls back to its procedural scene; no tainted canvas is exported.
 - The canvas preview uses generated scene video clips when available. Without a clip it falls back to generated stills with bounded camera movement, or procedural shapes when no still is available. Those fallbacks are not character animation.
-- WebM export records the full storyboard sequentially and uses generated scene video clips when available. Timed dialogue and optional local music can be mixed into the final recording. The video-generation model outputs silent clips; lip-sync is not generated automatically.
-- Voice synthesis, lip-sync, music generation, and production-grade audiovisual export are not implemented yet.
+- WebM export records the full storyboard sequentially and uses generated scene video clips when available. Timed character dialogue is decoded and mixed into the final recording; optional local music is supplied by the user (music generation is not implemented). Video-generation models output silent clips.
+- Browser-local TTS is implemented for supported languages: English Kokoro, Russian two-speaker VITS (female/male), and Ukrainian multi-speaker Piper. Each character receives a stable distinct voice when the selected engine has enough voices; generation stops rather than silently reusing a voice when the cast exceeds the engine's capacity. Generated WAV files are stored in browser IndexedDB.
+- Character mouth movement is approximate and combines audio-energy analysis with grapheme-based viseme fallback when a model does not provide native timestamps. This is not phoneme-accurate lip-sync; experimental timestamped visemes are currently limited to the English Kokoro path.
+- Real Russian VITS weights are tested through inference and final WAV-to-WebM export on Desktop Chromium and a Pixel 7 browser-emulation profile. This is not a physical Android-device test.
+- Production-grade audiovisual export and accurate lip-sync remain in development.
 - No paid API is required.
-- A successful CI run verifies syntax, unit tests, and bundling only; it does not prove physical-device rendering, playback, or audio/video codec support.
+- CI runs unit tests, browser-based preview/export checks, synthetic audio-audibility checks, and opt-in real Russian VITS WAV-to-WebM checks. It does not validate physical-device rendering or playback, and external AI provider quality remains variable.
 
 
 
