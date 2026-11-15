@@ -44,6 +44,6 @@ test("selects the permissively licensed Ukrainian three-speaker Piper model", ()
  assert.equal(model.commercialUse, true);
  assert.equal(model.voiceMode, "multi-speaker");
  assert.deepEqual(model.voices, ["lada", "mykyta", "tetiana"]);
- assert.match(model.modelUrl, /uk_UA-ukrainian_tts-medium\\.onnx$/);
- assert.match(model.configUrl, /uk_UA-ukrainian_tts-medium\\.onnx\\.json$/);
+ assert.match(model.modelUrl, /uk_UA-ukrainian_tts-medium\.onnx$/);
+ assert.match(model.configUrl, /uk_UA-ukrainian_tts-medium\.onnx\.json$/);
 });
