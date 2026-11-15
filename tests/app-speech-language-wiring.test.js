@@ -12,11 +12,13 @@ test('prompt-to-film speech planning validates existing voice artifacts against 
   assert.ok(end > start, 'full-film speech preparation block must be present');
 
   const speechBlock = appSource.slice(start, end);
-  const calls = [...speechBlock.matchAll(/resolveAutomaticSpeechTasks\\(\\{([^}]*)\\}\\)/g)];
+  const calls = speechBlock.split('resolveAutomaticSpeechTasks({').slice(1);
   assert.equal(calls.length, 2, 'the initial and post-dialogue checks must both run');
 
-  for (const [, args] of calls) {
-    assert.match(args, /language:\\s*storyLanguage\\(\\)/,
+  for (const tail of calls) {
+    const callEnd = tail.indexOf('})');
+    assert.ok(callEnd >= 0, 'speech planner call must be complete');
+    assert.ok(tail.slice(0, callEnd).includes('language:storyLanguage()'),
       'the resolver must reject voice cues generated in a different story language');
   }
 });
