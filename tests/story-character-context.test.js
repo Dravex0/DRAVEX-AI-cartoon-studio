@@ -61,3 +61,28 @@ test('handles missing plan fields without inventing scene content', () => {
   const result = prepareStoryCharacterContext(null, [], '', 'en');
   assert.deepEqual(result, { characterBible: [], scenes: [] });
 });
+
+test('enriches an existing empty protagonist placeholder from the next story extraction', () => {
+  const plan = {
+    brief: {
+      characterProfiles: [{
+        characterId: 'Foxy',
+        visualDescription: 'Small orange fox with amber eyes',
+        clothing: 'Blue scarf'
+      }]
+    },
+    scenes: [{ id: 'scene_1', storyDetail: 'Foxy discovers a glowing stone.' }]
+  };
+
+  const result = prepareStoryCharacterContext(
+    plan,
+    [{ characterId: 'Foxy' }],
+    'Foxy',
+    'en'
+  );
+
+  assert.equal(result.characterBible.length, 1);
+  assert.equal(result.characterBible[0].visualDescription, 'Small orange fox with amber eyes');
+  assert.equal(result.characterBible[0].clothing, 'Blue scarf');
+  assert.deepEqual(result.scenes[0].characters, ['Foxy']);
+});
