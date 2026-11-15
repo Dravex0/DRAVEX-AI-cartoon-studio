@@ -12,7 +12,7 @@ ONNX model in Chromium through ONNX Runtime Web/WASM.
 3. Run:
 
    ```sh
-   DRAVEX_REAL_PIPER=1 npx playwright test tests/e2e/piper-real-inference.spec.js --workers=1
+   DRAVEX_REAL_PIPER=1 npx playwright test tests/e2e/piper-real-inference.spec.js --project=chromium-desktop --workers=1
    ```
 
 The test loads the model once in the browser, synthesizes the same Ukrainian
