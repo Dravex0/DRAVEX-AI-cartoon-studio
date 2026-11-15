@@ -11,7 +11,7 @@ DRAVEX has an isolated browser-local Russian VITS adapter for
 - Speakers: `ru-female` (speaker ID 0) and `ru-male` (speaker ID 1)
 - Model card license: Apache-2.0
 - Runtime: ONNX Runtime Web / WASM
-- Tokenizer: Transformers.js AutoTokenizer
+- Tokenizer: pinned `vocab.json` with the model's character-level VITS encoding (blank token ID 0 inserted between characters); this checkpoint does not publish `tokenizer.json`.
 - Weights are downloaded only when the user loads Russian speech; synthesis runs in the browser.
 - The model card recommends lowercase text and explicit stress marks for better pronunciation. This prototype lowercases text but does not yet run a Russian accentuation model.
 
