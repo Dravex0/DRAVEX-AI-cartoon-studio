@@ -70,6 +70,18 @@ export function createPiperTextOnnxRuntime({ ort, fetchImpl = globalThis.fetch }
   let loaded = null;
 
   return Object.freeze({
+    get availableVoices() {
+      if (!loaded) return [];
+      const map = loaded.config?.speaker_id_map;
+      if (!map || typeof map !== "object" || Array.isArray(map)) return [];
+      return Object.entries(map)
+        .filter(([id, speakerId]) => typeof id === "string" && id.trim()
+          && Number.isInteger(speakerId) && speakerId >= 0
+          && speakerId < Number(loaded.config.num_speakers ?? 1))
+        .sort((a, b) => a[1] - b[1])
+        .map(([id]) => id);
+    },
+
     get status() {
       return loaded ? {
         loaded: true,
@@ -140,7 +152,8 @@ export function createPiperTextOnnxRuntime({ ort, fetchImpl = globalThis.fetch }
         error.name = "AbortError";
         throw error;
       }
-      const samples = result?.output?.data;
+      const outputName = loaded.session.outputNames?.[0] || "output";
+      const samples = result?.[outputName]?.data;
       assert(samples instanceof Float32Array && samples.length > 0,
         "Piper ONNX returned no audio samples.");
       return {

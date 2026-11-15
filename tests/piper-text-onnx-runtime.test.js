@@ -21,6 +21,7 @@ function createHarness({ output = new Float32Array([0.1, -0.1, 0.2]) } = {}) {
   const calls = { fetch: [], sessionOptions: null, feeds: null, released: 0 };
   const session = {
     inputNames: ["input", "input_lengths", "scales", "sid"],
+    outputNames: ["output"],
     async run(feeds) {
       calls.feeds = feeds;
       return { output: { data: output } };
@@ -70,6 +71,7 @@ test("loads ONNX locally through WASM and sends the chosen speaker ID to sid", a
   const { calls, runtime } = createHarness();
   const status = await runtime.load({ modelUrl: "/models/uk.onnx", configUrl: "/models/uk.onnx.json" });
   assert.equal(status.loaded, true);
+  assert.deepEqual(runtime.availableVoices, ["lada", "mykyta", "tetiana"]);
   assert.deepEqual(calls.sessionOptions.executionProviders, ["wasm"]);
   const result = await runtime.synthesize({ text: "аб", voiceId: "mykyta" });
   assert.equal(result.speakerId, 1);
@@ -112,4 +114,5 @@ test("releases the ONNX session on dispose", async () => {
   runtime.dispose();
   assert.equal(calls.released, 1);
   assert.deepEqual(runtime.status, { loaded: false, localInference: true });
+  assert.deepEqual(runtime.availableVoices, []);
 });
