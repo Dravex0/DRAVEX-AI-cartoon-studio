@@ -52,7 +52,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.real_piper
         env:
           DRAVEX_REAL_PIPER: "1"
-        run: npx playwright test tests/e2e/piper-real-inference.spec.js --workers=1
+        run: npx playwright test tests/e2e/piper-real-inference.spec.js --project=chromium-desktop --workers=1
 
       - name: Upload Playwright report and failure evidence
         if: always()
