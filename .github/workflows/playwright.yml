@@ -58,11 +58,17 @@ jobs:
         if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/russian-vits-two-speaker-local-tts-20261115'
         run: npm run build
 
-      - name: Run real Russian VITS weights inference test
+      - name: Run real Russian VITS weights inference test on Desktop Chromium
         if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/russian-vits-two-speaker-local-tts-20261115'
         env:
           DRAVEX_REAL_RUSSIAN_VITS: "1"
         run: npx playwright test tests/e2e/russian-vits-real-inference.spec.js --project=chromium-desktop --workers=1
+
+      - name: Run real Russian VITS weights inference test on Pixel 7 profile
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/russian-vits-two-speaker-local-tts-20261115'
+        env:
+          DRAVEX_REAL_RUSSIAN_VITS: "1"
+        run: npx playwright test tests/e2e/russian-vits-real-inference.spec.js --project=chromium-pixel-7 --workers=1
 
       - name: Upload Playwright report and failure evidence
         if: always()
