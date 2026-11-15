@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
-    "kokoro-js": "^1.2.1"
+    "kokoro-js": "^1.2.1",
+    "onnxruntime-web": "^1.22.0"
   }
 }
