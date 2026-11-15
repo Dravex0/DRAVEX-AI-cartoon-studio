@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      real_piper:
+        description: Download real Ukrainian Piper weights (~76.7 MB) and synthesize three test voices
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -37,6 +43,16 @@ jobs:
 
       - name: Run desktop and Pixel 7 browser tests
         run: npm run test:e2e
+
+      - name: Build local ONNX WASM assets for real Piper smoke
+        if: github.event_name == 'workflow_dispatch' && inputs.real_piper
+        run: npm run build
+
+      - name: Run opt-in real Piper weights inference test
+        if: github.event_name == 'workflow_dispatch' && inputs.real_piper
+        env:
+          DRAVEX_REAL_PIPER: "1"
+        run: npx playwright test tests/e2e/piper-real-inference.spec.js --workers=1
 
       - name: Upload Playwright report and failure evidence
         if: always()
