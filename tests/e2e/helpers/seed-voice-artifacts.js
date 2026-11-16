@@ -3,10 +3,13 @@
  * This bypasses model download/latency while exercising the real IndexedDB,
  * voice timeline, speech-readiness gate, and WebM export path.
  */
-export async function seedVoiceArtifactsForCurrentDraft(page, { language = 'en', proceduralDemoCharacter = false, prepareStoryboard = true } = {}) {
-  if (prepareStoryboard) await page.locator('#make').click();
+export async function seedVoiceArtifactsForCurrentDraft(page, { language = 'en', prepareStoryboard = true } = {}) {
+  if (prepareStoryboard) {
+    await page.locator('#language').selectOption(language);
+    await page.locator('#make').click();
+  }
   await page.locator('#save').click();
-  const evidence = await page.evaluate(async ({ language, proceduralDemoCharacter }) => {
+  const evidence = await page.evaluate(async ({ language }) => {
     const draftKey = 'dravex-cartoon-draft';
     const draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
     if (!draft || !Array.isArray(draft.sceneMetadata) || draft.sceneMetadata.length === 0) {
@@ -103,13 +106,12 @@ export async function seedVoiceArtifactsForCurrentDraft(page, { language = 'en',
       scene.voiceTimeline = scheduled.timeline;
     }
     draft.language = language;
-    if (proceduralDemoCharacter === true) draft.proceduralDemoCharacter = true;
     localStorage.setItem(draftKey, JSON.stringify(draft));
     if (generatedArtifacts === 0) {
       throw new Error('No character speakers were found in the storyboard; voice fixtures cannot be seeded.');
     }
     return { scenes: draft.sceneMetadata.length, speakers: speakerNames.length, generatedArtifacts };
-  }, { language, proceduralDemoCharacter });
+  }, { language });
   await page.reload();
   return evidence;
 }
