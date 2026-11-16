@@ -158,6 +158,48 @@ test('localizes style and quality options and restores the saved creative setup'
   await expect(page.locator('#imageQuality')).toHaveValue('ultra');
 });
 
+test('renders the built-in procedural Foxy when a named fox has no scene artwork', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#language').selectOption('en');
+  await page.locator('#idea').fill([
+    'Main character: Foxy — a small orange fox with large expressive eyes.',
+    'Foxy finds a red ball under a tree and pushes it with his paw.'
+  ].join(String.fromCharCode(10)));
+  await page.locator('#make').click();
+
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await expect(page.locator('#character')).toHaveValue('Foxy');
+  await page.waitForTimeout(220);
+
+  const visual = await page.locator('#canvas').evaluate(canvas => {
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let orangePixels = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const red = pixels[offset];
+      const green = pixels[offset + 1];
+      const blue = pixels[offset + 2];
+      if (red >= 160 && green >= 60 && green <= 190 && blue <= 120
+        && red - green >= 35 && red - blue >= 60) orangePixels += 1;
+    }
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      orangePixels,
+      orangePixelRatio: orangePixels / (canvas.width * canvas.height)
+    };
+  });
+
+  expect(visual.width).toBe(1280);
+  expect(visual.height).toBe(720);
+  expect(visual.orangePixels).toBeGreaterThan(1000);
+  expect(visual.orangePixelRatio).toBeGreaterThan(0.001);
+  expect(pageErrors).toEqual([]);
+});
+
 test('local canvas mode exports a playable WebM without contacting cloud video or image providers', async ({ page }) => {
   const pageErrors = [];
   const remoteProviderRequests = [];
@@ -174,7 +216,9 @@ test('local canvas mode exports a playable WebM without contacting cloud video o
   await page.locator('#idea').fill(
     'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\nDuration: 0.25 seconds'
   );
-  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en', proceduralDemoCharacter: true });
+  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
+  const savedDemoFlag = await page.evaluate(() => JSON.parse(localStorage.getItem('dravex-cartoon-draft') || '{}').proceduralDemoCharacter);
+  expect(savedDemoFlag).toBe(true);
   await expect(page.locator('#videoGenerationMode')).toHaveValue('local-canvas');
   await expect(page.locator('#generateFullFilmComfy')).toBeHidden();
   await page.locator('#idea').fill(
@@ -558,6 +602,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
 
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
+  await page.locator('#language').selectOption('en');
 
   const sceneVideoBase64 = await page.evaluate(async () => {
     const results = [];
