@@ -97,7 +97,7 @@ import { prepareStoryCharacterContext } from "./story-character-context.js";
 import { normalizeSceneCast } from "./scene-cast.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
 import { buildStoryEventChain } from "./story-event-chain.js";
-import { shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
+import { isProceduralFoxCharacter, shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
 import { drawProceduralDemoFox } from './demo-character-renderer.js';
 const localTextRuntime = createLocalTransformersRuntime();
 let activeUniversalPlanController = null;
@@ -2464,13 +2464,16 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
  const requestedCharacter=$('character').value.trim();
  const character=resolveStoryProtagonist(idea,requestedCharacter,lang);
  const characterSelectionWarning=getCharacterSelectionWarning(idea,requestedCharacter);
- const proceduralDemoCharacter=!requestedCharacter&&['Главный герой','Головний герой','Main character','Personaje principal'].includes(character);
+ const fallbackDemoCharacter=!requestedCharacter&&['Главный герой','Головний герой','Main character','Personaje principal'].includes(character);
  $('character').value=character;
  try{
   status.textContent=uiLang==='ru'?'Создаём раскадровку локальным движком DRAVEX…':'Creating a storyboard with the local DRAVEX engine…';
   const plan=buildStoryboardFromText(idea,lang,character);
   const storyContext=prepareStoryCharacterContext(plan,characterBible,character,lang);
   characterBible=storyContext.characterBible;
+  const protagonistProfile=characterBible.find(profile=>String(profile.characterId||'').trim().toLocaleLowerCase()===character.toLocaleLowerCase());
+  // The built-in procedural fox is a truthful fallback for fox protagonists without scene artwork.
+  const proceduralDemoCharacter=fallbackDemoCharacter||isProceduralFoxCharacter(protagonistProfile);
   const preparedScenes=storyContext.scenes;
   const stateChanges=inferStoryboardStateChanges(preparedScenes,lang,character);
   sceneMetadata=ensureSceneIds(preparedScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]})));
@@ -3746,7 +3749,19 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     checkAbort();
     assertRequiredSceneSnapshot();
     sceneIndex=timeline.segments[0].sceneIndex;
+    // captureStream may snapshot the current canvas immediately. Freeze the preview and
+    // paint the first timeline scene before opening the stream, or mobile browsers can
+    // record one stale frame from the previously selected (often last) scene.
+    if(raf)cancelAnimationFrame(raf);
+    raf=0;
+    playing=false;
     sceneMotionSceneIndex=-1;
+    sceneMotionStartTimeMs=0;
+    rigPreviewProgress=null;
+    animationClock.reset(0);
+    frame=0;
+    exportMouthOriginTimeMs=performance.now();
+    draw();
     stream=canvas.captureStream(24);
     const musicFile=$('audioFile').files?.[0]||null;
     const voiceTracks=[];
