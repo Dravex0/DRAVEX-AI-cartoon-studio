@@ -17,9 +17,22 @@ export async function seedVoiceArtifactsForCurrentDraft(page, { language = 'en' 
       import('./src/scene-voice-workflow.js')
     ]);
     const storage = createVoiceAudioStorage();
-    const speakerNames = [...new Set(draft.sceneMetadata.flatMap(scene =>
-      Array.isArray(scene.characters) ? scene.characters.filter(value => typeof value === 'string' && value.trim()) : []
-    ))].sort();
+    const normalizeSpeakers = value => Array.isArray(value)
+      ? value.map(item => typeof item === 'string' ? item.trim() : String(item?.characterId || item?.id || item?.name || '').trim()).filter(Boolean)
+      : [];
+    const fallbackSpeaker = String(
+      draft.character
+      || draft.characterBible?.find(entry => entry?.characterId)?.characterId
+      || 'E2E main character'
+    ).trim();
+    // Some deterministic one-line prompts do not explicitly name a cast member.
+    // Give those scenes a stable test-only speaker so the E2E still exercises
+    // the mandatory speech path instead of depending on parser heuristics.
+    for (const scene of draft.sceneMetadata) {
+      const speakers = normalizeSpeakers(scene.characters);
+      scene.characters = speakers.length ? speakers : [fallbackSpeaker];
+    }
+    const speakerNames = [...new Set(draft.sceneMetadata.flatMap(scene => normalizeSpeakers(scene.characters)))].sort();
     const voiceBySpeaker = new Map(speakerNames.map((speaker, index) => [speaker, {
       voiceId: 'e2e-synthetic-' + (index + 1),
       frequency: 220 + index * 65
@@ -54,9 +67,7 @@ export async function seedVoiceArtifactsForCurrentDraft(page, { language = 'en' 
     };
     for (let sceneIndex = 0; sceneIndex < draft.sceneMetadata.length; sceneIndex++) {
       const scene = draft.sceneMetadata[sceneIndex];
-      const speakers = [...new Set(Array.isArray(scene.characters)
-        ? scene.characters.filter(value => typeof value === 'string' && value.trim())
-        : [])];
+      const speakers = [...new Set(normalizeSpeakers(scene.characters))];
       if (!speakers.length) continue;
       const dialogue = speakers.map(characterId => ({
         characterId,
