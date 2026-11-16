@@ -196,6 +196,9 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
 
   await page.goto('/');
   await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);
+  await page.locator('#idea').fill('A small blue robot walks through a park, meets a little red bird, waves, and they become friends. Make a short animated film.');
+  await page.locator('#language').selectOption('en');
+  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
 
   // Create real browser-decodable media fixtures. The provider response itself is mocked;
   // this test validates the app's integration and export, not the model's visual quality.
