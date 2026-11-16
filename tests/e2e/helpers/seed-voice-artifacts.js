@@ -6,7 +6,7 @@
 export async function seedVoiceArtifactsForCurrentDraft(page, { language = 'en', proceduralDemoCharacter = false, prepareStoryboard = true } = {}) {
   if (prepareStoryboard) await page.locator('#make').click();
   await page.locator('#save').click();
-  const evidence = await page.evaluate(async ({ language }) => {
+  const evidence = await page.evaluate(async ({ language, proceduralDemoCharacter }) => {
     const draftKey = 'dravex-cartoon-draft';
     const draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
     if (!draft || !Array.isArray(draft.sceneMetadata) || draft.sceneMetadata.length === 0) {
