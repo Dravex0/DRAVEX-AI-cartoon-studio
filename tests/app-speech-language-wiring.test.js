@@ -40,3 +40,16 @@ test('draws the fallback character after generated scene media so the background
   assert.ok(media >= 0 && fallback > media && layers > fallback,
     'background media must render first, then fallback character, then authored character layers');
 });
+
+
+test('blocks Hugging Face and ComfyUI generation when requested speech preparation fails', () => {
+  const handler = appSource.indexOf("$('generateFullFilmComfy').addEventListener");
+  const skipped = appSource.indexOf("if(speechPreparation.status==='skipped')", handler);
+  const videoStart = appSource.indexOf("generateStoryboardVideos({", handler);
+  assert.ok(handler >= 0 && skipped > handler && videoStart > skipped,
+    'full video provider handler must validate speech before starting scene generation');
+  const failureBranch = appSource.slice(skipped, videoStart);
+  assert.match(failureBranch, /Озвучка не подготовлена — генерация фильма остановлена/);
+  assert.match(failureBranch, /throw new Error\(message\)/,
+    'unavailable requested dialogue audio must abort the remote/local video-provider pipeline');
+});
