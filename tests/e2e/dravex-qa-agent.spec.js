@@ -20,7 +20,7 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
     agent: 'DRAVEX Browser QA Agent',
     runAt: new Date().toISOString(),
     browserProject: testInfo.project.name,
-    prompt: 'A small blue robot walks through a park, meets a little red bird, waves, and they become friends. Duration: 0.25 seconds.',
+    prompt: 'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden. Duration: 0.25 seconds.',
     steps: [],
     provider: { selectedMode: null, classification: 'not-verified-yet', externalVideoRequests: [] },
     browserErrors: [],
