@@ -9,6 +9,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 import { readFile } from 'node:fs/promises';
+import { seedVoiceArtifactsForCurrentDraft } from './helpers/seed-voice-artifacts.js';
 
 test.use({ video: 'on' });
 
@@ -64,6 +65,13 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
       testInfo.attach('01-prompt-before-generation.png', { body, contentType: 'image/png' })
     );
     report.steps.push({ id: 'prompt-entered', status: 'passed' });
+
+    // Preseed real local IndexedDB WAV artifacts so this full-pipeline test
+    // exercises the required speech gate without downloading model weights.
+    await page.locator('#language').selectOption('en');
+    const voiceFixtures = await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
+    report.steps.push({ id: 'local-character-voices-prepared', status: 'passed', ...voiceFixtures });
+    await page.locator('#idea').fill(report.prompt);
 
     // Listen before clicking: the app starts the download when the local export finishes.
     const downloadPromise = page.waitForEvent('download', { timeout: 150_000 });
