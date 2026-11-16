@@ -22,3 +22,21 @@ test('prompt-to-film speech planning validates existing voice artifacts against 
       'the resolver must reject voice cues generated in a different story language');
   }
 });
+
+
+test('stops the one-click export when requested speech preparation fails', () => {
+  const start = appSource.indexOf("if(speechPreparation.status==='skipped')");
+  const end = appSource.indexOf('const motionPreparation=prepareAutomaticCharacterMotion()', start);
+  assert.ok(start >= 0 && end > start, 'speech failure branch must precede motion and export');
+  const failureBranch = appSource.slice(start, end);
+  assert.match(failureBranch, /Озвучка не подготовлена — экспорт остановлен/);
+  assert.match(failureBranch, /return;/, 'failed requested speech must stop the film workflow');
+});
+
+test('draws the fallback character after generated scene media so the background cannot cover it', () => {
+  const media = appSource.indexOf('if(hasGeneratedVideo){drawImageCover');
+  const fallback = appSource.indexOf('if(showDemoFox){drawProceduralDemoFox', media);
+  const layers = appSource.indexOf('drawCharacterLayers(ctx,currentSceneData.characterLayers', media);
+  assert.ok(media >= 0 && fallback > media && layers > fallback,
+    'background media must render first, then fallback character, then authored character layers');
+});
