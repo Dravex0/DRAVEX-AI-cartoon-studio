@@ -879,7 +879,7 @@ test('keeps the essential creator settings visible and usable on mobile', async 
 });
 
 
-test('missing optional dialogue model does not block local film export', async ({ page }) => {
+test('does not export a silent film when requested dialogue voice preparation is unavailable', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -891,9 +891,9 @@ test('missing optional dialogue model does not block local film export', async (
   await page.locator('#makeFilm').click();
 
   await expect(page.locator('#sceneVoiceStatus')).toContainText(
-    /Видео продолжится без диалогов\/озвучки/i,
+    /Озвучка не подготовлена — экспорт остановлен/i,
     { timeout: 15000 }
   );
-  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
+  await expect(page.locator('#finalFilmResult')).toBeHidden();
   expect(pageErrors).toEqual([]);
 });
