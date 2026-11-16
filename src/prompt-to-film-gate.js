@@ -14,12 +14,14 @@ export function evaluatePromptToFilmStart({
   videoProviderReady = false,
   remoteVideoConsent = false,
   missingImageCount = 0,
+  missingCharacterAssetCount = 0,
   imagePromptConsent = false,
   running = false
 } = {}) {
   const blockers = [];
   const scenes = count(sceneCount);
   const missingImages = count(missingImageCount);
+  const missingCharacterAssets = count(missingCharacterAssetCount);
   const selectedMode = String(mode || '').trim().toLowerCase();
 
   if (running) blockers.push('generation-already-running');
@@ -29,6 +31,9 @@ export function evaluatePromptToFilmStart({
     blockers.push('remote-video-consent-required');
   }
   if (selectedMode !== 'local-canvas' && videoProviderReady !== true) blockers.push('video-provider-not-ready');
+  if (selectedMode === 'local-canvas' && missingCharacterAssets > 0) {
+    blockers.push('character-visual-assets-required');
+  }
   if (selectedMode === 'huggingface' && missingImages > 0 && imagePromptConsent !== true) {
     blockers.push('image-prompt-consent-required');
   }
@@ -39,6 +44,7 @@ export function evaluatePromptToFilmStart({
     blockers,
     sceneCount: scenes,
     missingImageCount: missingImages,
+    missingCharacterAssetCount: missingCharacterAssets,
     mode: selectedMode || null
   };
 }
