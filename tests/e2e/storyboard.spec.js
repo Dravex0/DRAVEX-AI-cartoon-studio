@@ -172,7 +172,7 @@ test('local canvas mode exports a playable WebM without contacting cloud video o
   await page.goto('/');
   await page.locator('#language').selectOption('en');
   await page.locator('#idea').fill(
-    'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\\nDuration: 0.25 seconds'
+    'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\nDuration: 0.25 seconds'
   );
   await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
   await expect(page.locator('#videoGenerationMode')).toHaveValue('local-canvas');
