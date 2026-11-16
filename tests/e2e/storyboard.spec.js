@@ -809,14 +809,20 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     const sceneColorSequence = [];
     let firstSceneFrameSeen = false;
     let lastSceneColorBucket = null;
+    let characterOverlayFrames = 0;
     let lastSampleAt = -1000;
     await video.play();
     const startedAt = performance.now();
     while (!video.ended && performance.now() - startedAt < 30000) {
       if (video.readyState >= 2) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const pixel = context.getImageData(8, 8, 1, 1).data;
-        const rgb = [pixel[0], pixel[1], pixel[2]];
+        // Sample a top-left background pixel: the built-in fox is intentionally composited over the center.
+        const backgroundPixel = context.getImageData(1, 1, 1, 1).data;
+        const centerPixel = context.getImageData(8, 8, 1, 1).data;
+        const rgb = [backgroundPixel[0], backgroundPixel[1], backgroundPixel[2]];
+        const centerRgb = [centerPixel[0], centerPixel[1], centerPixel[2]];
+        if (centerRgb[0] >= 160 && centerRgb[1] >= 60 && centerRgb[1] <= 190 && centerRgb[2] <= 120
+          && centerRgb[0] - centerRgb[1] >= 35 && centerRgb[0] - centerRgb[2] >= 60) characterOverlayFrames += 1;
         // Ignore the recorder's initial black frame before the first scene frame is available.
         const colorBucket = rgb.map(value => Math.round(value / 32)).join(',');
         if (colorBucket !== '0,0,0') {
@@ -828,7 +834,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
         }
         if (firstSceneFrameSeen) colors.add(colorBucket);
         if (performance.now() - lastSampleAt >= 100) {
-          samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb });
+          samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb, centerRgb });
           lastSampleAt = performance.now();
         }
       }
@@ -838,12 +844,13 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     video.pause();
     video.removeAttribute('src');
     video.load();
-    return { colors: [...colors], sceneColorSequence, samples };
+    return { colors: [...colors], sceneColorSequence, samples, characterOverlayFrames };
   });
   const expectedColorBuckets = [...expectedSceneColorBuckets].sort();
   const observedColorBuckets = [...new Set(observedSceneColors.colors)].sort();
   expect(observedColorBuckets, 'Final WebM should contain exactly the five generated scene color buckets; expected: '+JSON.stringify(expectedColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedColorBuckets);
   expect(observedSceneColors.sceneColorSequence, 'Final WebM scene colors should follow storyboard order; expected: '+JSON.stringify(expectedSceneColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.sceneColorSequence)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedSceneColorBuckets);
+  expect(observedSceneColors.characterOverlayFrames).toBeGreaterThan(0);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
