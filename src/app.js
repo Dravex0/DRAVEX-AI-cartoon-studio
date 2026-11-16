@@ -2322,9 +2322,21 @@ $('makeFilm').addEventListener('click',async()=>{
   const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
   return source.kind==='missing'&&!cachedVideo?.video;
  }).length;
+ const missingCharacterAssetCount=mode==='local-canvas'&&currentStoryboardPlan?.proceduralDemoCharacter!==true
+  ?sceneMetadata.filter((scene,index)=>{
+    const cast=Array.isArray(scene?.characters)?scene.characters.filter(value=>String(value||'').trim()):[];
+    const hasRequestedCharacter=Boolean(requestedCharacter)||cast.length>0;
+    const hasCharacterLayers=Array.isArray(scene?.characterLayers)&&scene.characterLayers.some(layer=>layer?.visible!==false&&String(layer?.imageUrl||'').trim());
+    const hasSceneImage=Boolean(String(scene?.generatedImageUrl||'').trim()||comfySourceImageForScene(index));
+    const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
+    const hasSceneVideo=Boolean(cachedVideo?.video);
+    return hasRequestedCharacter&&!hasCharacterLayers&&!hasSceneImage&&!hasSceneVideo;
+   }).length
+  :0;
  const gate=evaluatePromptToFilmStart({
   mode,
   sceneCount:sceneMetadata.length,
+  missingCharacterAssetCount,
   videoProviderReady:mode==='local-canvas'?true:mode==='huggingface'
    ?hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'
    :mode==='comfyui'&&comfyConnected&&Object.keys(comfyWorkflowConfigs()).length>0,
@@ -2344,6 +2356,9 @@ $('makeFilm').addEventListener('click',async()=>{
   if(gate.blockers.includes('image-prompt-consent-required'))messages.push(ru
    ?'Для '+gate.missingImageCount+' сцен ещё нет изображений. Отдельно подтверди отправку только текстовых промптов в AI Horde либо добавь изображения вручную.'
    :' '+gate.missingImageCount+' scene image(s) are missing. Separately allow sending text prompts to AI Horde, or add scene images manually.');
+  if(gate.blockers.includes('character-visual-assets-required'))messages.push(ru
+   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах нет изображений или видеоклипов персонажей. Добавь изображения/спрайты героев через инструменты генерации сцен и персонажей либо выбери Hugging Face или локальный ComfyUI. Фоновое видео вместо мультфильма создавать не будем.'
+   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes have no character images or video clips. Add character images/sprites with the scene and character tools, or choose Hugging Face or local ComfyUI. A background-only video will not be exported.');
   $('status').textContent=messages.join(' ');
   if(mode==='huggingface')$('hfVideoPanel').open=true;
   if(mode==='comfyui')$('comfyPanel').open=true;
