@@ -53,3 +53,19 @@ test('blocks Hugging Face and ComfyUI generation when requested speech preparati
   assert.match(failureBranch, /throw new Error\(message\)/,
     'unavailable requested dialogue audio must abort the remote/local video-provider pipeline');
 });
+
+
+test('blocks local-canvas export instead of producing a background-only film for a named cast', () => {
+  const handler = appSource.indexOf("$('makeFilm').addEventListener");
+  const gate = appSource.indexOf('const missingCharacterAssetCount=', handler);
+  const evaluate = appSource.indexOf('const gate=evaluatePromptToFilmStart({', gate);
+  const blocker = appSource.indexOf("gate.blockers.includes('character-visual-assets-required')", evaluate);
+  assert.ok(handler >= 0 && gate > handler && evaluate > gate && blocker > evaluate,
+    'named-character visual readiness must be checked before local-canvas export starts');
+  const readiness = appSource.slice(gate, evaluate);
+  assert.match(readiness, /characterLayers/);
+  assert.match(readiness, /generatedImageUrl/);
+  assert.match(readiness, /sceneVideoCache/);
+  assert.match(readiness, /proceduralDemoCharacter/);
+  assert.match(appSource.slice(blocker, blocker + 900), /Фоновое видео вместо мультфильма создавать не будем/);
+});
