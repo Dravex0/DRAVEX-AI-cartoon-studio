@@ -69,7 +69,7 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
     // Preseed real local IndexedDB WAV artifacts so this full-pipeline test
     // exercises the required speech gate without downloading model weights.
     await page.locator('#language').selectOption('en');
-    const voiceFixtures = await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
+    const voiceFixtures = await seedVoiceArtifactsForCurrentDraft(page, { language: 'en', proceduralDemoCharacter: true });
     report.steps.push({ id: 'local-character-voices-prepared', status: 'passed', ...voiceFixtures });
     await page.locator('#idea').fill(report.prompt);
 
