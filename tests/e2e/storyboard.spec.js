@@ -174,7 +174,7 @@ test('local canvas mode exports a playable WebM without contacting cloud video o
   await page.locator('#idea').fill(
     'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\nDuration: 0.25 seconds'
   );
-  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
+  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en', proceduralDemoCharacter: true });
   await expect(page.locator('#videoGenerationMode')).toHaveValue('local-canvas');
   await expect(page.locator('#generateFullFilmComfy')).toBeHidden();
   await page.locator('#idea').fill(
@@ -682,6 +682,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   await page.locator('#make').click();
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
+  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en', prepareStoryboard: false });
 
   await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('comfyui');
