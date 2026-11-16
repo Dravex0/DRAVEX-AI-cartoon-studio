@@ -3389,9 +3389,11 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   });
   if(speechPreparation.status==='cancelled'||controller.signal.aborted)throw new DOMException('Film generation was cancelled.','AbortError');
   if(speechPreparation.status==='skipped'){
-   const message=(uiLang==='ru'?'Видео продолжится без диалогов/озвучки: ':'Video will continue without dialogue/voice: ')+speechPreparation.reason;
+   const message=(uiLang==='ru'?'Озвучка не подготовлена — генерация фильма остановлена: ':'Voice preparation failed — film generation stopped: ')+speechPreparation.reason;
    $('sceneVoiceStatus').textContent=message;
    status.textContent=message;
+   $('dialogueSummary')?.closest('details')?.setAttribute('open','');
+   throw new Error(message);
   }
   if(mode==='huggingface'){
    const tooShortIndex=scenes.findIndex(scene=>{
