@@ -78,7 +78,11 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
     await page.locator('#makeFilm').click();
     report.steps.push({ id: 'create-clicked', status: 'passed' });
 
-    await expect(page.locator('#fullFilmProgressPanel')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('#fullFilmProgressPanel')).toBeVisible({ timeout: 20_000 }).catch(async error => {
+      const status = await page.locator('#status').textContent().catch(() => '');
+      const voiceStatus = await page.locator('#sceneVoiceStatus').textContent().catch(() => '');
+      throw new Error('Local film progress did not start. status="' + status + '"; voice="' + voiceStatus + '". ' + error.message);
+    });
     report.steps.push({ id: 'render-progress-visible', status: 'passed' });
 
     await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 140_000 });
