@@ -3,7 +3,7 @@ import { validateCharacterRig } from './character-rig.js';
 const FOX_MARKERS = ['fox', 'лисиц', 'лисён', 'лисен', 'лисич'];
 const DEFAULT_FALLBACK_NAMES = new Set(['Главный герой', 'Головний герой', 'Main character', 'Personaje principal']);
 const NON_FOX_SPECIES_PATTERNS = [
-  /\\b(?:robot|android|human|person|man|woman|boy|girl|bird|rabbit|bunny|cat|dog|wolf|dragon|bear|deer|horse|mouse|fish|turtle)\\b/iu,
+  /\b(?:robot|android|human|person|man|woman|boy|girl|bird|rabbit|bunny|cat|dog|wolf|dragon|bear|deer|horse|mouse|fish|turtle)\\b/iu,
   /(?:робот|андроид|андроїд|людин|человек|мужчин|женщин|мальчик|девочк|птиц|кролик|заяц|кот|кошк|собак|пёс|пес|волк|дракон|медвед|олень|лошад|мыш|рыб|черепах)/iu
 ];
 
