@@ -77,13 +77,21 @@ export async function seedVoiceArtifactsForCurrentDraft(page, { language = 'en',
         text: characterId + ' speaks in scene ' + (sceneIndex + 1) + '.',
         language
       }));
+      const sceneDurationSeconds = Number(scene.durationSeconds ?? scene.duration ?? 3);
+      const sceneDurationMs = Number.isFinite(sceneDurationSeconds) && sceneDurationSeconds > 0
+        ? sceneDurationSeconds * 1000
+        : 3000;
+      const frameMs = 1000 / 24;
+      // Leave room for frame-aligned cue starts and the export's 35 ms tolerance.
+      const durationMs = Math.max(1, Math.min(650,
+        Math.floor((sceneDurationMs - 35 - frameMs) / dialogue.length)
+      ));
       const artifacts = [];
       for (const line of dialogue) {
         const voice = voiceBySpeaker.get(line.characterId);
-        const blob = encodeWav(voice.frequency);
+        const blob = encodeWav(voice.frequency, durationMs);
         const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
         const audioHash = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
-        const durationMs = 650;
         await storage.put(audioHash, blob, {
           filename: 'e2e-' + voice.voiceId + '.wav',
           mimeType: 'audio/wav',
