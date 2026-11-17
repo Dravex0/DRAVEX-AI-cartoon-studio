@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hasRenderableCharacterRig, isProceduralFoxCharacter, resolveProceduralDemoCharacter, shouldShowProceduralDemoCharacter } from '../src/demo-character-mode.js';
+import { hasRenderableCharacterLayer, hasRenderableCharacterRig, isProceduralFoxCharacter, resolveProceduralDemoCharacter, shouldShowProceduralDemoCharacter } from '../src/demo-character-mode.js';
 import { readFile } from 'node:fs/promises';
 
 const appSource = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
@@ -73,4 +73,15 @@ test('local-AI storyboard rebuilds preserve procedural fallback metadata and rig
   assert.match(runLocalModelBlock, /proceduralDemoCharacter,/);
   assert.match(appSource, /hasCharacterRig:hasRenderableCharacterRig\(currentSceneData,currentStoryboardPlan\?\.sourceCharacter\|\|\$\('character'\)\.value\)/);
   assert.match(appSource, /const hasCharacterRig=hasRenderableCharacterRig\(scene\)/);
+});
+
+
+test('matches visible sprite layers to the protagonist instead of any cast member', () => {
+  const scene = { characterLayers: [
+    { characterId: 'Owl', imageUrl: 'https://example.com/owl.png', visible: true },
+    { characterId: 'Foxy', imageUrl: 'https://example.com/fox.png', visible: false }
+  ] };
+  assert.equal(hasRenderableCharacterLayer(scene, 'Foxy'), false);
+  assert.equal(hasRenderableCharacterLayer(scene, 'Owl'), true);
+  assert.equal(shouldShowProceduralDemoCharacter({ storyUsesFallback: true, hasCharacterLayers: hasRenderableCharacterLayer(scene, 'Foxy') }), true);
 });
