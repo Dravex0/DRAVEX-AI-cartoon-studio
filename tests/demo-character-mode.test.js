@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isProceduralFoxCharacter, shouldShowProceduralDemoCharacter } from '../src/demo-character-mode.js';
+import { hasRenderableCharacterRig, isProceduralFoxCharacter, resolveProceduralDemoCharacter, shouldShowProceduralDemoCharacter } from '../src/demo-character-mode.js';
+import { readFile } from 'node:fs/promises';
+
+const appSource = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
 
 test('shows the built-in character when the story has no selected protagonist', () => {
   assert.equal(shouldShowProceduralDemoCharacter({ storyUsesFallback: true }), true);
@@ -36,4 +39,38 @@ test('does not treat a Foxy-named robot as a fox when its appearance describes a
 
 test('keeps an explicitly described fox eligible even when its profile contains a secondary non-fox term', () => {
   assert.equal(isProceduralFoxCharacter({ characterId: 'Foxy', species: 'fox', visualDescription: 'a small robotic fox' }), true);
+});
+
+
+test('resolves the same procedural fallback for deterministic and local-AI storyboard plans', () => {
+  assert.equal(resolveProceduralDemoCharacter({ requestedCharacter: '', protagonistId: 'Main character' }), true);
+  assert.equal(resolveProceduralDemoCharacter({ requestedCharacter: 'Foxy', protagonistId: 'Foxy' }), true);
+  assert.equal(resolveProceduralDemoCharacter({ requestedCharacter: 'Foxy', protagonistId: 'Foxy', protagonistProfile: { characterId: 'Foxy', species: 'robot' } }), false);
+});
+
+test('recognizes a valid image-backed rig as a renderable character visual', () => {
+  const rig = {
+    schemaVersion: 1,
+    characterId: 'Foxy',
+    bones: [{ id: 'root' }],
+    parts: [{ id: 'body', boneId: 'root', imageUrl: 'https://example.com/body.png', x: 0.5, y: 0.5, width: 0.3, height: 0.4 }]
+  };
+  assert.equal(hasRenderableCharacterRig({ characterRigs: [rig] }, 'Foxy'), true);
+  assert.equal(hasRenderableCharacterRig({ characterRigs: [rig] }, 'Other'), false);
+  assert.equal(hasRenderableCharacterRig({ characterRigs: [{ ...rig, parts: [{ ...rig.parts[0], imageUrl: 'javascript:alert(1)' }] }] }), false);
+});
+
+test('does not draw the fallback fox or assign its lip-sync when a matching body rig exists', () => {
+  assert.equal(shouldShowProceduralDemoCharacter({ storyUsesFallback: true, hasCharacterRig: true }), false);
+});
+
+test('local-AI storyboard rebuilds preserve procedural fallback metadata and rig-aware rendering', () => {
+  const runLocalModelStart = appSource.indexOf("$('runLocalModel').addEventListener('click'");
+  const planUniversalStart = appSource.indexOf("$('planUniversalTask').addEventListener('click'", runLocalModelStart);
+  const runLocalModelBlock = appSource.slice(runLocalModelStart, planUniversalStart);
+  assert.ok(runLocalModelStart >= 0 && planUniversalStart > runLocalModelStart);
+  assert.match(runLocalModelBlock, /resolveProceduralDemoCharacter\(/);
+  assert.match(runLocalModelBlock, /proceduralDemoCharacter,/);
+  assert.match(appSource, /hasCharacterRig:hasRenderableCharacterRig\(currentSceneData,currentStoryboardPlan\?\.sourceCharacter\|\|\$\('character'\)\.value\)/);
+  assert.match(appSource, /const hasCharacterRig=hasRenderableCharacterRig\(scene\)/);
 });
