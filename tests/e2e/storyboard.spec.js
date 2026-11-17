@@ -824,15 +824,27 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     while (!video.ended && performance.now() - startedAt < 30000) {
       if (video.readyState >= 2) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        // Sample a top-left background pixel: the built-in fox is intentionally composited over the center.
-        const backgroundPixel = context.getImageData(1, 1, 1, 1).data;
+        // Use the dominant frame color instead of one corner pixel. Camera pans and the
+        // intentionally overlaid character can cover individual pixels, but the synthetic
+        // ComfyUI fixture keeps each scene's background color across most of the frame.
+        const framePixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        const colorCounts = new Map();
+        for (let pixel = 0; pixel < framePixels.length; pixel += 4) {
+          if (framePixels[pixel + 3] < 128) continue;
+          const bucket = [
+            Math.round(framePixels[pixel] / 32),
+            Math.round(framePixels[pixel + 1] / 32),
+            Math.round(framePixels[pixel + 2] / 32)
+          ].join(',');
+          if (bucket !== '0,0,0') colorCounts.set(bucket, (colorCounts.get(bucket) || 0) + 1);
+        }
+        const colorBucket = [...colorCounts].sort((a, b) => b[1] - a[1])[0]?.[0] || '0,0,0';
         const centerPixel = context.getImageData(8, 8, 1, 1).data;
-        const rgb = [backgroundPixel[0], backgroundPixel[1], backgroundPixel[2]];
+        const rgb = colorBucket.split(',').map(value => Number(value) * 32);
         const centerRgb = [centerPixel[0], centerPixel[1], centerPixel[2]];
         if (centerRgb[0] >= 160 && centerRgb[1] >= 60 && centerRgb[1] <= 190 && centerRgb[2] <= 120
           && centerRgb[0] - centerRgb[1] >= 35 && centerRgb[0] - centerRgb[2] >= 60) characterOverlayFrames += 1;
         // Ignore the recorder's initial black frame before the first scene frame is available.
-        const colorBucket = rgb.map(value => Math.round(value / 32)).join(',');
         if (colorBucket !== '0,0,0') {
           firstSceneFrameSeen = true;
           if (colorBucket !== lastSceneColorBucket) {
