@@ -113,3 +113,19 @@ test("does not assign the procedural fox mouth to a character already rendered f
   });
   assert.deepEqual(result, []);
 });
+
+
+test("keeps the procedural fox lip-sync when only a secondary character layer is present", () => {
+  const candidate = track("Foxy");
+  const result = selectRenderableLipSyncTracks({
+    voiceTracks: [candidate],
+    mainCharacterKey: "Foxy",
+    storyUsesFallback: true,
+    sceneMetadata: [{
+      characterLayers: [{ characterId: "Owl", imageUrl: "https://example.com/owl.png", visible: true }],
+      characterRigs: [],
+      characterFacialRigs: []
+    }]
+  });
+  assert.deepEqual(result, [candidate]);
+});
