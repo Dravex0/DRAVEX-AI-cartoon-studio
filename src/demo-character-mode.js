@@ -1,6 +1,9 @@
+import { validateCharacterRig } from './character-rig.js';
+
 const FOX_MARKERS = ['fox', 'лисиц', 'лисён', 'лисен', 'лисич'];
+const DEFAULT_FALLBACK_NAMES = new Set(['Главный герой', 'Головний герой', 'Main character', 'Personaje principal']);
 const NON_FOX_SPECIES_PATTERNS = [
-  /\b(?:robot|android|human|person|man|woman|boy|girl|bird|rabbit|bunny|cat|dog|wolf|dragon|bear|deer|horse|mouse|fish|turtle)\b/iu,
+  /\\b(?:robot|android|human|person|man|woman|boy|girl|bird|rabbit|bunny|cat|dog|wolf|dragon|bear|deer|horse|mouse|fish|turtle)\\b/iu,
   /(?:робот|андроид|андроїд|людин|человек|мужчин|женщин|мальчик|девочк|птиц|кролик|заяц|кот|кошк|собак|пёс|пес|волк|дракон|медвед|олень|лошад|мыш|рыб|черепах)/iu
 ];
 
@@ -32,7 +35,30 @@ export function isProceduralFoxCharacter(profile = {}) {
   return containsFoxMarker(profile.characterId);
 }
 
+/** Preserve the same fallback decision when the deterministic or local-AI director rebuilds a plan. */
+export function resolveProceduralDemoCharacter({ requestedCharacter = '', protagonistId = '', protagonistProfile = null } = {}) {
+  const requested = String(requestedCharacter ?? '').trim();
+  const id = String(protagonistId ?? protagonistProfile?.characterId ?? '').trim();
+  if (!requested && DEFAULT_FALLBACK_NAMES.has(id)) return true;
+  const profile = protagonistProfile && typeof protagonistProfile === 'object' && !Array.isArray(protagonistProfile)
+    ? protagonistProfile
+    : { characterId: id };
+  return isProceduralFoxCharacter(profile);
+}
+
+/** Return true only when a scene has a structurally valid, image-backed character rig. */
+export function hasRenderableCharacterRig(sceneOrRigs, characterId = '') {
+  const rigs = Array.isArray(sceneOrRigs)
+    ? sceneOrRigs
+    : Array.isArray(sceneOrRigs?.characterRigs) ? sceneOrRigs.characterRigs : [];
+  const target = String(characterId ?? '').trim().toLocaleLowerCase();
+  return rigs.some(input => {
+    const report = validateCharacterRig(input);
+    return report.passed && (!target || report.rig.characterId.toLocaleLowerCase() === target);
+  });
+}
+
 /** Decide when the built-in procedural character should stand in for missing art. */
-export function shouldShowProceduralDemoCharacter({ storyUsesFallback = false, hasCharacterLayers = false } = {}) {
-  return storyUsesFallback === true && hasCharacterLayers !== true;
+export function shouldShowProceduralDemoCharacter({ storyUsesFallback = false, hasCharacterLayers = false, hasCharacterRig = false } = {}) {
+  return storyUsesFallback === true && hasCharacterLayers !== true && hasCharacterRig !== true;
 }
