@@ -29,6 +29,7 @@ import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasForma
 import { getSceneComposition } from "./scene-layout.js";
 import { drawImageCover } from "./image-frame.js";
 import { drawCharacterLayers } from "./scene-character-layers.js";
+import { collectSceneCharacterImageUrls } from "./scene-character-assets.js";
 import { validateCharacterRigTimeline, sampleCharacterRigTimeline } from "./character-rig-timeline.js";
 import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from "./character-rig-motion-presets.js";
 import { createCharacterRigTimelineFromActionTimeline } from "./character-rig-action-planner.js";
@@ -3731,6 +3732,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:false});
     $('status').textContent=uiLang==='ru'?'Ожидание готовности медиа сцен…':'Waiting for scene media to become ready…';
     const readinessTasks=[];
+    const readyCharacterImageUrls=new Set();
     for(const segment of timeline.segments){
       const meta=sceneMetadata[segment.sceneIndex]||{};
       const key=String(meta.id||('scene-index-'+segment.sceneIndex));
@@ -3744,6 +3746,16 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
         const imageEntry=sceneImageCache.get(imageUrl);
         if(!imageEntry)throw new Error('Could not initialize generated image for scene '+(segment.sceneIndex+1)+'.');
         readinessTasks.push(waitForSceneImageReady(imageEntry.image,{timeoutMs:12000}));
+      }
+      for(const characterImageUrl of collectSceneCharacterImageUrls(meta)){
+        if(readyCharacterImageUrls.has(characterImageUrl))continue;
+        readyCharacterImageUrls.add(characterImageUrl);
+        getLoadedSceneImage(characterImageUrl);
+        const characterImageEntry=sceneImageCache.get(characterImageUrl);
+        if(!characterImageEntry)throw new Error('Could not initialize character image for scene '+(segment.sceneIndex+1)+'.');
+        readinessTasks.push(waitForSceneImageReady(characterImageEntry.image,{timeoutMs:12000}).catch(error=>{
+          throw new Error('Character image for scene '+(segment.sceneIndex+1)+' could not be loaded: '+(error?.message||'image unavailable'));
+        }));
       }
     }
     await Promise.all(readinessTasks);
