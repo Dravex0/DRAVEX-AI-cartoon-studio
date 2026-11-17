@@ -4,13 +4,27 @@ import { createAudioExportSession } from '../src/audio-export.js';
 
 function createHarness() {
   const events = [];
+  const gains = [];
   const videoTrack = { kind: 'video', stop() { events.push('video-stop'); } };
   const audioTrack = { kind: 'audio', stopped: false, stop() { this.stopped = true; events.push('audio-stop'); } };
   const destination = { stream: { getAudioTracks: () => [audioTrack] } };
   class FakeAudioContext {
     state = 'suspended';
+    currentTime = 10;
     createMediaElementSource() { return { connect(node) { events.push('source-connect'); } }; }
-    createGain() { return { gain: { value: 0 }, connect(node) { events.push('gain-connect'); } }; }
+    createGain() {
+      const gain = {
+        value: 0,
+        automation: [],
+        setValueAtTime(value, time) {
+          this.automation.push({ value, time });
+          events.push(`gain-set:${value}@${time}`);
+        }
+      };
+      const node = { gain, connect() { events.push('gain-connect'); } };
+      gains.push(node);
+      return node;
+    }
     createMediaStreamDestination() { return destination; }
     async resume() { events.push('resume'); this.state = 'running'; }
     async close() { events.push('close'); this.state = 'closed'; }
@@ -24,7 +38,7 @@ function createHarness() {
     async play() { events.push('play'); },
     pause() { events.push('pause'); }
   };
-  return { events, videoTrack, audioTrack, destination, FakeAudioContext, FakeMediaStream, audioElement };
+  return { events, gains, videoTrack, audioTrack, destination, FakeAudioContext, FakeMediaStream, audioElement };
 }
 
 test('mixes canvas video and one audio track into a recording stream', async () => {
@@ -47,17 +61,30 @@ test('mixes canvas video and one audio track into a recording stream', async () 
   assert.ok(h.events.includes('close'));
 });
 
-test('clamps invalid and out-of-range volume values safely', async () => {
+test('keeps local music silent until the shared voice and recording start time', async () => {
+  const h = createHarness();
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    audioElement: h.audioElement,
+    volume: 0.65,
+    AudioContextClass: h.FakeAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  assert.equal(h.gains[0].gain.value, 0);
+  assert.deepEqual(h.gains[0].gain.automation, []);
+  await session.start();
+  assert.deepEqual(h.gains[0].gain.automation, [
+    { value: 0, time: 10 },
+    { value: 0.65, time: 10.08 }
+  ]);
+  await session.cleanup();
+});
+
+test('clamps invalid and out-of-range volume values safely at the scheduled start', async () => {
   for (const [value, expected] of [[-4, 0], [4, 1], ['not-a-number', 1]]) {
     const h = createHarness();
-    const gains = [];
-    class InspectContext extends h.FakeAudioContext {
-      createGain() {
-        const node = super.createGain();
-        gains.push(node);
-        return node;
-      }
-    }
+    class InspectContext extends h.FakeAudioContext {}
     const session = await createAudioExportSession({
       videoStream: { getTracks: () => [h.videoTrack] },
       audioElement: h.audioElement,
@@ -65,7 +92,8 @@ test('clamps invalid and out-of-range volume values safely', async () => {
       AudioContextClass: InspectContext,
       MediaStreamClass: h.FakeMediaStream
     });
-    assert.equal(gains[0].gain.value, expected);
+    await session.start();
+    assert.equal(h.gains[0].gain.automation.at(-1).value, expected);
     await session.cleanup();
   }
 });
