@@ -8,6 +8,7 @@ const PRESETS = Object.freeze({
   run: { label: 'Run / Бег', frames: 9 },
   jump: { label: 'Jump / Прыжок', frames: 5 },
   dodge: { label: 'Dodge / Уклонение', frames: 5 },
+  stagger: { label: 'Stagger / Пошатывание', frames: 5 },
   wave: { label: 'Wave / Приветствие', frames: 5 },
   dance: { label: 'Dance / Танец', frames: 9 },
   attack: { label: 'Attack / Атака', frames: 5 },
@@ -198,6 +199,18 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightLeg') rotation = 0.28 * tuck;
       if (role === 'leftLowerLeg' && bone.pivotEnabled) rotation = 0.34 * tuck;
       if (role === 'rightLowerLeg' && bone.pivotEnabled) rotation = 0.34 * tuck;
+    } else if (preset === 'stagger') {
+      // A source-grounded recoil: the torso shifts back, the head and arms
+      // react, and the whole rig returns to neutral at both ends.
+      const recoil = Math.sin(Math.PI * phase);
+      if (role === 'root') { x = -0.055 * recoil; y = 0.018 * recoil; rotation = 0.11 * recoil; }
+      if (role === 'head') rotation = -0.09 * recoil;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.48 * recoil;
+      if (role === 'rightArm') rotation = 0.48 * recoil;
+      if (role === 'leftLowerArm') rotation = 0.2 * recoil;
+      if (role === 'rightLowerArm') rotation = -0.2 * recoil;
+      if (role === 'leftLeg' || role === 'leg') rotation = 0.18 * recoil;
+      if (role === 'rightLeg') rotation = -0.18 * recoil;
     } else if (preset === 'wave') {
       if (role === 'rightArm' || role === 'arm') rotation = -0.8 + 0.22 * Math.sin(phase * Math.PI * 2);
       if (role === 'leftArm') rotation = -0.12;

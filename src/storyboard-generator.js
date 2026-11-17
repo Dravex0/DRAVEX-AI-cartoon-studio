@@ -10,6 +10,7 @@ import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
 import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
+import { inferGroundedAttackReaction } from './grounded-action-phases.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -181,6 +182,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     const actionTarget = primaryInteraction?.targetId ||
       (semanticNeedsPair && scene.characters.length > 1 ? scene.characters[1] : null);
     const canRepresentSemanticPair = !semanticNeedsPair || Boolean(actionTarget);
+    const groundedReaction = inferGroundedAttackReaction(scene.storyDetail, scene.characters, scene.interactions);
     if (actionActor && actionEvidence && canRepresentSemanticPair &&
         (sourceAction !== 'idle' || primaryInteraction || semanticIsActionable)) {
       const semanticDescription = semanticIsActionable
@@ -190,7 +192,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
         : scene.visibleAction || scene.storyDetail;
       scene.actionTimeline = {
         schemaVersion: 1,
-        phases: [{
+        phases: groundedReaction?.phases ?? [{
           phase: 'action', start: 0, end: 1,
           actorId: actionActor,
           targetId: actionTarget || null,

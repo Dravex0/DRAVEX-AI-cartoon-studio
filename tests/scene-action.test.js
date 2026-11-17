@@ -6,6 +6,9 @@ const cases = [
   ['Лисёнок исчезает за деревом', 'vanish'],
   ['The fox leaps over a fallen branch', 'jump'],
   ['Герой убегает от грозы', 'run'],
+  ['The guard recoils and stumbles backward from the strike', 'stagger'],
+  ['Противник отшатывается после удара', 'stagger'],
+  ['Супротивник відсахується назад після удару', 'stagger'],
   ['The character dances and twirls', 'dance'],
   ['Лисёнок медленно шагает к двери', 'walk'],
   ['A bird hovers above the lake', 'float'],
@@ -100,6 +103,7 @@ test('distinguishes defense, evasion, attack, awakening, reveal and warning', as
     ['Nox blocks the blue blade with his armor.', 'defend'],
     ['Arin dodges the incoming strike.', 'dodge'],
     ['Arin attacks with an energy blade.', 'attack'],
+    ['The guard recoils and stumbles backward from the strike.', 'stagger'],
     ['Blue energy awakens around Arin’s hand.', 'power_up'],
     ['Nox appears among the ruins.', 'reveal'],
     ['Elira warns Arin about the ancient darkness.', 'warning']
@@ -112,6 +116,7 @@ test('distinguishes defense, evasion, attack, awakening, reveal and warning', as
 test('supports Russian and Ukrainian semantic scene actions', async () => {
   const { inferSceneActionIntent } = await import('../src/scene-action.js');
   assert.equal(inferSceneActionIntent('Арин и Элира объединяют свои силы и магию.').intent, 'team_magic');
+  assert.equal(inferSceneActionIntent('Противник отшатывается после удара.').intent, 'stagger');
   assert.equal(inferSceneActionIntent('Нокс появляется среди руин.').intent, 'reveal');
   assert.equal(inferSceneActionIntent('Арін та Еліра поєднують свої сили й енергію.').intent, 'team_magic');
   assert.equal(inferSceneActionIntent('Нокс з’являється серед руїн.').intent, 'reveal');

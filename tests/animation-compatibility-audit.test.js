@@ -36,7 +36,7 @@ test('accepts compatible body, facial and bone animation systems on the same cha
   assert.equal(report.status, 'compatible-with-warnings');
   assert.equal(report.errorCount, 0);
   assert.ok(report.warningCount > 0, 'the minimal rig should disclose unsupported full-body preset details');
-  assert.equal(report.presetCount, 9);
+  assert.equal(report.presetCount, 10);
   assert.ok(report.issues.some(item => item.code === 'rig-preset-limited'));
   assert.equal(report.rigCount, 1);
   assert.equal(report.facialRigCount, 1);

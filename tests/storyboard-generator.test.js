@@ -194,6 +194,54 @@ test('creates a single action phase for explicit movement without inventing othe
   assert.equal(timeline.phases[0].evidence, 'Foxy runs through the forest.');
 });
 
+test('splits an explicitly written attack and target stagger into ordered grounded phases', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nKael — a young warrior.\nGuard — an armored guard.\n\nScene 1: Clash\nKael strikes the guard, and the guard stumbles backward.',
+    'en',
+    'Kael'
+  );
+  const scene = result.scenes[0];
+  assert.deepEqual(result.brief.characters, ['Kael', 'Guard']);
+  assert.equal(scene.storyDetail, 'Kael strikes the guard, and the guard stumbles backward.');
+  assert.deepEqual(scene.characters, ['Kael', 'Guard']);
+  assert.equal(scene.interactions[0]?.type, 'attack');
+  assert.deepEqual(scene.actionTimeline.phases.map(({ phase, actorId, targetId, start, end }) => ({
+    phase, actorId, targetId, start, end
+  })), [
+    { phase: 'action', actorId: 'Kael', targetId: 'Guard', start: 0, end: 0.62 },
+    { phase: 'reaction', actorId: 'Guard', targetId: 'Kael', start: 0.62, end: 1 }
+  ]);
+  assert.equal(scene.actionTimeline.phases[0].evidence, 'Kael strikes the guard');
+  assert.equal(scene.actionTimeline.phases[1].evidence, 'and the guard stumbles backward.');
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+  assert.match(scene.motionGenerationPrompt, /reaction \(62%-100%/);
+});
+
+test('does not assign a stagger reaction to a character other than the attack target', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nKael — a young warrior.\nGuard — an armored guard.\nFoxy — a small fox.\n\nScene 1: Clash\nKael strikes the guard, and Foxy stumbles backward.',
+    'en',
+    'Kael'
+  );
+  assert.equal(result.scenes[0].actionTimeline.phases.length, 1);
+  assert.equal(result.scenes[0].actionTimeline.phases[0].actorId, 'Kael');
+});
+
+test('recognizes an explicitly written Russian attack followed by the target stagger', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nКаэль — молодой воин.\nРико — воин в доспехах.\n\nScene 1: Столкновение\nКаэль атакует Рико, и Рико отшатывается назад.',
+    'ru',
+    'Каэль'
+  );
+  const phases = result.scenes[0].actionTimeline.phases;
+  assert.equal(phases.length, 2);
+  assert.equal(phases[0].actorId, 'Каэль');
+  assert.equal(phases[1].phase, 'reaction');
+  assert.equal(phases[1].actorId, 'Рико');
+  assert.equal(phases[1].evidence, 'и Рико отшатывается назад.');
+  assert.equal(result.scenes[0].productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+});
+
 
 test('semantic scene intent reaches motion prompt and action timeline for team magic', () => {
   const result = buildStoryboardFromText(
