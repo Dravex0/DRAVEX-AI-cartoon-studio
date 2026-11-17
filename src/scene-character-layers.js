@@ -230,13 +230,28 @@ export function attachCharacterSpriteToSceneLayers(scene = {}, asset = {}) {
   if (layers.length >= MAX_CHARACTER_LAYERS) {
     return { status: 'limit-reached', layers };
   }
+  const cast = Array.isArray(source.characters)
+    ? source.characters.map(value => clean(value, 120)).filter(Boolean)
+    : [];
+  const castIndex = cast.findIndex(value => value.toLocaleLowerCase() === key);
+  const castCount = Math.max(cast.length, layers.length + 1);
+  const slotIndex = castIndex >= 0 ? castIndex : layers.length;
+  const columns = Math.min(4, castCount);
+  const rows = Math.ceil(castCount / columns);
+  const row = Math.floor(slotIndex / columns);
+  const rowStart = row * columns;
+  const rowCount = Math.min(columns, castCount - rowStart);
+  const column = slotIndex - rowStart;
+  const placement = {
+    x: (column + 1) / (rowCount + 1),
+    y: Number((rows === 1 ? 0.68 : 0.48 + row * (0.34 / (rows - 1))).toFixed(4)),
+    width: Math.min(0.28, 0.84 / columns),
+    height: rows === 1 ? 0.46 : Math.min(0.34, 0.78 / rows)
+  };
   layers.push(normalizeCharacterLayer({
     characterId,
     imageUrl,
-    x: 0.5,
-    y: 0.68,
-    width: 0.28,
-    height: 0.46,
+    ...placement,
     zIndex: layers.length
   }, layers.length));
   return { status: 'added', layers };

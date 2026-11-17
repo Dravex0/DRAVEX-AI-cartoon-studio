@@ -22,6 +22,8 @@ function characterIdentitySeed(characterId, appearance) {
   return hash >>> 0;
 }
 
+const NEUTRAL_CHARACTER_POSE = 'Neutral full-body standing pose, facing the scene action; do not invent movement, interactions, or props.';
+
 function characterAction(scene, characterId, castSize) {
   if (scene.actionTimeline != null) {
     const report = validateCharacterActionTimeline(scene);
@@ -30,10 +32,12 @@ function characterAction(scene, characterId, castSize) {
       .filter(phase => key(phase.actorId) === key(characterId))
       .map(phase => clean(phase.description, 700))
       .filter(Boolean);
-    return [...new Set(phases)].join(' ');
+    return [...new Set(phases)].join(' ') || NEUTRAL_CHARACTER_POSE;
   }
-  // A general action can be assigned safely only when the scene has one character.
-  return castSize === 1 ? clean(scene.visibleAction, 1000) : '';
+  // Never copy one shared action onto multiple actors. Unassigned cast members
+  // still receive a neutral sprite so they can appear in the scene without invented actions.
+  const explicitAction = castSize === 1 ? clean(scene.visibleAction, 1000) : '';
+  return explicitAction || NEUTRAL_CHARACTER_POSE;
 }
 
 /**
@@ -90,6 +94,7 @@ export function buildCharacterSpriteAssetPlan(scene = {}, characterBible = []) {
       appearanceReference: appearance,
       identitySeed,
       action,
+      actionStatus: action === NEUTRAL_CHARACTER_POSE ? 'neutral-fallback' : action ? 'grounded' : 'blocked',
       prompt,
       negativePrompt: 'background, scenery, extra characters, cropped body, missing feet, text, logo, watermark, costume change, different colors, duplicate limbs',
       // `status` remains the legacy planning status for existing consumers.

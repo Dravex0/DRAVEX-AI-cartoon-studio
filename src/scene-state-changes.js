@@ -6,24 +6,29 @@
 const VERBS = {
   en: [
     { re: /(?:picks up|takes|grabs|holds)/iu, property: 'holder', value: 'actor' },
+    { re: /(?:pushes|nudges|kicks)/iu, property: 'motion', value: 'rolling' },
     { re: /(?:drops|puts down|leaves behind)/iu, property: 'holder', value: null },
     { re: /opens/iu, property: 'openState', value: 'open' },
     { re: /closes/iu, property: 'openState', value: 'closed' }
   ],
   ru: [
     { re: /(?:поднимает|бер[её]т|забирает|держит)/iu, property: 'holder', value: 'actor' },
+    { re: /(?:толкает|пинает)/iu, property: 'motion', value: 'rolling' },
     { re: /(?:роняет|клад[её]т|оставляет)/iu, property: 'holder', value: null },
     { re: /открывает/iu, property: 'openState', value: 'open' },
     { re: /закрывает/iu, property: 'openState', value: 'closed' }
   ],
   uk: [
     { re: /(?:піднімає|бере|забирає|тримає)/iu, property: 'holder', value: 'actor' },
+    { re: /штовхає/iu, property: 'motion', value: 'rolling' },
+    { re: /копає(?=\s+(?:червон\p{L}*\s+)?(?:м[’']?яч\p{L}*|кул\p{L}*))/iu, property: 'motion', value: 'rolling' },
     { re: /(?:роняє|кладе|залишає)/iu, property: 'holder', value: null },
     { re: /відкриває/iu, property: 'openState', value: 'open' },
     { re: /закриває/iu, property: 'openState', value: 'closed' }
   ],
   es: [
     { re: /(?:recoge|toma|agarra|sostiene)/iu, property: 'holder', value: 'actor' },
+    { re: /(?:empuja|patea)/iu, property: 'motion', value: 'rolling' },
     { re: /(?:suelta|deja caer|deja)/iu, property: 'holder', value: null },
     { re: /abre/iu, property: 'openState', value: 'open' },
     { re: /cierra/iu, property: 'openState', value: 'closed' }
@@ -71,8 +76,21 @@ function findEntity(source, actorId, verb) {
   if (!actorMatch) return null;
   const afterActor = source.slice(actorMatch.index + actorMatch[0].length);
   const verbMatch = verb.re.exec(afterActor);
-  if (!verbMatch || !hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index))) return null;
-  const entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
+  if (!verbMatch) return null;
+  const afterVerb = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
+  const hasExplicitActionTool = /^(?:лапой|лапами|ногой|ногами|рукой|руками|paw|paws|foot|feet|hand|hands)$/iu.test(afterVerb);
+  if (!hasOnlyOptionalAdverb(afterActor.slice(0, verbMatch.index)) && !hasExplicitActionTool) return null;
+  let entity = cutTail(afterActor.slice(verbMatch.index + verbMatch[0].length));
+  // In natural Russian/Ukrainian phrasing the object may be named before the
+  // action, while the phrase after the verb names only the body part ("толкает
+  // лапой"). Recover only a known prop noun from the same actor sentence.
+  const actionTool = /^(?:лапой|лапами|ногой|ногами|рукой|руками|paw|paws|foot|feet|hand|hands)$/iu;
+  if (actionTool.test(entity)) {
+    const beforeVerb = afterActor.slice(0, verbMatch.index);
+    const propPattern = /(?:красн(?:ый|ого|ую|ое)\s+мяч|червон\p{L}*\s+м[’']?яч|red\s+ball|мяч(?:а|ом|у)?|м[’']?яч|ball|звезд[ауы]|star|ключ(?:а|ом|у)?|key|книг[ауи]|book|яблок[оа]|apple)/giu;
+    const matches = [...beforeVerb.matchAll(propPattern)];
+    if (matches.length) entity = clean(matches[matches.length - 1][0]);
+  }
   if (!entity || entity.length > 100 || /^(?:it|them|him|her|его|её|ее|их|його|її|їх)$/iu.test(entity)) return null;
   return { entity, evidence: clean(source, 1_200) };
 }

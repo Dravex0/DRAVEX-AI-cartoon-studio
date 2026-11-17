@@ -67,3 +67,41 @@ test('keeps location evidence inside the sentence that names the moving characte
   assert.equal(changes[0][0].value, 'inside:stone castle');
   assert.equal(changes[0][0].evidence, 'Mira enters the stone castle.');
 });
+
+
+test('tracks an explicit push action as a rolling prop in Russian and English', () => {
+  const ru = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy толкает красный мяч лапой.', characters: ['Foxy'] }
+  ], 'ru');
+  const en = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy pushes the red ball.', characters: ['Foxy'] }
+  ], 'en');
+  assert.equal(ru[0][0].entityId, 'красный мяч лапой');
+  assert.equal(ru[0][0].property, 'motion');
+  assert.equal(ru[0][0].value, 'rolling');
+  assert.equal(en[0][0].entityId, 'red ball');
+  assert.equal(en[0][0].property, 'motion');
+  assert.equal(en[0][0].value, 'rolling');
+});
+
+test('recognizes a Russian object named before the push verb when the phrase after it names the paw', () => {
+  const changes = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy стоит на лесной тропинке, замечает красный мяч у дерева, подбегает к нему, толкает лапой, мяч катится.', characters: ['Foxy'] }
+  ], 'ru');
+  assert.equal(changes[0][0].entityId, 'красный мяч');
+  assert.equal(changes[0][0].property, 'motion');
+  assert.equal(changes[0][0].value, 'rolling');
+});
+
+test('treats Ukrainian kopaye as rolling only when the explicit object is a ball', () => {
+  const ball = inferStoryboardStateChanges([
+    { storyDetail: "Foxy копає червоний м'яч.", characters: ['Foxy'] }
+  ], 'uk');
+  const pit = inferStoryboardStateChanges([
+    { storyDetail: 'Foxy копає яму.', characters: ['Foxy'] }
+  ], 'uk');
+  assert.equal(ball[0][0].entityId, "червоний м'яч");
+  assert.equal(ball[0][0].property, 'motion');
+  assert.equal(ball[0][0].value, 'rolling');
+  assert.deepEqual(pit, [[]]);
+});

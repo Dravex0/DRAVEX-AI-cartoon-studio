@@ -280,7 +280,8 @@ test('production scene exposes a per-character sprite asset plan grounded in the
   ]);
   assert.equal(prepared.characterSpriteAssetPlan.length, 2);
   assert.deepEqual(prepared.characterSpriteAssetPlan.map(asset => asset.characterId), ['Foxy', 'Bird']);
-  assert.ok(prepared.characterSpriteAssetPlan.every(asset => asset.status === 'blocked'));
+  assert.ok(prepared.characterSpriteAssetPlan.every(asset => asset.status === 'ready'));
+  assert.ok(prepared.characterSpriteAssetPlan.every(asset => asset.actionStatus === 'neutral-fallback'));
   assert.match(prepared.characterSpriteAssetPlan[0].prompt, /Small orange fox/);
   assert.match(prepared.characterSpriteAssetPlan[1].prompt, /Small round bird/);
   assert.equal(prepared.characterSpriteAssetPlan[0].assetRole, 'character-sprite');

@@ -59,11 +59,31 @@ test('blocks missing and empty character references without inventing appearance
   assert.ok(plan[1].issues.some(issue => issue.code === 'empty-character-appearance'));
 });
 
-test('does not assign a shared action to multiple characters without actor evidence', () => {
+test('uses neutral sprite poses rather than inventing a shared action for multiple characters', () => {
   const plan = buildCharacterSpriteAssetPlan({
     characters: ['Foxy', 'Bird'], visibleAction: 'They move together.'
   }, bible);
-  assert.equal(plan.every(item => item.action === '' && item.status === 'blocked'), true);
+  assert.equal(plan.every(item => item.status === 'ready'), true);
+  assert.equal(plan.every(item => item.actionStatus === 'neutral-fallback'), true);
+  assert.ok(plan.every(item => item.action.includes('Neutral full-body standing pose')));
+  assert.ok(plan.every(item => !item.action.includes('They move together')));
+});
+
+test('uses a neutral pose for a cast member omitted from an otherwise valid actor timeline', () => {
+  const plan = buildCharacterSpriteAssetPlan({
+    id: 'scene-4',
+    characters: ['Foxy', 'Bird'],
+    storyDetail: 'Foxy waves to Bird.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [
+        { phase: 'action', start: 0, end: 0.6, actorId: 'Foxy', description: 'Foxy waves to Bird.', evidence: 'Foxy waves to Bird.' }
+      ]
+    }
+  }, bible);
+  assert.equal(plan[0].actionStatus, 'grounded');
+  assert.equal(plan[1].actionStatus, 'neutral-fallback');
+  assert.ok(plan[1].action.includes('Neutral full-body standing pose'));
 });
 
 test('deduplicates IDs case-insensitively and enforces the scene cast limit', () => {
