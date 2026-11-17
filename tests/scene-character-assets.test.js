@@ -40,7 +40,7 @@ test('ignores scenes without drawable character image assets', () => {
 
 test('full-film export waits for character images before starting MediaRecorder', () => {
   const start = appSource.indexOf('async function exportFilm(');
-  const end = appSource.indexOf("\\n$('export').onclick", start);
+  const end = appSource.indexOf("\n$('export').onclick", start);
   assert.ok(start >= 0 && end > start, 'exportFilm must be present');
   const block = appSource.slice(start, end);
   const collect = block.indexOf('collectSceneCharacterImageUrls(meta)');
