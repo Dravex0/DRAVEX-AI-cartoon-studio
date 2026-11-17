@@ -95,3 +95,21 @@ test("does not use the procedural demo fallback when a generated character layer
   });
   assert.deepEqual(result, []);
 });
+
+
+test("does not assign the procedural fox mouth to a character already rendered from a body rig", () => {
+  const candidate = track("Foxy");
+  const bodyRig = {
+    schemaVersion: 1,
+    characterId: "Foxy",
+    bones: [{ id: "root" }],
+    parts: [{ id: "body", boneId: "root", imageUrl: "https://example.com/body.png" }]
+  };
+  const result = selectRenderableLipSyncTracks({
+    voiceTracks: [candidate],
+    mainCharacterKey: "Foxy",
+    storyUsesFallback: true,
+    sceneMetadata: [{ characterLayers: [], characterRigs: [bodyRig], characterFacialRigs: [] }]
+  });
+  assert.deepEqual(result, []);
+});
