@@ -124,3 +124,24 @@ test("isolates progress callback errors from scene generation", async () => {
     [2, "completed", "UI progress failed: completed"]
   ]);
 });
+
+
+test("continues scene generation when asynchronous progress observers reject", async () => {
+  const generated = [];
+  const report = await generateStoryboardVideos({
+    scenes: [{ id: "a" }, { id: "b" }],
+    generateScene: async scene => {
+      generated.push(scene.id);
+      return { status: "completed", video: new Blob(["clip"], { type: "video/webm" }) };
+    },
+    onProgress: async () => {
+      throw new Error("async progress UI failed");
+    }
+  });
+
+  assert.deepEqual(generated, ["a", "b"]);
+  assert.equal(report.completed, 2);
+  assert.equal(report.failed, 0);
+  assert.equal(report.progressErrors.length, 4);
+  assert.ok(report.progressErrors.every(item => item.error === "async progress UI failed"));
+});
