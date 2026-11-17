@@ -3783,14 +3783,9 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
       }
     }
     if(musicFile||voiceTracks.length){
-      const audioElement=musicFile?new Audio(selectedMusicUrl):null;
-      if(audioElement){audioElement.loop=true;audioElement.preload='auto';}
-      audioSession=await createAudioExportSession({videoStream:stream,audioElement,volume:Number($('audioVolume').value)/100,voiceTracks,voiceVolume:0.9});
+      audioSession=await createAudioExportSession({videoStream:stream,musicBlob:musicFile,volume:Number($('audioVolume').value)/100,voiceTracks,voiceVolume:0.9});
       checkAbort();
       stream=audioSession.stream;
-      const audioStartInfo=await audioSession.start();
-      checkAbort();
-      audioScheduledStartAtMs=Number.isFinite(audioStartInfo?.scheduledStartAtMs)?audioStartInfo.scheduledStartAtMs:null;
     }
     const mimeTypes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
     const mimeType=mimeTypes.find(type=>MediaRecorder.isTypeSupported(type));
@@ -3870,6 +3865,11 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     draw();
     assertRequiredSceneSnapshot();
     recorder.start(250);
+    if(audioSession){
+      const audioStartInfo=await audioSession.start();
+      checkAbort();
+      audioScheduledStartAtMs=Number.isFinite(audioStartInfo?.scheduledStartAtMs)?audioStartInfo.scheduledStartAtMs:null;
+    }
     if(audioScheduledStartAtMs!==null){
       const mouthStartOffsetMs=getAudioTimelineOffsetMs(audioScheduledStartAtMs,exportMouthOriginTimeMs);
       exportMouthTracks=exportMouthTracks.map(track=>({...track,startMs:track.startMs+mouthStartOffsetMs}));
