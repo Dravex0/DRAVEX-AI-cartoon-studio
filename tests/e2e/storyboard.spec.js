@@ -225,7 +225,11 @@ test('local canvas mode exports a playable WebM without contacting cloud video o
     'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\nDuration: 0.25 seconds'
   );
   await page.locator('#makeFilm').click();
-  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 }).catch(async error => {
+    const status = await page.locator('#status').textContent().catch(() => '');
+    const voiceStatus = await page.locator('#sceneVoiceStatus').textContent().catch(() => '');
+    throw new Error('Local canvas export did not complete. status="' + status + '"; voice="' + voiceStatus + '". ' + error.message);
+  });
 
   const video = await page.locator('#finalFilmPlayer').evaluate(async element => {
     const response = await fetch(element.currentSrc);
@@ -768,7 +772,11 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   await expect(page.locator('#generateFullFilmComfy')).toBeEnabled();
   await page.locator('#generateFullFilmComfy').click();
 
-  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 90000 });
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 90000 }).catch(async error => {
+    const status = await page.locator('#status').textContent().catch(() => '');
+    const voiceStatus = await page.locator('#sceneVoiceStatus').textContent().catch(() => '');
+    throw new Error('ComfyUI full-film export did not complete. status="' + status + '"; voice="' + voiceStatus + '". ' + error.message);
+  });
   await expect(page.locator('#fullFilmProgress')).toHaveJSProperty('value', 100);
   const finalVideo = await page.locator('#finalFilmPlayer').evaluate(async element => {
     await element.play().catch(() => {});
