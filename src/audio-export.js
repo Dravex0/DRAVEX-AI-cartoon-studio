@@ -32,6 +32,7 @@ function validateVoiceTracks(tracks) {
 export async function createAudioExportSession({
   videoStream,
   audioElement = null,
+  musicBlob = null,
   volume = 1,
   voiceTracks = [],
   voiceVolume = 1,
@@ -44,8 +45,11 @@ export async function createAudioExportSession({
   if (audioElement && typeof audioElement.play !== 'function') {
     throw new TypeError('audioElement must provide play() when supplied.');
   }
+  if (musicBlob && (!(typeof Blob !== 'undefined' && musicBlob instanceof Blob) || musicBlob.size === 0)) {
+    throw new TypeError('musicBlob must be a non-empty audio Blob.');
+  }
   const tracks = validateVoiceTracks(voiceTracks);
-  if (!audioElement && tracks.length === 0) {
+  if (!audioElement && !musicBlob && tracks.length === 0) {
     throw new TypeError('At least one music element or voice track is required.');
   }
   if (typeof AudioContextClass !== 'function') {
@@ -60,9 +64,21 @@ export async function createAudioExportSession({
   let closed = false;
   let startPromise = null;
   const voiceSources = [];
+  let musicSource = null;
   try {
     const destination = context.createMediaStreamDestination();
-    if (audioElement) {
+    let musicGain = null;
+    let decodedMusic = null;
+    if (musicBlob) {
+      const bytes = await musicBlob.arrayBuffer();
+      decodedMusic = await context.decodeAudioData(bytes);
+      if (!decodedMusic || !Number.isFinite(decodedMusic.duration) || decodedMusic.duration <= 0) {
+        throw new Error('Could not decode local background music.');
+      }
+      musicGain = context.createGain();
+      musicGain.gain.value = clampVolume(volume);
+      musicGain.connect(destination);
+    } else if (audioElement) {
       const source = context.createMediaElementSource(audioElement);
       const gain = context.createGain();
       gain.gain.value = clampVolume(volume);
@@ -107,6 +123,13 @@ export async function createAudioExportSession({
           const scheduledStartAtMs = typeof performance !== 'undefined' && typeof performance.now === 'function'
             ? performance.now() + Math.max(0, (clockStart - context.currentTime) * 1000)
             : null;
+          if (decodedMusic) {
+            musicSource = context.createBufferSource();
+            musicSource.buffer = decodedMusic;
+            musicSource.loop = true;
+            musicSource.connect(musicGain);
+            musicSource.start(clockStart);
+          }
           for (const track of decodedVoices) {
             const source = context.createBufferSource();
             source.buffer = track.buffer;
@@ -119,6 +142,7 @@ export async function createAudioExportSession({
           for (const source of voiceSources.splice(0)) {
             try { source.stop(); } catch {}
           }
+          if (musicSource) { try { musicSource.stop(); } catch {} musicSource = null; }
           if (audioElement) {
             try { audioElement.pause(); } catch {}
             try { audioElement.currentTime = 0; } catch {}
@@ -138,6 +162,7 @@ export async function createAudioExportSession({
         for (const source of voiceSources.splice(0)) {
           try { source.stop(); } catch {}
         }
+        if (musicSource) { try { musicSource.stop(); } catch {} musicSource = null; }
         try { audioTrack.stop(); } catch {}
         if (context.state !== 'closed') await context.close();
       }
@@ -146,6 +171,7 @@ export async function createAudioExportSession({
     for (const source of voiceSources.splice(0)) {
       try { source.stop(); } catch {}
     }
+    if (musicSource) { try { musicSource.stop(); } catch {} }
     if (audioTrack) {
       try { audioTrack.stop(); } catch {}
     }
