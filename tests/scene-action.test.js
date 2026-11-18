@@ -253,3 +253,12 @@ test('bounds extracted scene action sequences to eight events', async () => {
   );
   assert.equal(sequence.length, 8);
 });
+
+
+test('does not confuse the English word girl with the Spanish turn verb', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  assert.deepEqual(
+    extractSceneActionSequence('A girl walks to the table.').map(event => event.intent),
+    ['walk']
+  );
+});
