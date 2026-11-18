@@ -334,3 +334,24 @@ test('assigns longer pacing hints to careful listening and stealth movement', as
   assert.ok(byIntent.listen_carefully > byIntent.hear_sound);
   assert.ok(byIntent.stealth_advance > byIntent.hear_sound);
 });
+
+
+test('recognizes torture as a visible threat and does not confuse weapon drawing with sketching', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  assert.deepEqual(
+    extractSceneActionSequence('Полицейский видит, как пытают человека.').map(event => event.intent),
+    ['discover_threat']
+  );
+  assert.deepEqual(
+    extractSceneActionSequence('The officer sees a person being tortured.').map(event => event.intent),
+    ['discover_threat']
+  );
+  assert.deepEqual(
+    extractSceneActionSequence('The officer draws his pistol.').map(event => event.intent),
+    ['draw_weapon']
+  );
+  assert.deepEqual(
+    extractSceneActionSequence('The child draws a map.').map(event => event.intent),
+    ['write_draw']
+  );
+});
