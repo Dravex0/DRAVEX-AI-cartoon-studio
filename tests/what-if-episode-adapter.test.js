@@ -64,7 +64,7 @@ test('creates a validated action timeline for supported actor poses and explicit
   assert.deepEqual(scene.actionTimeline, {
     schemaVersion: 1,
     phases: [{
-      phase: 'action', start: 0.1, end: 0.9, actorId: 'main-character',
+      phase: 'action', start: 0.1, end: 0.9, actorId: 'main-character', targetId: null,
       description: 'main-character walks to the right',
       evidence: 'main-character walks to the right'
     }]
