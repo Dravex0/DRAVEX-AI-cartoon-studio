@@ -57,7 +57,10 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
   const phases = [];
   const skipped = [];
 
-  for (const source of scene.actionTimeline.phases) {
+  const actionSteps = scene.actionTimeline.phases.flatMap(phase =>
+    Array.isArray(phase.steps) ? phase.steps.map(step => ({ ...step, phase: 'action' })) : [phase]
+  );
+  for (const source of actionSteps) {
     const actorId = clean(source.actorId);
     const actorKey = key(actorId);
     const actorLayer = layerById.get(actorKey);
