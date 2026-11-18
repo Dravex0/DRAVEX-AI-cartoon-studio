@@ -436,7 +436,7 @@ describe('tactical character rig motion presets', () => {
     const drawPose = sampleCharacterRigTimeline(draw.timeline, 0.5).Foxy;
     const aimPose = sampleCharacterRigTimeline(aim.timeline, 0.5).Foxy;
     assert.ok(Math.abs(listenPose.head.rotation) > 0.1);
-    assert.ok(Math.abs(drawPose.rightLowerArm.rotation) > 0.5);
+    assert.ok(Math.abs(drawPose.rightArm.rotation) > 0.5);
     assert.ok(Math.abs(aimPose.rightArm.rotation) > 0.7);
     assert.notDeepEqual(drawPose, aimPose);
   });
@@ -452,7 +452,7 @@ describe('tactical character rig motion presets', () => {
     const dropPose = sampleCharacterRigTimeline(drop.timeline, 0.5).Foxy;
     assert.ok(Math.abs(handsPose.leftArm.rotation) > 0.8);
     assert.ok(coverPose.root.y > 0);
-    assert.ok(Math.abs(dropPose.rightLowerArm.rotation) > 0.3);
+    assert.ok(Math.abs(dropPose.rightArm.rotation) > 0.3);
     assert.notDeepEqual(handsPose, coverPose);
   });
 });
