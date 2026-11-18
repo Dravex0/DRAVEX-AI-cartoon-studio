@@ -205,16 +205,26 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
           description: semanticDescription,
           evidence: actionEvidence,
           ...(actionSequence.length ? {
-            steps: actionSequence.map((event, eventIndex) => ({
-              intent: event.intent,
-              motionCue: event.motionCue,
-              start: eventIndex / actionSequence.length,
-              end: (eventIndex + 1) / actionSequence.length,
-              actorId: actionActor,
-              targetId: null,
-              description: `Perform the ${event.intent} action: ${event.evidence}`,
-              evidence: event.evidence
-            }))
+            steps: (() => {
+              const weights = actionSequence.map(event => Math.max(0.25, Math.min(3, Number(event.durationWeight) || 1)));
+              const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+              let elapsedWeight = 0;
+              return actionSequence.map((event, eventIndex) => {
+                const start = elapsedWeight / totalWeight;
+                elapsedWeight += weights[eventIndex];
+                const end = elapsedWeight / totalWeight;
+                return {
+                  intent: event.intent,
+                  motionCue: event.motionCue,
+                  start,
+                  end,
+                  actorId: actionActor,
+                  targetId: null,
+                  description: `Perform the ${event.intent} action: ${event.evidence}`,
+                  evidence: event.evidence
+                };
+              });
+            })()
           } : {})
         }]
       };
