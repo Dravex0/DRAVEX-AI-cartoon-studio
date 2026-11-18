@@ -236,7 +236,7 @@ test('extracts ordered action sequences without inventing negated or connective 
 test('extracts Russian and Ukrainian multi-action sequences in source order', async () => {
   const { extractSceneActionSequence } = await import('../src/scene-action.js');
   assert.deepEqual(
-    extractSceneActionSequence('Лисёнок подбегает к двери, открывает её и забирает ключ.').map(event => event.intent),
+    extractSceneActionSequence('Лисёнок подходит к двери, открывает её и подбирает ключ.').map(event => event.intent),
     ['walk', 'open', 'pick_up']
   );
   assert.deepEqual(
