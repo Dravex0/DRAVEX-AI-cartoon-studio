@@ -107,6 +107,12 @@ const SEMANTIC_ACTIONS = [
     /попереджа\w*|застеріга\w*/i,
     /advierte\w*|alerta/i
   ] },
+  { intent: 'enter_location', motionCue: 'walk', patterns: [
+    /\\b(?:enters?|steps? into|goes? inside|walks? into)\\s+(?:the\\s+)?(?:building|room|house|hall|warehouse|office)\\b/i,
+    /заходи\\w*\\s+(?:в|во)\\s+(?:здани\\w*|дом|комнат\\w*|зал|склад|офис)|входи\\w*\\s+(?:в|во)\\s+(?:здани\\w*|дом|комнат\\w*|зал|склад|офис)/iu,
+    /заходить\\w*\\s+(?:у|в)\\s+(?:будівл\\w*|будинок|кімнат\\w*|зал|склад|офіс)/iu,
+    /entra\\s+en\\s+(?:el\\s+)?(?:edificio|edificios|habitación|casa|almacén|oficina)/i
+  ] },
   { intent: 'hear_sound', motionCue: 'turn', patterns: [
     /\\b(?:hears?|hearing)\\s+(?:a\\s+)?(?:screams?|shouts?|cries?|voices?|gunshots?|footsteps?|noise|sounds?)\\b/i,
     /слышит?\\s+(?:крик\\w*|голос\\w*|выстрел\\w*|шаг\\w*|шум\\w*|зву\\w*)|услыш\\w*\\s+(?:крик\\w*|голос\\w*|выстрел\\w*|шаг\\w*)/iu,
