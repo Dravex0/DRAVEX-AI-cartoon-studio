@@ -323,3 +323,14 @@ test('recognizes each tactical reaction independently before sequence assembly',
     );
   }
 });
+
+
+test('assigns longer pacing hints to careful listening and stealth movement', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const sequence = extractSceneActionSequence(
+    'The officer hears screams, listens carefully, then advances slowly and quietly.'
+  );
+  const byIntent = Object.fromEntries(sequence.map(event => [event.intent, event.durationWeight]));
+  assert.ok(byIntent.listen_carefully > byIntent.hear_sound);
+  assert.ok(byIntent.stealth_advance > byIntent.hear_sound);
+});
