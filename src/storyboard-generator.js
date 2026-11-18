@@ -9,7 +9,7 @@ import { inferSceneCausalLinks } from './scene-causality.js';
 import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
-import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
+import { detectSceneAction, inferSceneActionIntent, extractSceneActionSequence } from './scene-action.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -164,6 +164,8 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     // Semantic story intent is separate from renderer movement presets and is now
     // carried into the actual motion prompt and validated action timeline.
     const semanticIntent = inferSceneActionIntent(scene.storyDetail);
+    const actionSequence = extractSceneActionSequence(scene.storyDetail);
+    scene.actionSequence = actionSequence;
     scene.semanticActionIntent = semanticIntent;
     const semanticIsActionable = !['unknown', 'descriptive'].includes(semanticIntent.intent);
     const semanticMotionInstruction = semanticIsActionable
@@ -188,16 +190,25 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
           ? `${scene.characters[0]} and ${actionTarget} combine their powers as described in the source event: ${scene.storyDetail}`
           : `Perform the ${semanticIntent.intent} event: ${scene.storyDetail}`
         : scene.visibleAction || scene.storyDetail;
-      scene.actionTimeline = {
-        schemaVersion: 1,
-        phases: [{
-          phase: 'action', start: 0, end: 1,
-          actorId: actionActor,
-          targetId: actionTarget || null,
-          description: semanticDescription,
-          evidence: actionEvidence
-        }]
-      };
+      const sequenceCanReplaceSinglePhase = actionSequence.length > 1 && !semanticNeedsPair;
+      const phases = sequenceCanReplaceSinglePhase
+        ? actionSequence.map((event, eventIndex) => ({
+            phase: 'action',
+            start: eventIndex / actionSequence.length,
+            end: (eventIndex + 1) / actionSequence.length,
+            actorId: actionActor,
+            targetId: eventIndex === 0 ? (primaryInteraction?.targetId || null) : null,
+            description: `Perform the ${event.intent} action: ${event.evidence}`,
+            evidence: event.evidence
+          }))
+        : [{
+            phase: 'action', start: 0, end: 1,
+            actorId: actionActor,
+            targetId: actionTarget || null,
+            description: semanticDescription,
+            evidence: actionEvidence
+          }];
+      scene.actionTimeline = { schemaVersion: 1, phases };
     }
     // Preserve the original single-interaction field for older UI and consumers.
     scene.interaction = scene.interactions[0]
