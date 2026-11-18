@@ -2447,7 +2447,33 @@ $('importWhatIfEpisode').addEventListener('change',async event=>{
   const lang=storyLanguage();
   const storyContext=prepareStoryCharacterContext({scenes:converted.scenes},characterBible,selectedCharacter,lang);
   characterBible=storyContext.characterBible;
-  const importedScenes=ensureSceneIds(storyContext.scenes);
+  // Reuse already-approved local character assets from the previous storyboard.
+  // A fresh What-if import must not silently discard a rig/sprite that can animate its cast.
+  const reusableCharacterAssets=new Map();
+  const addReusableAsset=(kind,asset)=>{
+   const id=String(asset?.characterId||'').trim();
+   if(!id)return;
+   const key=id.toLocaleLowerCase();
+   const entry=reusableCharacterAssets.get(key)||{characterRigs:[],characterLayers:[],characterFacialRigs:[]};
+   if(!entry[kind].some(item=>String(item?.id||item?.imageUrl||item?.partId||'')===String(asset?.id||asset?.imageUrl||asset?.partId||'')))entry[kind].push(asset);
+   reusableCharacterAssets.set(key,entry);
+  };
+  for(const previousScene of sceneMetadata){
+   for(const rig of previousScene?.characterRigs||[])addReusableAsset('characterRigs',rig);
+   for(const layer of previousScene?.characterLayers||[])addReusableAsset('characterLayers',layer);
+   for(const rig of previousScene?.characterFacialRigs||[])addReusableAsset('characterFacialRigs',rig);
+  }
+  const importedScenes=ensureSceneIds(storyContext.scenes.map(scene=>{
+   const assets=(scene.characters||[]).map(id=>reusableCharacterAssets.get(String(id).toLocaleLowerCase())).filter(Boolean);
+   if(!assets.length)return scene;
+   const merge=(key)=>assets.flatMap(item=>item[key]||[]);
+   return {
+    ...scene,
+    characterRigs:merge('characterRigs'),
+    characterLayers:merge('characterLayers'),
+    characterFacialRigs:merge('characterFacialRigs')
+   };
+  }));
   if(!importedScenes.length)throw new Error(uiLang==='ru'?'В эпизоде нет пригодных сцен.':'The episode contains no usable scenes.');
   sceneMetadata=importedScenes;
   titles=importedScenes.map((scene,index)=>scene.title||('Scene '+(index+1)));
@@ -2470,8 +2496,14 @@ $('importWhatIfEpisode').addEventListener('change',async event=>{
   syncSceneEditor();
   updateStoryQA();
   ensureMainCharacterReference(selectedCharacter);
+  const motionPreparation=prepareAutomaticCharacterMotion();
   const warnings=converted.diagnostics.warnings;
+  const preparedRigActions=motionPreparation.rigBatch.generatedActions;
+  const preparedSpriteActions=motionPreparation.spriteBatch.generatedActions;
   status.textContent=(uiLang==='ru'?'Импортировано сцен: ':'Imported scenes: ')+sceneMetadata.length+
+   (uiLang==='ru'
+    ? '. Подготовлено движений рига: '+preparedRigActions+', движений спрайта: '+preparedSpriteActions+'.'
+    : '. Rig actions prepared: '+preparedRigActions+', sprite motion phases: '+preparedSpriteActions+'.')+
    (warnings.length?(uiLang==='ru'?'. Предупреждений совместимости: ':'. Compatibility warnings: ')+warnings.length:'.');
   if(warnings.length){
    const note=document.createElement('p');
