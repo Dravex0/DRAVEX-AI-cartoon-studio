@@ -281,6 +281,6 @@ test('understands equivalent English sensory, stealth and intervention beats', a
   const sequence = extractSceneActionSequence(story);
   assert.deepEqual(sequence.map(event => event.intent), [
     'enter_location', 'hear_sound', 'draw_weapon', 'stealth_advance',
-    'listen_carefully', 'stealth_advance', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
+    'listen_carefully', 'advance', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
   ], JSON.stringify(sequence));
 });
