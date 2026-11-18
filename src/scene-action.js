@@ -204,7 +204,7 @@ const SEMANTIC_ACTIONS = [
     /deja caer|baja|suelta\s+(?:su\s+)?(?:arma|pistola)/i
   ] },
   { intent: 'hands_up', motionCue: 'surprised', patterns: [
-    /\b(?:raises?|puts?)\s+(?:both\s+)?hands?\s+(?:up|above (?:his|her|their) head)\b/i,
+    /\b(?:raises?|puts?)\s+(?:both\s+)?hands?(?:\s+(?:up|above (?:his|her|their) head))?\b/i,
     /поднимает\s+руки|поднимает\s+обе\s+руки/iu,
     /підніма[\p{L}]*\s+руки/iu,
     /levanta\s+las\s+manos/i
