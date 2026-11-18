@@ -1,5 +1,5 @@
 import { validateCharacterFacialRig } from "./character-facial-rig.js";
-import { shouldShowProceduralDemoCharacter } from "./demo-character-mode.js";
+import { hasRenderableCharacterLayer, hasRenderableCharacterRig, shouldShowProceduralDemoCharacter } from "./demo-character-mode.js";
 
 const cleanKey = value => String(value ?? "").trim().toLowerCase();
 
@@ -41,7 +41,8 @@ export function selectRenderableLipSyncTracks({
     if (!mainKey || cleanKey(track?.characterName) !== mainKey) return false;
     return shouldShowProceduralDemoCharacter({
       storyUsesFallback,
-      hasCharacterLayers: Array.isArray(scene.characterLayers) && scene.characterLayers.length > 0
+      hasCharacterLayers: hasRenderableCharacterLayer(scene, mainKey),
+      hasCharacterRig: hasRenderableCharacterRig(scene, mainKey)
     });
   });
 }

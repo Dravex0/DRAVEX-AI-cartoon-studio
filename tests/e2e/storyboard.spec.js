@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { seedVoiceArtifactsForCurrentDraft } from './helpers/seed-voice-artifacts.js';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -157,6 +158,48 @@ test('localizes style and quality options and restores the saved creative setup'
   await expect(page.locator('#imageQuality')).toHaveValue('ultra');
 });
 
+test('renders the built-in procedural Foxy when a named fox has no scene artwork', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#language').selectOption('en');
+  await page.locator('#idea').fill([
+    'Main character: Foxy — a small orange fox with large expressive eyes.',
+    'Foxy finds a red ball under a tree and pushes it with his paw.'
+  ].join(String.fromCharCode(10)));
+  await page.locator('#make').click();
+
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await expect(page.locator('#character')).toHaveValue('Foxy');
+  await page.waitForTimeout(220);
+
+  const visual = await page.locator('#canvas').evaluate(canvas => {
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let orangePixels = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const red = pixels[offset];
+      const green = pixels[offset + 1];
+      const blue = pixels[offset + 2];
+      if (red >= 160 && green >= 60 && green <= 190 && blue <= 120
+        && red - green >= 35 && red - blue >= 60) orangePixels += 1;
+    }
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      orangePixels,
+      orangePixelRatio: orangePixels / (canvas.width * canvas.height)
+    };
+  });
+
+  expect(visual.width).toBe(1280);
+  expect(visual.height).toBe(720);
+  expect(visual.orangePixels).toBeGreaterThan(1000);
+  expect(visual.orangePixelRatio).toBeGreaterThan(0.001);
+  expect(pageErrors).toEqual([]);
+});
+
 test('local canvas mode exports a playable WebM without contacting cloud video or image providers', async ({ page }) => {
   const pageErrors = [];
   const remoteProviderRequests = [];
@@ -169,13 +212,24 @@ test('local canvas mode exports a playable WebM without contacting cloud video o
   });
 
   await page.goto('/');
+  await page.locator('#language').selectOption('en');
+  await page.locator('#idea').fill(
+    'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\nDuration: 0.25 seconds'
+  );
+  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
+  const savedDemoFlag = await page.evaluate(() => JSON.parse(localStorage.getItem('dravex-cartoon-draft') || '{}').proceduralDemoCharacter);
+  expect(savedDemoFlag).toBe(true);
   await expect(page.locator('#videoGenerationMode')).toHaveValue('local-canvas');
   await expect(page.locator('#generateFullFilmComfy')).toBeHidden();
   await page.locator('#idea').fill(
     'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden.\nDuration: 0.25 seconds'
   );
   await page.locator('#makeFilm').click();
-  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 }).catch(async error => {
+    const status = await page.locator('#status').textContent().catch(() => '');
+    const voiceStatus = await page.locator('#sceneVoiceStatus').textContent().catch(() => '');
+    throw new Error('Local canvas export did not complete. status="' + status + '"; voice="' + voiceStatus + '". ' + error.message);
+  });
 
   const video = await page.locator('#finalFilmPlayer').evaluate(async element => {
     const response = await fetch(element.currentSrc);
@@ -478,6 +532,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
   await page.locator('#make').click();
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
+  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
 
   await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('comfyui');
@@ -551,6 +606,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
 
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
+  await page.locator('#language').selectOption('en');
 
   const sceneVideoBase64 = await page.evaluate(async () => {
     const results = [];
@@ -675,6 +731,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   await page.locator('#make').click();
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
+  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en', prepareStoryboard: false });
 
   await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('comfyui');
@@ -715,7 +772,11 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   await expect(page.locator('#generateFullFilmComfy')).toBeEnabled();
   await page.locator('#generateFullFilmComfy').click();
 
-  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 90000 });
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 90000 }).catch(async error => {
+    const status = await page.locator('#status').textContent().catch(() => '');
+    const voiceStatus = await page.locator('#sceneVoiceStatus').textContent().catch(() => '');
+    throw new Error('ComfyUI full-film export did not complete. status="' + status + '"; voice="' + voiceStatus + '". ' + error.message);
+  });
   await expect(page.locator('#fullFilmProgress')).toHaveJSProperty('value', 100);
   const finalVideo = await page.locator('#finalFilmPlayer').evaluate(async element => {
     await element.play().catch(() => {});
@@ -756,16 +817,34 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     const sceneColorSequence = [];
     let firstSceneFrameSeen = false;
     let lastSceneColorBucket = null;
+    let characterOverlayFrames = 0;
     let lastSampleAt = -1000;
     await video.play();
     const startedAt = performance.now();
     while (!video.ended && performance.now() - startedAt < 30000) {
       if (video.readyState >= 2) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const pixel = context.getImageData(8, 8, 1, 1).data;
-        const rgb = [pixel[0], pixel[1], pixel[2]];
+        // Use the dominant frame color instead of one corner pixel. Camera pans and the
+        // intentionally overlaid character can cover individual pixels, but the synthetic
+        // ComfyUI fixture keeps each scene's background color across most of the frame.
+        const framePixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        const colorCounts = new Map();
+        for (let pixel = 0; pixel < framePixels.length; pixel += 4) {
+          if (framePixels[pixel + 3] < 128) continue;
+          const bucket = [
+            Math.round(framePixels[pixel] / 32),
+            Math.round(framePixels[pixel + 1] / 32),
+            Math.round(framePixels[pixel + 2] / 32)
+          ].join(',');
+          if (bucket !== '0,0,0') colorCounts.set(bucket, (colorCounts.get(bucket) || 0) + 1);
+        }
+        const colorBucket = [...colorCounts].sort((a, b) => b[1] - a[1])[0]?.[0] || '0,0,0';
+        const centerPixel = context.getImageData(8, 8, 1, 1).data;
+        const rgb = colorBucket.split(',').map(value => Number(value) * 32);
+        const centerRgb = [centerPixel[0], centerPixel[1], centerPixel[2]];
+        if (centerRgb[0] >= 160 && centerRgb[1] >= 60 && centerRgb[1] <= 190 && centerRgb[2] <= 120
+          && centerRgb[0] - centerRgb[1] >= 35 && centerRgb[0] - centerRgb[2] >= 60) characterOverlayFrames += 1;
         // Ignore the recorder's initial black frame before the first scene frame is available.
-        const colorBucket = rgb.map(value => Math.round(value / 32)).join(',');
         if (colorBucket !== '0,0,0') {
           firstSceneFrameSeen = true;
           if (colorBucket !== lastSceneColorBucket) {
@@ -775,7 +854,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
         }
         if (firstSceneFrameSeen) colors.add(colorBucket);
         if (performance.now() - lastSampleAt >= 100) {
-          samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb });
+          samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb, centerRgb });
           lastSampleAt = performance.now();
         }
       }
@@ -785,12 +864,13 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     video.pause();
     video.removeAttribute('src');
     video.load();
-    return { colors: [...colors], sceneColorSequence, samples };
+    return { colors: [...colors], sceneColorSequence, samples, characterOverlayFrames };
   });
   const expectedColorBuckets = [...expectedSceneColorBuckets].sort();
   const observedColorBuckets = [...new Set(observedSceneColors.colors)].sort();
   expect(observedColorBuckets, 'Final WebM should contain exactly the five generated scene color buckets; expected: '+JSON.stringify(expectedColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedColorBuckets);
   expect(observedSceneColors.sceneColorSequence, 'Final WebM scene colors should follow storyboard order; expected: '+JSON.stringify(expectedSceneColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.sceneColorSequence)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedSceneColorBuckets);
+  expect(observedSceneColors.characterOverlayFrames).toBeGreaterThan(0);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
@@ -879,7 +959,7 @@ test('keeps the essential creator settings visible and usable on mobile', async 
 });
 
 
-test('missing optional dialogue model does not block local film export', async ({ page }) => {
+test('does not export a silent film when requested dialogue voice preparation is unavailable', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -891,9 +971,9 @@ test('missing optional dialogue model does not block local film export', async (
   await page.locator('#makeFilm').click();
 
   await expect(page.locator('#sceneVoiceStatus')).toContainText(
-    /Видео продолжится без диалогов\/озвучки/i,
+    /Озвучка не подготовлена — экспорт остановлен/i,
     { timeout: 15000 }
   );
-  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
+  await expect(page.locator('#finalFilmResult')).toBeHidden();
   expect(pageErrors).toEqual([]);
 });

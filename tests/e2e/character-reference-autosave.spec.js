@@ -59,3 +59,55 @@ test('character reference image and profile survive page reload without manual s
   await expect(preview).toBeVisible();
   await expect.poll(() => preview.evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
 });
+
+test('preserves all Character Bible identity anchors across draft reload', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#language').selectOption('en');
+  await page.locator('#idea').fill('Foxy is a small orange fox who finds a blue scarf.');
+  await page.locator('#make').click();
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await page.locator('#save').click();
+
+  await page.evaluate(() => {
+    const draft = JSON.parse(localStorage.getItem('dravex-cartoon-draft') || 'null');
+    if (!draft) throw new Error('The draft was not saved before Character Bible restore verification.');
+    draft.character = 'Foxy';
+    draft.characterBible = [{
+      characterId: 'Foxy',
+      visualDescription: 'Small orange fox with amber eyes',
+      clothing: 'Blue scarf',
+      colors: 'Orange and cream',
+      distinctiveFeatures: 'White tail tip',
+      species: 'fox',
+      ageRange: 'young adult',
+      bodyShape: 'small and agile',
+      hair: 'auburn',
+      eyeColor: 'amber',
+      silhouette: 'large ears and bushy tail',
+      signatureAccessories: 'blue scarf and brass pendant'
+    }];
+    localStorage.setItem('dravex-cartoon-draft', JSON.stringify(draft));
+  });
+
+  await page.reload();
+  await page.locator('#save').click();
+  const restored = await page.evaluate(() => {
+    const draft = JSON.parse(localStorage.getItem('dravex-cartoon-draft') || 'null');
+    return draft?.characterBible?.find(profile => profile.characterId === 'Foxy') || null;
+  });
+
+  expect(restored).toMatchObject({
+    characterId: 'Foxy',
+    visualDescription: 'Small orange fox with amber eyes',
+    clothing: 'Blue scarf',
+    colors: 'Orange and cream',
+    distinctiveFeatures: 'White tail tip',
+    species: 'fox',
+    ageRange: 'young adult',
+    bodyShape: 'small and agile',
+    hair: 'auburn',
+    eyeColor: 'amber',
+    silhouette: 'large ears and bushy tail',
+    signatureAccessories: 'blue scarf and brass pendant'
+  });
+});

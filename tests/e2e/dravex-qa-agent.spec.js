@@ -9,6 +9,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 import { readFile } from 'node:fs/promises';
+import { seedVoiceArtifactsForCurrentDraft } from './helpers/seed-voice-artifacts.js';
 
 test.use({ video: 'on' });
 
@@ -19,7 +20,7 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
     agent: 'DRAVEX Browser QA Agent',
     runAt: new Date().toISOString(),
     browserProject: testInfo.project.name,
-    prompt: 'A small blue robot walks through a park, meets a little red bird, waves, and they become friends. Duration: 0.25 seconds.',
+    prompt: 'A little fox finds a glowing key in a forest, opens a hidden gate, and discovers a bright garden. Duration: 0.25 seconds.',
     steps: [],
     provider: { selectedMode: null, classification: 'not-verified-yet', externalVideoRequests: [] },
     browserErrors: [],
@@ -65,12 +66,23 @@ test('DRAVEX Browser QA Agent: prompt → local film → downloaded and decoded 
     );
     report.steps.push({ id: 'prompt-entered', status: 'passed' });
 
+    // Preseed real local IndexedDB WAV artifacts so this full-pipeline test
+    // exercises the required speech gate without downloading model weights.
+    await page.locator('#language').selectOption('en');
+    const voiceFixtures = await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
+    report.steps.push({ id: 'local-character-voices-prepared', status: 'passed', ...voiceFixtures });
+    await page.locator('#idea').fill(report.prompt);
+
     // Listen before clicking: the app starts the download when the local export finishes.
     const downloadPromise = page.waitForEvent('download', { timeout: 150_000 });
     await page.locator('#makeFilm').click();
     report.steps.push({ id: 'create-clicked', status: 'passed' });
 
-    await expect(page.locator('#fullFilmProgressPanel')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('#fullFilmProgressPanel')).toBeVisible({ timeout: 20_000 }).catch(async error => {
+      const status = await page.locator('#status').textContent().catch(() => '');
+      const voiceStatus = await page.locator('#sceneVoiceStatus').textContent().catch(() => '');
+      throw new Error('Local film progress did not start. status="' + status + '"; voice="' + voiceStatus + '". ' + error.message);
+    });
     report.steps.push({ id: 'render-progress-visible', status: 'passed' });
 
     await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 140_000 });
@@ -188,6 +200,9 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
 
   await page.goto('/');
   await expect(page).toHaveTitle(/DRAVEX AI Cartoon Studio/i);
+  await page.locator('#idea').fill('A small blue robot walks through a park, meets a little red bird, waves, and they become friends. Make a short animated film.');
+  await page.locator('#language').selectOption('en');
+  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
 
   // Create real browser-decodable media fixtures. The provider response itself is mocked;
   // this test validates the app's integration and export, not the model's visual quality.

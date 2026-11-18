@@ -93,3 +93,25 @@ test('Hugging Face still requires AI Horde consent when scene images are missing
   });
   assert.ok(result.blockers.includes('image-prompt-consent-required'));
 });
+
+
+test('local canvas blocks a named-cast film when no character visuals exist', () => {
+  const result = evaluatePromptToFilmStart({
+    mode: 'local-canvas',
+    sceneCount: 5,
+    missingCharacterAssetCount: 5
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.blockers.includes('character-visual-assets-required'));
+  assert.equal(result.missingCharacterAssetCount, 5);
+});
+
+test('local canvas permits an explicitly marked procedural demo character fallback', () => {
+  const result = evaluatePromptToFilmStart({
+    mode: 'local-canvas',
+    sceneCount: 5,
+    missingCharacterAssetCount: 0
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.blockers, []);
+});

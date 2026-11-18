@@ -30,6 +30,7 @@ import { getCanvasDimensions, getImageGenerationDimensions, normalizeCanvasForma
 import { getSceneComposition } from "./scene-layout.js";
 import { drawImageCover } from "./image-frame.js";
 import { drawCharacterLayers } from "./scene-character-layers.js";
+import { collectSceneCharacterImageUrls } from "./scene-character-assets.js";
 import { validateCharacterRigTimeline, sampleCharacterRigTimeline } from "./character-rig-timeline.js";
 import { createCharacterRigMotionPreset, listCharacterRigMotionPresets } from "./character-rig-motion-presets.js";
 import { createCharacterRigTimelineFromActionTimeline } from "./character-rig-action-planner.js";
@@ -93,12 +94,12 @@ import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
 import { generateCharacterSpriteAsset } from "./character-sprite-generation.js";
 import { verifySpriteTransparency } from "./character-sprite-verification.js";
-import { upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene } from "./character-reference.js";
+import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene } from "./character-reference.js";
 import { prepareStoryCharacterContext } from "./story-character-context.js";
 import { normalizeSceneCast } from "./scene-cast.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
 import { buildStoryEventChain } from "./story-event-chain.js";
-import { shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
+import { hasRenderableCharacterLayer, hasRenderableCharacterRig, resolveProceduralDemoCharacter, shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
 import { drawProceduralDemoFox } from './demo-character-renderer.js';
 const localTextRuntime = createLocalTransformersRuntime();
 let activeUniversalPlanController = null;
@@ -861,13 +862,15 @@ async function startSceneVoicePreview(index=sceneIndex){
   if(token===previewVoiceRequestToken){previewMouthTracks=[];previewMouthOriginTimeMs=null;$("status").textContent=(uiLang==="ru"?"Голосовой предпросмотр не запущен: ":"Voice preview could not start: ")+(error.message||"Unknown error");}
  }
 }
-function draw(){const animationTimeMs=animationClock.advance(performance.now(),playing),dimensions=getCanvasDimensions(activeCanvasFormat),w=dimensions.logicalWidth,h=dimensions.logicalHeight,t=animationTimeMs/1000;ctx.setTransform(canvas.width/w,0,0,canvas.height/h,0,0);ctx.clearRect(0,0,w,h);const g=ctx.createLinearGradient(0,0,0,h);const paletteSets={ 'Storybook':[['#29274d','#132b3b'],['#49304e','#192b46'],['#193f45','#102735'],['#4b3440','#20243c'],['#243c55','#102c38']], 'Anime-inspired':[['#40265f','#132b4c'],['#702f62','#172d52'],['#124e67','#172044'],['#713b48','#211c46'],['#3b3978','#12394a']], 'Flat 2D':[['#83c5be','#277da1'],['#ffafcc','#6d597a'],['#90be6d','#277da1'],['#f9c74f','#577590'],['#bde0fe','#5e548e']], 'Pixel art':[['#312e2e','#1d3557'],['#6a4c93','#1982c4'],['#386641','#1d3557'],['#bc4749','#283618'],['#3a506b','#0b132b']]};const scenePalettes=paletteSets[$('style').value]||paletteSets['Storybook'];const palette=scenePalettes[sceneIndex%scenePalettes.length];g.addColorStop(0,palette[0]);g.addColorStop(1,palette[1]);ctx.fillStyle=g;ctx.fillRect(0,0,w,h);for(let i=0;i<45;i++){let x=(i*97+25)%w,y=(i*53+17)%(h*.61);ctx.fillStyle='rgba(255,255,255,'+(0.25+0.45*Math.abs(Math.sin(t+i)))+')';ctx.fillRect(x,y,2,2)}ctx.fillStyle=sceneIndex===1?'#25434a':sceneIndex===2?'#244c3b':'#183b38';ctx.beginPath();ctx.ellipse(w/2,h*1.03,w*.453,h*.278,0,0,Math.PI*2);ctx.fill();for(let i=0;i<7;i++){let x=(i+.25)*w/7,baseY=h*.86,peakY=h*.43+(i%3)*h*.0694;ctx.fillStyle='#172d36';ctx.beginPath();ctx.moveTo(x,baseY);ctx.lineTo(x+w*.07,peakY);ctx.lineTo(x+w*.14,baseY);ctx.fill()}const currentSceneData=sceneMetadata[sceneIndex]||{title:titles[sceneIndex],visibleAction:descriptions[sceneIndex],prompt:descriptions[sceneIndex]};drawProceduralSceneEnvironment(ctx,currentSceneData,w,h,t);if(sceneMotionSceneIndex!==sceneIndex){sceneMotionSceneIndex=sceneIndex;sceneMotionStartTimeMs=animationTimeMs;rigPreviewProgress=null;if($('characterRigScrubber')){$('characterRigScrubber').value='0';$('characterRigScrubberValue').textContent='Scene clock'}syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(currentSceneData.id||('scene-index-'+sceneIndex)),shouldPlay:playing,restart:exportMouthOriginTimeMs===null})}const sceneDurationRaw=Number(currentSceneData.durationSeconds??$('duration').value);const sceneDuration=Number.isFinite(sceneDurationRaw)&&sceneDurationRaw>=0.25&&sceneDurationRaw<=30?sceneDurationRaw:3;const sceneMotionProgress=Math.max(0,Math.min(1,(animationTimeMs-sceneMotionStartTimeMs)/(sceneDuration*1000)));const rigAnimationProgress=rigPreviewProgress===null?sceneMotionProgress:rigPreviewProgress;const previousSceneData=sceneIndex>0?(sceneMetadata[sceneIndex-1]||{title:titles[sceneIndex-1],visibleAction:descriptions[sceneIndex-1],prompt:descriptions[sceneIndex-1]}):null;const previousScale=previousSceneData?calculateCinematicShot({...previousSceneData,beatIndex:sceneIndex-1}).shotScale:null;const directorShot=calculateCinematicShot({...currentSceneData,beatIndex:sceneIndex},previousScale);const cameraPlan=directorShot.cameraTransform;const composition=getSceneComposition(activeCanvasFormat,sceneIndex);const starBase=[composition.star.x*w,composition.star.y*h];const foxBase=[composition.character.x*w,composition.character.y*h];const showDemoFox=shouldShowProceduralDemoCharacter({storyUsesFallback:currentStoryboardPlan?currentStoryboardPlan.proceduralDemoCharacter===true:!String($('character').value||'').trim(),hasCharacterLayers:Array.isArray(currentSceneData.characterLayers)&&currentSceneData.characterLayers.length>0});const focusX=showDemoFox&&directorShot.focusTarget==='prop'?starBase[0]:showDemoFox?foxBase[0]:w/2;const focusY=showDemoFox&&directorShot.focusTarget==='prop'?starBase[1]:showDemoFox?foxBase[1]:h*.65;ctx.save();ctx.translate(w/2,h/2+cameraPlan.offsetY);ctx.scale(cameraPlan.zoom,cameraPlan.zoom);ctx.translate(-focusX,-focusY);const action=getSceneAction(sceneIndex);const activeMouthTracks=exportMouthOriginTimeMs!==null?exportMouthTracks:previewMouthTracks;const mouthClockOrigin=exportMouthOriginTimeMs!==null?exportMouthOriginTimeMs:previewMouthOriginTimeMs;const exportElapsedMs=mouthClockOrigin===null?-1:performance.now()-mouthClockOrigin;const facialLipSync=sampleCharacterFacialLipSync(activeMouthTracks,sceneIndex,exportElapsedMs);const activeMouthTrack=activeMouthTracks.find(track=>track.sceneIndex===sceneIndex&&exportElapsedMs>=track.startMs&&exportElapsedMs<track.startMs+track.envelope.durationMs);const mouthTrackTimeMs=activeMouthTrack?exportElapsedMs-activeMouthTrack.startMs:-1;const exportMouthOpenness=activeMouthTrack?sampleAudioMouthEnvelope(activeMouthTrack.envelope,mouthTrackTimeMs):0;const exportViseme=activeMouthTrack?sampleVisemeTimeline(activeMouthTrack.visemes,mouthTrackTimeMs):"neutral";let sx=320,sy=300;if(showDemoFox){sx=starBase[0]+Math.sin(t*1.5)*15;sy=starBase[1]+Math.cos(t*2)*12;if(action==='run'){sx+=Math.sin(t*2)*36;sy-=Math.abs(Math.sin(t*3))*10}else if(action==='float'){sy-=Math.abs(Math.sin(t*1.4))*24}else if(action==='vanish'){sx+=Math.sin(t)*4}const starPulse=1+Math.sin(t*3)*.08;const starScale=action==='magic'?1.35:action==='vanish'?Math.max(.08,1-((frame%45)/45)):action==='float'?.88:sceneIndex===1?1.18:sceneIndex===3?1.35:sceneIndex===4?.88:1; if(sceneIndex===3){ctx.save();ctx.translate(sx,sy);ctx.strokeStyle='rgba(255,229,138,'+(.35+.25*Math.abs(Math.sin(t*3)))+')';ctx.lineWidth=3;for(let ray=0;ray<8;ray++){const a=ray*Math.PI/4+t*.08;ctx.beginPath();ctx.moveTo(Math.cos(a)*34,Math.sin(a)*34);ctx.lineTo(Math.cos(a)*48,Math.sin(a)*48);ctx.stroke()}ctx.restore()}if(sceneIndex===4){for(let spark=0;spark<7;spark++){const a=spark*Math.PI*2/7+t*.35;const px=sx+Math.cos(a)*(24+Math.sin(t*2+spark)*5),py=sy+Math.sin(a)*(24+Math.sin(t*2+spark)*5);ctx.fillStyle='rgba(255,229,138,.8)';ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);ctx.fill()}}ctx.save();ctx.translate(sx,sy);ctx.scale(starScale*starPulse,starScale*starPulse);ctx.rotate(t*.25);ctx.shadowBlur=sceneIndex===3?38:25;ctx.shadowColor='#ffe58a';ctx.fillStyle='#ffe58a';ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?13:30;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.restore();}if(showDemoFox){drawProceduralDemoFox(ctx,{x:foxBase[0],y:foxBase[1],time:t,action,sceneIndex,mouthOpenness:exportMouthOpenness,viseme:exportViseme});}const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
+function draw(){const animationTimeMs=animationClock.advance(performance.now(),playing),dimensions=getCanvasDimensions(activeCanvasFormat),w=dimensions.logicalWidth,h=dimensions.logicalHeight,t=animationTimeMs/1000;ctx.setTransform(canvas.width/w,0,0,canvas.height/h,0,0);ctx.clearRect(0,0,w,h);const g=ctx.createLinearGradient(0,0,0,h);const paletteSets={ 'Storybook':[['#29274d','#132b3b'],['#49304e','#192b46'],['#193f45','#102735'],['#4b3440','#20243c'],['#243c55','#102c38']], 'Anime-inspired':[['#40265f','#132b4c'],['#702f62','#172d52'],['#124e67','#172044'],['#713b48','#211c46'],['#3b3978','#12394a']], 'Flat 2D':[['#83c5be','#277da1'],['#ffafcc','#6d597a'],['#90be6d','#277da1'],['#f9c74f','#577590'],['#bde0fe','#5e548e']], 'Pixel art':[['#312e2e','#1d3557'],['#6a4c93','#1982c4'],['#386641','#1d3557'],['#bc4749','#283618'],['#3a506b','#0b132b']]};const scenePalettes=paletteSets[$('style').value]||paletteSets['Storybook'];const palette=scenePalettes[sceneIndex%scenePalettes.length];g.addColorStop(0,palette[0]);g.addColorStop(1,palette[1]);ctx.fillStyle=g;ctx.fillRect(0,0,w,h);for(let i=0;i<45;i++){let x=(i*97+25)%w,y=(i*53+17)%(h*.61);ctx.fillStyle='rgba(255,255,255,'+(0.25+0.45*Math.abs(Math.sin(t+i)))+')';ctx.fillRect(x,y,2,2)}ctx.fillStyle=sceneIndex===1?'#25434a':sceneIndex===2?'#244c3b':'#183b38';ctx.beginPath();ctx.ellipse(w/2,h*1.03,w*.453,h*.278,0,0,Math.PI*2);ctx.fill();for(let i=0;i<7;i++){let x=(i+.25)*w/7,baseY=h*.86,peakY=h*.43+(i%3)*h*.0694;ctx.fillStyle='#172d36';ctx.beginPath();ctx.moveTo(x,baseY);ctx.lineTo(x+w*.07,peakY);ctx.lineTo(x+w*.14,baseY);ctx.fill()}const currentSceneData=sceneMetadata[sceneIndex]||{title:titles[sceneIndex],visibleAction:descriptions[sceneIndex],prompt:descriptions[sceneIndex]};drawProceduralSceneEnvironment(ctx,currentSceneData,w,h,t);if(sceneMotionSceneIndex!==sceneIndex){sceneMotionSceneIndex=sceneIndex;sceneMotionStartTimeMs=animationTimeMs;rigPreviewProgress=null;if($('characterRigScrubber')){$('characterRigScrubber').value='0';$('characterRigScrubberValue').textContent='Scene clock'}syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(currentSceneData.id||('scene-index-'+sceneIndex)),shouldPlay:playing,restart:exportMouthOriginTimeMs===null})}const sceneDurationRaw=Number(currentSceneData.durationSeconds??$('duration').value);const sceneDuration=Number.isFinite(sceneDurationRaw)&&sceneDurationRaw>=0.25&&sceneDurationRaw<=30?sceneDurationRaw:3;const sceneMotionProgress=Math.max(0,Math.min(1,(animationTimeMs-sceneMotionStartTimeMs)/(sceneDuration*1000)));const rigAnimationProgress=rigPreviewProgress===null?sceneMotionProgress:rigPreviewProgress;const previousSceneData=sceneIndex>0?(sceneMetadata[sceneIndex-1]||{title:titles[sceneIndex-1],visibleAction:descriptions[sceneIndex-1],prompt:descriptions[sceneIndex-1]}):null;const previousScale=previousSceneData?calculateCinematicShot({...previousSceneData,beatIndex:sceneIndex-1}).shotScale:null;const directorShot=calculateCinematicShot({...currentSceneData,beatIndex:sceneIndex},previousScale);const cameraPlan=directorShot.cameraTransform;const composition=getSceneComposition(activeCanvasFormat,sceneIndex);const starBase=[composition.star.x*w,composition.star.y*h];const foxBase=[composition.character.x*w,composition.character.y*h];const showDemoFox=shouldShowProceduralDemoCharacter({storyUsesFallback:currentStoryboardPlan?currentStoryboardPlan.proceduralDemoCharacter===true:!String($('character').value||'').trim(),hasCharacterLayers:hasRenderableCharacterLayer(currentSceneData,currentStoryboardPlan?.sourceCharacter||$('character').value),hasCharacterRig:hasRenderableCharacterRig(currentSceneData,currentStoryboardPlan?.sourceCharacter||$('character').value)});const focusX=showDemoFox&&directorShot.focusTarget==='prop'?starBase[0]:showDemoFox?foxBase[0]:w/2;const focusY=showDemoFox&&directorShot.focusTarget==='prop'?starBase[1]:showDemoFox?foxBase[1]:h*.65;ctx.save();ctx.translate(w/2,h/2+cameraPlan.offsetY);ctx.scale(cameraPlan.zoom,cameraPlan.zoom);ctx.translate(-focusX,-focusY);const action=getSceneAction(sceneIndex);const activeMouthTracks=exportMouthOriginTimeMs!==null?exportMouthTracks:previewMouthTracks;const mouthClockOrigin=exportMouthOriginTimeMs!==null?exportMouthOriginTimeMs:previewMouthOriginTimeMs;const exportElapsedMs=mouthClockOrigin===null?-1:performance.now()-mouthClockOrigin;const facialLipSync=sampleCharacterFacialLipSync(activeMouthTracks,sceneIndex,exportElapsedMs);const activeMouthTrack=activeMouthTracks.find(track=>track.sceneIndex===sceneIndex&&exportElapsedMs>=track.startMs&&exportElapsedMs<track.startMs+track.envelope.durationMs);const mouthTrackTimeMs=activeMouthTrack?exportElapsedMs-activeMouthTrack.startMs:-1;const exportMouthOpenness=activeMouthTrack?sampleAudioMouthEnvelope(activeMouthTrack.envelope,mouthTrackTimeMs):0;const exportViseme=activeMouthTrack?sampleVisemeTimeline(activeMouthTrack.visemes,mouthTrackTimeMs):"neutral";let sx=320,sy=300;if(showDemoFox){sx=starBase[0]+Math.sin(t*1.5)*15;sy=starBase[1]+Math.cos(t*2)*12;if(action==='run'){sx+=Math.sin(t*2)*36;sy-=Math.abs(Math.sin(t*3))*10}else if(action==='float'){sy-=Math.abs(Math.sin(t*1.4))*24}else if(action==='vanish'){sx+=Math.sin(t)*4}const starPulse=1+Math.sin(t*3)*.08;const starScale=action==='magic'?1.35:action==='vanish'?Math.max(.08,1-((frame%45)/45)):action==='float'?.88:sceneIndex===1?1.18:sceneIndex===3?1.35:sceneIndex===4?.88:1; if(sceneIndex===3){ctx.save();ctx.translate(sx,sy);ctx.strokeStyle='rgba(255,229,138,'+(.35+.25*Math.abs(Math.sin(t*3)))+')';ctx.lineWidth=3;for(let ray=0;ray<8;ray++){const a=ray*Math.PI/4+t*.08;ctx.beginPath();ctx.moveTo(Math.cos(a)*34,Math.sin(a)*34);ctx.lineTo(Math.cos(a)*48,Math.sin(a)*48);ctx.stroke()}ctx.restore()}if(sceneIndex===4){for(let spark=0;spark<7;spark++){const a=spark*Math.PI*2/7+t*.35;const px=sx+Math.cos(a)*(24+Math.sin(t*2+spark)*5),py=sy+Math.sin(a)*(24+Math.sin(t*2+spark)*5);ctx.fillStyle='rgba(255,229,138,.8)';ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);ctx.fill()}}ctx.save();ctx.translate(sx,sy);ctx.scale(starScale*starPulse,starScale*starPulse);ctx.rotate(t*.25);ctx.shadowBlur=sceneIndex===3?38:25;ctx.shadowColor='#ffe58a';ctx.fillStyle='#ffe58a';ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?13:30;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.restore();}const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
 const generatedVideo=sceneVideoCache.get(String(currentSceneData.id||('scene-index-'+sceneIndex)))?.video;
 const hasGeneratedVideo=Boolean(generatedVideo&&generatedVideo.readyState>=2&&generatedVideo.videoWidth>0);
 const hasGeneratedMedia=hasGeneratedVideo||Boolean(generatedFrame);
 const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);
 if(hasGeneratedVideo){drawImageCover(ctx,generatedVideo,w,h,motionTransform)}
 else if(generatedFrame){drawImageCover(ctx,generatedFrame,w,h,motionTransform)}
+// Scene media is the background layer; keep the built-in fallback character above it.
+if(showDemoFox){drawProceduralDemoFox(ctx,{x:foxBase[0],y:foxBase[1],time:t,action,sceneIndex,mouthOpenness:exportMouthOpenness,viseme:exportViseme});}
 const sampledRigPoses=currentSceneData.characterRigTimeline?.keyframes?.length
  ? sampleCharacterRigTimeline(currentSceneData.characterRigTimeline,rigAnimationProgress)
  : currentSceneData.characterRigPoses;
@@ -2321,9 +2324,22 @@ $('makeFilm').addEventListener('click',async()=>{
   const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
   return source.kind==='missing'&&!cachedVideo?.video;
  }).length;
+ const missingCharacterAssetCount=mode==='local-canvas'&&currentStoryboardPlan?.proceduralDemoCharacter!==true
+  ?sceneMetadata.filter((scene,index)=>{
+    const cast=Array.isArray(scene?.characters)?scene.characters.filter(value=>String(value||'').trim()):[];
+    const hasRequestedCharacter=Boolean(requestedCharacter)||cast.length>0;
+    const hasCharacterLayers=Array.isArray(scene?.characterLayers)&&scene.characterLayers.some(layer=>layer?.visible!==false&&String(layer?.imageUrl||'').trim());
+    const hasCharacterRig=hasRenderableCharacterRig(scene);
+    const hasSceneImage=Boolean(String(scene?.generatedImageUrl||'').trim()||comfySourceImageForScene(index));
+    const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
+    const hasSceneVideo=Boolean(cachedVideo?.video);
+    return hasRequestedCharacter&&!hasCharacterLayers&&!hasCharacterRig&&!hasSceneImage&&!hasSceneVideo;
+   }).length
+  :0;
  const gate=evaluatePromptToFilmStart({
   mode,
   sceneCount:sceneMetadata.length,
+  missingCharacterAssetCount,
   videoProviderReady:mode==='local-canvas'?true:mode==='huggingface'
    ?hfVideoConnected&&!!hfVideoClient&&typeof hfHandleFile==='function'
    :mode==='comfyui'&&comfyConnected&&Object.keys(comfyWorkflowConfigs()).length>0,
@@ -2343,6 +2359,9 @@ $('makeFilm').addEventListener('click',async()=>{
   if(gate.blockers.includes('image-prompt-consent-required'))messages.push(ru
    ?'Для '+gate.missingImageCount+' сцен ещё нет изображений. Отдельно подтверди отправку только текстовых промптов в AI Horde либо добавь изображения вручную.'
    :' '+gate.missingImageCount+' scene image(s) are missing. Separately allow sending text prompts to AI Horde, or add scene images manually.');
+  if(gate.blockers.includes('character-visual-assets-required'))messages.push(ru
+   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах нет изображений или видеоклипов персонажей. Добавь изображения/спрайты героев через инструменты генерации сцен и персонажей либо выбери Hugging Face или локальный ComfyUI. Фоновое видео вместо мультфильма создавать не будем.'
+   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes have no character images or video clips. Add character images/sprites with the scene and character tools, or choose Hugging Face or local ComfyUI. A background-only video will not be exported.');
   $('status').textContent=messages.join(' ');
   if(mode==='huggingface')$('hfVideoPanel').open=true;
   if(mode==='comfyui')$('comfyPanel').open=true;
@@ -2378,11 +2397,13 @@ $('makeFilm').addEventListener('click',async()=>{
   return;
  }
  if(speechPreparation.status==='skipped'){
-  const message=(uiLang==='ru'?'Видео продолжится без диалогов/озвучки: ':'Video will continue without dialogue/voice: ')+speechPreparation.reason;
+  const message=(uiLang==='ru'?'Озвучка не подготовлена — экспорт остановлен: ':'Voice preparation failed — export stopped: ')+speechPreparation.reason;
   const dialogueDetails=$('dialogueSummary')?.closest('details');
   if(dialogueDetails)dialogueDetails.open=true;
   if($('sceneVoiceStatus'))$('sceneVoiceStatus').textContent=message;
   $('status').textContent=message;
+  $('status').scrollIntoView({behavior:'smooth',block:'nearest'});
+  return;
  }
  const motionPreparation=prepareAutomaticCharacterMotion();
  if(mode==='local-canvas'){
@@ -2537,13 +2558,15 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
  const requestedCharacter=$('character').value.trim();
  const character=resolveStoryProtagonist(idea,requestedCharacter,lang);
  const characterSelectionWarning=getCharacterSelectionWarning(idea,requestedCharacter);
- const proceduralDemoCharacter=!requestedCharacter&&['Главный герой','Головний герой','Main character','Personaje principal'].includes(character);
  $('character').value=character;
  try{
   status.textContent=uiLang==='ru'?'Создаём раскадровку локальным движком DRAVEX…':'Creating a storyboard with the local DRAVEX engine…';
   const plan=buildStoryboardFromText(idea,lang,character);
   const storyContext=prepareStoryCharacterContext(plan,characterBible,character,lang);
   characterBible=storyContext.characterBible;
+  const protagonistProfile=characterBible.find(profile=>String(profile.characterId||'').trim().toLocaleLowerCase()===character.toLocaleLowerCase());
+  // The built-in procedural fox is a truthful fallback for fox protagonists without scene artwork.
+  const proceduralDemoCharacter=resolveProceduralDemoCharacter({requestedCharacter,protagonistId:character,protagonistProfile});
   const preparedScenes=storyContext.scenes;
   const stateChanges=inferStoryboardStateChanges(preparedScenes,lang,character);
   sceneMetadata=ensureSceneIds(preparedScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]})));
@@ -2614,9 +2637,10 @@ if(!story){status.textContent=ru?'Сначала введи историю.':'En
 if(button.disabled||activeUniversalPlanController)return;button.disabled=true;$('planUniversalTask').disabled=true;status.textContent=ru?'Локальный AI-режиссёр создаёт варианты сцен и проверяет их…':'Local AI director is drafting and evaluating the scenes…';output.hidden=true;
 try{
 const language=storyLanguage(),languageName={ru:'Russian',uk:'Ukrainian',en:'English',es:'Spanish'}[language]||'English';
-const character=resolveStoryProtagonist(story,$('character').value,language);
+const requestedCharacter=$('character').value.trim();
+const character=resolveStoryProtagonist(story,requestedCharacter,language);
 const rawBasePlan=currentStoryboardPlan?.sourceText===story&&currentStoryboardPlan?.sourceLanguage===language&&currentStoryboardPlan?.sourceCharacter===character?currentStoryboardPlan:buildStoryboardFromText(story,language,character);
-const storyContext=prepareStoryCharacterContext(rawBasePlan,characterBible,character,language);characterBible=storyContext.characterBible;const castScenes=storyContext.scenes;const stateChanges=inferStoryboardStateChanges(castScenes,language,character);const preparedScenes=castScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]}));const basePlan={...rawBasePlan,scenes:preparedScenes,eventChain:buildStoryEventChain(preparedScenes)};const result=await directStoryboardWithLocalAI({runtime:localTextRuntime,basePlan,storyText:story,language:languageName,character,characterBible});
+const storyContext=prepareStoryCharacterContext(rawBasePlan,characterBible,character,language);characterBible=storyContext.characterBible;const protagonistProfile=characterBible.find(profile=>String(profile.characterId||'').trim().toLocaleLowerCase()===character.toLocaleLowerCase());const proceduralDemoCharacter=resolveProceduralDemoCharacter({requestedCharacter,protagonistId:character,protagonistProfile});const castScenes=storyContext.scenes;const stateChanges=inferStoryboardStateChanges(castScenes,language,character);const preparedScenes=castScenes.map((scene,index)=>({...scene,stateChanges:stateChanges[index]}));const basePlan={...rawBasePlan,proceduralDemoCharacter,scenes:preparedScenes,eventChain:buildStoryEventChain(preparedScenes)};const result=await directStoryboardWithLocalAI({runtime:localTextRuntime,basePlan,storyText:story,language:languageName,character,characterBible});
 if(result.usedLocalModel){
 currentStoryboardPlan={...basePlan,eventChain:result.eventChain||buildStoryEventChain(result.scenes),sourceText:story,sourceLanguage:language,sourceCharacter:character,scenes:result.scenes,titles:result.scenes.map(scene=>scene.title),descriptions:result.scenes.map(scene=>scene.visibleAction)};
 titles=currentStoryboardPlan.titles;descriptions=currentStoryboardPlan.descriptions;sceneMetadata=ensureSceneIds(result.scenes.map(scene=>({...scene,characters:Array.isArray(scene.characters)&&scene.characters.length?scene.characters:[character]})));ensureMainCharacterReference(character);sceneIndex=0;$('bibleCharacterId').value=character;$('bibleCharacterId').dataset.loaded='';$('sceneLabel').textContent=(storyLabels[language]||'Scene')+' 1 · '+titles[0];renderScenes();syncSceneEditor();updateStoryQA();
@@ -3477,9 +3501,11 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   });
   if(speechPreparation.status==='cancelled'||controller.signal.aborted)throw new DOMException('Film generation was cancelled.','AbortError');
   if(speechPreparation.status==='skipped'){
-   const message=(uiLang==='ru'?'Видео продолжится без диалогов/озвучки: ':'Video will continue without dialogue/voice: ')+speechPreparation.reason;
+   const message=(uiLang==='ru'?'Озвучка не подготовлена — генерация фильма остановлена: ':'Voice preparation failed — film generation stopped: ')+speechPreparation.reason;
    $('sceneVoiceStatus').textContent=message;
    status.textContent=message;
+   $('dialogueSummary')?.closest('details')?.setAttribute('open','');
+   throw new Error(message);
   }
   if(mode==='huggingface'){
    const tooShortIndex=scenes.findIndex(scene=>{
@@ -3713,7 +3739,7 @@ $('analyzeCharacterMotion').onclick=()=>{
   :'Audit armed. Play this scene to capture five frames of the final composition.';
  if(!playing)draw();
 };
-$('save').onclick=()=>{const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));$('status').textContent=saved?tr('saved'):tr('storageError')};
+$('save').onclick=()=>{const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex,proceduralDemoCharacter:currentStoryboardPlan?.proceduralDemoCharacter===true}));$('status').textContent=saved?tr('saved'):tr('storageError')};
 async function exportFilm({signal=null,requireAllVideos=false,download=true,onProgress=null}={}){
   if(!canvas.captureStream||!window.MediaRecorder){
     $('status').textContent=tr('unsupported');
@@ -3798,6 +3824,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex)),shouldPlay:false});
     $('status').textContent=uiLang==='ru'?'Ожидание готовности медиа сцен…':'Waiting for scene media to become ready…';
     const readinessTasks=[];
+    const readyCharacterImageUrls=new Set();
     for(const segment of timeline.segments){
       const meta=sceneMetadata[segment.sceneIndex]||{};
       const key=String(meta.id||('scene-index-'+segment.sceneIndex));
@@ -3812,12 +3839,34 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
         if(!imageEntry)throw new Error('Could not initialize generated image for scene '+(segment.sceneIndex+1)+'.');
         readinessTasks.push(waitForSceneImageReady(imageEntry.image,{timeoutMs:12000}));
       }
+      for(const characterImageUrl of collectSceneCharacterImageUrls(meta)){
+        if(readyCharacterImageUrls.has(characterImageUrl))continue;
+        readyCharacterImageUrls.add(characterImageUrl);
+        getLoadedSceneImage(characterImageUrl);
+        const characterImageEntry=sceneImageCache.get(characterImageUrl);
+        if(!characterImageEntry)throw new Error('Could not initialize character image for scene '+(segment.sceneIndex+1)+'.');
+        readinessTasks.push(waitForSceneImageReady(characterImageEntry.image,{timeoutMs:12000}).catch(error=>{
+          throw new Error('Character image for scene '+(segment.sceneIndex+1)+' could not be loaded: '+(error?.message||'image unavailable'));
+        }));
+      }
     }
     await Promise.all(readinessTasks);
     checkAbort();
     assertRequiredSceneSnapshot();
     sceneIndex=timeline.segments[0].sceneIndex;
+    // captureStream may snapshot the current canvas immediately. Freeze the preview and
+    // paint the first timeline scene before opening the stream, or mobile browsers can
+    // record one stale frame from the previously selected (often last) scene.
+    if(raf)cancelAnimationFrame(raf);
+    raf=0;
+    playing=false;
     sceneMotionSceneIndex=-1;
+    sceneMotionStartTimeMs=0;
+    rigPreviewProgress=null;
+    animationClock.reset(0);
+    frame=0;
+    exportMouthOriginTimeMs=performance.now();
+    draw();
     stream=canvas.captureStream(24);
     const musicFile=$('audioFile').files?.[0]||null;
     const voiceTracks=[];
@@ -4011,5 +4060,5 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
   }
 }
 $('export').onclick=()=>{void exportFilm().catch(error=>{console.error('DRAVEX export failed:',error);$('status').textContent=tr('exportFailed');})};
-try{const saved=JSON.parse(readLocalStorage('dravex-cartoon-draft')||'null');if(saved){$('idea').value=saved.idea||$('idea').value;activeCanvasFormat=normalizeCanvasFormat(saved.canvasFormat||activeCanvasFormat);$('uiLanguage').value=saved.uiLanguage||uiLang;uiLang=saved.uiLanguage||uiLang;$('character').value=saved.character||'';$('style').value=saved.style||'Storybook';$('imageQuality').value=saved.imageQuality||'standard';$('duration').value=saved.duration||'3';$('language').value=saved.language||'en';if(Array.isArray(saved.titles)&&Array.isArray(saved.descriptions)&&saved.titles.length===saved.descriptions.length&&saved.titles.length>0&&saved.titles.length<=12){titles=saved.titles.map(v=>String(v).slice(0,80));descriptions=saved.descriptions.map(v=>String(v).slice(0,500));sceneMetadata=ensureSceneIds(Array.isArray(saved.sceneMetadata)&&saved.sceneMetadata.length===titles.length?saved.sceneMetadata.map(item=>item&&typeof item==='object'?{...item}:{}):titles.map((title,index)=>({title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''})));characterBible=Array.isArray(saved.characterBible)?saved.characterBible.filter(entry=>entry&&typeof entry==='object').slice(0,20).map(entry=>({characterId:String(entry.characterId||'').slice(0,120),visualDescription:String(entry.visualDescription||'').slice(0,700),clothing:String(entry.clothing||'').slice(0,400),colors:String(entry.colors||'').slice(0,200),distinctiveFeatures:String(entry.distinctiveFeatures||'').slice(0,400),referenceImageAssetId:String(entry.referenceImageAssetId||'').slice(0,100)})):[];if(!characterBible.length)characterBible=upsertCharacterReference([],{characterId:$('character').value.trim()||''});sceneIndex=Math.min(Math.max(0,Number(saved.sceneIndex)||0),titles.length-1)}$('status').textContent=tr('restored')}}catch(e){}
+try{const saved=JSON.parse(readLocalStorage('dravex-cartoon-draft')||'null');if(saved){$('idea').value=saved.idea||$('idea').value;activeCanvasFormat=normalizeCanvasFormat(saved.canvasFormat||activeCanvasFormat);$('uiLanguage').value=saved.uiLanguage||uiLang;uiLang=saved.uiLanguage||uiLang;$('character').value=saved.character||'';$('style').value=saved.style||'Storybook';$('imageQuality').value=saved.imageQuality||'standard';$('duration').value=saved.duration||'3';$('language').value=saved.language||'en';if(Array.isArray(saved.titles)&&Array.isArray(saved.descriptions)&&saved.titles.length===saved.descriptions.length&&saved.titles.length>0&&saved.titles.length<=12){titles=saved.titles.map(v=>String(v).slice(0,80));descriptions=saved.descriptions.map(v=>String(v).slice(0,500));sceneMetadata=ensureSceneIds(Array.isArray(saved.sceneMetadata)&&saved.sceneMetadata.length===titles.length?saved.sceneMetadata.map(item=>item&&typeof item==='object'?{...item}:{}):titles.map((title,index)=>({title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''})));characterBible=Array.isArray(saved.characterBible)?saved.characterBible.filter(entry=>entry&&typeof entry==='object').slice(0,20).map(normalizeCharacterReference):[];if(!characterBible.length)characterBible=upsertCharacterReference([],{characterId:$('character').value.trim()||''});sceneIndex=Math.min(Math.max(0,Number(saved.sceneIndex)||0),titles.length-1);currentStoryboardPlan={sourceText:String(saved.idea||'').trim(),sourceLanguage:String(saved.language||$('language').value),sourceCharacter:resolveStoryProtagonist(String(saved.idea||''),$('character').value.trim(),String(saved.language||$('language').value)),proceduralDemoCharacter:saved.proceduralDemoCharacter===true,scenes:sceneMetadata,titles,descriptions,eventChain:buildStoryEventChain(sceneMetadata),automaticDirectionApplied:true}}$('status').textContent=tr('restored')}}catch(e){}
 applyCanvasFormat();applyLanguage();renderScenes();applySceneEditorLanguage();syncSceneEditor();draw();sceneVideoRestorePromise=restorePersistedSceneVideos();
