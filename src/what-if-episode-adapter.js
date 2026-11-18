@@ -27,6 +27,23 @@ const FX = new Set([
   'hearts','freeze','glitch','fade-in','fade-out'
 ]);
 const text = (value, max = 2000) => String(value ?? '').trim().slice(0, max);
+const ACTION_VERBS = Object.freeze({
+  walk: 'walks', run: 'runs', jump: 'jumps', wave: 'waves',
+  dance: 'dances', punch: 'attacks', kick: 'attacks',
+  defend: 'defends', dodge: 'dodges'
+});
+function describeSupportedAction(actor, characterId) {
+  const targetPose = text(actor?.toPose, 60).toLowerCase();
+  const pose = text(actor?.pose, 60).toLowerCase();
+  const action = ACTION_VERBS[targetPose] ? targetPose : pose;
+  const verb = ACTION_VERBS[action];
+  if (!verb) return '';
+  const startX = Number(actor?.x), endX = Number(actor?.toX);
+  const direction = Number.isFinite(startX) && Number.isFinite(endX) && startX !== endX
+    ? (endX > startX ? 'to the right' : 'to the left') : '';
+  return [text(characterId, 120) || 'the character', verb, direction].filter(Boolean).join(' ');
+}
+
 const list = value => Array.isArray(value) ? value : [];
 const safeSlug = value => text(value, 80).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
 
@@ -129,6 +146,17 @@ export function convertWhatIfEpisode(input, options = {}) {
       effects.length ? `Effects: ${effects.join(', ')}` : ''
     ].filter(Boolean).join('. ');
     const narration = text(shot?.say, 2000);
+    // Only map explicit, supported What-if poses to deterministic DRAVEX action presets.
+    // Keep this as structured source evidence; do not infer movement from narration.
+    const actionActor = actors.find(actor => {
+      const targetPose = text(actor?.toPose, 60).toLowerCase();
+      const pose = text(actor?.pose, 60).toLowerCase();
+      return Boolean(ACTION_VERBS[targetPose] || ACTION_VERBS[pose]);
+    });
+    const actionActorId = actionActor
+      ? text(characterMap[text(actionActor.who, 120)] ?? text(actionActor.who, 120), 120)
+      : '';
+    const actionEvidence = actionActor ? describeSupportedAction(actionActor, actionActorId) : '';
     const scene = normalizeScene({
       id: `whatif_${index + 1}`,
       order: index + 1,
@@ -136,12 +164,16 @@ export function convertWhatIfEpisode(input, options = {}) {
       purpose: text(shot?.beat, 80),
       storyDetail: narration,
       sourceStoryText: narration,
-      sourceEvents: [narration].filter(Boolean),
+      sourceEvents: [narration, actionEvidence].filter(Boolean),
       characters: actorIds,
       location: background,
       timeOfDay: text(shot?.time, 30),
       environmentDescription: background,
       visibleAction: action || 'Preserve the supplied What-if shot direction and generate a visible action.',
+      actionTimeline: actionEvidence ? {
+        schemaVersion: 1,
+        phases: [{ phase: 'action', start: 0.1, end: 0.9, actorId: actionActorId, description: actionEvidence, evidence: actionEvidence }]
+      } : null,
       camera: cameraDescription,
       startState: actorDescriptions.join('; '),
       endState: actorDescriptions.join('; '),
