@@ -5,6 +5,7 @@ A free-first cartoon studio for turning story text into a structured storyboard 
 ## Storyboard engine foundation
 
 - `src/scene-model.js` normalizes current and legacy scene shapes into a predictable scene structure.
+- `src/what-if-episode-adapter.js` imports What-if Kit `episode.json` files into DRAVEX scenes; the main UI exposes this through the What-if JSON file input. Imported scenes still pass DRAVEX story QA and use the existing video/voice/export pipeline.
 - `src/story-qa.js` performs deterministic text-level checks for missing actions, duplicate IDs, repetitive prompts, duration normalization, and dialogue/character mismatches. It does not inspect rendered video or claim model-level understanding.
 - `src/scene-production.js` assembles separate still-image and motion prompts using camera direction, start/end states, negative constraints, and matching Character Bible entries.
 - `src/device-capabilities.js` checks HTTPS, WebGPU adapter availability, WASM fallback, approximate browser memory, CPU threads, and browser storage before a local model load. This is advisory only; it does not guarantee model compatibility.
