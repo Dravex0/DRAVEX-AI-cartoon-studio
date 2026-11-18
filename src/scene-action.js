@@ -333,7 +333,7 @@ export function detectSceneActionForScene(scene = {}, fallbackTitle = '', fallba
  * It does not invent connective actions: only explicit positive matches are returned.
  * Overlapping synonyms are collapsed so one phrase cannot create duplicate timeline phases.
  */
-export function extractSceneActionSequence(input, { maxActions = 8 } = {}) {
+export function extractSceneActionSequence(input, { maxActions = 16 } = {}) {
   const text = String(input ?? '').normalize('NFKC').trim();
   if (!text) return [];
   const matchesFound = [];
@@ -401,7 +401,7 @@ export function extractSceneActionSequence(input, { maxActions = 8 } = {}) {
       continue;
     }
     sequence.push(candidate);
-    if (sequence.length >= Math.max(1, Math.min(8, Number(maxActions) || 8))) break;
+    if (sequence.length >= Math.max(1, Math.min(24, Number(maxActions) || 16))) break;
   }
   return sequence.map(({ priority, ...event }) => event);
 }
