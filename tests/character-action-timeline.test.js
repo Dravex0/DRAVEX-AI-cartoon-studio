@@ -188,3 +188,50 @@ test('rejects unsupported motion easing profiles', () => {
   const report = validateCharacterActionTimeline(candidate);
   assert.ok(report.issues.some(item => item.code === 'phase-easing-invalid'));
 });
+
+
+test('normalizes and validates ordered, source-grounded action substeps', () => {
+  const candidate = {
+    ...structuredClone(scene),
+    storyDetail: 'Foxy enters the room, hears a sound, then walks quietly.',
+    characters: ['Foxy'],
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Foxy',
+        description: 'Foxy enters, hears a sound, and walks quietly.',
+        evidence: 'Foxy enters the room',
+        steps: [
+          { intent: 'enter_location', motionCue: 'walk', start: 0, end: 0.33, actorId: 'Foxy', description: 'Enter the room', evidence: 'enters the room' },
+          { intent: 'hear_sound', motionCue: 'turn', start: 0.33, end: 0.66, actorId: 'Foxy', description: 'Hear a sound', evidence: 'hears a sound' },
+          { intent: 'stealth_advance', motionCue: 'walk', start: 0.66, end: 1, actorId: 'Foxy', description: 'Walk quietly', evidence: 'walks quietly' }
+        ]
+      }]
+    }
+  };
+  assert.equal(validateCharacterActionTimeline(candidate).passed, true);
+  assert.deepEqual(
+    normalizeCharacterActionTimeline(candidate.actionTimeline).phases[0].steps.map(step => step.intent),
+    ['enter_location', 'hear_sound', 'stealth_advance']
+  );
+});
+
+test('rejects unordered or ungrounded action substeps', () => {
+  const candidate = {
+    ...structuredClone(scene),
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Foxy',
+        description: 'Foxy picks up a key.', evidence: 'picks it up',
+        steps: [
+          { intent: 'pick_up', motionCue: 'turn', start: 0.5, end: 0.8, actorId: 'Foxy', description: 'Pick up key', evidence: 'picks it up' },
+          { intent: 'open', motionCue: 'turn', start: 0.2, end: 0.4, actorId: 'Foxy', description: 'Open door', evidence: 'opens an invented door' }
+        ]
+      }]
+    }
+  };
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'action-step-timing-invalid'));
+  assert.ok(report.issues.some(item => item.code === 'action-step-evidence-ungrounded'));
+});
