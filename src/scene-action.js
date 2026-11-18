@@ -260,3 +260,55 @@ export function detectSceneActionForScene(scene = {}, fallbackTitle = '', fallba
   }
   return 'idle';
 }
+
+
+/**
+ * Extracts ordered, source-grounded action events from a single scene description.
+ * It does not invent connective actions: only explicit positive matches are returned.
+ * Overlapping synonyms are collapsed so one phrase cannot create duplicate timeline phases.
+ */
+export function extractSceneActionSequence(input, { maxActions = 8 } = {}) {
+  const text = String(input ?? '').normalize('NFKC').trim();
+  if (!text) return [];
+  const matchesFound = [];
+  for (let priority = 0; priority < SEMANTIC_ACTIONS.length; priority++) {
+    const entry = SEMANTIC_ACTIONS[priority];
+    for (const pattern of entry.patterns) {
+      try {
+        const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
+        const scanner = new RegExp(pattern.source, flags);
+        let match;
+        while ((match = scanner.exec(text))) {
+          if (match[0] && !isNegatedMatch(text, match.index)) {
+            matchesFound.push({
+              intent: entry.intent,
+              motionCue: entry.motionCue,
+              confidence: 0.9,
+              evidence: match[0],
+              startIndex: match.index,
+              endIndex: match.index + match[0].length,
+              priority
+            });
+          }
+          if (match[0] === '') scanner.lastIndex++;
+        }
+      } catch {
+        // An invalid optional pattern must not prevent the remaining actions from parsing.
+      }
+    }
+  }
+  matchesFound.sort((a, b) => a.startIndex - b.startIndex || a.priority - b.priority || b.endIndex - a.endIndex);
+  const sequence = [];
+  for (const candidate of matchesFound) {
+    const overlap = sequence.find(item =>
+      candidate.startIndex < item.endIndex && candidate.endIndex > item.startIndex
+    );
+    if (overlap) {
+      if (candidate.priority < overlap.priority) Object.assign(overlap, candidate);
+      continue;
+    }
+    sequence.push(candidate);
+    if (sequence.length >= Math.max(1, Math.min(8, Number(maxActions) || 8))) break;
+  }
+  return sequence.map(({ priority, ...event }) => event);
+}
