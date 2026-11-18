@@ -85,3 +85,16 @@ test('matches visible sprite layers to the protagonist instead of any cast membe
   assert.equal(hasRenderableCharacterLayer(scene, 'Owl'), true);
   assert.equal(shouldShowProceduralDemoCharacter({ storyUsesFallback: true, hasCharacterLayers: hasRenderableCharacterLayer(scene, 'Foxy') }), true);
 });
+
+test('keeps the procedural fallback above generated scene media', () => {
+  const drawStart = appSource.indexOf('function draw(){');
+  const drawEnd = appSource.indexOf('\nfunction ', drawStart + 1);
+  assert.ok(drawStart >= 0 && drawEnd > drawStart, 'the scene draw function must exist');
+  const drawBlock = appSource.slice(drawStart, drawEnd);
+  const mediaDraw = drawBlock.indexOf('if(hasGeneratedVideo){drawImageCover');
+  const fallbackDraw = drawBlock.indexOf('drawProceduralDemoFox(ctx');
+  const characterLayersDraw = drawBlock.indexOf('drawCharacterLayers(ctx');
+  assert.ok(mediaDraw >= 0, 'generated video or still media must be drawn');
+  assert.ok(fallbackDraw > mediaDraw, 'the fallback character must be drawn after scene media');
+  assert.ok(characterLayersDraw > fallbackDraw, 'generated character layers must remain above the fallback');
+});
