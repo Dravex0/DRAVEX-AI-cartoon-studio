@@ -300,7 +300,7 @@ const SEMANTIC_ACTIONS = [
     /señala\w*/
   ] },
   { intent: 'write_draw', motionCue: 'talk', patterns: [
-    /\b(?:writes?|draws?|sketches?|paints?)\b/i,
+    /\b(?:writes?|sketches?|paints?)\b|\bdraws?\s+(?:a|the|his|her|their)?\s*(?:picture|map|diagram|portrait|sketch|plan|symbol|shape)\b/i,
     /пишет|рисует|чертит|раскрашива\w*/iu,
     /пише|малює|креслить|розфарбову\w*/iu,
     /escribe\w*|dibuja\w*|pinta\w*/
