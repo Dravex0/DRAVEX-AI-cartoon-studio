@@ -227,7 +227,7 @@ test('extracts ordered action sequences without inventing negated or connective 
   const sequence = extractSceneActionSequence(
     'The girl walks to the table, picks up a key, opens the chest, then throws the key away.'
   );
-  assert.deepEqual(sequence.map(event => event.intent), ['walk', 'pick_up', 'open', 'throw']);
+  assert.deepEqual(sequence.map(event => event.intent), ['walk', 'pick_up', 'open', 'throw'], JSON.stringify(sequence));
   assert.ok(sequence.every(event => event.evidence && event.endIndex > event.startIndex));
   const negated = extractSceneActionSequence('The knight does not open the gate, but catches the falling key.');
   assert.deepEqual(negated.map(event => event.intent), ['catch']);
