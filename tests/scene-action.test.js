@@ -172,3 +172,51 @@ test('prefers the source-grounded semantic event over later incidental actions i
     storyDetail: 'Герой уклоняется от луча и создаёт энергетический щит.'
   }), 'jump');
 });
+
+
+test('recognizes concrete object interactions and physical actions in four languages', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  const cases = [
+    ['The girl picks up the glowing key.', 'pick_up'],
+    ['The boy throws the ball across the yard.', 'throw'],
+    ['The fox catches the falling apple.', 'catch'],
+    ['The knight opens the heavy gate.', 'open'],
+    ['The robot closes the metal door.', 'close'],
+    ['The child climbs the old tower.', 'climb'],
+    ['The mermaid swims beneath the bridge.', 'swim'],
+    ['The dragon falls from the cliff.', 'fall'],
+    ['The bird lands on the branch.', 'land'],
+    ['The friends hug each other.', 'hug'],
+    ['The wizard sits beside the fire.', 'sit'],
+    ['The puppy crawls under the table.', 'crawl'],
+    ['The girl drinks from a cup.', 'eat_drink'],
+    ['The hero wakes up at sunrise.', 'sleep_wake'],
+    ['The captain points toward the island.', 'point'],
+    ['The child draws a map.', 'write_draw'],
+    ['Девочка поднимает светящийся ключ.', 'pick_up'],
+    ['Мальчик бросает мяч через двор.', 'throw'],
+    ['Рыцарь открывает тяжёлые ворота.', 'open'],
+    ['Русалка плывёт под мостом.', 'swim'],
+    ['Дракон падает со скалы.', 'fall'],
+    ['Друзья обнимаются.', 'hug'],
+    ['Дитина малює карту.', 'write_draw']
+  ];
+  for (const [story, expected] of cases) {
+    assert.equal(inferSceneActionIntent(story).intent, expected, story);
+  }
+});
+
+test('does not classify explicitly negated object interactions as positive actions', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  assert.notEqual(inferSceneActionIntent('The knight does not open the gate.').intent, 'open');
+  assert.notEqual(inferSceneActionIntent('Рыцарь не открывает ворота.').intent, 'open');
+  assert.equal(inferSceneActionIntent('The knight does not open the gate, but throws a stone.').intent, 'throw');
+});
+
+test('maps new semantic actions only to existing renderer motion cues', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  const supported = new Set(['idle', 'walk', 'run', 'jump', 'turn', 'float', 'vanish', 'magic', 'talk', 'surprised', 'sad', 'happy', 'dance']);
+  for (const story of ['The girl picks up a key.', 'The dragon falls from a cliff.', 'The friends hug.', 'The child draws a map.']) {
+    assert.ok(supported.has(inferSceneActionIntent(story).motionCue));
+  }
+});
