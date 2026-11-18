@@ -7,7 +7,7 @@ const appSource = await readFile(new URL('../src/app.js', import.meta.url), 'utf
 test('starts the WebM recorder before scheduling local music and dialogue', () => {
   const start = appSource.indexOf('async function exportFilm(');
   assert.notEqual(start, -1, 'film export function must exist');
-  const end = appSource.indexOf("\\n$('export').onclick", start);
+  const end = appSource.indexOf("\n$('export').onclick", start);
   assert.ok(end > start, 'film export function must have a closing action binding');
   const exportBlock = appSource.slice(start, end);
   const recorderStart = exportBlock.indexOf('recorder.start(250);');
