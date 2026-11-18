@@ -100,6 +100,7 @@ test('exported WebM contains visible movement from the procedural fox, not only 
     }
   });
 
+  console.log('Exported WebM character-motion evidence:', JSON.stringify(evidence));
   expect(evidence.width).toBeGreaterThan(0);
   expect(evidence.height).toBeGreaterThan(0);
   expect(evidence.orangePixels.every(count => count > 500),
