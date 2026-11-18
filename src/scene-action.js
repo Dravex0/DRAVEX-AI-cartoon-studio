@@ -106,7 +106,7 @@ const SEMANTIC_ACTIONS = [
     /предупрежда\w*|предостерега\w*/i,
     /попереджа\w*|застеріга\w*/i,
     /advierte\w*|alerta/i
-  ] }
+  ] },
   { intent: 'pick_up', motionCue: 'turn', patterns: [
     /\b(?:picks? up|picks? .* up|grabs?|lifts?|takes? .* from the ground)\b/i,
     /поднима\w*|подбира\w*|бер[её]т в руки|хвата\w*|вздыма\w*/i,
