@@ -284,3 +284,22 @@ test('understands equivalent English sensory, stealth and intervention beats', a
     'listen_carefully', 'advance', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
   ], JSON.stringify(sequence));
 });
+
+
+test('recognizes tactical reactions and resolution events in multiple languages', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const russian = 'Полицейский замирает, прячется за стену, вызывает подкрепление, затем опускает пистолет.';
+  assert.deepEqual(
+    extractSceneActionSequence(russian).map(event => event.intent),
+    ['freeze', 'take_cover', 'call_for_backup', 'drop_weapon']
+  );
+  const english = 'The officer freezes, takes cover behind a wall, calls for backup, then lowers his pistol.';
+  assert.deepEqual(
+    extractSceneActionSequence(english).map(event => event.intent),
+    ['freeze', 'take_cover', 'call_for_backup', 'drop_weapon']
+  );
+  assert.deepEqual(
+    extractSceneActionSequence('The suspect raises both hands.').map(event => event.intent),
+    ['hands_up']
+  );
+});
