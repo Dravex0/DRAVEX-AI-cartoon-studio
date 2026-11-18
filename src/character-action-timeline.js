@@ -55,7 +55,24 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
         description: clean(phase.description, 700),
         evidence: clean(phase.evidence, 500),
         ...(phase.easing == null ? {} : { easing: clean(phase.easing, 24) }),
-        ...(phase.motion == null ? {} : { motion })
+        ...(phase.motion == null ? {} : { motion }),
+        ...(phase.steps == null ? {} : {
+          steps: Array.isArray(phase.steps) ? phase.steps.slice(0, 24).map(step => {
+            if (!isRecord(step)) return null;
+            const stepStart = Number(step.start);
+            const stepEnd = Number(step.end);
+            return {
+              intent: clean(step.intent, 80),
+              motionCue: clean(step.motionCue, 40),
+              start: Number.isFinite(stepStart) ? stepStart : null,
+              end: Number.isFinite(stepEnd) ? stepEnd : null,
+              actorId: clean(step.actorId, 120),
+              targetId: clean(step.targetId, 120) || null,
+              description: clean(step.description, 500),
+              evidence: clean(step.evidence, 300)
+            };
+          }) : null
+        })
       };
     })
   };
@@ -139,6 +156,33 @@ export function validateCharacterActionTimeline(scene = {}) {
   }
   if (reaction && action && reaction.start < action.end) {
     issues.push(issue('reaction-before-action-complete', 'reaction', 'Reaction must begin after the central action finishes.'));
+  }
+  if (action && action.steps !== undefined) {
+    if (!Array.isArray(action.steps) || action.steps.length === 0 || action.steps.length > 24) {
+      issues.push(issue('action-steps-shape-invalid', 'action', 'Action substeps must contain between one and 24 ordered steps.'));
+    } else {
+      let previousStepEnd = action.start;
+      action.steps.forEach((step, index) => {
+        if (!step) {
+          issues.push(issue('action-step-shape-invalid', 'action', `Action substep ${index + 1} must be an object.`));
+          return;
+        }
+        if (!step.intent || !step.motionCue || !step.description || !step.actorId || !step.evidence) {
+          issues.push(issue('action-step-fields-missing', 'action', `Action substep ${index + 1} needs intent, motion cue, actor, description, and source evidence.`));
+        }
+        if (step.start === null || step.end === null || step.start < action.start || step.end > action.end || step.start >= step.end || step.start < previousStepEnd) {
+          issues.push(issue('action-step-timing-invalid', 'action', `Action substep ${index + 1} must have ordered timing inside the central action phase.`));
+        } else {
+          previousStepEnd = step.end;
+        }
+        if (!evidenceSources.some(source => source.includes(step.evidence))) {
+          issues.push(issue('action-step-evidence-ungrounded', 'action', `Action substep ${index + 1} evidence must exactly match locked story evidence.`));
+        }
+        if (step.actorId && castWasExplicit && !cast.has(step.actorId.toLocaleLowerCase())) {
+          issues.push(issue('action-step-actor-not-in-cast', 'action', `Action substep ${index + 1} actor must belong to the scene cast.`));
+        }
+      });
+    }
   }
   const resultFloor = Math.max(action?.end ?? 0, reaction?.end ?? 0);
   if (result && result.start < resultFloor) {
