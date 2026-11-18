@@ -28,7 +28,7 @@ test("does not mark a generated main character lip-syncable without a facial mou
     voiceTracks: [track("Foxy")],
     mainCharacterKey: "Foxy",
     storyUsesFallback: false,
-    sceneMetadata: [{ characterLayers: [{ characterId: "Foxy" }], characterFacialRigs: [] }]
+    sceneMetadata: [{ characterLayers: [{ characterId: "Foxy", imageUrl: "https://example.com/foxy.png", visible: true }], characterFacialRigs: [] }]
   });
   assert.deepEqual(result, []);
 });
@@ -126,6 +126,17 @@ test("keeps the procedural fox lip-sync when only a secondary character layer is
       characterRigs: [],
       characterFacialRigs: []
     }]
+  });
+  assert.deepEqual(result, [candidate]);
+});
+
+test("keeps the procedural fallback eligible when a character layer has no image asset", () => {
+  const candidate = track("Foxy");
+  const result = selectRenderableLipSyncTracks({
+    voiceTracks: [candidate],
+    mainCharacterKey: "Foxy",
+    storyUsesFallback: true,
+    sceneMetadata: [{ characterLayers: [{ characterId: "Foxy" }], characterFacialRigs: [] }]
   });
   assert.deepEqual(result, [candidate]);
 });
