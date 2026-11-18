@@ -262,3 +262,25 @@ test('does not confuse the English word girl with the Spanish turn verb', async 
     ['walk']
   );
 });
+
+
+test('understands a complete Russian tactical story sequence with sensory cues and intent', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const story = 'Полицейский заходит в здание, слышит крики, достаёт пистолет, идёт медленно и тихо, прислушивается, идёт дальше, видит как избивают человека, выпрыгивает, наставляет пистолет и кричит: «Руки вверх!»';
+  const sequence = extractSceneActionSequence(story);
+  assert.deepEqual(sequence.map(event => event.intent), [
+    'enter_location', 'hear_sound', 'draw_weapon', 'stealth_advance',
+    'listen_carefully', 'walk', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
+  ], JSON.stringify(sequence));
+  assert.ok(sequence.every(event => story.slice(event.startIndex, event.endIndex) === event.evidence));
+});
+
+test('understands equivalent English sensory, stealth and intervention beats', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const story = 'The officer enters the building, hears screams, draws his pistol, moves slowly and quietly, pauses to listen carefully, advances further, sees an attacker beating a person, bursts out, aims his pistol at him and shouts "Hands up!"';
+  const sequence = extractSceneActionSequence(story);
+  assert.deepEqual(sequence.map(event => event.intent), [
+    'enter_location', 'hear_sound', 'draw_weapon', 'stealth_advance',
+    'listen_carefully', 'stealth_advance', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
+  ], JSON.stringify(sequence));
+});
