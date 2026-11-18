@@ -270,7 +270,7 @@ test('understands a complete Russian tactical story sequence with sensory cues a
   const sequence = extractSceneActionSequence(story);
   assert.deepEqual(sequence.map(event => event.intent), [
     'enter_location', 'hear_sound', 'draw_weapon', 'stealth_advance',
-    'listen_carefully', 'walk', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
+    'listen_carefully', 'advance', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
   ], JSON.stringify(sequence));
   assert.ok(sequence.every(event => story.slice(event.startIndex, event.endIndex) === event.evidence));
 });
