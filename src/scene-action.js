@@ -109,99 +109,99 @@ const SEMANTIC_ACTIONS = [
   ] }
   { intent: 'pick_up', motionCue: 'turn', patterns: [
     /\b(?:picks? up|picks? .* up|grabs?|lifts?|takes? .* from the ground)\b/i,
-    /поднима\\w*|подбира\\w*|бер[её]т в руки|хвата\\w*|вздыма\\w*/i,
-    /підніма\\w*|підбира\\w*|бере в руки|хапа\\w*/i,
-    /recoge\\w*|levanta\\w*|agarra\\w*/
+    /поднима\w*|подбира\w*|бер[её]т в руки|хвата\w*|вздыма\w*/i,
+    /підніма\w*|підбира\w*|бере в руки|хапа\w*/i,
+    /recoge\w*|levanta\w*|agarra\w*/
   ] },
   { intent: 'throw', motionCue: 'run', patterns: [
     /\b(?:throws?|tosses?|hurls?|launches? .* into)\b/i,
-    /броса\\w*|кида\\w*|швыря\\w*|мета\\w*/i,
-    /кида\\w*|жбурля\\w*|мета\\w*/i,
-    /lanza\\w*|arroja\\w*/
+    /броса\w*|кида\w*|швыря\w*|мета\w*/i,
+    /кида\w*|жбурля\w*|мета\w*/i,
+    /lanza\w*|arroja\w*/
   ] },
   { intent: 'catch', motionCue: 'jump', patterns: [
     /\b(?:catches?|grabs? .* in (?:the )?air|snatches?)\b/i,
-    /ловит|поймал|перехватыва\\w*/i,
-    /ловить|спійма\\w*|перехоплю\\w*/i,
-    /atrapa\\w*|captura\\w*/
+    /ловит|поймал|перехватыва\w*/i,
+    /ловить|спійма\w*|перехоплю\w*/i,
+    /atrapa\w*|captura\w*/
   ] },
   { intent: 'open', motionCue: 'turn', patterns: [
     /\b(?:opens?|unlocks?|pulls? .* open)\b/i,
-    /открыва\\w*|распахива\\w*|отпира\\w*/i,
-    /відчиня\\w*|відкрива\\w*|розблокову\\w*/i,
-    /abre\\w*|desbloquea\\w*/
+    /открыва\w*|распахива\w*|отпира\w*/i,
+    /відчиня\w*|відкрива\w*|розблокову\w*/i,
+    /abre\w*|desbloquea\w*/
   ] },
   { intent: 'close', motionCue: 'turn', patterns: [
     /\b(?:closes?|shuts?|locks? .* door)\b/i,
-    /закрыва\\w*|захлопыва\\w*|запира\\w*/i,
-    /зачиня\\w*|закрива\\w*|замика\\w*/i,
-    /cierra\\w*|bloquea\\w*/
+    /закрыва\w*|захлопыва\w*|запира\w*/i,
+    /зачиня\w*|закрива\w*|замика\w*/i,
+    /cierra\w*|bloquea\w*/
   ] },
   { intent: 'climb', motionCue: 'jump', patterns: [
     /\b(?:climbs?|scrambles? up|scales? (?:the|a))\b/i,
-    /взбира\\w*|карабка\\w*|лезет на|поднимается по лестниц/i,
-    /видира\\w*|дереться|підіймається по драбин/i,
-    /trepa\\w*|escala\\w*/
+    /взбира\w*|карабка\w*|лезет на|поднимается по лестниц/i,
+    /видира\w*|дереться|підіймається по драбин/i,
+    /trepa\w*|escala\w*/
   ] },
   { intent: 'swim', motionCue: 'float', patterns: [
     /\b(?:swims?|dives?|paddles?)\b/i,
-    /плыв[её]т|ныря\\w*|плавает/iu,
-    /пливе|пірна\\w*|плаває/iu,
-    /nada\\w*|bucea\\w*/
+    /плыв[её]т|ныря\w*|плавает/iu,
+    /пливе|пірна\w*|плаває/iu,
+    /nada\w*|bucea\w*/
   ] },
   { intent: 'fall', motionCue: 'jump', patterns: [
     /\b(?:falls?|tumbles?|topples?|plunges?)\b/i,
-    /пада\\w*|срыва\\w* вниз|валится/iu,
-    /пада\\w*|зрива\\w* вниз|перекидається/iu,
-    /cae\\w*|se desploma|tropieza\\w*/
+    /пада\w*|срыва\w* вниз|валится/iu,
+    /пада\w*|зрива\w* вниз|перекидається/iu,
+    /cae\w*|se desploma|tropieza\w*/
   ] },
   { intent: 'land', motionCue: 'jump', patterns: [
     /\b(?:lands?|touches? down|alights?)\b/i,
-    /приземля\\w*|опускается на землю/iu,
-    /приземля\\w*|сідає на землю/iu,
-    /aterriza\\w*/
+    /приземля\w*|опускается на землю/iu,
+    /приземля\w*|сідає на землю/iu,
+    /aterriza\w*/
   ] },
   { intent: 'hug', motionCue: 'happy', patterns: [
     /\b(?:hugs?|embraces?|cuddles?)\b/i,
-    /обнима\\w*|прижимает к себе/iu,
-    /обійма\\w*|притискає до себе/iu,
-    /abraza\\w*|acurruca\\w*/
+    /обнима\w*|прижимает к себе/iu,
+    /обійма\w*|притискає до себе/iu,
+    /abraza\w*|acurruca\w*/
   ] },
   { intent: 'sit', motionCue: 'turn', patterns: [
     /\b(?:sits? down|sits? on|takes? a seat)\b/i,
-    /садится|присажива\\w*|усажива\\w*/iu,
-    /сідає|присіда\\w*/iu,
+    /садится|присажива\w*|усажива\w*/iu,
+    /сідає|присіда\w*/iu,
     /se sienta|toma asiento/i
   ] },
   { intent: 'crawl', motionCue: 'walk', patterns: [
     /\b(?:crawls?|creeps? along the ground)\b/i,
-    /полз[её]т|прополза\\w*/iu,
-    /повзе|проповза\\w*/iu,
-    /gatea\\w*/
+    /полз[её]т|прополза\w*/iu,
+    /повзе|проповза\w*/iu,
+    /gatea\w*/
   ] },
   { intent: 'eat_drink', motionCue: 'talk', patterns: [
     /\b(?:eats?|bites?|chews?|drinks?|sips?)\b/i,
     /ест|кусает|ж[уё]в[её]т|пь[её]т|отпивает/iu,
     /їсть|кусає|жує|п'є|відпиває/iu,
-    /come\\w*|bebe\\w*|mastica\\w*/
+    /come\w*|bebe\w*|mastica\w*/
   ] },
   { intent: 'sleep_wake', motionCue: 'idle', patterns: [
     /\b(?:falls? asleep|wakes? up|dozes?|snoozes?)\b/i,
-    /засыпа\\w*|просыпа\\w*|дремлет/iu,
-    /засина\\w*|прокида\\w*|дрімає/iu,
-    /se duerme|despierta\\w*/
+    /засыпа\w*|просыпа\w*|дремлет/iu,
+    /засина\w*|прокида\w*|дрімає/iu,
+    /se duerme|despierta\w*/
   ] },
   { intent: 'point', motionCue: 'turn', patterns: [
     /\b(?:points? (?:at|to)|gestures? toward|signals? toward)\b/i,
     /указывает на|показывает пальцем|жестом указывает/iu,
     /вказує на|показує пальцем|жестом показує/iu,
-    /señala\\w*/
+    /señala\w*/
   ] },
   { intent: 'write_draw', motionCue: 'talk', patterns: [
     /\b(?:writes?|draws?|sketches?|paints?)\b/i,
-    /пишет|рисует|чертит|раскрашива\\w*/iu,
-    /пише|малює|креслить|розфарбову\\w*/iu,
-    /escribe\\w*|dibuja\\w*|pinta\\w*/
+    /пишет|рисует|чертит|раскрашива\w*/iu,
+    /пише|малює|креслить|розфарбову\w*/iu,
+    /escribe\w*|dibuja\w*|pinta\w*/
   ] },
 ];
 
