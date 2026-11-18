@@ -257,7 +257,7 @@ test('passes a sensory tactical story sequence into the actual scene motion prom
   const scene = result.scenes.find(item => item.storyDetail.includes('Полицейский')) || result.scenes[0];
   const expected = [
     'enter_location', 'hear_sound', 'draw_weapon', 'stealth_advance',
-    'listen_carefully', 'walk', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
+    'listen_carefully', 'advance', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
   ];
   assert.deepEqual(scene.actionSequence.map(event => event.intent), expected);
   for (const intent of expected) assert.ok(scene.motionGenerationPrompt.includes(intent), intent);
