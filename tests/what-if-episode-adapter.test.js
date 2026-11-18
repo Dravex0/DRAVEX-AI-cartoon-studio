@@ -51,3 +51,33 @@ test('handles malformed input without throwing', () => {
   assert.equal(result.diagnostics.ok, false);
   assert.equal(result.scenes.length, 0);
 });
+
+test('creates a validated action timeline for supported actor poses and explicit travel direction', () => {
+  const result = convertWhatIfEpisode({
+    shots: [{
+      say: 'The fox crosses the park.',
+      actors: [{ who: 'fox', x: 20, toX: 75, pose: 'walk' }]
+    }]
+  }, { characterMap: { fox: 'main-character' } });
+  const scene = result.scenes[0];
+  assert.deepEqual(scene.actionTimeline, {
+    schemaVersion: 1,
+    phases: [{
+      phase: 'action', start: 0.1, end: 0.9, actorId: 'main-character',
+      description: 'main-character walks to the right',
+      evidence: 'main-character walks to the right'
+    }]
+  });
+  assert.ok(scene.sourceEvents.includes(scene.actionTimeline.phases[0].evidence));
+});
+
+test('uses target pose for an explicit pose change and leaves unsupported poses without a fake timeline', () => {
+  const supported = convertWhatIfEpisode({
+    shots: [{ actors: [{ who: 'hero', pose: 'stand', toPose: 'jump' }] }]
+  });
+  assert.match(supported.scenes[0].actionTimeline.phases[0].description, /jumps/);
+  const unsupported = convertWhatIfEpisode({
+    shots: [{ actors: [{ who: 'hero', pose: 'think' }] }]
+  });
+  assert.equal(unsupported.scenes[0].actionTimeline, null);
+});
