@@ -125,6 +125,12 @@ const SEMANTIC_ACTIONS = [
     /прислуха\w*|вслухає\w*|завмира\w*.{0,24}слуха\w*/iu,
     /escucha\s+(?:atentamente|con\s+atención)|agudiza\s+el\s+oído/i
   ] },
+  { intent: 'advance', motionCue: 'walk', patterns: [
+    /\\b(?:continues?\\s+(?:forward|ahead)|advances?\\s+(?:further|forward|deeper)|moves?\\s+deeper)\\b/i,
+    /(?:ид[её]т|движется|продвигается)\\s+(?:дальше|впер[её]д|глубже)|продолжа\\w*\\s+движени\\w*/iu,
+    /(?:йде|рухається|просувається)\\s+(?:далі|вперед|глибше)|продовжу\\w*\\s+рух/iu,
+    /continúa\\s+(?:avanzando|adelante)|avanza\\s+(?:más|hacia)/i
+  ] },
   { intent: 'stealth_advance', motionCue: 'walk', patterns: [
     /\b(?:sneaks?|creeps?|moves?|walks?|advances?)\b.{0,35}\b(?:quietly|silently|slowly|stealthily|cautiously)\b|\b(?:quietly|silently|stealthily)\b.{0,25}\b(?:moves?|walks?|advances?)\b/i,
     /(?:ид[её]т|шагает|продвигается|крад[её]тся|подкрадыва\w*).{0,40}(?:медленно|тихо|бесшумно|осторожно)|(?:тихо|бесшумно|осторожно).{0,30}(?:ид[её]т|шагает|продвигается|крад[её]тся)/iu,
