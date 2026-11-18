@@ -1,4 +1,5 @@
 import { drawProceduralSceneEnvironment } from './procedural-scene-environment.js';
+import { convertWhatIfEpisode } from './what-if-episode-adapter.js';
 import { drawSceneProps } from './scene-prop-renderer.js';
 import { validateStoryScenes } from "./story-qa.js";
 import { buildStoryboardFromText } from "./storyboard-generator.js";
@@ -2432,6 +2433,59 @@ $('makeFilm').addEventListener('click',async()=>{
  generateButton.click();
 });
 
+$('importWhatIfEpisode').addEventListener('change',async event=>{
+ const file=event.target.files?.[0];
+ if(!file)return;
+ const status=$('status');
+ try{
+  if(file.size>5*1024*1024)throw new Error(uiLang==='ru'?'Файл больше 5 МБ.':'File is larger than 5 MB.');
+  const parsed=JSON.parse(await file.text());
+  const selectedCharacter=$('character').value.trim()||resolveStoryProtagonist($('idea').value, '', storyLanguage());
+  const hero=String(parsed?.hero||'').trim();
+  const converted=convertWhatIfEpisode(parsed,{characterMap:hero?{[hero]:selectedCharacter}:{}});
+  if(!converted.diagnostics.ok)throw new Error(converted.diagnostics.errors.map(item=>item.message).join(' '));
+  const lang=storyLanguage();
+  const storyContext=prepareStoryCharacterContext({scenes:converted.scenes},characterBible,selectedCharacter,lang);
+  characterBible=storyContext.characterBible;
+  const importedScenes=ensureSceneIds(storyContext.scenes);
+  if(!importedScenes.length)throw new Error(uiLang==='ru'?'В эпизоде нет пригодных сцен.':'The episode contains no usable scenes.');
+  sceneMetadata=importedScenes;
+  titles=importedScenes.map((scene,index)=>scene.title||('Scene '+(index+1)));
+  descriptions=importedScenes.map(scene=>scene.visibleAction||scene.prompt||'');
+  currentStoryboardPlan={
+   ...converted.episode,
+   sourceText:importedScenes.map(scene=>scene.sourceStoryText).filter(Boolean).join('\n'),
+   sourceLanguage:lang,
+   sourceCharacter:selectedCharacter,
+   scenes:sceneMetadata,
+   titles,
+   descriptions,
+   importedWhatIf:true
+  };
+  sceneIndex=0;
+  $('bibleCharacterId').value=selectedCharacter;
+  $('bibleCharacterId').dataset.loaded='';
+  $('sceneLabel').textContent=(storyLabels[lang]||'Scene')+' 1 · '+titles[0];
+  renderScenes();
+  syncSceneEditor();
+  updateStoryQA();
+  ensureMainCharacterReference(selectedCharacter);
+  const warnings=converted.diagnostics.warnings;
+  status.textContent=(uiLang==='ru'?'Импортировано сцен: ':'Imported scenes: ')+sceneMetadata.length+
+   (warnings.length?(uiLang==='ru'?'. Предупреждений совместимости: ':'. Compatibility warnings: ')+warnings.length:'.');
+  if(warnings.length){
+   const note=document.createElement('p');
+   note.className='qa-report__item qa-report__item--warning';
+   note.textContent=(uiLang==='ru'?'Некоторые позы, эффекты или объекты из What-if не поддерживаются напрямую. Их инструкции сохранены в промптах сцен. ':'Some What-if poses, effects, or props are not native DRAVEX render features. Their instructions were retained in scene prompts. ')+warnings.map(item=>item.details.join(', ')).join('; ');
+   $('qaReport').appendChild(note);
+  }
+ }catch(error){
+  status.textContent=(uiLang==='ru'?'Не удалось импортировать What-if JSON: ':'What-if JSON import failed: ')+(error?.message||'Invalid file');
+ }finally{
+  event.target.value='';
+ }
+});
+ 
 function createStoryboard(ideaOverride, {throwOnError=false}={}){
  const status=$('status');
  const idea=(typeof ideaOverride==='string'?ideaOverride:$('idea').value).trim();
