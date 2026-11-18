@@ -314,3 +314,63 @@ test('accepts decoded dialogue audio within the measured-duration tolerance', as
   });
   await session.cleanup();
 });
+
+test('schedules a decoded local music Blob on the shared export clock', async () => {
+  const h = createHarness();
+  const events = [];
+  const gains = [];
+  const sources = [];
+  const decodedMusic = { duration: 1.25 };
+  class MusicAudioContext extends h.FakeAudioContext {
+    currentTime = 12;
+    async decodeAudioData(bytes) {
+      events.push('decode-music');
+      assert.ok(bytes instanceof ArrayBuffer);
+      return decodedMusic;
+    }
+    createGain() {
+      const gain = super.createGain();
+      gains.push(gain);
+      return gain;
+    }
+    createBufferSource() {
+      const source = {
+        buffer: null,
+        loop: false,
+        connect() { events.push('music-source-connect'); },
+        start(time) { events.push('music-source-start:' + time); },
+        stop() { events.push('music-source-stop'); }
+      };
+      sources.push(source);
+      return source;
+    }
+  }
+  const musicBlob = new Blob(['synthetic local music'], { type: 'audio/wav' });
+  const session = await createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    musicBlob,
+    volume: 0.4,
+    AudioContextClass: MusicAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  });
+
+  assert.ok(events.includes('decode-music'));
+  const startInfo = await session.start();
+  assert.equal(Number.isFinite(startInfo.scheduledStartAtMs), true);
+  assert.equal(gains[0].gain.value, 0.4);
+  assert.equal(sources[0].loop, true);
+  assert.ok(events.includes('music-source-start:12.08'));
+  assert.equal(h.events.includes('play'), false);
+  await session.cleanup();
+  assert.ok(events.includes('music-source-stop'));
+});
+
+test('rejects an empty local music Blob before creating an export stream', async () => {
+  const h = createHarness();
+  await assert.rejects(() => createAudioExportSession({
+    videoStream: { getTracks: () => [h.videoTrack] },
+    musicBlob: new Blob([]),
+    AudioContextClass: h.FakeAudioContext,
+    MediaStreamClass: h.FakeMediaStream
+  }), /musicBlob must be a non-empty audio Blob/);
+});
