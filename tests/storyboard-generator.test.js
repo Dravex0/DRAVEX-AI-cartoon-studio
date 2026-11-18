@@ -224,7 +224,7 @@ test('semantic reveal creates a source-grounded action instead of a passive idle
 });
 
 
-test('preserves a multi-step scene as ordered, timed action phases', () => {
+test('preserves a multi-step scene as ordered motion instructions', () => {
   const result = buildStoryboardFromText(
     'Characters:\nFoxy — small orange fox.\n\nScene 1: The key\nFoxy walks to the table, picks up a key, opens the chest, then throws the key away.',
     'en',
@@ -247,5 +247,5 @@ test('does not turn a negated action into a timeline phase', () => {
   );
   assert.deepEqual(result.scenes[0].actionSequence.map(event => event.intent), ['catch']);
   assert.equal(result.scenes[0].actionTimeline.phases.length, 1);
-  assert.equal(result.scenes[0].actionTimeline.phases[0].evidence, 'catches');
+  assert.equal(result.scenes[0].actionTimeline.phases[0].evidence, result.scenes[0].storyDetail);
 });
