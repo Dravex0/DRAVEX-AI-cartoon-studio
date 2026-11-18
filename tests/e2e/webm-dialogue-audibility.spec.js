@@ -538,3 +538,73 @@ test('exports dialogue produced by the browser-local TTS adapter through Indexed
   expect(evidence.expectedPower).toBeGreaterThan(evidence.otherPower * 2);
   expect(pageErrors, 'local TTS artifact export should not throw uncaught browser errors').toEqual([]);
 });
+
+function createSteppedMusicWavBuffer() {
+  const sampleRate = 48_000;
+  const segmentSamples = sampleRate / 2;
+  const sampleCount = segmentSamples * 2;
+  const buffer = Buffer.alloc(44 + sampleCount * 2);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + sampleCount * 2, 4);
+  buffer.write('WAVE', 8);
+  buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(sampleCount * 2, 40);
+  for (let index = 0; index < sampleCount; index++) {
+    const frequency = index < segmentSamples ? 220 : 660;
+    const sample = Math.sin(2 * Math.PI * frequency * index / sampleRate) * 0.25;
+    buffer.writeInt16LE(Math.round(sample * 32767), 44 + index * 2);
+  }
+  return buffer;
+}
+
+test('preserves the first scheduled music segment in the exported WebM', async ({ page }) => {
+  test.setTimeout(60_000);
+  await seedThreeToneDialogue(page);
+  await page.locator('#audioFile').setInputFiles({
+    name: 'clock-start-music.wav',
+    mimeType: 'audio/wav',
+    buffer: createSteppedMusicWavBuffer()
+  });
+  await page.locator('#export').click();
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 20_000 });
+  const result = await page.locator('#finalFilmPlayer').evaluate(async video => {
+    const blob = await (await fetch(video.currentSrc)).blob();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const context = new AudioContextClass();
+    try {
+      const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+      const channel = decoded.getChannelData(0);
+      const rate = decoded.sampleRate;
+      const powerAt = (start, end, frequency) => {
+        const first = Math.max(0, Math.floor(start * rate));
+        const last = Math.min(channel.length, Math.floor(end * rate));
+        const coefficient = 2 * Math.cos(2 * Math.PI * frequency / rate);
+        let q1 = 0, q2 = 0;
+        for (let index = first; index < last; index++) {
+          const q0 = channel[index] + coefficient * q1 - q2;
+          q2 = q1; q1 = q0;
+        }
+        const count = Math.max(1, last - first);
+        return (q1 * q1 + q2 * q2 - coefficient * q1 * q2) / (count * count);
+      };
+      return {
+        duration: decoded.duration,
+        early220: powerAt(0.43, 0.49, 220),
+        early660: powerAt(0.43, 0.49, 660),
+        later660: powerAt(0.58, 0.68, 660)
+      };
+    } finally { await context.close(); }
+  });
+  expect(result.duration).toBeGreaterThan(2.1);
+  expect(result.early220, JSON.stringify(result)).toBeGreaterThan(0.000002);
+  expect(result.early220, JSON.stringify(result)).toBeGreaterThan(result.early660 * 2);
+  expect(result.later660, JSON.stringify(result)).toBeGreaterThan(0.000002);
+});
