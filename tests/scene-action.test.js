@@ -240,7 +240,7 @@ test('extracts Russian and Ukrainian multi-action sequences in source order', as
     ['walk', 'open', 'pick_up']
   );
   assert.deepEqual(
-    extractSceneActionSequence('Дитина підходить до столу, бере олівець і малює карту.').map(event => event.intent),
+    extractSceneActionSequence('Дитина підходить до столу, підбирає олівець і малює карту.').map(event => event.intent),
     ['walk', 'pick_up', 'write_draw']
   );
 });
