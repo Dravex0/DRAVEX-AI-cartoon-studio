@@ -24,8 +24,18 @@ Likewise, imported poses/props/effects are translated into image/motion prompts;
 DRAVEX renderers/providers can produce the corresponding visible animation. The import diagnostics
 warn when a token is outside the adapter's declared compatibility set.
 
-## Intended use
+## Use in DRAVEX
 
-Call `convertWhatIfEpisode(episodeJson, { characterMap })`, inspect
-`diagnostics.ok/errors/warnings`, then pass `scenes` through the normal DRAVEX story QA and
-production gates. Do not bypass those gates or mark a film complete before a playable export exists.
+In the main story panel, choose the What-if Kit `episode.json` file in the
+"Импорт What-if эпизода / Import What-if episode" control. Files larger than 5 MB are rejected.
+The selected hero ID is mapped to the current DRAVEX main character; other actor IDs remain
+available as cast metadata and may need matching Character Bible entries for a fully rendered cast.
+
+The importer inspects `diagnostics.ok/errors/warnings`, creates editable DRAVEX scenes, refreshes
+the scene preview/editor, and runs the normal DRAVEX story QA. The same adapter can also be called
+programmatically with `convertWhatIfEpisode(episodeJson, { characterMap })`.
+
+Imported narration is retained as source-story text; it is **not** silently marked as synthesized
+voice. Generate/validate speech through DRAVEX's existing voice workflow, then generate scene
+images/video with the configured provider and export through DRAVEX. Do not bypass those gates or
+mark a film complete before a playable export exists.
