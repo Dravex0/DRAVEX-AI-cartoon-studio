@@ -242,4 +242,17 @@ export function attachCharacterSpriteToSceneLayers(scene = {}, asset = {}) {
   return { status: 'added', layers };
 }
 
+
+/**
+ * Attach a generated sprite only after its decoded alpha channel passed the
+ * transparency check. This does not certify visual identity or anatomy.
+ */
+export function attachVerifiedCharacterSpriteToSceneLayers(scene = {}, asset = {}) {
+  const source = scene && typeof scene === 'object' && !Array.isArray(scene) ? scene : {};
+  if (asset?.transparencyStatus !== 'verified') {
+    return { status: 'verification-required', layers: normalizeCharacterLayers(source.characterLayers) };
+  }
+  return attachCharacterSpriteToSceneLayers(source, asset);
+}
+
 export const CHARACTER_LAYER_LIMIT = MAX_CHARACTER_LAYERS;
