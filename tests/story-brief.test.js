@@ -81,3 +81,13 @@ test('extracts visually described generic characters from a natural-language pro
   assert.equal(brief.characterProfiles[0].visualDescription, 'small blue robot');
   assert.equal(brief.characterProfiles[1].visualDescription, 'little red bird');
 });
+
+test('extracts diverse character archetypes from free-form prompts without a character field', () => {
+  const dinosaur = parseStoryBrief('A tiny purple dinosaur explores an abandoned city and meets a wise old wizard.');
+  assert.deepEqual(dinosaur.characters, ['tiny purple dinosaur', 'wise old wizard']);
+  assert.match(dinosaur.characterProfiles[0].visualDescription, /purple dinosaur/i);
+  assert.match(dinosaur.characterProfiles[1].visualDescription, /wise old wizard/i);
+
+  const fantasy = parseStoryBrief('Маленькая русалка спасает древнего дракона, а затем встречает храброго рыцаря.');
+  assert.deepEqual(fantasy.characters, ['Маленькая русалка', 'древнего дракона', 'храброго рыцаря']);
+});
