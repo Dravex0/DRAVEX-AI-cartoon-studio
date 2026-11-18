@@ -168,15 +168,19 @@ export function parseStoryBrief(input) {
   // Extract explicitly described generic characters from ordinary prose.
   // This keeps prompts such as "a small blue robot meets a little red bird"
   // from falling back to a generic demo protagonist.
-  const characterNouns = '(?:robot|bird|fox|rabbit|cat|dog|girl|boy|person|knight|dragon|wizard|alien|bear|wolf|princess|prince|машин(?:а|ку)|робот|птиц(?:а|у)|лис(?:а|ёнок|ёнка)|зайц(?:а|а)|кролик|кот(?:а|ёнок)|собак(?:а|у)|девочк(?:а|у)|мальчик|дракон|волк|медвед(?:ь|я)|принцесс(?:а|у)|принц)';
-  const characterDescriptorPattern = new RegExp(
-    '\\b(?:a|an|the)\\s+((?:(?:small|little|tiny|young|cute|brave|friendly|blue|red|green|golden|silver|white|black|orange|маленьк\\w*|крошечн\\w*|ю\\w*|син\\w*|красн\\w*|зелён\\w*|зелен\\w*|рыж\\w*|бел\\w*|чёрн\\w*|черн\\w*)\\s+){1,3}' + characterNouns + ')',
-    'giu'
-  );
+  // Lightweight offline extraction is intentionally broad, but it is not a substitute
+  // for the optional language model: recognize common character archetypes in prompts
+  // without requiring users to fill the separate Character field.
+  const characterNouns = '(?:robot|android|bird|fox|rabbit|bunny|cat|dog|girl|boy|person|knight|dragon|wizard|witch|alien|bear|wolf|princess|prince|dinosaur|monster|fairy|mermaid|ghost|vampire|astronaut|superhero|puppet|doll|машин(?:а|ку)|робот|андроид|птиц(?:а|у)|лис(?:а|ёнок|ёнка)|зайц(?:а|а)|кролик|кот(?:а|ёнок)|собак(?:а|у)|девочк(?:а|у)|мальчик|дракон|волк|медвед(?:ь|я)|принцесс(?:а|у)|принц|динозавр(?:а|у)?|монстр(?:а)?|фе(?:я|ю)|русалк(?:а|у)|привидени?е|вампир(?:а)?|астронавт(?:а)?|супергеро(?:й|я)|кукл(?:а|у)|рыцар(?:ь|я)|волшебник(?:а)?)';
+  const descriptorWords = '(?:small|little|tiny|young|cute|brave|friendly|wise|old|ancient|mysterious|funny|shy|curious|blue|red|green|golden|silver|white|black|orange|purple|pink|giant|миниатюрн\\w*|маленьк\\w*|крошечн\\w*|ю\\w*|стар\\w*|древн\\w*|мудр\\w*|загадочн\\w*|смешн\\w*|храбр\\w*|син\\w*|голуб\\w*|красн\\w*|зелён\\w*|зелен\\w*|рыж\\w*|бел\\w*|чёрн\\w*|черн\\w*|фиолетов\\w*|розов\\w*|огромн\\w*)';
+  const characterDescriptorPatterns = [
+    new RegExp('\\b(?:a|an|the)\\s+((?:' + descriptorWords + ')\\s+){1,4}' + characterNouns, 'giu'),
+    new RegExp('((?:' + descriptorWords + ')\\s+){1,4}' + characterNouns, 'giu')
+  ];
   const narrativeCharacterLines = [...storyLines, ...sceneBlocks.flatMap(scene => scene.lines)]
     .filter(line => !/^(?:stage|keep|preserve|show|use|ensure|render|maintain|avoid|create|generate|medium shot|camera|do not|make sure)\b/iu.test(line));
   const characterSourceText = narrativeCharacterLines.join('\n');
-  for (const match of characterSourceText.matchAll(characterDescriptorPattern)) {
+  for (const pattern of characterDescriptorPatterns) for (const match of characterSourceText.matchAll(pattern)) {
     const description = clean(match[1], 120).replace(/[.,!?;:]+$/u, '');
     if (!description || /\b(?:named|по имени)\b/iu.test(match[0])) continue;
     if (characterProfiles.some(profile =>
