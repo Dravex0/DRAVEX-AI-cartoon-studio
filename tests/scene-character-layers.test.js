@@ -255,3 +255,25 @@ test('prefers complete rig parts and suppresses the matching whole sprite withou
   assert.equal(result.rigDrawn, 1);
   assert.deepEqual(calls, [rigImage]);
 });
+
+test('only attaches a sprite after transparency has been verified', async () => {
+  const { attachVerifiedCharacterSpriteToSceneLayers } = await import('../src/scene-character-layers.js');
+  const scene = { characterLayers: [] };
+  const asset = { characterId: 'Foxy', imageUrl: 'https://cdn.example/foxy.png', transparencyStatus: 'unverified' };
+  const blocked = attachVerifiedCharacterSpriteToSceneLayers(scene, asset);
+  assert.equal(blocked.status, 'verification-required');
+  assert.deepEqual(blocked.layers, []);
+  const attached = attachVerifiedCharacterSpriteToSceneLayers(scene, { ...asset, transparencyStatus: 'verified' });
+  assert.equal(attached.status, 'added');
+  assert.equal(attached.layers[0].characterId, 'Foxy');
+  assert.equal(attached.layers[0].imageUrl, 'https://cdn.example/foxy.png');
+});
+
+test('does not attach sprites when alpha verification fails', async () => {
+  const { attachVerifiedCharacterSpriteToSceneLayers } = await import('../src/scene-character-layers.js');
+  const result = attachVerifiedCharacterSpriteToSceneLayers({}, {
+    characterId: 'Foxy', imageUrl: 'https://cdn.example/foxy.png', transparencyStatus: 'failed'
+  });
+  assert.equal(result.status, 'verification-required');
+  assert.deepEqual(result.layers, []);
+});
