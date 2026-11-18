@@ -171,7 +171,10 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     const semanticMotionInstruction = semanticIsActionable
       ? `Perform the story event "${semanticIntent.intent}" using this source-grounded action: ${scene.storyDetail}`
       : '';
-    scene.motionPrompt = [scene.visibleAction, semanticMotionInstruction].filter(Boolean).join('. ');
+    const orderedActionInstruction = actionSequence.length > 1
+      ? `Follow this exact source-grounded action order without skipping or rearranging steps: ${actionSequence.map((event, eventIndex) => `${eventIndex + 1}. ${event.intent} (${event.evidence})`).join('; ')}. Keep the same actor, objects, and scene continuity across the sequence.`
+      : '';
+    scene.motionPrompt = [scene.visibleAction, semanticMotionInstruction, orderedActionInstruction].filter(Boolean).join('. ');
     // Add one action phase only when source text supports a movement, semantic event,
     // or directed interaction. Never fabricate setup/reaction/aftermath phases.
     const sourceAction = detectSceneAction(scene.storyDetail);
@@ -190,25 +193,19 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
           ? `${scene.characters[0]} and ${actionTarget} combine their powers as described in the source event: ${scene.storyDetail}`
           : `Perform the ${semanticIntent.intent} event: ${scene.storyDetail}`
         : scene.visibleAction || scene.storyDetail;
-      const sequenceCanReplaceSinglePhase = actionSequence.length > 1 && !semanticNeedsPair;
-      const phases = sequenceCanReplaceSinglePhase
-        ? actionSequence.map((event, eventIndex) => ({
-            phase: 'action',
-            start: eventIndex / actionSequence.length,
-            end: (eventIndex + 1) / actionSequence.length,
-            actorId: actionActor,
-            targetId: eventIndex === 0 ? (primaryInteraction?.targetId || null) : null,
-            description: `Perform the ${event.intent} action: ${event.evidence}`,
-            evidence: event.evidence
-          }))
-        : [{
-            phase: 'action', start: 0, end: 1,
-            actorId: actionActor,
-            targetId: actionTarget || null,
-            description: semanticDescription,
-            evidence: actionEvidence
-          }];
-      scene.actionTimeline = { schemaVersion: 1, phases };
+      // The current validated timeline schema permits one central action phase.
+      // Preserve the full ordered sequence in actionSequence/motionPrompt instead of
+      // emitting duplicate "action" phases that the schema correctly rejects.
+      scene.actionTimeline = {
+        schemaVersion: 1,
+        phases: [{
+          phase: 'action', start: 0, end: 1,
+          actorId: actionActor,
+          targetId: actionTarget || null,
+          description: semanticDescription,
+          evidence: actionEvidence
+        }]
+      };
     }
     // Preserve the original single-interaction field for older UI and consumers.
     scene.interaction = scene.interactions[0]
