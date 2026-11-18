@@ -91,7 +91,7 @@ test("does not use the procedural demo fallback when a generated character layer
     voiceTracks: [candidate],
     mainCharacterKey: "Foxy",
     storyUsesFallback: true,
-    sceneMetadata: [{ characterLayers: [{ characterId: "Foxy" }], characterFacialRigs: [] }]
+    sceneMetadata: [{ characterLayers: [{ characterId: "Foxy", imageUrl: "https://example.com/foxy.png", visible: true }], characterFacialRigs: [] }]
   });
   assert.deepEqual(result, []);
 });
