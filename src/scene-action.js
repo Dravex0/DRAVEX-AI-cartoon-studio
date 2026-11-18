@@ -108,70 +108,70 @@ const SEMANTIC_ACTIONS = [
     /advierte\w*|alerta/i
   ] },
   { intent: 'enter_location', motionCue: 'walk', patterns: [
-    /\\b(?:enters?|steps? into|goes? inside|walks? into)\\s+(?:the\\s+)?(?:building|room|house|hall|warehouse|office)\\b/i,
-    /заходи\\w*\\s+(?:в|во)\\s+(?:здани\\w*|дом|комнат\\w*|зал|склад|офис)|входи\\w*\\s+(?:в|во)\\s+(?:здани\\w*|дом|комнат\\w*|зал|склад|офис)/iu,
-    /заходить\\w*\\s+(?:у|в)\\s+(?:будівл\\w*|будинок|кімнат\\w*|зал|склад|офіс)/iu,
-    /entra\\s+en\\s+(?:el\\s+)?(?:edificio|edificios|habitación|casa|almacén|oficina)/i
+    /\b(?:enters?|steps? into|goes? inside|walks? into)\s+(?:the\s+)?(?:building|room|house|hall|warehouse|office)\b/i,
+    /заходи\w*\s+(?:в|во)\s+(?:здани\w*|дом|комнат\w*|зал|склад|офис)|входи\w*\s+(?:в|во)\s+(?:здани\w*|дом|комнат\w*|зал|склад|офис)/iu,
+    /заходить\w*\s+(?:у|в)\s+(?:будівл\w*|будинок|кімнат\w*|зал|склад|офіс)/iu,
+    /entra\s+en\s+(?:el\s+)?(?:edificio|edificios|habitación|casa|almacén|oficina)/i
   ] },
   { intent: 'hear_sound', motionCue: 'turn', patterns: [
-    /\\b(?:hears?|hearing)\\s+(?:a\\s+)?(?:screams?|shouts?|cries?|voices?|gunshots?|footsteps?|noise|sounds?)\\b/i,
-    /слышит?\\s+(?:крик\\w*|голос\\w*|выстрел\\w*|шаг\\w*|шум\\w*|зву\\w*)|услыш\\w*\\s+(?:крик\\w*|голос\\w*|выстрел\\w*|шаг\\w*)/iu,
-    /чує\\s+(?:крик\\w*|голос\\w*|постріл\\w*|крок\\w*|шум\\w*)/iu,
-    /oye\\s+(?:gritos?|voces?|disparos?|pasos?|ruidos?)/i
+    /\b(?:hears?|hearing)\s+(?:a\s+)?(?:screams?|shouts?|cries?|voices?|gunshots?|footsteps?|noise|sounds?)\b/i,
+    /слышит?\s+(?:крик\w*|голос\w*|выстрел\w*|шаг\w*|шум\w*|зву\w*)|услыш\w*\s+(?:крик\w*|голос\w*|выстрел\w*|шаг\w*)/iu,
+    /чує\s+(?:крик\w*|голос\w*|постріл\w*|крок\w*|шум\w*)/iu,
+    /oye\s+(?:gritos?|voces?|disparos?|pasos?|ruidos?)/i
   ] },
   { intent: 'listen_carefully', motionCue: 'turn', patterns: [
-    /\\b(?:listens?\\s+(?:carefully|closely|intently)|pauses?\\s+to\\s+listen|strains?\\s+to\\s+hear)\\b/i,
-    /прислушива\\w*|вслушива\\w*|замира\\w*.{0,24}слуша\\w*/iu,
-    /прислуха\\w*|вслухає\\w*|завмира\\w*.{0,24}слуха\\w*/iu,
-    /escucha\\s+(?:atentamente|con\\s+atención)|agudiza\\s+el\\s+oído/i
+    /\b(?:listens?\s+(?:carefully|closely|intently)|pauses?\s+to\s+listen|strains?\s+to\s+hear)\b/i,
+    /прислушива\w*|вслушива\w*|замира\w*.{0,24}слуша\w*/iu,
+    /прислуха\w*|вслухає\w*|завмира\w*.{0,24}слуха\w*/iu,
+    /escucha\s+(?:atentamente|con\s+atención)|agudiza\s+el\s+oído/i
   ] },
   { intent: 'stealth_advance', motionCue: 'walk', patterns: [
-    /\\b(?:sneaks?|creeps?|moves?|walks?|advances?)\\b.{0,35}\\b(?:quietly|silently|slowly|stealthily|cautiously)\\b|\\b(?:quietly|silently|stealthily)\\b.{0,25}\\b(?:moves?|walks?|advances?)\\b/i,
-    /(?:ид[её]т|шагает|продвигается|крад[её]тся|подкрадыва\\w*).{0,40}(?:медленно|тихо|бесшумно|осторожно)|(?:тихо|бесшумно|осторожно).{0,30}(?:ид[её]т|шагает|продвигается|крад[её]тся)/iu,
+    /\b(?:sneaks?|creeps?|moves?|walks?|advances?)\b.{0,35}\b(?:quietly|silently|slowly|stealthily|cautiously)\b|\b(?:quietly|silently|stealthily)\b.{0,25}\b(?:moves?|walks?|advances?)\b/i,
+    /(?:ид[её]т|шагает|продвигается|крад[её]тся|подкрадыва\w*).{0,40}(?:медленно|тихо|бесшумно|осторожно)|(?:тихо|бесшумно|осторожно).{0,30}(?:ид[её]т|шагает|продвигается|крад[её]тся)/iu,
     /(?:йде|крокує|просувається|підкрадається).{0,40}(?:повільно|тихо|безшумно|обережно)/iu,
     /(?:avanza|camina|se mueve).{0,35}(?:despacio|lentamente|en silencio|con cuidado)/i
   ] },
   { intent: 'draw_weapon', motionCue: 'turn', patterns: [
-    /\\b(?:draws?|pulls? out|takes? out|unsheathes?)\\s+(?:his|her|their|a|the)?\\s*(?:pistol|gun|rifle|weapon|sidearm|revolver|sword|blade)\\b/i,
-    /доста[её]т\\s+(?:свой\\s+|из\\s+кобуры\\s+)?(?:пистолет|оружие|револьвер|винтовк\\w*|автомат\\w*|нож|меч)|вынима\\w*\\s+(?:пистолет|оружие|револьвер|нож|меч)|выхватыва\\w*\\s+(?:пистолет|оружие|нож|меч)/iu,
-    /діста[єе]\\s+(?:пістолет|зброю|револьвер|гвинтівк\\w*|ніж|меч)|вийма\\w*\\s+(?:пістолет|зброю|ніж|меч)/iu,
-    /saca\\s+(?:su\\s+)?(?:pistola|arma|revólver|rifle|cuchillo|espada)/i
+    /\b(?:draws?|pulls? out|takes? out|unsheathes?)\s+(?:his|her|their|a|the)?\s*(?:pistol|gun|rifle|weapon|sidearm|revolver|sword|blade)\b/i,
+    /доста[её]т\s+(?:свой\s+|из\s+кобуры\s+)?(?:пистолет|оружие|револьвер|винтовк\w*|автомат\w*|нож|меч)|вынима\w*\s+(?:пистолет|оружие|револьвер|нож|меч)|выхватыва\w*\s+(?:пистолет|оружие|нож|меч)/iu,
+    /діста[єе]\s+(?:пістолет|зброю|револьвер|гвинтівк\w*|ніж|меч)|вийма\w*\s+(?:пістолет|зброю|ніж|меч)/iu,
+    /saca\s+(?:su\s+)?(?:pistola|arma|revólver|rifle|cuchillo|espada)/i
   ] },
   { intent: 'aim_weapon', motionCue: 'turn', patterns: [
-    /\\b(?:aims?|points?)\\s+(?:his|her|their|the)?\\s*(?:gun|pistol|rifle|weapon|revolver)\\s+(?:at|toward|towards)\\b|\\b(?:raises?|levels?)\\s+(?:his|her|their|the)?\\s*(?:gun|pistol|rifle|weapon)\\b/i,
-    /наводит\\w*\\s+(?:пистолет|оружие|ствол|винтовк\\w*)|направля\\w*\\s+(?:пистолет|оружие|ствол)\\s+на|наставля\\w*\\s+(?:пистолет|оружие|ствол)|поднима\\w*\\s+(?:пистолет|оружие)\\s+и\\s+целится/iu,
-    /наводить\\w*\\s+(?:пістолет|зброю|гвинтівк\\w*)|спрямову\\w*\\s+(?:пістолет|зброю)\\s+на|цілиться\\s+(?:у|в)/iu,
-    /apunta\\s+(?:con\\s+)?(?:su\\s+)?(?:pistola|arma|rifle)\\s+(?:a|hacia)|encañona/i
+    /\b(?:aims?|points?)\s+(?:his|her|their|the)?\s*(?:gun|pistol|rifle|weapon|revolver)\s+(?:at|toward|towards)\b|\b(?:raises?|levels?)\s+(?:his|her|their|the)?\s*(?:gun|pistol|rifle|weapon)\b/i,
+    /наводит\w*\s+(?:пистолет|оружие|ствол|винтовк\w*)|направля\w*\s+(?:пистолет|оружие|ствол)\s+на|наставля\w*\s+(?:пистолет|оружие|ствол)|поднима\w*\s+(?:пистолет|оружие)\s+и\s+целится/iu,
+    /наводить\w*\s+(?:пістолет|зброю|гвинтівк\w*)|спрямову\w*\s+(?:пістолет|зброю)\s+на|цілиться\s+(?:у|в)/iu,
+    /apunta\s+(?:con\s+)?(?:su\s+)?(?:pistola|arma|rifle)\s+(?:a|hacia)|encañona/i
   ] },
   { intent: 'shout_command', motionCue: 'talk', patterns: [
-    /\\b(?:shouts?|yells?|screams?|barks?)\\s+(?:["“][^"”]{1,80}["”]|\\b(?:hands?\\s+up|freeze|drop\\s+(?:the\\s+)?weapon|stop|stay\\s+back)\\b)/i,
-    /кричит\\w*.{0,45}(?:руки\\s+вверх|стой|не\\s+двигаться|брось\\s+оружие|лежать|назад)|громко\\s+команду\\w*|приказыва\\w*.{0,35}(?:стоять|руки\\s+вверх|не\\s+двигаться)/iu,
-    /кричить\\w*.{0,45}(?:руки\\s+вгору|не\\s+рухатися|кинути\\s+зброю|стояти)|наказу\\w*.{0,35}(?:стояти|руки\\s+вгору|не\\s+рухатися)/iu,
-    /grita\\w*.{0,40}(?:manos\\s+arriba|quieto|no\\s+te\\s+muevas|suelta\\s+el\\s+arma)/i
+    /\b(?:shouts?|yells?|screams?|barks?)\s+(?:["“][^"”]{1,80}["”]|\b(?:hands?\s+up|freeze|drop\s+(?:the\s+)?weapon|stop|stay\s+back)\b)/i,
+    /кричит\w*.{0,45}(?:руки\s+вверх|стой|не\s+двигаться|брось\s+оружие|лежать|назад)|громко\s+команду\w*|приказыва\w*.{0,35}(?:стоять|руки\s+вверх|не\s+двигаться)/iu,
+    /кричить\w*.{0,45}(?:руки\s+вгору|не\s+рухатися|кинути\s+зброю|стояти)|наказу\w*.{0,35}(?:стояти|руки\s+вгору|не\s+рухатися)/iu,
+    /grita\w*.{0,40}(?:manos\s+arriba|quieto|no\s+te\s+muevas|suelta\s+el\s+arma)/i
   ] },
   { intent: 'discover_threat', motionCue: 'surprised', patterns: [
-    /\\b(?:spots?|notices?|discovers?|finds?|sees?)\\b.{0,55}\\b(?:attacker|intruder|robber|thief|criminal|hostage|victim|someone\\s+being\\s+attacked|a\\s+person\\s+being\\s+beaten)\\b/i,
-    /видит\\w*.{0,45}(?:преступник\\w*|напада\\w*|грабител\\w*|вор\\w*|заложник\\w*|жертв\\w*|избива\\w*|пострадавш\\w*)|обнаружива\\w*.{0,45}(?:человек\\w*|преступник\\w*|напада\\w*)/iu,
-    /бачить\\w*.{0,45}(?:злочин\\w*|нападник\\w*|грабіжник\\w*|заручник\\w*|жертв\\w*|потерпіл\\w*)/iu,
-    /ve\\s+(?:a\\s+)?(?:atacante|intruso|ladrón|criminal|rehén|víctima)/i
+    /\b(?:spots?|notices?|discovers?|finds?|sees?)\b.{0,55}\b(?:attacker|intruder|robber|thief|criminal|hostage|victim|someone\s+being\s+attacked|a\s+person\s+being\s+beaten)\b/i,
+    /видит\w*.{0,45}(?:преступник\w*|напада\w*|грабител\w*|вор\w*|заложник\w*|жертв\w*|избива\w*|пострадавш\w*)|обнаружива\w*.{0,45}(?:человек\w*|преступник\w*|напада\w*)/iu,
+    /бачить\w*.{0,45}(?:злочин\w*|нападник\w*|грабіжник\w*|заручник\w*|жертв\w*|потерпіл\w*)/iu,
+    /ve\s+(?:a\s+)?(?:atacante|intruso|ladrón|criminal|rehén|víctima)/i
   ] },
   { intent: 'intervene', motionCue: 'run', patterns: [
-    /\\b(?:rushes?|bursts?|leaps?|jumps?)\\s+(?:forward|out|in|into the room)|\\bintervenes?\\b/i,
-    /врыва\\w*|выскакива\\w*|выпрыгива\\w*|броса\\w*ся\\s+впер[её]д|вмешива\\w*|резко\\s+вбега\\w*/iu,
-    /врива\\w*|вистрибу\\w*|втруча\\w*|різко\\s+вбіга\\w*/iu,
-    /irrumpe|interviene|salta\\s+al\\s+interior/i
+    /\b(?:rushes?|bursts?|leaps?|jumps?)\s+(?:forward|out|in|into the room)|\bintervenes?\b/i,
+    /врыва\w*|выскакива\w*|выпрыгива\w*|броса\w*ся\s+впер[её]д|вмешива\w*|резко\s+вбега\w*/iu,
+    /врива\w*|вистрибу\w*|втруча\w*|різко\s+вбіга\w*/iu,
+    /irrumpe|interviene|salta\s+al\s+interior/i
   ] },
   { intent: 'restrain', motionCue: 'attack', patterns: [
-    /\\b(?:restrains?|handcuffs?|pins?\\s+down|subdues?|disarms?)\\b/i,
-    /задержива\\w*|скручива\\w*|надева\\w*.{0,20}наручник\\w*|обезоружива\\w*|прижимает\\w*.{0,20}к\\s+полу/iu,
-    /затриму\\w*|знерухомлю\\w*|одяга\\w*.{0,20}кайданк\\w*|роззброю\\w*/iu,
-    /esposa\\w*|inmoviliza\\w*|desarma\\w*/
+    /\b(?:restrains?|handcuffs?|pins?\s+down|subdues?|disarms?)\b/i,
+    /задержива\w*|скручива\w*|надева\w*.{0,20}наручник\w*|обезоружива\w*|прижимает\w*.{0,20}к\s+полу/iu,
+    /затриму\w*|знерухомлю\w*|одяга\w*.{0,20}кайданк\w*|роззброю\w*/iu,
+    /esposa\w*|inmoviliza\w*|desarma\w*/
   ] },
   { intent: 'rescue', motionCue: 'run', patterns: [
-    /\\b(?:rescues?|frees?|helps?\\s+(?:the\\s+)?(?:victim|hostage|person))\\b/i,
-    /спаса\\w*|освобожда\\w*.{0,25}(?:человек\\w*|заложник\\w*|жертв\\w*)|помога\\w*.{0,25}(?:пострадавш\\w*|ранен\\w*)/iu,
-    /ряту\\w*|звільня\\w*.{0,25}(?:людин\\w*|заручник\\w*|жертв\\w*)|допомага\\w*.{0,25}(?:потерпіл\\w*|поранен\\w*)/iu,
-    /rescata\\w*|libera\\w*.{0,25}(?:rehén|víctima)/i
+    /\b(?:rescues?|frees?|helps?\s+(?:the\s+)?(?:victim|hostage|person))\b/i,
+    /спаса\w*|освобожда\w*.{0,25}(?:человек\w*|заложник\w*|жертв\w*)|помога\w*.{0,25}(?:пострадавш\w*|ранен\w*)/iu,
+    /ряту\w*|звільня\w*.{0,25}(?:людин\w*|заручник\w*|жертв\w*)|допомага\w*.{0,25}(?:потерпіл\w*|поранен\w*)/iu,
+    /rescata\w*|libera\w*.{0,25}(?:rehén|víctima)/i
   ] },
   { intent: 'pick_up', motionCue: 'turn', patterns: [
     /\b(?:picks? up|picks? .* up|grabs?|lifts?|takes? .* from the ground)\b/i,
