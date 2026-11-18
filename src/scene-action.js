@@ -429,8 +429,17 @@ export function extractSceneActionSequence(input, { maxActions = 16 } = {}) {
   matchesFound.sort((a, b) => a.startIndex - b.startIndex || a.priority - b.priority || b.endIndex - a.endIndex);
   const sequence = [];
   for (const candidate of matchesFound) {
+    // Collapse duplicate detections of the same event and generic renderer cues
+    // covered by a semantic event. Never let one semantic phrase swallow a later,
+    // distinct semantic event in the same sentence.
     const overlap = sequence.find(item =>
-      candidate.startIndex < item.endIndex && candidate.endIndex > item.startIndex
+      candidate.startIndex < item.endIndex
+      && candidate.endIndex > item.startIndex
+      && (
+        candidate.intent === item.intent
+        || candidate.priority >= SEMANTIC_ACTIONS.length
+        || item.priority >= SEMANTIC_ACTIONS.length
+      )
     );
     if (overlap) {
       if (candidate.priority < overlap.priority) Object.assign(overlap, candidate);
