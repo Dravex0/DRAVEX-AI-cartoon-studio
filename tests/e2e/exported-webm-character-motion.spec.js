@@ -104,7 +104,7 @@ test('exported WebM contains visible movement from the procedural fox, not only 
   expect(evidence.width).toBeGreaterThan(0);
   expect(evidence.height).toBeGreaterThan(0);
   expect(evidence.orangePixels.every(count => count > 500),
-    'the expected fox-colored character should be visible in both decoded WebM frames').toBeTruthy();
+    `the expected fox-colored character should be visible in both decoded WebM frames; evidence=${JSON.stringify(evidence)}`).toBeTruthy();
   expect(evidence.changedCharacterPixels, 'the character-colored silhouette should change between exported frames')
     .toBeGreaterThan(100);
 });
