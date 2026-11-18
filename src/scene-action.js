@@ -192,7 +192,7 @@ const SEMANTIC_ACTIONS = [
     /se duerme|despierta\w*/
   ] },
   { intent: 'point', motionCue: 'turn', patterns: [
-    /\b(?:points? (?:at|to)|gestures? toward|signals? toward)\b/i,
+    /\b(?:points? (?:at|to|toward)|gestures? toward|signals? toward)\b/i,
     /указывает на|показывает пальцем|жестом указывает/iu,
     /вказує на|показує пальцем|жестом показує/iu,
     /señala\w*/
