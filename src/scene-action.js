@@ -180,34 +180,34 @@ const SEMANTIC_ACTIONS = [
     /rescata[\p{L}]*|libera[\p{L}]*.{0,25}(?:rehén|víctima)/i
   ] },
   { intent: 'freeze', motionCue: 'idle', patterns: [
-    /\\b(?:freezes?|stops? dead|stands? still|holds? still|comes? to a halt)\\b/i,
-    /замира[\\p{L}]*|застыва[\\p{L}]*|останавлива[\\p{L}]*\\s+(?:как вкопанн|на месте)|замирает на месте/iu,
-    /завмира[\\p{L}]*|застига[\\p{L}]*|зупиня[\\p{L}]*\\s+(?:на місці)/iu,
+    /\b(?:freezes?|stops? dead|stands? still|holds? still|comes? to a halt)\b/i,
+    /замира[\p{L}]*|застыва[\p{L}]*|останавлива[\p{L}]*\s+(?:как вкопанн|на месте)|замирает на месте/iu,
+    /завмира[\p{L}]*|застига[\p{L}]*|зупиня[\p{L}]*\s+(?:на місці)/iu,
     /se queda inmóvil|se congela|se detiene en seco/i
   ] },
   { intent: 'take_cover', motionCue: 'jump', patterns: [
-    /\\b(?:takes? cover|ducks? behind|dives? behind|hides? behind|shelters? behind)\\b/i,
-    /прячется\\s+за|ныряет\\s+за|укрыва[\\p{L}]*|занима[\\p{L}]*\\s+укрыти[\\p{L}]*|падает\\s+за\\s+укрыти[\\p{L}]*/iu,
-    /хова[\\p{L}]*\\s+за|пірна[\\p{L}]*\\s+за|шука[\\p{L}]*\\s+укритт[\\p{L}]*/iu,
+    /\b(?:takes? cover|ducks? behind|dives? behind|hides? behind|shelters? behind)\b/i,
+    /прячется\s+за|ныряет\s+за|укрыва[\p{L}]*|занима[\p{L}]*\s+укрыти[\p{L}]*|падает\s+за\s+укрыти[\p{L}]*/iu,
+    /хова[\p{L}]*\s+за|пірна[\p{L}]*\s+за|шука[\p{L}]*\s+укритт[\p{L}]*/iu,
     /se cubre detrás|se refugia|se esconde detrás/i
   ] },
   { intent: 'call_for_backup', motionCue: 'talk', patterns: [
-    /\\b(?:calls?|radios?|calls? in)\\s+(?:for\\s+)?(?:backup|reinforcements|support)\\b|\\brequests?\\s+backup\\b/i,
-    /вызывает\\s+(?:подкрепление|подмогу|поддержку)|запрашива[\\p{L}]*\\s+(?:подкреплени[\\p{L}]*|подмог[\\p{L}]*)|говорит\\s+по\\s+рации/iu,
-    /виклика[\\p{L}]*\\s+(?:підкріпленн[\\p{L}]*|підмогу)|запитує\\s+підкріпленн[\\p{L}]*|говорить\\s+по\\s+рації/iu,
+    /\b(?:calls?|radios?|calls? in)\s+(?:for\s+)?(?:backup|reinforcements|support)\b|\brequests?\s+backup\b/i,
+    /вызывает\s+(?:подкрепление|подмогу|поддержку)|запрашива[\p{L}]*\s+(?:подкреплени[\p{L}]*|подмог[\p{L}]*)|говорит\s+по\s+рации/iu,
+    /виклика[\p{L}]*\s+(?:підкріпленн[\p{L}]*|підмогу)|запитує\s+підкріпленн[\p{L}]*|говорить\s+по\s+рації/iu,
     /pide refuerzos|solicita apoyo|llama a refuerzos/i
   ] },
   { intent: 'drop_weapon', motionCue: 'turn', patterns: [
-    /\\b(?:drops?|lowers?)\\s+(?:his|her|their|the)?\\s*(?:gun|pistol|weapon|rifle)\\b|\\bthrows?\\s+(?:his|her|their|the)?\\s*(?:gun|pistol|weapon)\\s+down\\b/i,
-    /бросает\\s+(?:пистолет|оружие|револьвер)|роняет\\s+(?:пистолет|оружие)|опускает\\s+(?:пистолет|оружие)|выбрасывает\\s+(?:пистолет|оружие)/iu,
-    /кида[\\p{L}]*\\s+(?:пістолет|зброю)|опуска[\\p{L}]*\\s+(?:пістолет|зброю)|випуска[\\p{L}]*\\s+(?:пістолет|зброю)/iu,
-    /deja caer|baja|suelta\\s+(?:su\\s+)?(?:arma|pistola)/i
+    /\b(?:drops?|lowers?)\s+(?:his|her|their|the)?\s*(?:gun|pistol|weapon|rifle)\b|\bthrows?\s+(?:his|her|their|the)?\s*(?:gun|pistol|weapon)\s+down\b/i,
+    /бросает\s+(?:пистолет|оружие|револьвер)|роняет\s+(?:пистолет|оружие)|опускает\s+(?:пистолет|оружие)|выбрасывает\s+(?:пистолет|оружие)/iu,
+    /кида[\p{L}]*\s+(?:пістолет|зброю)|опуска[\p{L}]*\s+(?:пістолет|зброю)|випуска[\p{L}]*\s+(?:пістолет|зброю)/iu,
+    /deja caer|baja|suelta\s+(?:su\s+)?(?:arma|pistola)/i
   ] },
   { intent: 'hands_up', motionCue: 'surprised', patterns: [
-    /\\b(?:raises?|puts?)\\s+(?:both\\s+)?hands?\\s+(?:up|above (?:his|her|their) head)\\b|\\bhands?\\s+up\\b/i,
-    /поднимает\\s+руки|поднимает\\s+обе\\s+руки|руки\\s+вверх/iu,
-    /підніма[\\p{L}]*\\s+руки|руки\\s+вгору/iu,
-    /levanta\\s+las\\s+manos|manos\\s+arriba/i
+    /\b(?:raises?|puts?)\s+(?:both\s+)?hands?\s+(?:up|above (?:his|her|their) head)\b|\bhands?\s+up\b/i,
+    /поднимает\s+руки|поднимает\s+обе\s+руки|руки\s+вверх/iu,
+    /підніма[\p{L}]*\s+руки|руки\s+вгору/iu,
+    /levanta\s+las\s+manos|manos\s+arriba/i
   ] },
   { intent: 'pick_up', motionCue: 'turn', patterns: [
     /\b(?:picks? up|picks? .* up|grabs?|lifts?|takes? .* from the ground)\b/i,
