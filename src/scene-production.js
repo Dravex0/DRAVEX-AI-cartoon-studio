@@ -105,7 +105,13 @@ function actionTimelineInstructions(scene = {}) {
     const startSeconds = (Number(phase.start) * duration).toFixed(2);
     const endSeconds = (Number(phase.end) * duration).toFixed(2);
     const target = phase.targetId ? `; target: ${safe(phase.targetId, 120)}` : '';
-    return `- ${safe(phase.phase, 24)} (${Math.round(phase.start * 100)}%-${Math.round(phase.end * 100)}%; ${startSeconds}-${endSeconds}s): ${safe(phase.description, 700)}; actor: ${safe(phase.actorId, 120)}${target}`;
+    const steps = Array.isArray(phase.steps) ? phase.steps.map((step, index) => {
+      const stepStart = (Number(step.start) * duration).toFixed(2);
+      const stepEnd = (Number(step.end) * duration).toFixed(2);
+      const stepTarget = step.targetId ? `; target: ${safe(step.targetId, 120)}` : '';
+      return `  ${index + 1}. ${safe(step.intent, 80)} [${Math.round(step.start * 100)}%-${Math.round(step.end * 100)}%; ${stepStart}-${stepEnd}s; cue: ${safe(step.motionCue, 40)}]: ${safe(step.description, 500)}; actor: ${safe(step.actorId, 120)}${stepTarget}; source: ${safe(step.evidence, 300)}`;
+    }) : [];
+    return [`- ${safe(phase.phase, 24)} (${Math.round(phase.start * 100)}%-${Math.round(phase.end * 100)}%; ${startSeconds}-${endSeconds}s): ${safe(phase.description, 700)}; actor: ${safe(phase.actorId, 120)}${target}`, ...steps].join('\\n');
   });
   return [
     'Character action timeline (follow these phases in order):\n' + phases.join('\n'),
