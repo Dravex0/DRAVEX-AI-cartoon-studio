@@ -6,7 +6,7 @@ import { compileDoodleSceneMotion } from './doodle-rig-adapter.js';
 
 const clean = value => String(value ?? '').trim();
 const key = value => clean(value).toLocaleLowerCase();
-const PRESET_BY_ACTION = Object.freeze({ walk: 'walk', run: 'run', jump: 'jump', wave: 'wave', dance: 'dance', idle: 'idle' });
+const PRESET_BY_ACTION = Object.freeze({ walk: 'walk', run: 'run', jump: 'jump', wave: 'wave', dance: 'dance' });
 const PRESET_BY_INTENT = Object.freeze({
   hear_sound: 'listen', listen_carefully: 'listen',
   draw_weapon: 'draw_weapon', aim_weapon: 'aim_weapon',
