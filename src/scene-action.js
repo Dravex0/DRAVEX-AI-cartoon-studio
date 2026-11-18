@@ -448,5 +448,15 @@ export function extractSceneActionSequence(input, { maxActions = 16 } = {}) {
     sequence.push(candidate);
     if (sequence.length >= Math.max(1, Math.min(24, Number(maxActions) || 16))) break;
   }
-  return sequence.map(({ priority, ...event }) => event);
+  const durationWeight = {
+    enter_location: 1.1, hear_sound: 0.75, listen_carefully: 1.4,
+    stealth_advance: 1.5, advance: 1.2, draw_weapon: 0.9,
+    discover_threat: 0.9, intervene: 1.05, aim_weapon: 0.85,
+    shout_command: 0.8, freeze: 1.2, take_cover: 0.95,
+    call_for_backup: 1, drop_weapon: 0.8, hands_up: 0.8
+  };
+  return sequence.map(({ priority, ...event }) => ({
+    ...event,
+    durationWeight: durationWeight[event.intent] || 1
+  }));
 }
