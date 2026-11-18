@@ -181,7 +181,7 @@ export function parseStoryBrief(input) {
     .filter(line => !/^(?:stage|keep|preserve|show|use|ensure|render|maintain|avoid|create|generate|medium shot|camera|do not|make sure)\b/iu.test(line));
   const characterSourceText = narrativeCharacterLines.join('\n');
   for (const pattern of characterDescriptorPatterns) for (const match of characterSourceText.matchAll(pattern)) {
-    const description = clean(match[0].replace(/^(?:a|an|the)\\s+/iu, ''), 120).replace(/[.,!?;:]+$/u, '');
+    const description = clean(match[0].replace(/^(?:a|an|the)\s+/iu, ''), 120).replace(/[.,!?;:]+$/u, '');
     if (!description || /\b(?:named|по имени)\b/iu.test(match[0])) continue;
     if (characterProfiles.some(profile =>
       profile.characterId.toLocaleLowerCase() === description.toLocaleLowerCase()
