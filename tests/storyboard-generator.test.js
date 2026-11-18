@@ -222,3 +222,33 @@ test('semantic reveal creates a source-grounded action instead of a passive idle
   assert.equal(scene.actionTimeline.phases[0].actorId, 'Nox');
   assert.match(scene.motionGenerationPrompt, /reveal/);
 });
+
+
+test('preserves a multi-step scene as ordered, timed action phases', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — small orange fox.\n\nScene 1: The key\nFoxy walks to the table, picks up a key, opens the chest, then throws the key away.',
+    'en',
+    'Foxy'
+  );
+  const scene = result.scenes[0];
+  assert.deepEqual(scene.actionSequence.map(event => event.intent), ['walk', 'pick_up', 'open', 'throw']);
+  assert.deepEqual(scene.actionTimeline.phases.map(phase => phase.evidence), [
+    'walks', 'picks up', 'opens', 'throws'
+  ]);
+  assert.deepEqual(scene.actionTimeline.phases.map(phase => [phase.start, phase.end]), [
+    [0, 0.25], [0.25, 0.5], [0.5, 0.75], [0.75, 1]
+  ]);
+  assert.ok(scene.actionTimeline.phases.every(phase => phase.actorId === 'Foxy'));
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+});
+
+test('does not turn a negated action into a timeline phase', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nKnight — armored knight.\n\nScene 1: The gate\nThe knight does not open the gate, but catches the falling key.',
+    'en',
+    'Knight'
+  );
+  assert.deepEqual(result.scenes[0].actionSequence.map(event => event.intent), ['catch']);
+  assert.equal(result.scenes[0].actionTimeline.phases.length, 1);
+  assert.equal(result.scenes[0].actionTimeline.phases[0].evidence, 'catches');
+});
