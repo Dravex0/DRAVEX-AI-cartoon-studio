@@ -249,3 +249,17 @@ test('does not turn a negated action into a timeline phase', () => {
   assert.equal(result.scenes[0].actionTimeline.phases.length, 1);
   assert.equal(result.scenes[0].actionTimeline.phases[0].evidence, result.scenes[0].storyDetail);
 });
+
+
+test('passes a sensory tactical story sequence into the actual scene motion prompt', () => {
+  const story = 'Полицейский заходит в здание, слышит крики, достаёт пистолет, идёт медленно и тихо, прислушивается, идёт дальше, видит как избивают человека, выпрыгивает, наставляет пистолет и кричит: «Руки вверх!»';
+  const result = buildStoryboardFromText(story, 'ru', 'Полицейский');
+  const scene = result.scenes.find(item => item.storyDetail.includes('Полицейский')) || result.scenes[0];
+  const expected = [
+    'enter_location', 'hear_sound', 'draw_weapon', 'stealth_advance',
+    'listen_carefully', 'walk', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
+  ];
+  assert.deepEqual(scene.actionSequence.map(event => event.intent), expected);
+  for (const intent of expected) assert.ok(scene.motionGenerationPrompt.includes(intent), intent);
+  assert.match(scene.motionGenerationPrompt, /exact source-grounded action order/i);
+});
