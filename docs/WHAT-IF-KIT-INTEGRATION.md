@@ -7,7 +7,11 @@ provider-neutral scene model. It is deliberately an adapter, not a copy of the K
 
 - `src/what-if-episode-adapter.js`: bounded import, character ID mapping, narration/story
   attribution, camera/action/prop prompt conversion, and explicit warnings for unsupported tokens.
-- `tests/what-if-episode-adapter.test.js`: import, warning, empty-input, and input-limit tests.
+- Supported explicit actor poses (walk, run, jump, wave, dance, punch/kick, defend, dodge)
+  become a validated DRAVEX action phase. Explicit `x` → `toX` movement adds a direction cue.
+- The import UI preserves the structured actor cast, reuses matching character rigs/sprite layers
+  already present in the previous storyboard, and runs DRAVEX automatic motion preparation.
+- `tests/what-if-episode-adapter.test.js`: import, action mapping, warning, empty-input, and input-limit tests.
 
 ## Important compatibility boundary
 
@@ -20,8 +24,12 @@ not improve the existing DRAVEX pipeline safely.
 
 The adapter keeps What-if narration in `sourceStoryText`; it does not pretend that narration
 has been synthesized. The existing DRAVEX voice workflow must generate and validate the audio.
-Likewise, imported poses/props/effects are translated into image/motion prompts; only existing
-DRAVEX renderers/providers can produce the corresponding visible animation. The import diagnostics
+For the supported pose subset above, the adapter also creates a source-grounded action timeline
+that DRAVEX can map to its deterministic rig presets or whole-sprite movement planner. This only
+produces visible motion when a matching, valid character rig or sprite layer is already attached
+to the scene. The importer reuses such assets from the previous storyboard when character IDs
+match; it does not invent or generate missing character art/rig parts. Other imported poses,
+props, and effects remain prompts until a renderer/provider supports them. The import diagnostics
 warn when a token is outside the adapter's declared compatibility set.
 
 ## Use in DRAVEX
@@ -29,7 +37,8 @@ warn when a token is outside the adapter's declared compatibility set.
 In the main story panel, choose the What-if Kit `episode.json` file in the
 "Импорт What-if эпизода / Import What-if episode" control. Files larger than 5 MB are rejected.
 The selected hero ID is mapped to the current DRAVEX main character; other actor IDs remain
-available as cast metadata and may need matching Character Bible entries for a fully rendered cast.
+available as cast metadata. Matching existing rig/sprite assets are reused when available; otherwise
+the corresponding character still needs a generated/attached DRAVEX asset before it can be animated.
 
 The importer inspects `diagnostics.ok/errors/warnings`, creates editable DRAVEX scenes, refreshes
 the scene preview/editor, and runs the normal DRAVEX story QA. The same adapter can also be called
