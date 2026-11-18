@@ -22,3 +22,10 @@ test('imported narration is retained as source text and is not falsely marked as
   assert.match(app, /importedWhatIf:true/);
   assert.doesNotMatch(app, /importWhatIfEpisode[\s\S]{0,5000}voiceTimeline\s*=/);
 });
+
+test('What-if import reuses available character assets and prepares automatic motion', () => {
+  assert.match(app, /reusableCharacterAssets/);
+  assert.match(app, /characterRigs:merge\('characterRigs'\)/);
+  assert.match(app, /const motionPreparation=prepareAutomaticCharacterMotion\(\)/);
+  assert.match(app, /actionTimeline/);
+});
