@@ -297,6 +297,33 @@ export function extractSceneActionSequence(input, { maxActions = 8 } = {}) {
       }
     }
   }
+  // Include the renderer's basic movement/emotion cues as explicit events too.
+  for (let priority = 0; priority < ACTION_PATTERNS.length; priority++) {
+    const entry = ACTION_PATTERNS[priority];
+    for (const pattern of entry.patterns) {
+      try {
+        const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
+        const scanner = new RegExp(pattern.source, flags);
+        let match;
+        while ((match = scanner.exec(text))) {
+          if (match[0] && !isNegatedMatch(text, match.index)) {
+            matchesFound.push({
+              intent: entry.action,
+              motionCue: entry.action,
+              confidence: 0.65,
+              evidence: match[0],
+              startIndex: match.index,
+              endIndex: match.index + match[0].length,
+              priority: SEMANTIC_ACTIONS.length + priority
+            });
+          }
+          if (match[0] === '') scanner.lastIndex++;
+        }
+      } catch {
+        // Ignore malformed optional patterns and continue with the remaining cues.
+      }
+    }
+  }
   matchesFound.sort((a, b) => a.startIndex - b.startIndex || a.priority - b.priority || b.endIndex - a.endIndex);
   const sequence = [];
   for (const candidate of matchesFound) {
