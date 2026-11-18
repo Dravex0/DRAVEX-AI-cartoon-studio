@@ -203,7 +203,19 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
           actorId: actionActor,
           targetId: actionTarget || null,
           description: semanticDescription,
-          evidence: actionEvidence
+          evidence: actionEvidence,
+          ...(actionSequence.length ? {
+            steps: actionSequence.map((event, eventIndex) => ({
+              intent: event.intent,
+              motionCue: event.motionCue,
+              start: eventIndex / actionSequence.length,
+              end: (eventIndex + 1) / actionSequence.length,
+              actorId: actionActor,
+              targetId: null,
+              description: `Perform the ${event.intent} action: ${event.evidence}`,
+              evidence: event.evidence
+            }))
+          } : {})
         }]
       };
     }
