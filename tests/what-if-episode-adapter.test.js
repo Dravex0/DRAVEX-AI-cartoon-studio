@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { convertWhatIfEpisode } from '../src/what-if-episode-adapter.js';
+import { validateCharacterActionTimeline } from '../src/character-action-timeline.js';
 
 test('imports a What-if shot into the DRAVEX scene model without losing narration or staging', () => {
   const result = convertWhatIfEpisode({
@@ -69,6 +70,7 @@ test('creates a validated action timeline for supported actor poses and explicit
     }]
   });
   assert.ok(scene.sourceEvents.includes(scene.actionTimeline.phases[0].evidence));
+  assert.equal(validateCharacterActionTimeline(scene).passed, true);
 });
 
 test('uses target pose for an explicit pose change and leaves unsupported poses without a fake timeline', () => {
