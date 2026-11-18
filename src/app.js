@@ -39,7 +39,7 @@ import { validateCharacterRig, normalizeCharacterRigPoses, characterRigPosesFor 
 import { upsertCharacterMotionPhase } from "./character-motion-editor.js";
 import { planCharacterMotionFromActionTimeline } from "./character-motion-planner.js";
 import { generateCharacterMotionTimelinesForScenes } from "./character-motion-scene-batch.js";
-import { attachCharacterSpriteToSceneLayers } from "./scene-character-layers.js";
+import { attachCharacterSpriteToSceneLayers, attachVerifiedCharacterSpriteToSceneLayers } from "./scene-character-layers.js";
 import { createSceneId, ensureSceneIds } from "./scene-identity.js";
 import { formatDialogueLines, parseDialogueLines } from "./dialogue-lines.js";
 import { createBrowserLocalTtsEngine } from "./browser-local-tts-engine.js";
@@ -1079,7 +1079,30 @@ function renderCharacterSpriteAssets(){
    const resolvedSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===sceneId);
    if(resolvedSceneIndex>=0){
     const current=Array.isArray(sceneMetadata[resolvedSceneIndex].characterSpriteAssets)?sceneMetadata[resolvedSceneIndex].characterSpriteAssets:[];
-    sceneMetadata[resolvedSceneIndex]={...sceneMetadata[resolvedSceneIndex],characterSpriteAssets:current.map(item=>item&&String(item.assetId||'')===assetId?{...item,transparencyStatus:status,transparencyCheck:check,verificationStatus:'not_verified',visualIdentityStatus:'not_verified'}:item)};
+    const updatedAssets=current.map(item=>item&&String(item.assetId||'')===assetId?{...item,transparencyStatus:status,transparencyCheck:check,verificationStatus:'not_verified',visualIdentityStatus:'not_verified'}:item);
+    let updatedScene={...sceneMetadata[resolvedSceneIndex],characterSpriteAssets:updatedAssets};
+    sceneMetadata[resolvedSceneIndex]=updatedScene;
+    if(status==='verified'){
+     // Alpha-channel verification is the minimum safe gate before the sprite
+     // becomes a visible character layer. Identity/anatomy remain unverified.
+     const verifiedAsset=updatedAssets.find(item=>item&&String(item.assetId||'')===assetId);
+     const attached=attachVerifiedCharacterSpriteToSceneLayers(updatedScene,verifiedAsset);
+     if(attached.status==='added'||attached.status==='updated'){
+      updatedScene={...updatedScene,characterLayers:attached.layers};
+      sceneMetadata[resolvedSceneIndex]=updatedScene;
+      const motion=prepareAutomaticCharacterMotion();
+      if(resolvedSceneIndex===sceneIndex){
+       syncCharacterMotionEditor();
+       syncCharacterRigEditor();
+      }
+      const saved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
+      note.textContent=(uiLang==='ru'
+       ?'Прозрачность проверена. Спрайт автоматически добавлен на сцену; подготовлено движений: '+motion.spriteBatch.generatedActions+'. Сходство персонажа ещё не проверено.'
+       :'Transparency verified. Sprite automatically attached to the scene; motion phases prepared: '+motion.spriteBatch.generatedActions+'. Character identity is still unverified.')+(saved?' · '+(uiLang==='ru'?'черновик сохранён':'draft saved'):' · '+(uiLang==='ru'?'черновик не сохранён':'draft not saved'));
+      if(typeof addButton!=='undefined')addButton.textContent=uiLang==='ru'?'Обновить на сцене':'Update on scene';
+      if(!playing)draw();
+     }
+    }
    }
   };
   const verificationImage=new Image();
