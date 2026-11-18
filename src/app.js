@@ -2455,7 +2455,8 @@ $('importWhatIfEpisode').addEventListener('change',async event=>{
    if(!id)return;
    const key=id.toLocaleLowerCase();
    const entry=reusableCharacterAssets.get(key)||{characterRigs:[],characterLayers:[],characterFacialRigs:[]};
-   if(!entry[kind].some(item=>String(item?.id||item?.imageUrl||item?.partId||'')===String(asset?.id||asset?.imageUrl||asset?.partId||'')))entry[kind].push(asset);
+   const signature=JSON.stringify(asset);
+   if(!entry[kind].some(item=>JSON.stringify(item)===signature))entry[kind].push(asset);
    reusableCharacterAssets.set(key,entry);
   };
   for(const previousScene of sceneMetadata){
@@ -2463,7 +2464,12 @@ $('importWhatIfEpisode').addEventListener('change',async event=>{
    for(const layer of previousScene?.characterLayers||[])addReusableAsset('characterLayers',layer);
    for(const rig of previousScene?.characterFacialRigs||[])addReusableAsset('characterFacialRigs',rig);
   }
-  const importedScenes=ensureSceneIds(storyContext.scenes.map(scene=>{
+  const importedScenes=ensureSceneIds(storyContext.scenes.map((scene,index)=>({
+   ...scene,
+   // What-if's structured cast is authoritative; narration-only inference can miss silent actors.
+   characters:converted.scenes[index]?.characters?.length?converted.scenes[index].characters:scene.characters,
+   characterCastProvided:Boolean(converted.scenes[index]?.characters?.length)||scene.characterCastProvided
+  })).map(scene=>{
    const assets=(scene.characters||[]).map(id=>reusableCharacterAssets.get(String(id).toLocaleLowerCase())).filter(Boolean);
    if(!assets.length)return scene;
    const merge=(key)=>assets.flatMap(item=>item[key]||[]);
