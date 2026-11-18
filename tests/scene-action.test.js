@@ -303,3 +303,23 @@ test('recognizes tactical reactions and resolution events in multiple languages'
     ['hands_up']
   );
 });
+
+
+test('recognizes each tactical reaction independently before sequence assembly', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const cases = [
+    ['Полицейский прячется за стену.', 'take_cover'],
+    ['Полицейский вызывает подкрепление.', 'call_for_backup'],
+    ['Полицейский опускает пистолет.', 'drop_weapon'],
+    ['The officer takes cover behind a wall.', 'take_cover'],
+    ['The officer calls for backup.', 'call_for_backup'],
+    ['The officer lowers his pistol.', 'drop_weapon']
+  ];
+  for (const [story, expected] of cases) {
+    assert.deepEqual(
+      extractSceneActionSequence(story).map(event => event.intent),
+      [expected],
+      story
+    );
+  }
+});
