@@ -29,3 +29,8 @@ test('What-if import reuses available character assets and prepares automatic mo
   assert.match(app, /const motionPreparation=prepareAutomaticCharacterMotion\(\)/);
   assert.match(app, /actionTimeline/);
 });
+
+test('What-if import preserves the structured actor cast instead of relying only on narration inference', () => {
+  assert.match(app, /characters:converted\.scenes\[index\]\?\.characters\?\.length\?converted\.scenes\[index\]\.characters:scene\.characters/);
+  assert.match(app, /characterCastProvided:Boolean\(converted\.scenes\[index\]\?\.characters\?\.length\)/);
+});
