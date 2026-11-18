@@ -46,9 +46,13 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     .map(rig => [key(rig.characterId), rig]));
   const segments = [];
   const skipped = [];
-  for (const phase of scene.actionTimeline.phases) {
+  const actionSteps = scene.actionTimeline.phases.flatMap(phase =>
+    Array.isArray(phase.steps) ? phase.steps.map(step => ({ ...step, phase: 'action' })) : [phase]
+  );
+  for (const phase of actionSteps) {
     const actorId = clean(phase.actorId);
-    const preset = presetForDescription(phase.description);
+    const cuePreset = PRESET_BY_ACTION[phase.motionCue] || (phase.motionCue === 'idle' ? 'idle' : null);
+    const preset = cuePreset || presetForDescription(phase.description);
     const doodleAction = preset ? null : doodleActionForDescription(phase.description);
     if (!preset && !doodleAction) {
       skipped.push({ actorId, phase: phase.phase, reason: 'unsupported-or-ambiguous-action' });
