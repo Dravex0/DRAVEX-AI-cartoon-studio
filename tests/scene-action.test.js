@@ -220,3 +220,36 @@ test('maps new semantic actions only to existing renderer motion cues', async ()
     assert.ok(supported.has(inferSceneActionIntent(story).motionCue));
   }
 });
+
+
+test('extracts ordered action sequences without inventing negated or connective actions', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const sequence = extractSceneActionSequence(
+    'The girl walks to the table, picks up a key, opens the chest, then throws the key away.'
+  );
+  assert.deepEqual(sequence.map(event => event.intent), ['walk', 'pick_up', 'open', 'throw']);
+  assert.ok(sequence.every(event => event.evidence && event.endIndex > event.startIndex));
+  const negated = extractSceneActionSequence('The knight does not open the gate, but catches the falling key.');
+  assert.deepEqual(negated.map(event => event.intent), ['catch']);
+});
+
+test('extracts Russian and Ukrainian multi-action sequences in source order', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  assert.deepEqual(
+    extractSceneActionSequence('Лисёнок подбегает к двери, открывает её и забирает ключ.').map(event => event.intent),
+    ['walk', 'open', 'pick_up']
+  );
+  assert.deepEqual(
+    extractSceneActionSequence('Дитина підходить до столу, бере олівець і малює карту.').map(event => event.intent),
+    ['walk', 'pick_up', 'write_draw']
+  );
+});
+
+test('bounds extracted scene action sequences to eight events', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const sequence = extractSceneActionSequence(
+    'walks, jumps, runs, dances, turns, floats, waves, talks, then vanishes',
+    { maxActions: 8 }
+  );
+  assert.equal(sequence.length, 8);
+});
