@@ -151,7 +151,7 @@ export function convertWhatIfEpisode(input, options = {}) {
       motionPrompt: action,
       negativePrompt: 'Do not omit the listed characters or the described visible action. Avoid static empty backgrounds.',
       continuityLock: actorIds.length ? `Keep character identity consistent: ${actorIds.join(', ')}.` : '',
-      sound: list(shot?.sfx).map(value => text(value, 60)).filter(Boolean).join(', '),
+      sound: (Array.isArray(shot?.sfx) ? shot.sfx : shot?.sfx ? [shot.sfx] : []).map(value => text(value, 60)).filter(Boolean).join(', '),
       transition: text(shot?.transition, 120)
     }, index);
     return scene;
