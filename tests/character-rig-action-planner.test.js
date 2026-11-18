@@ -184,3 +184,17 @@ test('maps explicit fear reactions through the Doodle adapter to the existing de
   assert.ok(Math.abs(middle.leftArm.rotation) > 0.4);
   assert.ok(Math.abs(middle.rightArm.rotation) > 0.4);
 });
+
+
+test('compiles supported ordered walk and run substeps into separate rig segments', () => {
+  const scene = makeScene('walks slowly, then runs toward the door');
+  scene.actionTimeline.phases[0].steps = [
+    { intent: 'stealth_advance', motionCue: 'walk', start: 0.2, end: 0.48, actorId: 'Foxy', description: 'Walk slowly', evidence: 'walks slowly' },
+    { intent: 'intervene', motionCue: 'run', start: 0.48, end: 0.8, actorId: 'Foxy', description: 'Run toward the door', evidence: 'runs toward the door' }
+  ];
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 2);
+  assert.deepEqual(result.mappedActions.map(item => item.preset), ['walk', 'run']);
+  assert.deepEqual(result.mappedActions.map(item => [item.start, item.end]), [[0.2, 0.48], [0.48, 0.8]]);
+});
