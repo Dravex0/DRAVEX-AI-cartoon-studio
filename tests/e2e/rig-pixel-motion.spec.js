@@ -32,16 +32,16 @@ test('browser canvas renders visible character rig pixels that change between wa
         { id: 'head', parentId: 'root' }
       ],
       parts: [
-        { id: 'body', boneId: 'root', imageUrl: 'body', x: 0.5, y: 0.52, width: 0.22, height: 0.32, zIndex: 0 },
-        { id: 'left-arm', boneId: 'leftArm', imageUrl: 'left-arm', x: 0.36, y: 0.46, width: 0.08, height: 0.25, zIndex: 1 },
-        { id: 'right-arm', boneId: 'rightArm', imageUrl: 'right-arm', x: 0.64, y: 0.46, width: 0.08, height: 0.25, zIndex: 2 },
-        { id: 'left-leg', boneId: 'leftLeg', imageUrl: 'left-leg', x: 0.44, y: 0.76, width: 0.09, height: 0.25, zIndex: 3 },
-        { id: 'right-leg', boneId: 'rightLeg', imageUrl: 'right-leg', x: 0.56, y: 0.76, width: 0.09, height: 0.25, zIndex: 4 },
-        { id: 'head', boneId: 'head', imageUrl: 'head', x: 0.5, y: 0.28, width: 0.16, height: 0.16, zIndex: 5 }
+        { id: 'body', boneId: 'root', imageUrl: 'https://assets.example/body.png', x: 0.5, y: 0.52, width: 0.22, height: 0.32, zIndex: 0 },
+        { id: 'left-arm', boneId: 'leftArm', imageUrl: 'https://assets.example/left-arm.png', x: 0.36, y: 0.46, width: 0.08, height: 0.25, zIndex: 1 },
+        { id: 'right-arm', boneId: 'rightArm', imageUrl: 'https://assets.example/right-arm.png', x: 0.64, y: 0.46, width: 0.08, height: 0.25, zIndex: 2 },
+        { id: 'left-leg', boneId: 'leftLeg', imageUrl: 'https://assets.example/left-leg.png', x: 0.44, y: 0.76, width: 0.09, height: 0.25, zIndex: 3 },
+        { id: 'right-leg', boneId: 'rightLeg', imageUrl: 'https://assets.example/right-leg.png', x: 0.56, y: 0.76, width: 0.09, height: 0.25, zIndex: 4 },
+        { id: 'head', boneId: 'head', imageUrl: 'https://assets.example/head.png', x: 0.5, y: 0.28, width: 0.16, height: 0.16, zIndex: 5 }
       ]
     };
     const colors = ['#f3a712', '#e85d75', '#5bc0eb', '#9bc53d', '#c34271', '#f4f1de'];
-    const keys = ['body', 'left-arm', 'right-arm', 'left-leg', 'right-leg', 'head'];
+    const keys = ['https://assets.example/body.png', 'https://assets.example/left-arm.png', 'https://assets.example/right-arm.png', 'https://assets.example/left-leg.png', 'https://assets.example/right-leg.png', 'https://assets.example/head.png'];
     const images = Object.fromEntries(keys.map((key, index) => [key, makePart(colors[index])]));
     const preset = createCharacterRigMotionPreset(rig, 'walk');
     if (preset.status !== 'ready') throw new Error('Walk preset did not produce a validated timeline.');
