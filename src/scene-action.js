@@ -168,7 +168,7 @@ const SEMANTIC_ACTIONS = [
     /abraza\w*|acurruca\w*/
   ] },
   { intent: 'sit', motionCue: 'turn', patterns: [
-    /\b(?:sits? down|sits? on|takes? a seat)\b/i,
+    /\b(?:sits? down|sits? (?:on|beside|near|by)|takes? a seat)\b/i,
     /садится|присажива\w*|усажива\w*/iu,
     /сідає|присіда\w*/iu,
     /se sienta|toma asiento/i
