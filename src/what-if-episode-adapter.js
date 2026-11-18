@@ -156,7 +156,7 @@ export function convertWhatIfEpisode(input, options = {}) {
     const actionActorId = actionActor
       ? text(characterMap[text(actionActor.who, 120)] ?? text(actionActor.who, 120), 120)
       : '';
-    const actionEvidence = actionActor ? describeSupportedAction(actionActor, actionActorId) : '';
+    const actionEvidence = actionActor && actionActorId ? describeSupportedAction(actionActor, actionActorId) : '';
     const scene = normalizeScene({
       id: `whatif_${index + 1}`,
       order: index + 1,
