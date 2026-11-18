@@ -156,7 +156,7 @@ const SEMANTIC_ACTIONS = [
     /grita[\p{L}]*.{0,40}(?:manos\s+arriba|quieto|no\s+te\s+muevas|suelta\s+el\s+arma)/i
   ] },
   { intent: 'discover_threat', motionCue: 'surprised', patterns: [
-    /\b(?:spots?|notices?|discovers?|finds?|sees?)\b.{0,55}\b(?:attacker|intruder|robber|thief|criminal|hostage|victim|someone\s+being\s+attacked|a\s+person\s+being\s+beaten)\b/i,
+    /\b(?:spots?|notices?|discovers?|finds?|sees?)\b.{0,65}\b(?:attacker|intruder|robber|thief|criminal|hostage|victim|torturer|abuser|someone\s+being\s+attacked|a\s+person\s+being\s+beaten)\b/i,
     /видит[\p{L}]*.{0,45}(?:преступник[\p{L}]*|напада[\p{L}]*|грабител[\p{L}]*|вор[\p{L}]*|заложник[\p{L}]*|жертв[\p{L}]*|избива[\p{L}]*|пострадавш[\p{L}]*)|обнаружива[\p{L}]*.{0,45}(?:человек[\p{L}]*|преступник[\p{L}]*|напада[\p{L}]*)/iu,
     /бачить[\p{L}]*.{0,45}(?:злочин[\p{L}]*|нападник[\p{L}]*|грабіжник[\p{L}]*|заручник[\p{L}]*|жертв[\p{L}]*|потерпіл[\p{L}]*)/iu,
     /ve\s+(?:a\s+)?(?:atacante|intruso|ladrón|criminal|rehén|víctima)/i
