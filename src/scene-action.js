@@ -204,10 +204,10 @@ const SEMANTIC_ACTIONS = [
     /deja caer|baja|suelta\s+(?:su\s+)?(?:arma|pistola)/i
   ] },
   { intent: 'hands_up', motionCue: 'surprised', patterns: [
-    /\b(?:raises?|puts?)\s+(?:both\s+)?hands?\s+(?:up|above (?:his|her|their) head)\b|\bhands?\s+up\b/i,
-    /поднимает\s+руки|поднимает\s+обе\s+руки|руки\s+вверх/iu,
-    /підніма[\p{L}]*\s+руки|руки\s+вгору/iu,
-    /levanta\s+las\s+manos|manos\s+arriba/i
+    /\b(?:raises?|puts?)\s+(?:both\s+)?hands?\s+(?:up|above (?:his|her|their) head)\b/i,
+    /поднимает\s+руки|поднимает\s+обе\s+руки/iu,
+    /підніма[\p{L}]*\s+руки/iu,
+    /levanta\s+las\s+manos/i
   ] },
   { intent: 'pick_up', motionCue: 'turn', patterns: [
     /\b(?:picks? up|picks? .* up|grabs?|lifts?|takes? .* from the ground)\b/i,
