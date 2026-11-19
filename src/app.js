@@ -54,6 +54,7 @@ import { createFacialAssetStorage } from "./facial-asset-storage.js";
 import { createCharacterReferenceImageStorage } from "./character-reference-image-storage.js";
 import { generateStoryboardVideos, readVideoProgressPercent } from "./scene-video-batch.js";
 import { buildSceneProductionInstructions } from "./scene-production-instructions.js";
+import { buildSceneProductionContext } from './scene-production-runtime.js';
 import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./huggingface-zerogpu-video-provider.js";
 import { fitSceneVideoToDuration, syncSceneVideoPlayback } from "./scene-video-transport.js";
 import { waitForSceneVideoReady, rewindSceneVideoAndWait, waitForSceneImageReady, isSceneVideoDecoded } from "./scene-video-readiness.js";
@@ -3169,7 +3170,9 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const readField=(id,key)=>isCurrent?$(id).value.trim():String(originalMeta[key]||'').trim();
  const motionText=readField('sceneMotionPrompt','motionPrompt')||String(originalMeta.visibleAction||'');
  const motionScene={...originalMeta,title:readField('sceneTitle','title')||titles[index],description:readField('sceneDescription','description')||descriptions[index],motionPrompt:motionText,visibleAction:motionText,camera:readField('sceneCamera','camera'),startState:readField('sceneStartState','startState'),endState:readField('sceneEndState','endState'),negativePrompt:readField('sceneNegativePrompt','negativePrompt'),continuityLock:readField('sceneContinuityLock','continuityLock'),characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])};
- const prompt=buildMotionGenerationPrompt(motionScene,characterBible);
+ const productionContext=buildSceneProductionContext([motionScene],{language:storyLanguage()});
+ const productionInstructions=buildSceneProductionInstructions(productionContext.productionPlan.scenes[0]);
+ const prompt=[buildMotionGenerationPrompt(motionScene,characterBible),productionInstructions].filter(Boolean).join('\n\n');
  if(!prompt.trim())throw new Error('Add a motion instruction before remote video generation.');
  const imageSource=resolveSceneImageSource({
   mode:'huggingface',
@@ -3237,9 +3240,12 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  }
  if(imageBlob&&!imageBlob.size)throw new Error('Исходное изображение сцены пустое.');
  const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:imageBlob?'blob':'missing'});
+ const productionContext=buildSceneProductionContext([motionScene],{language:storyLanguage()});
+ const productionInstructions=buildSceneProductionInstructions(productionContext.productionPlan.scenes[0]);
+ const motionPrompt=buildMotionGenerationPrompt(motionScene,characterBible);
  const prompt=taskType==='text-to-video'
-  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
-  :buildMotionGenerationPrompt(motionScene,characterBible);
+  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),motionPrompt,productionInstructions].filter(Boolean).join('\n\n')
+  :[motionPrompt,productionInstructions].filter(Boolean).join('\n\n')
  if(!prompt.trim())throw new Error('Добавь описание движения сцены перед генерацией.');
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
  const provider=createComfyUIVideoProvider(comfyProviderOptions());
@@ -3365,9 +3371,12 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  const selectedSceneImage=comfySourceImageForScene(index);
  const imageSourceKind=selectedSceneImage?'blob':imageUrl?'url':'missing';
  const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind});
+ const productionContext=buildSceneProductionContext([motionScene],{language:storyLanguage()});
+ const productionInstructions=buildSceneProductionInstructions(productionContext.productionPlan.scenes[0]);
+ const motionPrompt=buildMotionGenerationPrompt(motionScene,characterBible);
  const prompt=taskType==='text-to-video'
-  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(motionScene,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
-  :buildMotionGenerationPrompt(motionScene,characterBible);
+  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),motionPrompt,productionInstructions].filter(Boolean).join('\n\n')
+  :[motionPrompt,productionInstructions].filter(Boolean).join('\n\n')
  if(!prompt.trim()){setComfyStatus('This scene has no usable visual or motion prompt. Add a scene description or motion instruction first.');return}
  button.disabled=true;$('checkComfyConnection').disabled=true;
  try{
@@ -3481,7 +3490,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
    ?createHuggingFaceZeroGPUVideoProvider({client:hfVideoClient,handleFile:hfHandleFile})
    :createComfyUIVideoProvider(comfyProviderOptions());
   const registry=createVideoProviderRegistry();registry.register(provider);
-  const scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
+  let scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
   // Prepare requested dialogue and speech before spending time/quota on video generation.
   // Existing user dialogue and matching voice artifacts are preserved by the workflow.
   const speechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata,language:storyLanguage()});
@@ -3531,6 +3540,10 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
    $('dialogueSummary')?.closest('details')?.setAttribute('open','');
    throw new Error(message);
   }
+  // Refresh scene snapshots after optional dialogue/voice preparation, then build the exact work orders sent to video providers.
+  scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
+  const productionContext=buildSceneProductionContext(scenes,{language:storyLanguage()});
+  currentStoryboardPlan={...(currentStoryboardPlan||{}),...productionContext,scenes};
   if(mode==='huggingface'){
    const tooShortIndex=scenes.findIndex(scene=>{
     const seconds=Number(scene.durationSeconds??scene.duration??$('duration').value)||3;
