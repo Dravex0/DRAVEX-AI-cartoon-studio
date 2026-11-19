@@ -87,3 +87,35 @@ test('scene normalization preserves the explicit character rig animation timelin
   assert.equal(scene.characterRigTimeline.keyframes.length, 2);
   assert.equal(scene.characterRigTimeline.keyframes[1].easing, 'ease-in-out');
 });
+
+
+test('scene normalization preserves structured causal and physics metadata', () => {
+  const scene = normalizeScene({
+    id: 'interaction',
+    storyDetail: 'Mira pushes the cart.',
+    physics: { gravityMps2: 9.81, gravitySource: 'explicit scene setting' },
+    physicsEvents: [{
+      id: 'cart-motion', type: 'motion', entityId: 'cart',
+      startPosition: { x: 0, y: 0, z: 0 }, endPosition: { x: 2, y: 0, z: 0 },
+      durationSeconds: 1, evidence: 'Mira pushes the cart.'
+    }],
+    causalEvents: [{
+      id: 'push', type: 'action', actorId: 'Mira', entityId: 'cart',
+      evidence: 'Mira pushes the cart.', physicsEventId: 'cart-motion'
+    }]
+  });
+
+  assert.equal(scene.physics.gravityMps2, 9.81);
+  assert.equal(scene.physics.gravitySource, 'explicit scene setting');
+  assert.equal(scene.physicsEvents[0].id, 'cart-motion');
+  assert.deepEqual(scene.physicsEvents[0].endPosition, { x: 2, y: 0, z: 0 });
+  assert.equal(scene.causalEvents[0].actorId, 'Mira');
+  assert.equal(scene.causalEvents[0].physicsEventId, 'cart-motion');
+});
+
+test('legacy scenes normalize structured causal and physics metadata to safe empty defaults', () => {
+  const scene = normalizeScene({ title: 'Legacy scene' });
+  assert.equal(scene.physics, null);
+  assert.deepEqual(scene.physicsEvents, []);
+  assert.deepEqual(scene.causalEvents, []);
+});

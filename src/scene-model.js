@@ -58,6 +58,41 @@ export function normalizeScene(input = {}, index = 0) {
           evidence: text(scene.causalLink.evidence, 1_200)
         }
       : null,
+    // Preserve structured physics and causal facts across normalization.
+    // Downstream models validate evidence and references; normalization must not erase them.
+    physics: scene.physics && typeof scene.physics === 'object' && !Array.isArray(scene.physics)
+      ? {
+          gravityMps2: Number.isFinite(scene.physics.gravityMps2) ? scene.physics.gravityMps2 : null,
+          gravitySource: text(scene.physics.gravitySource, 300)
+        }
+      : null,
+    physicsEvents: Array.isArray(scene.physicsEvents) ? scene.physicsEvents.slice(0, 50).filter(item =>
+      item && typeof item === 'object' && !Array.isArray(item)).map(item => ({
+        id: text(item.id, 120),
+        type: text(item.type, 40),
+        entityId: text(item.entityId, 160),
+        otherEntityId: text(item.otherEntityId, 160),
+        supportEntityId: text(item.supportEntityId, 160),
+        evidence: text(item.evidence, 500),
+        contact: item.contact === true,
+        startPosition: item.startPosition && typeof item.startPosition === 'object' ? { ...item.startPosition } : null,
+        endPosition: item.endPosition && typeof item.endPosition === 'object' ? { ...item.endPosition } : null,
+        durationSeconds: Number.isFinite(item.durationSeconds) ? item.durationSeconds : null,
+        massKg: Number.isFinite(item.massKg) ? item.massKg : null,
+        initialVelocityMps: item.initialVelocityMps && typeof item.initialVelocityMps === 'object' ? { ...item.initialVelocityMps } : null,
+        finalVelocityMps: item.finalVelocityMps && typeof item.finalVelocityMps === 'object' ? { ...item.finalVelocityMps } : null
+      })) : [],
+    causalEvents: Array.isArray(scene.causalEvents) ? scene.causalEvents.slice(0, 100).filter(item =>
+      item && typeof item === 'object' && !Array.isArray(item)).map(item => ({
+        id: text(item.id, 160),
+        type: text(item.type, 40),
+        entityId: text(item.entityId, 160),
+        actorId: text(item.actorId, 160),
+        targetId: text(item.targetId, 160),
+        evidence: text(item.evidence, 500),
+        causedByEventId: text(item.causedByEventId, 160),
+        physicsEventId: text(item.physicsEventId, 160)
+      })) : [],
     stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => ({
       entityType: text(change.entityType, 20),
       entityId: text(change.entityId, 120),
