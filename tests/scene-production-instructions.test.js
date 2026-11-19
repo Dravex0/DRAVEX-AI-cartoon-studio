@@ -39,7 +39,7 @@ test('returns no extra provider instruction when no validated production plan ex
   assert.equal(buildSceneProductionInstructions({ sceneId: 'empty' }), [
     'GROUNDED SCENE PRODUCTION WORK ORDER',
     'Treat the following as the authoritative scene specification. Do not invent entities, props, actions, dialogue, causal events, or state changes.',
-    'Execution constraints: keep each entity identity and appearance consistent with its supplied attributes; keep all listed characters and entities visually distinct; show cause before effect; maintain object ownership and contact through handoffs; preserve physical direction and scene continuity; make each timed beat visibly legible; do not replace character action with camera movement or a static background. Treat the previous-scene ending as continuity evidence, not as an instruction to replay it.',
+    'Execution constraints: keep each entity identity and appearance consistent with its supplied attributes; keep all listed characters and entities visually distinct; show every supplied causal event in its declared order; distinguish this scene's events from prior/future continuity context; show cause before effect; maintain object ownership and contact through handoffs; preserve physical direction and scene continuity; make each timed beat visibly legible; do not replace character action with camera movement or a static background. Treat the previous-scene ending as continuity evidence, not as an instruction to replay it.',
     'This is a provider instruction, not proof that the provider supports or has completed every requested pass.'
   ].join('\n'));
 });
