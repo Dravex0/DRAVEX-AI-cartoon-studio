@@ -58,8 +58,8 @@ test('handles an empty or malformed scene list safely', () => {
 test('grounds explicit natural-language actions for all supported story languages', () => {
   const samples = [
     { language: 'en', detail: 'Maya helps Noah.', expected: 'help' },
-    { language: 'ru', detail: 'Майя помогает Noah.', expected: 'help' },
-    { language: 'uk', detail: 'Майя допомагає Noah.', expected: 'help' },
+    { language: 'ru', detail: 'Maya помогает Noah.', expected: 'help' },
+    { language: 'uk', detail: 'Maya допомагає Noah.', expected: 'help' },
     { language: 'es', detail: 'Maya ayuda a Noah.', expected: 'help' }
   ];
   for (const sample of samples) {
