@@ -11,6 +11,11 @@ import { normalizeCharacterFacialRig, normalizeCharacterFacialExpressions } from
 
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
+// Prop state-change positions are authored in normalized viewport coordinates (0..1), not physics meters.
+const normalizedScenePoint = value => value && typeof value === 'object' && !Array.isArray(value)
+  && typeof value.x === 'number' && Number.isFinite(value.x) && value.x >= 0 && value.x <= 1
+  && typeof value.y === 'number' && Number.isFinite(value.y) && value.y >= 0 && value.y <= 1
+  ? { x: value.x, y: value.y } : null;
 
 /** Normalize both current and legacy prototype scene shapes without dropping production prompts. */
 export function normalizeScene(input = {}, index = 0) {
@@ -97,16 +102,20 @@ export function normalizeScene(input = {}, index = 0) {
         causedByEventId: text(item.causedByEventId, 160),
         physicsEventId: text(item.physicsEventId, 160)
       })) : [],
-    stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => ({
-      entityType: text(change.entityType, 20),
-      entityId: text(change.entityId, 120),
-      property: text(change.property, 40),
-      previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
-      value: change.value == null ? null : text(change.value, 160),
-      actorId: text(change.actorId, 120),
-      evidence: text(change.evidence, 1_200),
-      ...(change.actionIntent == null || change.actionIntent === '' ? {} : { actionIntent: text(change.actionIntent, 40) })
-    })) : [],
+    stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => {
+      const position = normalizedScenePoint(change.position);
+      return {
+        entityType: text(change.entityType, 20),
+        entityId: text(change.entityId, 120),
+        property: text(change.property, 40),
+        previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
+        value: change.value == null ? null : text(change.value, 160),
+        actorId: text(change.actorId, 120),
+        evidence: text(change.evidence, 1_200),
+        ...(change.actionIntent == null || change.actionIntent === '' ? {} : { actionIntent: text(change.actionIntent, 40) }),
+        ...(position ? { position } : {})
+      };
+    }) : [],
     interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
       type: text(item.type, 40), actorId: text(item.actorId, 120), targetId: text(item.targetId, 120),
       evidence: text(item.evidence, 500),
