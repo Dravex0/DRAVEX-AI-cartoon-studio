@@ -98,3 +98,9 @@ test('keeps the procedural fallback above generated scene media', () => {
   assert.ok(fallbackDraw > mediaDraw, 'the fallback character must be drawn after scene media');
   assert.ok(characterLayersDraw > fallbackDraw, 'generated character layers must remain above the fallback');
 });
+
+test('procedural fallback consumes source-ordered action timeline progress', () => {
+  assert.match(appSource, /function getSceneAction\(index,progress=0\)/);
+  assert.match(appSource, /detectSceneActionAtProgress\(sceneMetadata\[index\]\|\|\{\},progress/);
+  assert.match(appSource, /getSceneAction\(sceneIndex,sceneMotionProgress\)/);
+});
