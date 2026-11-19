@@ -185,7 +185,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       const from = normalizedPoint(change.previousPosition) || current;
       const to = normalizedPoint(change.position);
       if (!to) continue;
-      const matchedStep = matchedStepByChange.get(change);
+      const matchedStep = timelineSteps.find(step => clean(step.intent) === clean(change.actionIntent));
       const start = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
       const end = matchedStep ? matchedStep.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
       if (!from) {
