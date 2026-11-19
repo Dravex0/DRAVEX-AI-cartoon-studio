@@ -194,7 +194,7 @@ export function validateCharacterActionTimeline(scene = {}) {
         if (!evidenceSources.some(source => source.includes(step.evidence))) {
           issues.push(issue('action-step-evidence-ungrounded', 'action', `Action substep ${index + 1} evidence must exactly match locked story evidence.`));
         }
-        if (step.targetPosition != null && !step.targetPosition) {
+        if (Object.hasOwn(step, 'targetPosition') && !step.targetPosition) {
           issues.push(issue('action-step-target-position-invalid', 'action', `Action substep ${index + 1} target position must contain finite normalized x/y coordinates from 0 to 1.`));
         }
         if (step.actorId && castWasExplicit && !cast.has(step.actorId.toLocaleLowerCase())) {
