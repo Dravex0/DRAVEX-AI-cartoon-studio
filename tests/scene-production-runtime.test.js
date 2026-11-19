@@ -100,3 +100,68 @@ test('passes clean state continuity into production plans without adding warning
   assert.deepEqual(context.productionPlan.scenes[0].continuityIssues, []);
   assert.deepEqual(context.productionPlan.scenes[1].continuityIssues, []);
 });
+
+
+test('injects previous-scene memory and current causal timeline into provider work orders', async () => {
+  const { buildSceneProductionInstructions } = await import('../src/scene-production-instructions.js');
+  const scenes = [
+    {
+      id: 'scene-village',
+      title: 'The key is found',
+      characters: ['Mira'],
+      location: 'village square',
+      storyDetail: 'Mira holds the key.',
+      visibleAction: 'Mira holds the key.',
+      endState: {
+        characters: { Mira: { location: 'village square' } },
+        objects: { key: { owner: 'Mira', state: 'held' } }
+      },
+      stateChanges: [{ entityType: 'prop', entityId: 'key', property: 'owner',
+        previousValue: null, value: 'Mira', actorId: 'Mira',
+        actionIntent: 'pick_up', evidence: 'Mira holds the key.' }]
+    },
+    {
+      id: 'scene-bridge',
+      title: 'The key is handed over',
+      characters: ['Mira', 'Leo'],
+      location: 'stone bridge',
+      storyDetail: 'Mira gives Leo the key.',
+      visibleAction: 'Mira gives Leo the key.',
+      startState: {
+        characters: { Mira: { location: 'stone bridge' }, Leo: { location: 'stone bridge' } },
+        objects: { key: { owner: 'Leo', state: 'held' } }
+      },
+      stateChanges: [
+        { entity: 'key', property: 'owner', previousValue: 'Mira', value: 'Leo',
+          evidence: 'Mira gives Leo the key.' },
+        { entityType: 'prop', entityId: 'key', property: 'owner',
+          previousValue: 'Mira', value: 'Leo', actorId: 'Mira',
+          actionIntent: 'handoff', evidence: 'Mira gives Leo the key.' }
+      ],
+      physicsEvents: [{ id: 'key-handoff', type: 'transfer', entityId: 'key',
+        fromEntityId: 'Mira', toEntityId: 'Leo', actorId: 'Mira',
+        evidence: 'Mira gives Leo the key.' }],
+      causalEvents: [
+        { id: 'give-key', type: 'action', actorId: 'Mira', targetId: 'Leo',
+          entityId: 'key', evidence: 'Mira gives Leo the key.' },
+        { id: 'key-received', type: 'effect', actorId: 'Leo', entityId: 'key',
+          causedByEventId: 'give-key', evidence: 'Mira gives Leo the key.' }
+      ]
+    }
+  ];
+
+  const context = buildSceneProductionContext(scenes, { language: 'en' });
+  const bridgePlan = context.productionPlan.scenes[1];
+  const prompt = buildSceneProductionInstructions(bridgePlan);
+
+  assert.equal(context.filmMemory.sceneCount, 2);
+  assert.equal(bridgePlan.filmMemoryContext.previousScene.sceneId, 'scene-village');
+  assert.equal(bridgePlan.filmMemoryContext.previousScene.endState.objects.key.owner, 'Mira');
+  assert.equal(bridgePlan.filmMemoryContext.currentScene.sceneId, 'scene-bridge');
+  assert.equal(bridgePlan.filmMemoryContext.currentScene.holderTransitions[0].holderAfter, 'Leo');
+  assert.ok(bridgePlan.filmMemoryContext.currentScene.causalEdges.some(edge =>
+    edge.fromEventId === 'give-key' && edge.toEventId === 'key-received'));
+  assert.match(prompt, /Previous scene ending/);
+  assert.match(prompt, /Unified current-scene memory/);
+  assert.match(prompt, /stone bridge/);
+});
