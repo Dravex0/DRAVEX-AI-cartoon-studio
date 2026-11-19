@@ -1,0 +1,56 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildSceneWorldModel } from '../src/scene-world-model.js';
+
+test('builds the same directed interaction model for people, animals and robots', () => {
+  const model = buildSceneWorldModel([
+    { id: 's1', characters: ['Maya', 'Noah'], storyDetail: 'Maya gives Noah a phone.',
+      interaction: { type: 'give', actorId: 'Maya', targetId: 'Noah', evidence: 'Maya gives Noah a phone' },
+      stateChanges: [{ entityType: 'prop', entityId: 'phone', property: 'holder', previousValue: null,
+        value: 'Maya', actorId: 'Maya', evidence: 'Maya picks up the phone', actionIntent: 'pick_up' }] },
+    { id: 's2', characters: ['Noah', 'Rex the dog'], storyDetail: 'Noah gives Rex the ball.',
+      interaction: { type: 'give', actorId: 'Noah', targetId: 'Rex the dog', evidence: 'Noah gives Rex the ball' } },
+    { id: 's3', characters: ['Unit 7', 'Maya'], storyDetail: 'Unit 7 helps Maya.',
+      interaction: { type: 'help', actorId: 'Unit 7', targetId: 'Maya', evidence: 'Unit 7 helps Maya' } }
+  ]);
+
+  assert.equal(model.entityCount >= 6, true);
+  assert.ok(model.entities.some(entity => entity.id === 'Maya' && entity.kind === 'character'));
+  assert.ok(model.entities.some(entity => entity.id === 'Rex the dog' && entity.kind === 'character'));
+  assert.ok(model.entities.some(entity => entity.id === 'Unit 7' && entity.kind === 'character'));
+  assert.deepEqual(model.relations.filter(item => item.type === 'acts_on').map(item => [item.from, item.to]), [
+    ['Maya', 'Noah'], ['Noah', 'Rex the dog'], ['Unit 7', 'Maya']
+  ]);
+  assert.ok(model.entities.some(entity => entity.id === 'phone' && entity.kind === 'prop'));
+});
+
+test('represents object, vehicle and location state without species-specific assumptions', () => {
+  const model = buildSceneWorldModel([
+    { id: 's1', characters: ['Driver'], location: 'Garage',
+      stateChanges: [
+        { entityType: 'prop', entityId: 'car door', property: 'openState', previousValue: 'closed', value: 'open', actorId: 'Driver', evidence: 'Driver opens the car door', actionIntent: 'open' },
+        { entityType: 'vehicle', entityId: 'car', property: 'location', previousValue: 'Garage', value: 'Street', actorId: 'Driver', evidence: 'Driver drives the car onto the street' }
+      ] }
+  ]);
+  assert.ok(model.entities.some(entity => entity.id === 'Garage' && entity.kind === 'location'));
+  assert.ok(model.entities.some(entity => entity.id === 'car' && entity.kind === 'vehicle'));
+  assert.ok(model.relations.some(item => item.to === 'car door' && item.property === 'openState'));
+});
+
+test('reports conflicting object-state handoffs instead of silently accepting them', () => {
+  const model = buildSceneWorldModel([
+    { id: 's1', characters: ['Maya'], stateChanges: [
+      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: null, value: 'Maya', actorId: 'Maya' }
+    ] },
+    { id: 's2', characters: ['Noah'], stateChanges: [
+      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: 'Noah', value: null, actorId: 'Noah' }
+    ] }
+  ]);
+  assert.equal(model.validation.stateContinuityConflicts.length, 1);
+  assert.equal(model.validation.stateContinuityConflicts[0].entityId, 'key');
+});
+
+test('handles an empty or malformed scene list safely', () => {
+  assert.equal(buildSceneWorldModel(null).entityCount, 0);
+  assert.equal(buildSceneWorldModel([null, {}, 'invalid']).events.length, 3);
+});
