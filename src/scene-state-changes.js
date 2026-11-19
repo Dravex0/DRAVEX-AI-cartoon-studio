@@ -58,6 +58,33 @@ const cutTail = value => clean(String(value ?? '')
   .split(/\s+(?:and|then|while|и|а|та|потім|і|y|luego|mientras)\s+|[.!?,;:]/iu)[0].trim()
   .replace(/^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\s+/iu, ''));
 
+const TRANSFER_VERBS = {
+  en: /^(?:gives|hands|passes)\\b\\s+/iu,
+  ru: /^(?:переда[её]т|вручает)\\s+/iu,
+  uk: /^(?:переда[єе]|вручає)\\s+/iu,
+  es: /^(?:entrega|pasa|da)\\s+/iu
+};
+const stripLeadingArticle = value => clean(String(value ?? '')
+  .replace(/^(?:the|a|an|этот|эта|это|эту|этого|этой|цей|ця|це|цю|el|la|los|las|un|una)\\s+/iu, ''));
+
+function parseTransfer(sentence, actorId, cast, locale) {
+  const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');
+  const actorMatch = actor.exec(sentence);
+  if (!actorMatch) return null;
+  const afterActor = sentence.slice(actorMatch.index + actorMatch[0].length).trimStart();
+  const transfer = TRANSFER_VERBS[locale]?.exec(afterActor);
+  if (!transfer) return null;
+  const remainder = afterActor.slice(transfer[0].length).trimStart();
+  const recipient = cast.filter(name => name.toLocaleLowerCase() !== actorId.toLocaleLowerCase())
+    .map(name => ({ name, match: new RegExp('^' + boundary + escapeRegExp(name) + tailBoundary, 'iu').exec(remainder) }))
+    .filter(item => item.match)
+    .sort((a, b) => b.match[0].length - a.match[0].length)[0];
+  if (!recipient) return null;
+  const objectText = stripLeadingArticle(remainder.slice(recipient.match[0].length));
+  if (!objectText || objectText.length > 100 || /^(?:it|them|him|her|его|её|ее|их|його|її|їх)$/iu.test(objectText)) return null;
+  return { recipientId: recipient.name, entityId: objectText, evidence: clean(sentence, 1_200) };
+}
+
 const ALLOWED_ACTION_ADVERBS = /^(?:carefully|quickly|slowly|gently|quietly|осторожно|быстро|медленно|тихо|обережно|швидко|повільно|lentamente|cuidadosamente)$/iu;
 
 function hasOnlyOptionalAdverb(prefix) {
