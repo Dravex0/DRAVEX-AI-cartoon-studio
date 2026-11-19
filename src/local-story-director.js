@@ -2,6 +2,7 @@ import { evaluateStoryboard } from './ai-evaluation.js';
 import { normalizeScenes } from './scene-model.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildSceneWorldModel } from './scene-world-model.js';
+import { buildSemanticEditingPlan } from './semantic-editing-plan.js';
 import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-state-memory.js';
 
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
@@ -203,6 +204,7 @@ export async function directStoryboardWithLocalAI({
     : Math.max(16, Math.min(1024, Math.round(Number(maxNewTokens) || estimateDirectorTokenBudget(fallback.length))));
   const eventChain = buildStoryEventChain(fallback);
   const worldModel = buildSceneWorldModel(fallback, { language });
+  const editingPlan = buildSemanticEditingPlan(fallback, worldModel);
   const fallbackResult = (reason, evaluation = null) => ({
     usedLocalModel: false,
     scenes: fallback,
@@ -210,7 +212,8 @@ export async function directStoryboardWithLocalAI({
     fallbackReason: reason,
     modelId: runtime?.status?.modelId || null,
     eventChain,
-    worldModel
+    worldModel,
+    editingPlan
   });
 
   if (signal?.aborted) return fallbackResult('cancelled');
@@ -294,6 +297,7 @@ export async function directStoryboardWithLocalAI({
     scenes: candidate,
     eventChain,
     worldModel,
+    editingPlan,
     evaluation,
     fallbackReason: null,
     modelId: generated.modelId || runtime.status?.modelId || null,
