@@ -98,3 +98,57 @@ test('exposes the complete scene world and explicit prop hand-offs to renderer w
   assert.ok(scene.requiredPasses.includes('multi-entity-interaction'));
   assert.ok(scene.requiredPasses.includes('prop-state-and-motion'));
 });
+
+
+test('schedules complete grounded causal interaction chains in scene work orders', () => {
+  const events = [
+    { id: 'push', sceneId: 's1', sequence: 1, type: 'action', actorId: 'Mira', entityId: 'cart', grounded: true, evidence: 'Mira pushes the cart.' },
+    { id: 'move', sceneId: 's1', sequence: 2, type: 'effect', entityId: 'cart', grounded: true, evidence: 'The cart rolls forward.' },
+    { id: 'collision', sceneId: 's2', sequence: 3, type: 'physical_event', entityId: 'cart', targetId: 'crate', physicsEventId: 'impact', grounded: true, evidence: 'The cart hits the crate.' },
+    { id: 'crate-falls', sceneId: 's2', sequence: 4, type: 'effect', entityId: 'crate', grounded: true, evidence: 'The crate falls over.' },
+    { id: 'react', sceneId: 's3', sequence: 5, type: 'reaction', actorId: 'Mira', grounded: true, evidence: 'Mira jumps back.' }
+  ];
+  const causalModel = {
+    events,
+    edges: events.slice(1).map((event, index) => ({
+      fromEventId: events[index].id, toEventId: event.id,
+      fromSceneId: events[index].sceneId, toSceneId: event.sceneId
+    })),
+    chains: [{ id: 'cart-chain', eventIds: events.map(event => event.id) }]
+  };
+  const plan = buildSceneProductionPlan([
+    { id: 's1', characters: ['Mira'] },
+    { id: 's2', characters: ['Mira'] },
+    { id: 's3', characters: ['Mira'] }
+  ], { causalModel });
+
+  assert.equal(plan.causalChains.length, 1);
+  assert.deepEqual(plan.causalChains[0].eventIds, ['push', 'move', 'collision', 'crate-falls', 'react']);
+  assert.equal(plan.causalChains[0].events[2].physicsEventId, 'impact');
+  assert.deepEqual(plan.scenes.map(scene => scene.causalChainRefs[0]?.chainId), [
+    'cart-chain', 'cart-chain', 'cart-chain'
+  ]);
+  assert.ok(plan.scenes.every(scene => scene.requiredPasses.includes('causal-interaction-sequence')));
+});
+
+test('does not schedule incomplete, ungrounded, duplicated or edge-less causal chains', () => {
+  const plan = buildSceneProductionPlan([{ id: 's1' }, { id: 's2' }], {
+    causalModel: {
+      events: [
+        { id: 'push', sceneId: 's1', grounded: true },
+        { id: 'move', sceneId: 's2', grounded: false },
+        { id: 'duplicate', sceneId: 's2', grounded: true },
+        { id: 'duplicate', sceneId: 's2', grounded: true }
+      ],
+      edges: [{ fromEventId: 'push', toEventId: 'move' }],
+      chains: [
+        { id: 'ungrounded', eventIds: ['push', 'move'] },
+        { id: 'duplicate-id', eventIds: ['duplicate', 'push'] },
+        { id: 'missing-edge', eventIds: ['push', 'duplicate'] },
+        { id: 'single', eventIds: ['push'] }
+      ]
+    }
+  });
+  assert.deepEqual(plan.causalChains, []);
+  assert.ok(plan.scenes.every(scene => !scene.requiredPasses.includes('causal-interaction-sequence')));
+});
