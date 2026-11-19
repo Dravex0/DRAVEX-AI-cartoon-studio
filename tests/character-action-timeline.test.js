@@ -237,6 +237,18 @@ test('rejects unordered or ungrounded action substeps', () => {
 });
 
 
+
+test('rejects malformed target positions on action substeps', () => {
+  const candidate = structuredClone(scene);
+  candidate.actionTimeline.phases[1].steps = [{
+    intent: 'pick_up', motionCue: 'turn', start: 0.2, end: 0.65,
+    actorId: 'Foxy', description: 'Foxy picks up the key.',
+    evidence: 'picks it up', targetPosition: { x: Number.NaN, y: 0.5 }
+  }];
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'action-step-target-position-invalid'));
+});
+
 test('normalizes and validates explicit target positions without inventing missing coordinates', () => {
   const candidate = structuredClone(scene);
   candidate.actionTimeline.phases[1].targetPosition = { x: 0.72, y: 0.55 };
