@@ -18,7 +18,18 @@ const PRESETS = Object.freeze({
   hands_up: { label: 'Hands up / Руки вверх', frames: 4 },
   take_cover: { label: 'Take cover / Укрытие', frames: 5 },
   drop_weapon: { label: 'Drop weapon / Опустить оружие', frames: 4 },
-  freeze: { label: 'Freeze / Замирание', frames: 3 }
+  freeze: { label: 'Freeze / Замирание', frames: 3 },
+  pick_up: { label: 'Pick up / Поднять предмет', frames: 7 },
+  grasp: { label: 'Grasp / Захватить', frames: 5 },
+  release: { label: 'Release / Отпустить', frames: 5 },
+  carry: { label: 'Carry / Нести предмет', frames: 5 },
+  throw: { label: 'Throw / Бросить предмет', frames: 7 },
+  catch: { label: 'Catch / Поймать предмет', frames: 7 },
+  push: { label: 'Push / Толкать предмет', frames: 7 },
+  pull: { label: 'Pull / Тянуть предмет', frames: 7 },
+  hug: { label: 'Hug / Обнять', frames: 7 },
+  point: { label: 'Point / Указать', frames: 5 },
+  sit: { label: 'Sit / Сесть', frames: 7 }
 });
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const normalizeId = value => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -292,6 +303,97 @@ function poseFor(rig, preset, phase) {
       if (role === 'head') rotation = -0.075;
       if (role === 'leftArm' || role === 'arm') rotation = -0.08;
       if (role === 'rightArm') rotation = 0.08;
+    } else if (preset === 'pick_up') {
+      // Lower the body, reach toward the object, then rise while keeping the hand extended.
+      const reach = clamp(phase * 2.4, 0, 1);
+      const rise = clamp((phase - 0.32) * 1.9, 0, 1);
+      if (role === 'root') { y = 0.065 * (1 - rise); rotation = -0.045 * (1 - rise); }
+      if (role === 'head') rotation = 0.12 * (1 - rise);
+      if (role === 'rightArm' || role === 'arm') rotation = -0.82 * reach;
+      if (role === 'rightLowerArm') rotation = 0.42 * reach;
+      if (role === 'leftArm') rotation = -0.12 * reach;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.22 * (1 - rise);
+      if (role === 'rightLeg') rotation = 0.22 * (1 - rise);
+    } else if (preset === 'grasp') {
+      const close = clamp(phase * 3, 0, 1);
+      if (role === 'rightArm' || role === 'arm') rotation = -0.72 * close;
+      if (role === 'rightLowerArm') rotation = 0.58 * close;
+      if (role === 'root') rotation = -0.025 * close;
+      if (role === 'head') rotation = 0.08 * close;
+    } else if (preset === 'release') {
+      const release = Math.sin(Math.PI * phase);
+      if (role === 'rightArm' || role === 'arm') rotation = -0.62 * (1 - phase) + 0.18 * release;
+      if (role === 'rightLowerArm') rotation = 0.5 * (1 - phase) - 0.22 * release;
+      if (role === 'root') rotation = 0.025 * release;
+    } else if (preset === 'carry') {
+      const sway = Math.sin(phase * Math.PI * 2);
+      if (role === 'root') { y = 0.012 * Math.abs(sway); rotation = 0.025 * sway; }
+      if (role === 'rightArm' || role === 'arm') rotation = -0.68;
+      if (role === 'rightLowerArm') rotation = 0.38;
+      if (role === 'leftArm') rotation = 0.18;
+      if (role === 'leftLowerArm') rotation = -0.16;
+      if (role === 'head') rotation = -0.025 * sway;
+    } else if (preset === 'throw') {
+      // Wind-up, forward release and follow-through; object trajectory remains a separate prop system.
+      const windup = phase < 0.38 ? phase / 0.38 : 1;
+      const follow = clamp((phase - 0.38) / 0.62, 0, 1);
+      const strike = Math.sin(Math.PI * follow);
+      if (role === 'root') { x = 0.035 * strike; rotation = -0.055 * strike; }
+      if (role === 'rightArm' || role === 'arm') rotation = 0.62 * (1 - windup) - 1.18 * follow;
+      if (role === 'rightLowerArm') rotation = -0.58 * (1 - windup) + 0.35 * follow;
+      if (role === 'leftArm') rotation = 0.22 * strike;
+      if (role === 'head') rotation = -0.08 * strike;
+    } else if (preset === 'catch') {
+      const open = Math.sin(Math.PI * Math.min(phase * 1.5, 1));
+      const close = clamp((phase - 0.52) * 2.1, 0, 1);
+      if (role === 'root') { y = -0.025 * open; rotation = -0.035 * open; }
+      if (role === 'leftArm' || role === 'arm') rotation = -0.72 * open + 0.2 * close;
+      if (role === 'rightArm') rotation = 0.72 * open - 0.2 * close;
+      if (role === 'leftLowerArm') rotation = 0.25 * open;
+      if (role === 'rightLowerArm') rotation = -0.25 * open;
+      if (role === 'head') rotation = -0.12 * open;
+    } else if (preset === 'push') {
+      const force = Math.sin(Math.PI * phase);
+      if (role === 'root') { x = 0.045 * force; rotation = -0.12 * force; y = 0.025 * force; }
+      if (role === 'rightArm' || role === 'arm') rotation = -0.92 * force;
+      if (role === 'leftArm') rotation = -0.72 * force;
+      if (role === 'rightLowerArm') rotation = 0.22 * force;
+      if (role === 'leftLowerArm') rotation = -0.22 * force;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.18 * force;
+      if (role === 'rightLeg') rotation = 0.18 * force;
+    } else if (preset === 'pull') {
+      const force = Math.sin(Math.PI * phase);
+      if (role === 'root') { x = -0.045 * force; rotation = 0.12 * force; y = 0.025 * force; }
+      if (role === 'rightArm' || role === 'arm') rotation = 0.88 * force;
+      if (role === 'leftArm') rotation = 0.72 * force;
+      if (role === 'rightLowerArm') rotation = -0.28 * force;
+      if (role === 'leftLowerArm') rotation = 0.28 * force;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.16 * force;
+      if (role === 'rightLeg') rotation = 0.16 * force;
+    } else if (preset === 'hug') {
+      const embrace = Math.sin(Math.PI * phase);
+      if (role === 'root') { y = -0.018 * embrace; rotation = 0.035 * embrace; }
+      if (role === 'leftArm' || role === 'arm') rotation = -0.92 * embrace;
+      if (role === 'rightArm') rotation = 0.92 * embrace;
+      if (role === 'leftLowerArm') rotation = 0.42 * embrace;
+      if (role === 'rightLowerArm') rotation = -0.42 * embrace;
+      if (role === 'head') rotation = 0.06 * embrace;
+    } else if (preset === 'point') {
+      const gesture = clamp(phase * 2.2, 0, 1);
+      if (role === 'rightArm' || role === 'arm') rotation = -0.92 * gesture;
+      if (role === 'rightLowerArm') rotation = 0.08 * gesture;
+      if (role === 'leftArm') rotation = -0.08 * gesture;
+      if (role === 'head') rotation = -0.12 * gesture;
+    } else if (preset === 'sit') {
+      const lower = clamp(phase * 2.2, 0, 1);
+      if (role === 'root') { y = 0.09 * lower; rotation = -0.08 * lower; }
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.42 * lower;
+      if (role === 'rightLeg') rotation = 0.42 * lower;
+      if (role === 'leftLowerLeg') rotation = 0.62 * lower;
+      if (role === 'rightLowerLeg') rotation = -0.62 * lower;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.12 * lower;
+      if (role === 'rightArm') rotation = 0.12 * lower;
+      if (role === 'head') rotation = -0.035 * lower;
     } else if (preset === 'idle') {
       if (role === 'root') y = 0.008 * Math.sin(phase * Math.PI * 2);
       if (role === 'head') rotation = 0.025 * Math.sin(phase * Math.PI * 2);
