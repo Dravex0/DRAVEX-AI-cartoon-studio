@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildScenePropRenderPlan, drawSceneProps } from '../src/scene-prop-renderer.js';
+import { sampleCharacterRigTimeline } from '../src/character-rig-timeline.js';
 
 const scene = {
   stateChanges: [{
