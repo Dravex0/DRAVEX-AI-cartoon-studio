@@ -176,7 +176,7 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
       end: phase.end,
       preset: preset || result.actions?.[0]?.preset || 'idle',
       doodleAction,
-      ...(targetedReach ? { targetedReach } : {}),
+      ...(targetedReach ? { targetedReach, targetPositionSource } : {}),
       timeline
     });
   }
