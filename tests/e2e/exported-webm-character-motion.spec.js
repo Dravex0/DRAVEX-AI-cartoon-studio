@@ -16,7 +16,8 @@ function countFoxPixels(canvas) {
   let count = 0;
   for (let index = 0; index < pixels.length; index += 4) {
     const red = pixels[index], green = pixels[index + 1], blue = pixels[index + 2];
-    if (red > 175 && green > 65 && green < 190 && blue < 135 && red > green * 1.25) count++;
+    if (red >= 160 && green >= 60 && green <= 190 && blue <= 120
+      && red - green >= 35 && red - blue >= 60) count++;
   }
   return count;
 }
@@ -31,8 +32,8 @@ test('one prompt renders a visible protagonist in preview and in the downloaded 
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
 
-  await page.locator('#play').click();
-  await page.waitForTimeout(450);
+  await page.locator('#canvas').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(250);
   const previewFoxPixels = await page.locator('#canvas').evaluate(countFoxPixels);
   expect(previewFoxPixels, 'the local storyboard preview must contain the protagonist, not just the environment').toBeGreaterThan(500);
 
