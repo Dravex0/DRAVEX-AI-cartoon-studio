@@ -57,7 +57,9 @@ export function buildEditDecisionPlan(editingPlan, scenes = [], worldModel = nul
     const current = shots[index];
     const sameScene = previous.sceneId === current.sceneId;
     const sourceScene = sceneMap.get(current.sceneId);
-    const declaredTransition = explicitTransition(sourceScene?.transition || current.cut?.type);
+    // Only an authored scene transition is authoritative. The semantic plan's
+    // default cut metadata must not override same-scene action continuity.
+    const declaredTransition = explicitTransition(sourceScene?.transition);
     const previousLocation = locationOf(previous);
     const currentLocation = locationOf(current);
     const locationChanged = Boolean(previousLocation && currentLocation && previousLocation !== currentLocation);
