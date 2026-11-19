@@ -31,6 +31,46 @@ function normalizePhases(scene) {
   })).sort((a, b) => (a.start ?? 0) - (b.start ?? 0));
 }
 
+
+function buildGroundedCausalChains(causal) {
+  const events = (Array.isArray(causal?.events) ? causal.events : []).filter(record);
+  const counts = new Map();
+  for (const event of events) {
+    const id = clean(event.id, 160);
+    if (id) counts.set(id, (counts.get(id) || 0) + 1);
+  }
+  const byId = new Map(events.filter(event => clean(event.id, 160) && counts.get(clean(event.id, 160)) === 1)
+    .map(event => [clean(event.id, 160), event]));
+  const edges = new Set((Array.isArray(causal?.edges) ? causal.edges : [])
+    .filter(record).map(edge => `${clean(edge.fromEventId, 160)}->${clean(edge.toEventId, 160)}`));
+  const chains = [];
+  for (const raw of Array.isArray(causal?.chains) ? causal.chains : []) {
+    if (!record(raw) || !Array.isArray(raw.eventIds) || raw.eventIds.length < 2) continue;
+    const ids = raw.eventIds.map(id => clean(id, 160));
+    if (ids.some(id => !id) || new Set(ids).size !== ids.length) continue;
+    const sequence = ids.map(id => byId.get(id));
+    if (sequence.some(event => !event || event.grounded !== true)) continue;
+    if (ids.slice(1).some((id, index) => !edges.has(`${ids[index]}->${id}`))) continue;
+    chains.push({
+      id: clean(raw.id, 160) || `causal_chain_${chains.length + 1}`,
+      eventIds: ids,
+      sceneIds: unique(sequence.map(event => event.sceneId)),
+      events: sequence.map(event => ({
+        id: clean(event.id, 160),
+        sceneId: clean(event.sceneId, 120),
+        sequence: finite(event.sequence) ? event.sequence : null,
+        type: clean(event.type, 40),
+        actorId: clean(event.actorId, 160) || null,
+        targetId: clean(event.targetId, 160) || null,
+        entityId: clean(event.entityId, 160) || null,
+        physicsEventId: clean(event.physicsEventId, 160) || null,
+        evidence: clean(event.evidence, 500)
+      }))
+    });
+  }
+  return chains;
+}
+
 /** Build renderer-facing work orders from already validated semantic models. */
 export function buildSceneProductionPlan(scenes = [], context = {}) {
   const list = Array.isArray(scenes) ? scenes.filter(record) : [];
@@ -39,6 +79,7 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
   const causal = context.causalModel || null;
   const editing = context.editingPlan || null;
   const decisions = context.editDecisions || null;
+  const causalChains = buildGroundedCausalChains(causal);
   const scenePlans = [];
   const issues = [];
   let cursor = 0;
@@ -59,6 +100,8 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
     const groundedCausalEvents = causalEvents.filter(event => event.grounded === true);
     const causalEdges = (Array.isArray(causal?.edges) ? causal.edges : [])
       .filter(edge => record(edge) && (edge.fromSceneId === sceneId || edge.toSceneId === sceneId));
+    const causalChainRefs = causalChains.filter(chain => chain.sceneIds.includes(sceneId))
+      .map(chain => ({ chainId: chain.id, eventIds: chain.eventIds }));
     const shotIds = new Set(shots.map(shot => shot.id));
     const editCuts = (Array.isArray(decisions?.cuts) ? decisions.cuts : [])
       .filter(cut => record(cut) && (shotIds.has(cut.fromShotId) || shotIds.has(cut.toShotId)));
@@ -96,6 +139,7 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
     }
     if (propActions.length) requiredPasses.push('prop-state-and-motion');
     if (groundedPhysicsEvents.length) requiredPasses.push('grounded-physical-interaction');
+    if (causalChainRefs.length) requiredPasses.push('causal-interaction-sequence');
     if (dialogue.length) requiredPasses.push('dialogue-voice-and-timing');
     if (dialogue.length || audioCues.length || clean(scene.sound, 1000)) requiredPasses.push('scene-audio-mix');
     if (requiredPasses.length) requiredPasses.push('scene-compositing-and-export');
@@ -134,6 +178,7 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
       causalBeats: groundedCausalEvents,
       unresolvedCausalBeats: causalEvents.filter(event => event.grounded !== true),
       causalEdges,
+      causalChainRefs,
       shots,
       editCuts,
       dialogue,
@@ -153,10 +198,12 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
     shotCount,
     totalDurationSeconds: Number(cursor.toFixed(3)),
     scenes: scenePlans,
+    causalChains,
     validation: { passed: !issues.some(issue => issue.severity === 'error'), issues },
     constraints: [
       'Production passes are work orders, not proof that a renderer completed them.',
       'Only grounded physics and causal events are scheduled as production beats; unresolved events remain diagnostic data.',
+      'A causal interaction sequence is emitted only when every event is grounded, event IDs are unique, and every adjacent edge is explicitly present.',
       'Action beats, dialogue, audio cues and shot timing retain supplied source data.',
       'Missing actors, props, assets, measurements and causal links are never fabricated.',
       'Scene order and timeline follow the supplied storyboard order.'
