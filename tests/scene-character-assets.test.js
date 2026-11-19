@@ -50,3 +50,17 @@ test('full-film export waits for character images before starting MediaRecorder'
   assert.ok(wait > collect, 'export preflight must await decoded character images');
   assert.ok(recorder > wait, 'MediaRecorder must not start before character images are ready');
 });
+
+
+test('direct WebM export applies the shared character-visual gate before MediaRecorder starts', () => {
+  const start = appSource.indexOf('async function exportFilm(');
+  const end = appSource.indexOf("\\n$('export').onclick", start);
+  assert.ok(start >= 0 && end > start, 'exportFilm must be present');
+  const block = appSource.slice(start, end);
+  const gate = block.indexOf('getMissingCharacterVisualCount(exportProtagonistId)');
+  const blockedMessage = block.indexOf('background-only export is blocked');
+  const recorder = block.indexOf('recorder.start(250);');
+  assert.ok(gate >= 0, 'direct export must use the shared character-visual readiness check');
+  assert.ok(blockedMessage > gate, 'missing character visuals must produce an explicit blocker');
+  assert.ok(recorder > blockedMessage, 'MediaRecorder must not start after a blocked visual preflight');
+});
