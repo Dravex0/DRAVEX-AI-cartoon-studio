@@ -37,7 +37,7 @@ function resolveSceneLanguage(scene, fallback = 'en') {
   const text = clean(scene?.storyDetail || scene?.visibleAction, 1200);
   if (/[іїєґ]/iu.test(text)) return 'uk';
   if (/[а-яё]/iu.test(text)) return 'ru';
-  if (/\\b(?:el|la|los|las|una|uno|un|por|para|con|ayuda|entrega)\\b/iu.test(text)) return 'es';
+  if (/\b(?:el|la|los|las|una|uno|un|por|para|con|ayuda|entrega)\b/iu.test(text)) return 'es';
   return 'en';
 }
 
