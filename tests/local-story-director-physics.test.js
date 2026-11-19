@@ -54,6 +54,12 @@ test('director gives the local model physics constraints and locked source event
   assert.equal(result.fallbackReason, 'invalid-model-scene-structure');
   assert.match(capturedPrompt, /PHYSICS MODEL \(source-grounded only\)/);
   assert.match(capturedPrompt, /Never invent collisions, falls, contact, support/);
+  assert.match(capturedPrompt, /FILM LANGUAGE AND COVERAGE/);
+  assert.match(capturedPrompt, /CONTINUITY GRAMMAR/);
+  assert.match(capturedPrompt, /EDITING KNOWLEDGE/);
+  assert.match(capturedPrompt, /LOCKED SEMANTIC SHOT PLAN/);
+  assert.match(capturedPrompt, /LOCKED EDITORIAL DECISIONS/);
+  assert.match(capturedPrompt, /180-degree line/);
   assert.match(capturedPrompt, /cup_fall/);
   assert.equal(result.physicsModel.events[0].grounded, true);
 });
