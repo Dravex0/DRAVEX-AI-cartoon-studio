@@ -102,6 +102,7 @@ import { normalizeSceneCast } from "./scene-cast.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
 import { buildStoryEventChain } from "./story-event-chain.js";
 import { hasRenderableCharacterLayer, hasRenderableCharacterRig, resolveProceduralDemoCharacter, shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
+import { countScenesMissingCharacterVisuals } from './character-visual-readiness.js';
 import { drawProceduralDemoFox } from './demo-character-renderer.js';
 const localTextRuntime = createLocalTransformersRuntime();
 let activeUniversalPlanController = null;
@@ -2350,17 +2351,12 @@ $('makeFilm').addEventListener('click',async()=>{
   const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
   return source.kind==='missing'&&!cachedVideo?.video;
  }).length;
- const missingCharacterAssetCount=mode==='local-canvas'&&currentStoryboardPlan?.proceduralDemoCharacter!==true
-  ?sceneMetadata.filter((scene,index)=>{
-    const cast=Array.isArray(scene?.characters)?scene.characters.filter(value=>String(value||'').trim()):[];
-    const hasRequestedCharacter=Boolean(requestedCharacter)||cast.length>0;
-    const hasCharacterLayers=Array.isArray(scene?.characterLayers)&&scene.characterLayers.some(layer=>layer?.visible!==false&&String(layer?.imageUrl||'').trim());
-    const hasCharacterRig=hasRenderableCharacterRig(scene);
-    const hasSceneImage=Boolean(String(scene?.generatedImageUrl||'').trim()||comfySourceImageForScene(index));
-    const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
-    const hasSceneVideo=Boolean(cachedVideo?.video);
-    return hasRequestedCharacter&&!hasCharacterLayers&&!hasCharacterRig&&!hasSceneImage&&!hasSceneVideo;
-   }).length
+ const missingCharacterAssetCount=mode==='local-canvas'
+  ?countScenesMissingCharacterVisuals(sceneMetadata,{
+   protagonistId:requestedCharacter,
+   proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true,
+   hasSceneVideo:(scene,index)=>Boolean(sceneVideoCache.get(sceneVideoKey(index,scene))?.video)
+  })
   :0;
  const gate=evaluatePromptToFilmStart({
   mode,

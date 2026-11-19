@@ -96,7 +96,7 @@ test('local-AI storyboard rebuilds preserve procedural fallback metadata and rig
   assert.match(runLocalModelBlock, /resolveProceduralDemoCharacter\(/);
   assert.match(runLocalModelBlock, /proceduralDemoCharacter,/);
   assert.match(appSource, /hasCharacterRig:hasRenderableCharacterRig\(currentSceneData,currentStoryboardPlan\?\.sourceCharacter\|\|\$\('character'\)\.value\)/);
-  assert.match(appSource, /const hasCharacterRig=hasRenderableCharacterRig\(scene\)/);
+  assert.match(appSource, /countScenesMissingCharacterVisuals\(sceneMetadata/);
 });
 
 
