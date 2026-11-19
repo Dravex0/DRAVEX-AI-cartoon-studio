@@ -165,12 +165,13 @@ test('cinematic camera transform covers generated media, props, and rigged chara
   const mediaDraw = app.indexOf('drawImageCover(ctx,generatedVideo,w,h,motionTransform)', cameraStart);
   const propsDraw = app.indexOf('drawSceneProps(ctx,currentSceneData', cameraStart);
   const characterDraw = app.indexOf('drawCharacterLayers(ctx,currentSceneData.characterLayers', cameraStart);
-  const cameraRestore = app.indexOf('ctx.restore();', characterDraw);
+  const cameraRestore = app.indexOf('ctx.restore();', propsDraw);
   const titleDraw = app.indexOf("ctx.fillText($('character').value", cameraRestore);
   assert.ok(cameraStart >= 0);
   assert.ok(mediaDraw > cameraStart);
   assert.ok(propsDraw > mediaDraw);
-  assert.ok(characterDraw > propsDraw);
+  assert.ok(characterDraw > mediaDraw);
+  assert.ok(propsDraw > characterDraw);
   assert.ok(cameraRestore > characterDraw);
   assert.ok(titleDraw > cameraRestore);
 });
