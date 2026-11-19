@@ -362,14 +362,16 @@ test('matches repeated prop motion intents to distinct authored action steps', (
     actionTimeline: { schemaVersion: 1, phases: [{
       phase: 'action', start: 0.1, end: 0.9, actorId: 'Fox',
       steps: [
-        { intent: 'throw', start: 0.1, end: 0.4, actorId: 'Fox', description: 'Throw the first ball' },
-        { intent: 'throw', start: 0.6, end: 0.9, actorId: 'Fox', description: 'Throw the second ball' }
+        { intent: 'throw', start: 0.1, end: 0.4, actorId: 'Fox', targetId: 'ball-one', evidence: 'Fox throws the first ball.', description: 'Throw the first ball' },
+        { intent: 'throw', start: 0.6, end: 0.9, actorId: 'Fox', targetId: 'ball-two', evidence: 'Fox throws the second ball.', description: 'Throw the second ball' }
       ]
     }] },
     stateChanges: [
       { entityType: 'prop', entityId: 'ball-one', property: 'position', actionIntent: 'throw',
+        actorId: 'Fox', evidence: 'Fox throws the first ball.',
         previousPosition: { x: 0.1, y: 0.2 }, position: { x: 0.4, y: 0.5 } },
       { entityType: 'prop', entityId: 'ball-two', property: 'position', actionIntent: 'throw',
+        actorId: 'Fox', evidence: 'Fox throws the second ball.',
         previousPosition: { x: 0.6, y: 0.7 }, position: { x: 0.9, y: 0.4 } }
     ]
   };
@@ -397,4 +399,34 @@ test('does not match an untargeted prop change to an action step with no intent'
   const beforeFallback = buildScenePropRenderPlan(scene, [], 0.2)[0];
   assert.ok(Math.abs(beforeFallback.x - 0.2) < 1e-9);
   assert.ok(Math.abs(beforeFallback.y - 0.3) < 1e-9);
+});
+
+
+test('matches prop trajectories by actor, target entity, and evidence instead of array order', () => {
+  const evidenceOne = 'Fox throws the first ball.';
+  const evidenceTwo = 'Bird throws the second ball.';
+  const scene = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.1, end: 0.9,
+      steps: [
+        { intent: 'throw', start: 0.1, end: 0.4, actorId: 'Fox', targetId: 'ball-one', evidence: evidenceOne },
+        { intent: 'throw', start: 0.6, end: 0.9, actorId: 'Bird', targetId: 'ball-two', evidence: evidenceTwo }
+      ]
+    }] },
+    // Reverse source order deliberately: matching must not depend on list position.
+    stateChanges: [
+      { entityType: 'prop', entityId: 'ball-two', property: 'position', actionIntent: 'throw',
+        actorId: 'Bird', evidence: evidenceTwo,
+        previousPosition: { x: 0.6, y: 0.7 }, position: { x: 0.9, y: 0.4 } },
+      { entityType: 'prop', entityId: 'ball-one', property: 'position', actionIntent: 'throw',
+        actorId: 'Fox', evidence: evidenceOne,
+        previousPosition: { x: 0.1, y: 0.2 }, position: { x: 0.4, y: 0.5 } }
+    ]
+  };
+  const first = buildScenePropRenderPlan(scene, [], 0.25).find(item => item.id === 'ball-one');
+  const second = buildScenePropRenderPlan(scene, [], 0.75).find(item => item.id === 'ball-two');
+  assert.ok(Math.abs(first.x - 0.25) < 1e-9);
+  assert.ok(Math.abs(first.y - 0.35) < 1e-9);
+  assert.ok(Math.abs(second.x - 0.75) < 1e-9);
+  assert.ok(Math.abs(second.y - 0.55) < 1e-9);
 });
