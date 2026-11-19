@@ -69,3 +69,36 @@ test('keeps location evidence inside the sentence that names the moving characte
   assert.equal(changes[0][0].value, 'inside:stone castle');
   assert.equal(changes[0][0].evidence, 'Mira enters the stone castle.');
 });
+
+
+test('transfers a prop only when the named actor is its known current holder', () => {
+  const changes = inferStoryboardStateChanges([
+    { storyDetail: 'Maya picks up the phone.', characters: ['Maya', 'Noah'] },
+    { storyDetail: 'Maya gives Noah the phone.', characters: ['Maya', 'Noah'] },
+    { storyDetail: 'Noah drops the phone.', characters: ['Maya', 'Noah'] }
+  ], 'en');
+  assert.deepEqual(changes[0].map(change => [change.entityId, change.previousValue, change.value]), [
+    ['phone', null, 'Maya']
+  ]);
+  assert.deepEqual(changes[1].map(change => [change.entityId, change.previousValue, change.value, change.actionIntent]), [
+    ['phone', 'Maya', 'Noah', 'handoff']
+  ]);
+  assert.deepEqual(changes[2].map(change => [change.entityId, change.previousValue, change.value]), [
+    ['phone', 'Noah', null]
+  ]);
+});
+
+test('does not invent a prop transfer when the actor is not known to hold it', () => {
+  const changes = inferStoryboardStateChanges([
+    { storyDetail: 'Maya gives Noah the phone.', characters: ['Maya', 'Noah'] }
+  ], 'en');
+  assert.deepEqual(changes, [[]]);
+});
+
+test('does not infer a transfer when the recipient or object is ambiguous', () => {
+  const changes = inferStoryboardStateChanges([
+    { storyDetail: 'Maya gives the phone.', characters: ['Maya', 'Noah'] },
+    { storyDetail: 'Maya gives Noah.', characters: ['Maya', 'Noah'] }
+  ], 'en');
+  assert.deepEqual(changes, [[], []]);
+});
