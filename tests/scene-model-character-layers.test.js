@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeScene } from '../src/scene-model.js';
+import { buildScenePhysicsModel } from '../src/scene-physics-model.js';
 
 test('scene normalization preserves validated independent character layers', () => {
   const scene = normalizeScene({
@@ -133,4 +134,41 @@ test('scene normalization preserves timed audio cues for the production planner'
     { type: 'foley', startSeconds: 0.5, endSeconds: 1.25, description: 'Footsteps', characterId: 'Mira' },
     { type: 'music', startSeconds: 0, endSeconds: null, description: 'Theme', characterId: '' }
   ]);
+});
+
+
+test('scene normalization preserves physics actors, targets, transfers, and unknown contact state', () => {
+  const scene = normalizeScene({
+    id: 'physics-preservation',
+    storyDetail: 'Mira throws the ball to Noah. Mira picks up the key.',
+    physicsEvents: [
+      {
+        id: 'throw', type: 'throw', entityId: 'ball', actorId: 'Mira', targetId: 'Noah',
+        contact: true, evidence: 'Mira throws the ball to Noah.'
+      },
+      {
+        id: 'transfer', type: 'transfer', entityId: 'ball', fromEntityId: 'Mira', toEntityId: 'Noah',
+        evidence: 'Mira throws the ball to Noah.'
+      },
+      {
+        id: 'grasp', type: 'grasp', entityId: 'key', actorId: 'Mira',
+        evidence: 'Mira picks up the key.'
+      }
+    ]
+  });
+
+  assert.equal(scene.physicsEvents[0].actorId, 'Mira');
+  assert.equal(scene.physicsEvents[0].targetId, 'Noah');
+  assert.equal(scene.physicsEvents[0].contact, true);
+  assert.equal(scene.physicsEvents[1].fromEntityId, 'Mira');
+  assert.equal(scene.physicsEvents[1].toEntityId, 'Noah');
+  assert.equal(Object.hasOwn(scene.physicsEvents[2], 'contact'), false);
+
+  const physics = buildScenePhysicsModel([scene]);
+  assert.equal(physics.events[0].actorId, 'Mira');
+  assert.equal(physics.events[0].targetId, 'Noah');
+  assert.equal(physics.events[0].contactKnown, true);
+  assert.equal(physics.events[1].fromEntityId, 'Mira');
+  assert.equal(physics.events[1].toEntityId, 'Noah');
+  assert.equal(physics.events[2].contactKnown, false);
 });
