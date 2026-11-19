@@ -169,6 +169,55 @@ export function buildScenePhysicsModel(scenes = [], worldModel = null) {
     }
   }
 
+  // Track only explicitly grounded holder changes. This is a continuity
+  // check, not a guess about who is holding an object in an unobserved moment.
+  const knownHolders = new Map();
+  const holderTimeline = [];
+  for (const event of events) {
+    if (!event.grounded || !event.entityId) continue;
+    const holderBefore = knownHolders.has(event.entityId) ? knownHolders.get(event.entityId) : null;
+    let holderAfter = holderBefore;
+    let transition = null;
+
+    if (event.type === 'grasp' || event.type === 'catch' || event.type === 'carry') {
+      if (holderBefore && holderBefore !== event.actorId) {
+        issues.push({ code: 'object-already-held-by-another-actor', severity: 'warning',
+          sceneId: event.sceneId, eventId: event.id, entityId: event.entityId,
+          currentHolderId: holderBefore, attemptedHolderId: event.actorId });
+        transition = 'conflict';
+      } else if (event.actorId) {
+        holderAfter = event.actorId;
+        knownHolders.set(event.entityId, holderAfter);
+        transition = holderBefore === holderAfter ? 'confirmed-continuation' : 'holder-acquired';
+      }
+    } else if (event.type === 'release' || event.type === 'throw') {
+      if (holderBefore && holderBefore !== event.actorId) {
+        issues.push({ code: 'object-released-by-non-holder', severity: 'warning',
+          sceneId: event.sceneId, eventId: event.id, entityId: event.entityId,
+          currentHolderId: holderBefore, actorId: event.actorId });
+        transition = 'conflict';
+      } else if (event.actorId) {
+        holderAfter = null;
+        knownHolders.delete(event.entityId);
+        transition = holderBefore ? 'holder-released' : 'release-holder-unverified';
+      }
+    } else if (event.type === 'transfer' && event.fromEntityId && event.toEntityId) {
+      if (holderBefore && holderBefore !== event.fromEntityId) {
+        issues.push({ code: 'object-transferred-by-non-holder', severity: 'warning',
+          sceneId: event.sceneId, eventId: event.id, entityId: event.entityId,
+          currentHolderId: holderBefore, declaredFromHolderId: event.fromEntityId });
+        transition = 'conflict';
+      } else {
+        holderAfter = event.toEntityId;
+        knownHolders.set(event.entityId, holderAfter);
+        transition = 'holder-transferred';
+      }
+    }
+
+    if (transition) holderTimeline.push({ eventId: event.id, sceneId: event.sceneId,
+      entityId: event.entityId, holderBefore, holderAfter, transition });
+  }
+
   return {
     schemaVersion: 1,
     eventCount: events.length,
@@ -176,6 +225,7 @@ export function buildScenePhysicsModel(scenes = [], worldModel = null) {
     derivedMotionCount,
     environments,
     events,
+    holderTimeline,
     validation: {
       passed: !issues.some(issue => issue.severity === 'error'),
       issues
