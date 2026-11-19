@@ -4,6 +4,7 @@ import { buildStoryEventChain } from './story-event-chain.js';
 import { buildSceneWorldModel } from './scene-world-model.js';
 import { buildSemanticEditingPlan } from './semantic-editing-plan.js';
 import { buildEditDecisionPlan } from './edit-decision-engine.js';
+import { buildSceneProductionPlan } from './scene-production-plan.js';
 import { buildScenePhysicsModel } from './scene-physics-model.js';
 import { buildSceneCausalModel } from './scene-causal-model.js';
 import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-state-memory.js';
@@ -146,7 +147,7 @@ function buildStructuredStateMemory(modelScenes, baselineScenes) {
     return { supplied: true, report: { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-memory-error', severity: 'error' }] } };
   }
 }
-function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null, physicsModel = null, editingPlan = null, editDecisions = null }) {
+function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null, physicsModel = null, editingPlan = null, editDecisions = null, productionPlan = null }) {
   const requiredDetails = basePlan.scenes.map((scene, index) => ({
     scene: index + 1,
     sourceDetail: clean(scene.storyDetail, 1_200),
@@ -183,6 +184,8 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'EDITING KNOWLEDGE: Respect the supplied shot plan and editorial decisions. Prefer continuity cuts for connected action, match cuts for a documented visual/action match, reaction cuts for a documented reaction, and location/time transitions only when the story supports them. Avoid arbitrary jump cuts, decorative whip pans, dissolves or repeated close-ups. Preserve chronology, causal order, action direction, state hand-offs and audio cue timing. A cut must not invent an event or hide a missing action.',
     'LOCKED SEMANTIC SHOT PLAN: ' + JSON.stringify(editingPlan),
     'LOCKED EDITORIAL DECISIONS: ' + JSON.stringify(editDecisions),
+    'LOCKED SCENE PRODUCTION BLUEPRINT: ' + JSON.stringify(productionPlan),
+    'Treat production passes as ordered implementation requirements, not as evidence that assets already exist. Preserve all scene IDs, time ranges, cast, dialogue, grounded physical beats and continuity locks. Do not claim a pass is complete unless the renderer actually produces its output.',
     'Use the shot plan as production guidance; it does not authorize adding scenes, actors, props, actions or causal links.',
     'Keep imagePrompt focused on one still frame; keep motionPrompt focused on movement.',
     'For each scene, provide actionTimeline.phases in normalized scene time from 0 to 1. Include only phases supported by the scene: preparation, action, reaction, result. Any supplied timeline must include one central action phase; preparation ends before action, reaction starts after action, and result starts after the action and any reaction. Every phase needs an assigned actorId, a concrete description, and evidence copied exactly from locked storyDetail or sourceEvents. Use only characters assigned to that scene. Do not invent reactions or targets; targetId may be null. If the scene is an establishing shot with no character action, set actionTimeline to null.',
@@ -225,6 +228,7 @@ export async function directStoryboardWithLocalAI({
   const causalModel = buildSceneCausalModel(fallback, worldModel, physicsModel);
   const editingPlan = buildSemanticEditingPlan(fallback, worldModel);
   const editDecisions = buildEditDecisionPlan(editingPlan, fallback, worldModel);
+  const productionPlan = buildSceneProductionPlan(fallback, { worldModel, physicsModel, causalModel, editingPlan, editDecisions });
   const fallbackResult = (reason, evaluation = null) => ({
     usedLocalModel: false,
     scenes: fallback,
@@ -236,7 +240,8 @@ export async function directStoryboardWithLocalAI({
     physicsModel,
     causalModel,
     editingPlan,
-    editDecisions
+    editDecisions,
+    productionPlan
   });
 
   if (signal?.aborted) return fallbackResult('cancelled');
@@ -245,7 +250,7 @@ export async function directStoryboardWithLocalAI({
 
   let generated;
   try {
-    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel, physicsModel, causalModel, editingPlan }, physicsModel, editingPlan, editDecisions }), {
+    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel, physicsModel, causalModel, editingPlan }, physicsModel, editingPlan, editDecisions, productionPlan }), {
       maxNewTokens: tokenBudget,
       temperature: 0.15,
       signal
@@ -320,6 +325,7 @@ export async function directStoryboardWithLocalAI({
   const acceptedCausalModel = buildSceneCausalModel(candidate, acceptedWorldModel, acceptedPhysicsModel);
   const acceptedEditingPlan = buildSemanticEditingPlan(candidate, acceptedWorldModel);
   const acceptedEditDecisions = buildEditDecisionPlan(acceptedEditingPlan, candidate, acceptedWorldModel);
+  const acceptedProductionPlan = buildSceneProductionPlan(candidate, { worldModel: acceptedWorldModel, physicsModel: acceptedPhysicsModel, causalModel: acceptedCausalModel, editingPlan: acceptedEditingPlan, editDecisions: acceptedEditDecisions });
 
   return {
     usedLocalModel: true,
@@ -330,6 +336,7 @@ export async function directStoryboardWithLocalAI({
     causalModel: acceptedCausalModel,
     editingPlan: acceptedEditingPlan,
     editDecisions: acceptedEditDecisions,
+    productionPlan: acceptedProductionPlan,
     evaluation,
     fallbackReason: null,
     modelId: generated.modelId || runtime.status?.modelId || null,

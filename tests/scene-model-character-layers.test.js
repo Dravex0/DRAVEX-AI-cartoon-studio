@@ -119,3 +119,18 @@ test('legacy scenes normalize structured causal and physics metadata to safe emp
   assert.deepEqual(scene.physicsEvents, []);
   assert.deepEqual(scene.causalEvents, []);
 });
+
+
+test('scene normalization preserves timed audio cues for the production planner', () => {
+  const scene = normalizeScene({
+    id: 'audio-scene',
+    audioCues: [
+      { type: 'foley', startSeconds: 0.5, endSeconds: 1.25, description: 'Footsteps', characterId: 'Mira' },
+      { type: 'music', startSeconds: -2, endSeconds: 'invalid', source: 'Theme' }
+    ]
+  });
+  assert.deepEqual(scene.audioCues, [
+    { type: 'foley', startSeconds: 0.5, endSeconds: 1.25, description: 'Footsteps', characterId: 'Mira' },
+    { type: 'music', startSeconds: 0, endSeconds: null, description: 'Theme', characterId: '' }
+  ]);
+});

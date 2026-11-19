@@ -23,6 +23,8 @@ test('director exposes the grounded physics model when local inference is unavai
   assert.equal(result.usedLocalModel, false);
   assert.equal(result.physicsModel.eventCount, 1);
   assert.equal(result.physicsModel.groundedEventCount, 1);
+  assert.equal(result.productionPlan.sceneCount, 1);
+  assert.ok(result.productionPlan.scenes[0].requiredPasses.includes('character-layer-composition'));
   assert.deepEqual(result.physicsModel.events[0].derivedMotion.averageVelocityMps, {
     x: 2, y: 0, z: 0
   });
@@ -60,6 +62,8 @@ test('director gives the local model physics constraints and locked source event
   assert.match(capturedPrompt, /LOCKED SEMANTIC SHOT PLAN/);
   assert.match(capturedPrompt, /LOCKED EDITORIAL DECISIONS/);
   assert.match(capturedPrompt, /180-degree line/);
+  assert.match(capturedPrompt, /LOCKED SCENE PRODUCTION BLUEPRINT/);
+  assert.match(capturedPrompt, /renderer actually produces its output/);
   assert.match(capturedPrompt, /cup_fall/);
   assert.equal(result.physicsModel.events[0].grounded, true);
 });
