@@ -34,7 +34,14 @@ export function buildSceneWorldModel(scenes = []) {
   const state = new Map();
 
   list.forEach((scene, index) => {
-    if (!record(scene)) return;
+    if (!record(scene)) {
+      // Keep a positional placeholder so later scene/event indexes never shift
+      // when an upstream planner emits a malformed entry.
+      events.push({ id: `event_${index + 1}`, sceneId: `scene_${index + 1}`,
+        sequence: index + 1, sourceEvidence: '', participants: [], location: null,
+        actions: [], invalidInput: true });
+      return;
+    }
     const sceneId = clean(scene.id, 120) || `scene_${index + 1}`;
     const participants = Array.isArray(scene.characters) ? scene.characters : [];
     for (const participant of participants) {
