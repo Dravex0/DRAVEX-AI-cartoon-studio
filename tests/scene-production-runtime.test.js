@@ -60,3 +60,43 @@ test('rebuilds production context after scene edits instead of reusing stale IDs
   assert.deepEqual(second.productionPlan.scenes[0].cast, ['Noah']);
   assert.equal(second.productionPlan.scenes[0].worldEntities.some(entity => entity.id === 'Mira'), false);
 });
+
+
+test('attaches state continuity QA to scene work orders and provider instructions', async () => {
+  const { buildSceneProductionInstructions } = await import('../src/scene-production-instructions.js');
+  const baseState = {
+    characters: { Mira: { location: 'village' } },
+    objects: { key: { owner: 'Mira', state: 'held' } }
+  };
+  const nextState = {
+    characters: { Mira: { location: 'castle' } },
+    objects: { key: { owner: 'Mira', state: 'held' } }
+  };
+  const context = buildSceneProductionContext([
+    { id: 'scene-village', characters: ['Mira'], startState: baseState, endState: baseState },
+    { id: 'scene-castle', characters: ['Mira'], startState: nextState, endState: nextState }
+  ]);
+  const nextPlan = context.productionPlan.scenes[1];
+  const prompt = buildSceneProductionInstructions(nextPlan);
+
+  assert.equal(context.stateContinuity.passed, false);
+  assert.ok(context.stateContinuity.issues.some(issue => issue.code === 'character-teleportation'));
+  assert.ok(nextPlan.continuityIssues.some(issue => issue.code === 'character-teleportation'));
+  assert.match(prompt, /Continuity QA warnings to reconcile/);
+  assert.match(prompt, /never invent a journey/);
+});
+
+test('passes clean state continuity into production plans without adding warnings', () => {
+  const state = {
+    characters: { Mira: { location: 'village' } },
+    objects: { key: { owner: 'Mira', state: 'held' } }
+  };
+  const context = buildSceneProductionContext([
+    { id: 'scene-one', characters: ['Mira'], startState: state, endState: state },
+    { id: 'scene-two', characters: ['Mira'], startState: state, endState: state }
+  ]);
+
+  assert.equal(context.stateContinuity.passed, true);
+  assert.deepEqual(context.productionPlan.scenes[0].continuityIssues, []);
+  assert.deepEqual(context.productionPlan.scenes[1].continuityIssues, []);
+});
