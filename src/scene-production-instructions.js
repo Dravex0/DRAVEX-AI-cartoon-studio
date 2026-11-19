@@ -20,6 +20,7 @@ export function buildSceneProductionInstructions(plan) {
     clean(plan.setting?.environment, 600) && 'Environment: ' + clean(plan.setting.environment, 600),
     clean(plan.setting?.lighting, 300) && 'Lighting: ' + clean(plan.setting.lighting, 300),
     clean(plan.setting?.timeOfDay, 120) && 'Time of day: ' + clean(plan.setting.timeOfDay, 120),
+    records(plan.characterProfiles).length && 'Canonical character appearance profiles (preserve these exact identities across every shot and scene): ' + records(plan.characterProfiles).slice(0, 12).map(item => compact(item, 700)).join('; '),
     records(plan.worldEntities).length && 'World entities (preserve identity and kind): ' + records(plan.worldEntities).slice(0, 16).map(item => compact({id:item.id,kind:item.kind,attributes:item.attributes}, 450)).join('; '),
     records(plan.worldRelations).length && 'Entity relationships (preserve direction and participants): ' + records(plan.worldRelations).slice(0, 16).map(item => compact(item, 500)).join('; '),
     records(plan.actionBeats).length && 'Timed action beats: ' + records(plan.actionBeats).slice(0, 16).map(item => compact({phase:item.phase,start:item.start,end:item.end,actorId:item.actorId,targetId:item.targetId,description:item.description,evidence:item.evidence}, 650)).join('; '),
