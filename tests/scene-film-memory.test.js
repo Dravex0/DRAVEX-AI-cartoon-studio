@@ -83,13 +83,17 @@ test('rejects duplicate scene IDs rather than silently merging scene memories', 
   assert.equal(memory.issues[0].code, 'duplicate-film-scene-id');
 });
 
-test('reports relations whose entity references are absent from the world model', () => {
+test('reports relation endpoints absent from a non-empty world model', () => {
   const memory = buildSceneFilmMemory([{ id: 's1' }], {
-    worldModel: { entities: [], relations: [{ sceneId: 's1', from: 'Mira', to: 'unknown', type: 'acts_on' }] }
+    worldModel: {
+      entities: [{ id: 'Mira', kind: 'character', scenes: ['s1'] }],
+      relations: [{ sceneId: 's1', from: 'Mira', to: 'unknown', type: 'acts_on' }]
+    }
   });
   assert.equal(memory.valid, true);
-  assert.equal(memory.issues.length, 2);
-  assert.ok(memory.issues.every(issue => issue.code === 'film-relation-entity-unresolved'));
+  assert.equal(memory.issues.length, 1);
+  assert.equal(memory.issues[0].code, 'film-relation-entity-unresolved');
+  assert.equal(memory.issues[0].entityId, 'unknown');
 });
 
 test('attaches continuity warnings to both adjacent scenes without inventing a fix', () => {
