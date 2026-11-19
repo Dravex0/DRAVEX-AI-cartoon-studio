@@ -3,6 +3,10 @@ import { applyCharacterRigPose, validateCharacterRig } from './character-rig.js'
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const clean = value => String(value ?? '').trim();
 const key = value => clean(value).toLocaleLowerCase();
+const normalizedPoint = value => value && typeof value === 'object' && !Array.isArray(value)
+  && Number.isFinite(value.x) && value.x >= 0 && value.x <= 1
+  && Number.isFinite(value.y) && value.y >= 0 && value.y <= 1
+  ? { x: value.x, y: value.y } : null;
 
 function propKind(name) {
   const value = key(name);
@@ -96,8 +100,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   }
 
   const ground = { x: 0.68, y: 0.79, rotation: 0 };
-  const holderPoint = holderId => {
-    if (holderId == null || !clean(holderId)) return ground;
+  const holderPoint = (holderId, loosePosition = null) => {
+    if (holderId == null || !clean(holderId)) return normalizedPoint(loosePosition) || ground;
     const actorId = clean(holderId);
     const actor = layers.find(layer => key(layer?.characterId) === key(actorId));
     const actorX = Number.isFinite(actor?.x) ? actor.x : 0.5;
@@ -113,7 +117,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     const entityId = clean(history[0].entityId);
     const interval = (phaseEnd - phaseStart) / Math.max(1, history.length);
     let holder = history[0].previousValue ?? null;
-    let from = holderPoint(holder);
+    let from = holderPoint(holder, history[0].position);
     let to = from;
     let held = holder != null;
     let activeEvidence = clean(history[0].evidence);
@@ -127,8 +131,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       const end = matchedStep ? matchedStep.end : start + interval;
       const nextHolder = change.value ?? null;
       if (p < start) break;
-      from = holderPoint(holder);
-      to = holderPoint(nextHolder);
+      from = holderPoint(holder, change.position);
+      to = holderPoint(nextHolder, change.position);
       activeEvidence = clean(change.evidence);
       activeIndex = index;
       if (p <= end) {
@@ -148,7 +152,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       held = holder != null;
     }
 
-    const point = holderPoint(holder);
+    const finalPositionChange = history[activeIndex >= 0 ? activeIndex : 0];
+    const point = holderPoint(holder, finalPositionChange?.position);
     return {
       id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
       rotation: point.rotation || 0, held, visible: true, scale: 1,
