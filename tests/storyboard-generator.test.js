@@ -222,3 +222,48 @@ test('semantic reveal creates a source-grounded action instead of a passive idle
   assert.equal(scene.actionTimeline.phases[0].actorId, 'Nox');
   assert.match(scene.motionGenerationPrompt, /reveal/);
 });
+
+
+test('preserves a multi-step scene as ordered motion instructions', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — small orange fox.\n\nScene 1: The key\nFoxy walks to the table, picks up a key, opens the chest, then throws the key away.',
+    'en',
+    'Foxy'
+  );
+  const scene = result.scenes[0];
+  assert.deepEqual(scene.actionSequence.map(event => event.intent), ['walk', 'pick_up', 'open', 'throw']);
+  assert.equal(scene.actionTimeline.phases.length, 1);
+  assert.deepEqual(scene.actionTimeline.phases[0].steps.map(step => step.intent), ['walk', 'pick_up', 'open', 'throw']);
+  assert.deepEqual(scene.actionTimeline.phases[0].steps.map(step => [step.start, step.end]), [
+    [0, 0.25], [0.25, 0.5], [0.5, 0.75], [0.75, 1]
+  ]);
+  assert.equal(scene.actionTimeline.phases[0].actorId, 'Foxy');
+  assert.equal(scene.actionTimeline.phases[0].evidence, scene.storyDetail);
+  assert.match(scene.motionGenerationPrompt, /1\. walk \(walks\); 2\. pick_up \(picks up\); 3\. open \(opens\); 4\. throw \(throws\)/);
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+});
+
+test('does not turn a negated action into a timeline phase', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nKnight — armored knight.\n\nScene 1: The gate\nThe knight does not open the gate, but catches the falling key.',
+    'en',
+    'Knight'
+  );
+  assert.deepEqual(result.scenes[0].actionSequence.map(event => event.intent), ['catch']);
+  assert.equal(result.scenes[0].actionTimeline.phases.length, 1);
+  assert.equal(result.scenes[0].actionTimeline.phases[0].evidence, result.scenes[0].storyDetail);
+});
+
+
+test('passes a sensory tactical story sequence into the actual scene motion prompt', () => {
+  const story = 'Полицейский заходит в здание, слышит крики, достаёт пистолет, идёт медленно и тихо, прислушивается, идёт дальше, видит как избивают человека, выпрыгивает, наставляет пистолет и кричит: «Руки вверх!»';
+  const result = buildStoryboardFromText(story, 'ru', 'Полицейский');
+  const scene = result.scenes.find(item => item.storyDetail.includes('Полицейский')) || result.scenes[0];
+  const expected = [
+    'enter_location', 'hear_sound', 'draw_weapon', 'stealth_advance',
+    'listen_carefully', 'advance', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
+  ];
+  assert.deepEqual(scene.actionSequence.map(event => event.intent), expected);
+  for (const intent of expected) assert.ok(scene.motionGenerationPrompt.includes(intent), intent);
+  assert.match(scene.motionGenerationPrompt, /exact source-grounded action order/i);
+});

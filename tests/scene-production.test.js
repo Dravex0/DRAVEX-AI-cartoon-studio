@@ -411,3 +411,39 @@ test('changes the scene-image seed when the canonical character design or visual
 test('does not force a seed when a scene has no saved character identity', () => {
   assert.equal(buildSceneIdentitySeed({ characters: ['unknown'] }, []), undefined);
 });
+
+
+test('motion provider prompt receives validated timed action substeps in exact order', () => {
+  const source = 'The officer enters the building, hears screams, draws his pistol, and advances quietly.';
+  const sceneWithSteps = {
+    ...scene,
+    durationSeconds: 8,
+    characters: ['Officer'],
+    characterCastProvided: true,
+    storyDetail: source,
+    motionPrompt: 'Follow the officer through the scene.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Officer',
+        description: source, evidence: source,
+        steps: [
+          { intent: 'enter_location', motionCue: 'walk', start: 0, end: 0.25, actorId: 'Officer', description: 'Enter the building', evidence: 'enters the building' },
+          { intent: 'hear_sound', motionCue: 'turn', start: 0.25, end: 0.5, actorId: 'Officer', description: 'React to screams', evidence: 'hears screams' },
+          { intent: 'draw_weapon', motionCue: 'turn', start: 0.5, end: 0.75, actorId: 'Officer', description: 'Draw the pistol', evidence: 'draws his pistol' },
+          { intent: 'stealth_advance', motionCue: 'walk', start: 0.75, end: 1, actorId: 'Officer', description: 'Advance quietly', evidence: 'advances quietly' }
+        ]
+      }]
+    }
+  };
+  const prompt = buildMotionGenerationPrompt(sceneWithSteps, bible);
+  assert.match(prompt, /enter_location/);
+  assert.match(prompt, /hear_sound/);
+  assert.match(prompt, /draw_weapon/);
+  assert.match(prompt, /stealth_advance/);
+  assert.ok(prompt.indexOf('enter_location') < prompt.indexOf('hear_sound'));
+  assert.ok(prompt.indexOf('hear_sound') < prompt.indexOf('draw_weapon'));
+  assert.ok(prompt.indexOf('draw_weapon') < prompt.indexOf('stealth_advance'));
+  assert.match(prompt, /0\.00-2\.00s/);
+  assert.match(prompt, /6\.00-8\.00s/);
+});

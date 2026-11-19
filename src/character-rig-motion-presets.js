@@ -11,7 +11,14 @@ const PRESETS = Object.freeze({
   wave: { label: 'Wave / Приветствие', frames: 5 },
   dance: { label: 'Dance / Танец', frames: 9 },
   attack: { label: 'Attack / Атака', frames: 5 },
-  defend: { label: 'Defend / Защита', frames: 5 }
+  defend: { label: 'Defend / Защита', frames: 5 },
+  listen: { label: 'Listen carefully / Прислушивание', frames: 5 },
+  draw_weapon: { label: 'Draw weapon / Достать оружие', frames: 5 },
+  aim_weapon: { label: 'Aim weapon / Прицеливание', frames: 4 },
+  hands_up: { label: 'Hands up / Руки вверх', frames: 4 },
+  take_cover: { label: 'Take cover / Укрытие', frames: 5 },
+  drop_weapon: { label: 'Drop weapon / Опустить оружие', frames: 4 },
+  freeze: { label: 'Freeze / Замирание', frames: 3 }
 });
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const normalizeId = value => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -236,6 +243,55 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightLowerArm') rotation = -0.2 * brace;
       if (role === 'leftLeg') rotation = -0.16 * brace;
       if (role === 'rightLeg') rotation = 0.16 * brace;
+    } else if (preset === 'listen') {
+      const listen = Math.sin(Math.PI * phase);
+      if (role === 'root') { x = -0.018 * listen; rotation = -0.045 * listen; }
+      if (role === 'head') rotation = 0.22 * listen;
+      if (role === 'rightArm' || role === 'arm') rotation = -0.08 * listen;
+      if (role === 'rightLowerArm') rotation = 0.12 * listen;
+    } else if (preset === 'draw_weapon') {
+      const draw = Math.sin(Math.PI * phase);
+      if (role === 'root') rotation = -0.035 * draw;
+      if (role === 'head') rotation = -0.04 * draw;
+      if (role === 'rightArm' || role === 'arm') rotation = -0.62 * draw;
+      if (role === 'rightLowerArm') rotation = 0.82 * draw;
+      if (role === 'leftArm') rotation = -0.08 * draw;
+    } else if (preset === 'aim_weapon') {
+      const aim = Math.sin(Math.PI * phase);
+      if (role === 'root') { x = 0.025 * aim; rotation = -0.025 * aim; }
+      if (role === 'head') rotation = -0.08 * aim;
+      if (role === 'rightArm' || role === 'arm') rotation = -0.92 * aim;
+      if (role === 'rightLowerArm') rotation = 0.18 * aim;
+      if (role === 'leftArm') rotation = -0.72 * aim;
+      if (role === 'leftLowerArm') rotation = 0.12 * aim;
+    } else if (preset === 'hands_up') {
+      const raise = Math.sin(Math.PI * phase);
+      if (role === 'root') y = -0.018 * raise;
+      if (role === 'head') rotation = -0.08 * raise;
+      if (role === 'leftArm' || role === 'arm') rotation = -1.18 * raise;
+      if (role === 'rightArm') rotation = 1.18 * raise;
+      if (role === 'leftLowerArm') rotation = 0.24 * raise;
+      if (role === 'rightLowerArm') rotation = -0.24 * raise;
+    } else if (preset === 'take_cover') {
+      const crouch = Math.sin(Math.PI * phase);
+      if (role === 'root') { y = 0.085 * crouch; rotation = -0.12 * crouch; }
+      if (role === 'head') rotation = -0.2 * crouch;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.82 * crouch;
+      if (role === 'rightArm') rotation = 0.82 * crouch;
+      if (role === 'leftLowerArm') rotation = 0.32 * crouch;
+      if (role === 'rightLowerArm') rotation = -0.32 * crouch;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.25 * crouch;
+      if (role === 'rightLeg') rotation = 0.25 * crouch;
+    } else if (preset === 'drop_weapon') {
+      const release = Math.sin(Math.PI * phase);
+      if (role === 'rightArm' || role === 'arm') rotation = 0.42 * release;
+      if (role === 'rightLowerArm') rotation = -0.58 * release;
+      if (role === 'root') rotation = 0.025 * release;
+    } else if (preset === 'freeze') {
+      if (role === 'root') rotation = -0.025;
+      if (role === 'head') rotation = -0.075;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.08;
+      if (role === 'rightArm') rotation = 0.08;
     } else if (preset === 'idle') {
       if (role === 'root') y = 0.008 * Math.sin(phase * Math.PI * 2);
       if (role === 'head') rotation = 0.025 * Math.sin(phase * Math.PI * 2);
@@ -255,7 +311,7 @@ export function createCharacterRigMotionPreset(rigInput, presetName) {
   const report = validateCharacterRig(rigInput);
   if (!report.passed) return { status: 'invalid-rig', preset: presetName, timeline: null, issues: report.issues };
   const preset = PRESETS[presetName];
-  if (!preset) return { status: 'unknown-preset', preset: presetName, timeline: null, issues: [{ code: 'motion-preset-unknown', message: 'Choose idle, walk, run, jump, dodge, wave, dance, attack, or defend.' }] };
+  if (!preset) return { status: 'unknown-preset', preset: presetName, timeline: null, issues: [{ code: 'motion-preset-unknown', message: 'Choose any registered character rig motion preset.' }] };
   const rig = report.rig;
   const roles = new Set(rig.bones.map(bone => roleOf(bone.id)));
   const warnings = [];

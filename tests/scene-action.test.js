@@ -172,3 +172,186 @@ test('prefers the source-grounded semantic event over later incidental actions i
     storyDetail: 'Герой уклоняется от луча и создаёт энергетический щит.'
   }), 'jump');
 });
+
+
+test('recognizes concrete object interactions and physical actions in four languages', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  const cases = [
+    ['The girl picks up the glowing key.', 'pick_up'],
+    ['The boy throws the ball across the yard.', 'throw'],
+    ['The fox catches the falling apple.', 'catch'],
+    ['The knight opens the heavy gate.', 'open'],
+    ['The robot closes the metal door.', 'close'],
+    ['The child climbs the old tower.', 'climb'],
+    ['The mermaid swims beneath the bridge.', 'swim'],
+    ['The dragon falls from the cliff.', 'fall'],
+    ['The bird lands on the branch.', 'land'],
+    ['The friends hug each other.', 'hug'],
+    ['The wizard sits beside the fire.', 'sit'],
+    ['The puppy crawls under the table.', 'crawl'],
+    ['The girl drinks from a cup.', 'eat_drink'],
+    ['The hero wakes up at sunrise.', 'sleep_wake'],
+    ['The captain points toward the island.', 'point'],
+    ['The child draws a map.', 'write_draw'],
+    ['Девочка поднимает светящийся ключ.', 'pick_up'],
+    ['Мальчик бросает мяч через двор.', 'throw'],
+    ['Рыцарь открывает тяжёлые ворота.', 'open'],
+    ['Русалка плывёт под мостом.', 'swim'],
+    ['Дракон падает со скалы.', 'fall'],
+    ['Друзья обнимаются.', 'hug'],
+    ['Дитина малює карту.', 'write_draw']
+  ];
+  for (const [story, expected] of cases) {
+    assert.equal(inferSceneActionIntent(story).intent, expected, story);
+  }
+});
+
+test('does not classify explicitly negated object interactions as positive actions', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  assert.notEqual(inferSceneActionIntent('The knight does not open the gate.').intent, 'open');
+  assert.notEqual(inferSceneActionIntent('Рыцарь не открывает ворота.').intent, 'open');
+  assert.equal(inferSceneActionIntent('The knight does not open the gate, but throws a stone.').intent, 'throw');
+});
+
+test('maps new semantic actions only to existing renderer motion cues', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  const supported = new Set(['idle', 'walk', 'run', 'jump', 'turn', 'float', 'vanish', 'magic', 'talk', 'surprised', 'sad', 'happy', 'dance']);
+  for (const story of ['The girl picks up a key.', 'The dragon falls from a cliff.', 'The friends hug.', 'The child draws a map.']) {
+    assert.ok(supported.has(inferSceneActionIntent(story).motionCue));
+  }
+});
+
+
+test('extracts ordered action sequences without inventing negated or connective actions', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const sequence = extractSceneActionSequence(
+    'The girl walks to the table, picks up a key, opens the chest, then throws the key away.'
+  );
+  assert.deepEqual(sequence.map(event => event.intent), ['walk', 'pick_up', 'open', 'throw'], JSON.stringify(sequence));
+  assert.ok(sequence.every(event => event.evidence && event.endIndex > event.startIndex));
+  const negated = extractSceneActionSequence('The knight does not open the gate, but catches the falling key.');
+  assert.deepEqual(negated.map(event => event.intent), ['catch']);
+});
+
+test('extracts Russian and Ukrainian multi-action sequences in source order', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  assert.deepEqual(
+    extractSceneActionSequence('Лисёнок подходит к двери, открывает её и подбирает ключ.').map(event => event.intent),
+    ['walk', 'open', 'pick_up']
+  );
+  assert.deepEqual(
+    extractSceneActionSequence('Дитина підходить до столу, підбирає олівець і малює карту.').map(event => event.intent),
+    ['walk', 'pick_up', 'write_draw']
+  );
+});
+
+test('bounds extracted scene action sequences to eight events', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const sequence = extractSceneActionSequence(
+    'walks, jumps, runs, dances, turns, floats, waves, talks, then vanishes',
+    { maxActions: 8 }
+  );
+  assert.equal(sequence.length, 8);
+});
+
+
+test('does not confuse the English word girl with the Spanish turn verb', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  assert.deepEqual(
+    extractSceneActionSequence('A girl walks to the table.').map(event => event.intent),
+    ['walk']
+  );
+});
+
+
+test('understands a complete Russian tactical story sequence with sensory cues and intent', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const story = 'Полицейский заходит в здание, слышит крики, достаёт пистолет, идёт медленно и тихо, прислушивается, идёт дальше, видит как избивают человека, выпрыгивает, наставляет пистолет и кричит: «Руки вверх!»';
+  const sequence = extractSceneActionSequence(story);
+  assert.deepEqual(sequence.map(event => event.intent), [
+    'enter_location', 'hear_sound', 'draw_weapon', 'stealth_advance',
+    'listen_carefully', 'advance', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
+  ], JSON.stringify(sequence));
+  assert.ok(sequence.every(event => story.slice(event.startIndex, event.endIndex) === event.evidence));
+});
+
+test('understands equivalent English sensory, stealth and intervention beats', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const story = 'The officer enters the building, hears screams, draws his pistol, moves slowly and quietly, pauses to listen carefully, advances further, sees an attacker beating a person, bursts out, aims his pistol at him and shouts "Hands up!"';
+  const sequence = extractSceneActionSequence(story);
+  assert.deepEqual(sequence.map(event => event.intent), [
+    'enter_location', 'hear_sound', 'draw_weapon', 'stealth_advance',
+    'listen_carefully', 'advance', 'discover_threat', 'intervene', 'aim_weapon', 'shout_command'
+  ], JSON.stringify(sequence));
+});
+
+
+test('recognizes tactical reactions and resolution events in multiple languages', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const russian = 'Полицейский замирает, прячется за стену, вызывает подкрепление, затем опускает пистолет.';
+  assert.deepEqual(
+    extractSceneActionSequence(russian).map(event => event.intent),
+    ['freeze', 'take_cover', 'call_for_backup', 'drop_weapon']
+  );
+  const english = 'The officer freezes, takes cover behind a wall, calls for backup, then lowers his pistol.';
+  assert.deepEqual(
+    extractSceneActionSequence(english).map(event => event.intent),
+    ['freeze', 'take_cover', 'call_for_backup', 'drop_weapon']
+  );
+  assert.deepEqual(
+    extractSceneActionSequence('The suspect raises both hands.').map(event => event.intent),
+    ['hands_up']
+  );
+});
+
+
+test('recognizes each tactical reaction independently before sequence assembly', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const cases = [
+    ['Полицейский прячется за стену.', 'take_cover'],
+    ['Полицейский вызывает подкрепление.', 'call_for_backup'],
+    ['Полицейский опускает пистолет.', 'drop_weapon'],
+    ['The officer takes cover behind a wall.', 'take_cover'],
+    ['The officer calls for backup.', 'call_for_backup'],
+    ['The officer lowers his pistol.', 'drop_weapon']
+  ];
+  for (const [story, expected] of cases) {
+    assert.deepEqual(
+      extractSceneActionSequence(story).map(event => event.intent),
+      [expected],
+      story
+    );
+  }
+});
+
+
+test('assigns longer pacing hints to careful listening and stealth movement', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  const sequence = extractSceneActionSequence(
+    'The officer hears screams, listens carefully, then advances slowly and quietly.'
+  );
+  const byIntent = Object.fromEntries(sequence.map(event => [event.intent, event.durationWeight]));
+  assert.ok(byIntent.listen_carefully > byIntent.hear_sound);
+  assert.ok(byIntent.stealth_advance > byIntent.hear_sound);
+});
+
+
+test('recognizes torture as a visible threat and does not confuse weapon drawing with sketching', async () => {
+  const { extractSceneActionSequence } = await import('../src/scene-action.js');
+  assert.deepEqual(
+    extractSceneActionSequence('Полицейский видит, как пытают человека.').map(event => event.intent),
+    ['discover_threat']
+  );
+  assert.deepEqual(
+    extractSceneActionSequence('The officer sees a person being tortured.').map(event => event.intent),
+    ['discover_threat']
+  );
+  assert.deepEqual(
+    extractSceneActionSequence('The officer draws his pistol.').map(event => event.intent),
+    ['draw_weapon']
+  );
+  assert.deepEqual(
+    extractSceneActionSequence('The child draws a map.').map(event => event.intent),
+    ['write_draw']
+  );
+});

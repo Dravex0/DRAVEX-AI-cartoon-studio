@@ -7,6 +7,12 @@ import { compileDoodleSceneMotion } from './doodle-rig-adapter.js';
 const clean = value => String(value ?? '').trim();
 const key = value => clean(value).toLocaleLowerCase();
 const PRESET_BY_ACTION = Object.freeze({ walk: 'walk', run: 'run', jump: 'jump', wave: 'wave', dance: 'dance' });
+const PRESET_BY_INTENT = Object.freeze({
+  hear_sound: 'listen', listen_carefully: 'listen',
+  draw_weapon: 'draw_weapon', aim_weapon: 'aim_weapon',
+  hands_up: 'hands_up', take_cover: 'take_cover',
+  drop_weapon: 'drop_weapon', freeze: 'freeze', discover_threat: 'freeze'
+});
 
 function presetForDescription(description) {
   const intent = inferSceneActionIntent(description);
@@ -46,9 +52,13 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     .map(rig => [key(rig.characterId), rig]));
   const segments = [];
   const skipped = [];
-  for (const phase of scene.actionTimeline.phases) {
+  const actionSteps = scene.actionTimeline.phases.flatMap(phase =>
+    Array.isArray(phase.steps) ? phase.steps.map(step => ({ ...step, phase: 'action' })) : [phase]
+  );
+  for (const phase of actionSteps) {
     const actorId = clean(phase.actorId);
-    const preset = presetForDescription(phase.description);
+    const cuePreset = PRESET_BY_INTENT[phase.intent] || PRESET_BY_ACTION[phase.motionCue] || null;
+    const preset = cuePreset || presetForDescription(phase.description);
     const doodleAction = preset ? null : doodleActionForDescription(phase.description);
     if (!preset && !doodleAction) {
       skipped.push({ actorId, phase: phase.phase, reason: 'unsupported-or-ambiguous-action' });

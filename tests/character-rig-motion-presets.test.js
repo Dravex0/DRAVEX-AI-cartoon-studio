@@ -28,7 +28,7 @@ const rig = () => ({
 
 describe('procedural character rig motion presets', () => {
   it('exposes the supported starter movement library', () => {
-    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'wave', 'dance', 'attack', 'defend']);
+    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'wave', 'dance', 'attack', 'defend', 'listen', 'draw_weapon', 'aim_weapon', 'hands_up', 'take_cover', 'drop_weapon', 'freeze']);
   });
 
   it('creates a validated walk cycle with explicit start and end frames', () => {
@@ -420,5 +420,39 @@ describe('dance motion preset', () => {
     assert.ok(Math.abs(middle.leftLeg.rotation) > 0.05);
     assert.equal(start.root?.y || 0, end.root?.y || 0);
     assert.equal(start.root?.rotation || 0, end.root?.rotation || 0);
+  });
+});
+
+
+describe('tactical character rig motion presets', () => {
+  it('creates distinct listening, weapon draw, and aiming poses', () => {
+    const listen = createCharacterRigMotionPreset(rig(), 'listen');
+    const draw = createCharacterRigMotionPreset(rig(), 'draw_weapon');
+    const aim = createCharacterRigMotionPreset(rig(), 'aim_weapon');
+    assert.equal(listen.status, 'ready');
+    assert.equal(draw.status, 'ready');
+    assert.equal(aim.status, 'ready');
+    const listenPose = sampleCharacterRigTimeline(listen.timeline, 0.5).Foxy;
+    const drawPose = sampleCharacterRigTimeline(draw.timeline, 0.5).Foxy;
+    const aimPose = sampleCharacterRigTimeline(aim.timeline, 0.5).Foxy;
+    assert.ok(Math.abs(listenPose.head.rotation) > 0.1);
+    assert.ok(Math.abs(drawPose.rightArm.rotation) > 0.5);
+    assert.ok(Math.abs(aimPose.rightArm.rotation) > 0.7);
+    assert.notDeepEqual(drawPose, aimPose);
+  });
+
+  it('creates separate surrender, cover, release, and freeze poses', () => {
+    const hands = createCharacterRigMotionPreset(rig(), 'hands_up');
+    const cover = createCharacterRigMotionPreset(rig(), 'take_cover');
+    const drop = createCharacterRigMotionPreset(rig(), 'drop_weapon');
+    const freeze = createCharacterRigMotionPreset(rig(), 'freeze');
+    for (const result of [hands, cover, drop, freeze]) assert.equal(result.status, 'ready');
+    const handsPose = sampleCharacterRigTimeline(hands.timeline, 0.5).Foxy;
+    const coverPose = sampleCharacterRigTimeline(cover.timeline, 0.5).Foxy;
+    const dropPose = sampleCharacterRigTimeline(drop.timeline, 0.5).Foxy;
+    assert.ok(Math.abs(handsPose.leftArm.rotation) > 0.8);
+    assert.ok(coverPose.root.y > 0);
+    assert.ok(Math.abs(dropPose.rightArm.rotation) > 0.3);
+    assert.notDeepEqual(handsPose, coverPose);
   });
 });

@@ -9,7 +9,7 @@ import { inferSceneCausalLinks } from './scene-causality.js';
 import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
-import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
+import { detectSceneAction, inferSceneActionIntent, extractSceneActionSequence } from './scene-action.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -164,12 +164,17 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     // Semantic story intent is separate from renderer movement presets and is now
     // carried into the actual motion prompt and validated action timeline.
     const semanticIntent = inferSceneActionIntent(scene.storyDetail);
+    const actionSequence = extractSceneActionSequence(scene.storyDetail);
+    scene.actionSequence = actionSequence;
     scene.semanticActionIntent = semanticIntent;
     const semanticIsActionable = !['unknown', 'descriptive'].includes(semanticIntent.intent);
     const semanticMotionInstruction = semanticIsActionable
       ? `Perform the story event "${semanticIntent.intent}" using this source-grounded action: ${scene.storyDetail}`
       : '';
-    scene.motionPrompt = [scene.visibleAction, semanticMotionInstruction].filter(Boolean).join('. ');
+    const orderedActionInstruction = actionSequence.length > 1
+      ? `Follow this exact source-grounded action order without skipping or rearranging steps: ${actionSequence.map((event, eventIndex) => `${eventIndex + 1}. ${event.intent} (${event.evidence})`).join('; ')}. Keep the same actor, objects, and scene continuity across the sequence.`
+      : '';
+    scene.motionPrompt = [scene.visibleAction, semanticMotionInstruction, orderedActionInstruction].filter(Boolean).join('. ');
     // Add one action phase only when source text supports a movement, semantic event,
     // or directed interaction. Never fabricate setup/reaction/aftermath phases.
     const sourceAction = detectSceneAction(scene.storyDetail);
@@ -188,6 +193,9 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
           ? `${scene.characters[0]} and ${actionTarget} combine their powers as described in the source event: ${scene.storyDetail}`
           : `Perform the ${semanticIntent.intent} event: ${scene.storyDetail}`
         : scene.visibleAction || scene.storyDetail;
+      // The current validated timeline schema permits one central action phase.
+      // Preserve the full ordered sequence in actionSequence/motionPrompt instead of
+      // emitting duplicate "action" phases that the schema correctly rejects.
       scene.actionTimeline = {
         schemaVersion: 1,
         phases: [{
@@ -195,7 +203,29 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
           actorId: actionActor,
           targetId: actionTarget || null,
           description: semanticDescription,
-          evidence: actionEvidence
+          evidence: actionEvidence,
+          ...(actionSequence.length ? {
+            steps: (() => {
+              const weights = actionSequence.map(event => Math.max(0.25, Math.min(3, Number(event.durationWeight) || 1)));
+              const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+              let elapsedWeight = 0;
+              return actionSequence.map((event, eventIndex) => {
+                const start = elapsedWeight / totalWeight;
+                elapsedWeight += weights[eventIndex];
+                const end = elapsedWeight / totalWeight;
+                return {
+                  intent: event.intent,
+                  motionCue: event.motionCue,
+                  start,
+                  end,
+                  actorId: actionActor,
+                  targetId: null,
+                  description: `Perform the ${event.intent} action: ${event.evidence}`,
+                  evidence: event.evidence
+                };
+              });
+            })()
+          } : {})
         }]
       };
     }

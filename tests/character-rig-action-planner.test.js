@@ -184,3 +184,49 @@ test('maps explicit fear reactions through the Doodle adapter to the existing de
   assert.ok(Math.abs(middle.leftArm.rotation) > 0.4);
   assert.ok(Math.abs(middle.rightArm.rotation) > 0.4);
 });
+
+
+test('compiles supported ordered walk and run substeps into separate rig segments', () => {
+  const scene = makeScene('walks slowly, then runs toward the door');
+  scene.actionTimeline.phases[0].steps = [
+    { intent: 'stealth_advance', motionCue: 'walk', start: 0.2, end: 0.48, actorId: 'Foxy', description: 'Walk slowly', evidence: 'walks slowly' },
+    { intent: 'intervene', motionCue: 'run', start: 0.48, end: 0.8, actorId: 'Foxy', description: 'Run toward the door', evidence: 'runs toward the door' }
+  ];
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 2);
+  assert.deepEqual(result.mappedActions.map(item => item.preset), ['walk', 'run']);
+  assert.deepEqual(result.mappedActions.map(item => [item.start, item.end]), [[0.2, 0.48], [0.48, 0.8]]);
+});
+
+
+test('maps distinct tactical intents to dedicated rig poses instead of generic turn cues', () => {
+  const story = 'Foxy listens carefully, draws a weapon, aims, raises both hands, takes cover, drops the weapon, and freezes.';
+  const scene = {
+    characters: ['Foxy'],
+    characterCastProvided: true,
+    storyDetail: story,
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Foxy',
+        description: story, evidence: story,
+        steps: [
+          { intent: 'listen_carefully', motionCue: 'turn', start: 0, end: 0.14, actorId: 'Foxy', description: 'Listen carefully', evidence: 'listens carefully' },
+          { intent: 'draw_weapon', motionCue: 'turn', start: 0.14, end: 0.28, actorId: 'Foxy', description: 'Draw a weapon', evidence: 'draws a weapon' },
+          { intent: 'aim_weapon', motionCue: 'turn', start: 0.28, end: 0.42, actorId: 'Foxy', description: 'Aim the weapon', evidence: 'aims' },
+          { intent: 'hands_up', motionCue: 'surprised', start: 0.42, end: 0.56, actorId: 'Foxy', description: 'Raise both hands', evidence: 'raises both hands' },
+          { intent: 'take_cover', motionCue: 'jump', start: 0.56, end: 0.7, actorId: 'Foxy', description: 'Take cover', evidence: 'takes cover' },
+          { intent: 'drop_weapon', motionCue: 'turn', start: 0.7, end: 0.84, actorId: 'Foxy', description: 'Drop the weapon', evidence: 'drops the weapon' },
+          { intent: 'freeze', motionCue: 'idle', start: 0.84, end: 1, actorId: 'Foxy', description: 'Freeze in place', evidence: 'freezes' }
+        ]
+      }]
+    }
+  };
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 7);
+  assert.deepEqual(result.mappedActions.map(item => item.preset), [
+    'listen', 'draw_weapon', 'aim_weapon', 'hands_up', 'take_cover', 'drop_weapon', 'freeze'
+  ]);
+});
