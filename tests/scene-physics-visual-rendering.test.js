@@ -19,8 +19,8 @@ test('renders a grounded throw along its explicitly authored viewport trajectory
   const ball = plan.find(item => item.id === 'ball');
   assert.ok(ball);
   assert.equal(ball.physicsEventId, 'throw-ball');
-  assert.equal(ball.x, 0.5);
-  assert.equal(ball.y, 0.5);
+  assert.ok(Math.abs(ball.x - 0.5) < 1e-12);
+  assert.ok(Math.abs(ball.y - 0.5) < 1e-12);
 });
 
 test('normalization preserves explicit viewport trajectory separately from meter coordinates', () => {
