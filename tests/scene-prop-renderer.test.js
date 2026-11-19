@@ -14,7 +14,8 @@ test('plans a grounded pickup and moves the prop from the ground to the named ac
   const early = buildScenePropRenderPlan(scene, layers, 0.1)[0];
   const late = buildScenePropRenderPlan(scene, layers, 1)[0];
   assert.equal(early.kind, 'star');
-  assert.equal(early.held, true);
+  assert.equal(early.held, false);
+  assert.equal(late.held, true);
   assert.ok(early.y > late.y);
   assert.ok(late.x > 0.4 && late.x < 0.6);
   assert.equal(late.evidence, 'Fox picks up the glowing star.');
@@ -137,4 +138,24 @@ test('uses an explicitly authored grip point transformed by the posed hand rotat
   assert.ok(Math.abs(plan.x - 0.5) < 1e-9);
   assert.ok(Math.abs(plan.y - 0.54) < 1e-9);
   assert.ok(Math.abs(plan.rotation - Math.PI / 2) < 1e-9);
+});
+
+test('preserves pickup and drop as two ordered transitions for the same prop', () => {
+  const sequence = {
+    actionTimeline: { phases: [{ phase: 'action', start: 0, end: 1 }] },
+    stateChanges: [
+      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: null, value: 'Fox', actorId: 'Fox', evidence: 'Fox picks up the key.' },
+      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: 'Fox', value: null, actorId: 'Fox', evidence: 'Fox throws the key away.' }
+    ]
+  };
+  const start = buildScenePropRenderPlan(sequence, layers, 0)[0];
+  const carried = buildScenePropRenderPlan(sequence, layers, 0.4)[0];
+  const released = buildScenePropRenderPlan(sequence, layers, 1)[0];
+  assert.equal(start.held, false);
+  assert.equal(carried.held, true);
+  assert.equal(released.held, false);
+  assert.ok(start.x > carried.x);
+  assert.ok(released.x > carried.x);
+  assert.equal(carried.transitionIndex, 0);
+  assert.equal(released.transitionIndex, 1);
 });
