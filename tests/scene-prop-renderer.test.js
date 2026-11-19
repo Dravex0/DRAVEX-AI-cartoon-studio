@@ -284,3 +284,14 @@ test('held props follow the same sampled rig timeline pose as the character hand
   assert.ok(Math.abs((atEnd.x - atStart.x) - 0.18) < 1e-9);
   assert.ok(Math.abs((atEnd.y - atStart.y) + 0.05) < 1e-9);
 });
+
+
+test('uses an explicit prop position as the pickup origin instead of the generic ground fallback', () => {
+  const positioned = {
+    ...scene,
+    stateChanges: scene.stateChanges.map(change => ({ ...change, position: { x: 0.23, y: 0.41 } }))
+  };
+  const before = buildScenePropRenderPlan(positioned, layers, 0.1)[0];
+  assert.equal(before.x, 0.23);
+  assert.equal(before.y, 0.41);
+});
