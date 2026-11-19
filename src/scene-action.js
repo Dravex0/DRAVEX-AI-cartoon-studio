@@ -365,6 +365,29 @@ export function detectSceneActionForScene(scene = {}, fallbackTitle = '', fallba
 
 
 /**
+ * Resolve the procedural renderer cue from the source-ordered action timeline.
+ * Step boundaries are normalized to the scene's 0..1 progress range. If a scene
+ * has no supported single-phase step timeline, retain the existing lexical fallback.
+ */
+export function detectSceneActionAtProgress(scene = {}, progress = 0, fallbackTitle = '', fallbackDescription = '') {
+  const phases = Array.isArray(scene?.actionTimeline?.phases) ? scene.actionTimeline.phases : [];
+  if (phases.length === 1) {
+    const steps = Array.isArray(phases[0]?.steps) ? phases[0].steps : [];
+    const normalizedProgress = Math.max(0, Math.min(1, Number.isFinite(Number(progress)) ? Number(progress) : 0));
+    const activeStep = steps.find((step, index) => {
+      const start = Number(step?.start);
+      const end = Number(step?.end);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return false;
+      return normalizedProgress >= start
+        && (normalizedProgress < end || (index === steps.length - 1 && normalizedProgress <= end));
+    });
+    const cue = String(activeStep?.motionCue ?? '').trim();
+    if (cue === 'idle' || ACTION_PATTERNS.some(entry => entry.action === cue)) return cue;
+  }
+  return detectSceneActionForScene(scene, fallbackTitle, fallbackDescription);
+}
+
+/**
  * Extracts ordered, source-grounded action events from a single scene description.
  * It does not invent connective actions: only explicit positive matches are returned.
  * Overlapping synonyms are collapsed so one phrase cannot create duplicate timeline phases.
