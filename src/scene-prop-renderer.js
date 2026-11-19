@@ -74,21 +74,39 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   const phaseStart = actionPhase ? actionPhase.start : 0.52;
   const phaseEnd = actionPhase ? actionPhase.end : 0.8;
   const timelineSteps = (Array.isArray(scene?.actionTimeline?.phases) ? scene.actionTimeline.phases : [])
-    .flatMap(phase => Array.isArray(phase?.steps) ? phase.steps : [])
+    .flatMap(phase => Array.isArray(phase?.steps) ? phase.steps.map(step => ({
+      ...step,
+      actorId: clean(step.actorId) || clean(phase.actorId),
+      targetId: clean(step.targetId) || clean(phase.targetId),
+      evidence: clean(step.evidence) || clean(phase.evidence)
+    })) : [])
     .filter(step => Number.isFinite(step?.start) && Number.isFinite(step?.end)
       && step.start >= 0 && step.start < step.end && step.end <= 1);
+  const matchActionStep = (change, compatibleIntents, claimed) => {
+    const intent = clean(change?.actionIntent);
+    if (!intent) return null;
+    const actorId = key(change.actorId);
+    const targetId = key(change.entityId);
+    const evidence = key(change.evidence);
+    const matches = timelineSteps.map((step, index) => ({ step, index })).filter(({step,index}) => {
+      if (claimed.has(index) || !compatibleIntents.has(clean(step.intent))) return false;
+      if (actorId && clean(step.actorId) && key(step.actorId) !== actorId) return false;
+      if (targetId && clean(step.targetId) && key(step.targetId) !== targetId) return false;
+      if (evidence && clean(step.evidence) && key(step.evidence) !== evidence) return false;
+      return true;
+    });
+    return matches.length === 1 ? matches[0] : null;
+  };
   const claimedSteps = new Set();
   const matchedStepByChange = new Map();
   for (const change of changes) {
     const intent = clean(change?.actionIntent);
     if (!intent) continue;
     const compatible = intent === 'drop' ? new Set(['drop', 'drop_weapon', 'throw']) : new Set([intent]);
-    const stepIndex = timelineSteps.findIndex((step, index) =>
-      !claimedSteps.has(index) && compatible.has(clean(step.intent))
-    );
-    if (stepIndex >= 0) {
-      claimedSteps.add(stepIndex);
-      matchedStepByChange.set(change, timelineSteps[stepIndex]);
+    const match = matchActionStep(change, compatible, claimedSteps);
+    if (match) {
+      claimedSteps.add(match.index);
+      matchedStepByChange.set(change, match.step);
     }
   }
   const byProp = new Map();
@@ -189,12 +207,11 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       const to = normalizedPoint(change.position);
       if (!to) continue;
       const actionIntent = clean(change.actionIntent);
-      const matchedStepIndex = actionIntent
-        ? timelineSteps.findIndex((step, stepIndex) => !claimedPositionSteps.has(stepIndex)
-          && clean(step.intent) === actionIntent)
-        : -1;
-      const matchedStep = matchedStepIndex >= 0 ? timelineSteps[matchedStepIndex] : null;
-      if (matchedStep) claimedPositionSteps.add(matchedStepIndex);
+      const match = actionIntent
+        ? matchActionStep(change, new Set([actionIntent]), claimedPositionSteps)
+        : null;
+      const matchedStep = match?.step || null;
+      if (match) claimedPositionSteps.add(match.index);
       const start = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
       const end = matchedStep ? matchedStep.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
       if (!from) {
