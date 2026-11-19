@@ -3172,7 +3172,7 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const motionScene={...originalMeta,title:readField('sceneTitle','title')||titles[index],description:readField('sceneDescription','description')||descriptions[index],motionPrompt:motionText,visibleAction:motionText,camera:readField('sceneCamera','camera'),startState:readField('sceneStartState','startState'),endState:readField('sceneEndState','endState'),negativePrompt:readField('sceneNegativePrompt','negativePrompt'),continuityLock:readField('sceneContinuityLock','continuityLock'),characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])};
  const productionContext=buildSceneProductionContext([motionScene],{language:storyLanguage()});
  const productionInstructions=buildSceneProductionInstructions(productionContext.productionPlan.scenes[0]);
- const prompt=[buildMotionGenerationPrompt(motionScene,characterBible),productionInstructions].filter(Boolean).join('\\n\\n');
+ const prompt=[buildMotionGenerationPrompt(motionScene,characterBible),productionInstructions].filter(Boolean).join('\n\n');
  if(!prompt.trim())throw new Error('Add a motion instruction before remote video generation.');
  const imageSource=resolveSceneImageSource({
   mode:'huggingface',
@@ -3244,8 +3244,8 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  const productionInstructions=buildSceneProductionInstructions(productionContext.productionPlan.scenes[0]);
  const motionPrompt=buildMotionGenerationPrompt(motionScene,characterBible);
  const prompt=taskType==='text-to-video'
-  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),motionPrompt,productionInstructions].filter(Boolean).join('\\n\\n')
-  :[motionPrompt,productionInstructions].filter(Boolean).join('\\n\\n')
+  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),motionPrompt,productionInstructions].filter(Boolean).join('\n\n')
+  :[motionPrompt,productionInstructions].filter(Boolean).join('\n\n')
  if(!prompt.trim())throw new Error('Добавь описание движения сцены перед генерацией.');
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
  const provider=createComfyUIVideoProvider(comfyProviderOptions());
@@ -3375,8 +3375,8 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  const productionInstructions=buildSceneProductionInstructions(productionContext.productionPlan.scenes[0]);
  const motionPrompt=buildMotionGenerationPrompt(motionScene,characterBible);
  const prompt=taskType==='text-to-video'
-  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),motionPrompt,productionInstructions].filter(Boolean).join('\\n\\n')
-  :[motionPrompt,productionInstructions].filter(Boolean).join('\\n\\n')
+  ?[buildImageGenerationPrompt(motionScene,characterBible,{includeNegative:false,visualStyle:$('style').value}),motionPrompt,productionInstructions].filter(Boolean).join('\n\n')
+  :[motionPrompt,productionInstructions].filter(Boolean).join('\n\n')
  if(!prompt.trim()){setComfyStatus('This scene has no usable visual or motion prompt. Add a scene description or motion instruction first.');return}
  button.disabled=true;$('checkComfyConnection').disabled=true;
  try{
