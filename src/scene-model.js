@@ -134,6 +134,14 @@ export function normalizeScene(input = {}, index = 0) {
       ? { characterId: '', text: text(line, 2_000), language: 'en' }
       : { characterId: text(line?.characterId, 120), text: text(line?.text, 2_000), language: text(line?.language, 12) || 'en' })
       .filter(line => line.text),
+    audioCues: Array.isArray(scene.audioCues) ? scene.audioCues.slice(0, 50).filter(item =>
+      item && typeof item === 'object' && !Array.isArray(item)).map(item => ({
+        type: text(item.type, 60),
+        startSeconds: Number.isFinite(item.startSeconds) ? Math.max(0, item.startSeconds) : null,
+        endSeconds: Number.isFinite(item.endSeconds) ? Math.max(0, item.endSeconds) : null,
+        description: text(item.description ?? item.source, 500),
+        characterId: text(item.characterId, 120)
+      })) : [],
     sound: text(scene.sound ?? scene.soundCue, 1_000),
     durationSeconds,
     transition: text(scene.transition, 500),
