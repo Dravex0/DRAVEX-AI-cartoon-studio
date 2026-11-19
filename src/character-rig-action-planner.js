@@ -11,7 +11,10 @@ const PRESET_BY_INTENT = Object.freeze({
   hear_sound: 'listen', listen_carefully: 'listen',
   draw_weapon: 'draw_weapon', aim_weapon: 'aim_weapon',
   hands_up: 'hands_up', take_cover: 'take_cover',
-  drop_weapon: 'drop_weapon', freeze: 'freeze', discover_threat: 'freeze'
+  drop_weapon: 'drop_weapon', freeze: 'freeze', discover_threat: 'freeze',
+  pick_up: 'pick_up', grasp: 'grasp', release: 'release', carry: 'carry',
+  throw: 'throw', catch: 'catch', push: 'push', pull: 'pull',
+  hug: 'hug', point: 'point', sit: 'sit'
 });
 
 function presetForDescription(description) {
