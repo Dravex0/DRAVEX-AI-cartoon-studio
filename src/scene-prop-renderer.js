@@ -95,7 +95,15 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       if (evidence && clean(step.evidence) && key(step.evidence) !== evidence) return false;
       return true;
     });
-    return matches.length === 1 ? matches[0] : null;
+    if (matches.length === 1) return matches[0];
+    // Backward compatibility: older scenes have no actor/target/evidence keys.
+    // Keep their historical stable order, but never use this fallback when
+    // any grounding identity was authored or when evidence is ambiguous.
+    if (!actorId && !targetId && !evidence) {
+      return timelineSteps.map((step, index) => ({ step, index }))
+        .find(({step,index}) => !claimed.has(index) && compatibleIntents.has(clean(step.intent))) || null;
+    }
+    return null;
   };
   const claimedSteps = new Set();
   const matchedStepByChange = new Map();
