@@ -159,3 +159,24 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
   expect(film.mediaError).toBeNull();
   expect(pageErrors, 'export should not throw uncaught browser errors').toEqual([]);
 });
+
+
+test('blocks direct WebM export when a named protagonist has no character artwork', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#language').selectOption('en');
+  await page.locator('#character').fill('Arin');
+  await page.locator('#idea').fill(
+    'Arin walks through a quiet city square, notices a fountain, and waits beside it.'
+  );
+  await page.locator('#make').click();
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await expect(page.locator('#status')).toContainText(/local preview currently shows only the scene background/i);
+
+  await page.locator('#export').click();
+  await expect(page.locator('#status')).toContainText(/export stopped: .*no character image, rig or scene video/i);
+  await expect(page.locator('#finalFilmResult')).toBeHidden();
+  expect(pageErrors, 'a background-only direct export should be blocked without browser errors').toEqual([]);
+});
