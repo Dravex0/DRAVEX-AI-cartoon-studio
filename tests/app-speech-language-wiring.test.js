@@ -55,17 +55,18 @@ test('blocks Hugging Face and ComfyUI generation when requested speech preparati
 });
 
 
-test('blocks local-canvas export instead of producing a background-only film for a named cast', () => {
+test('blocks local-canvas export when a scene background is present but character visuals are missing', () => {
   const handler = appSource.indexOf("$('makeFilm').addEventListener");
   const gate = appSource.indexOf('const missingCharacterAssetCount=', handler);
   const evaluate = appSource.indexOf('const gate=evaluatePromptToFilmStart({', gate);
   const blocker = appSource.indexOf("gate.blockers.includes('character-visual-assets-required')", evaluate);
   assert.ok(handler >= 0 && gate > handler && evaluate > gate && blocker > evaluate,
-    'named-character visual readiness must be checked before local-canvas export starts');
+    'character visual readiness must be checked before local-canvas export starts');
   const readiness = appSource.slice(gate, evaluate);
-  assert.match(readiness, /characterLayers/);
-  assert.match(readiness, /generatedImageUrl/);
+  assert.match(readiness, /countScenesMissingCharacterVisuals/);
   assert.match(readiness, /sceneVideoCache/);
-  assert.match(readiness, /proceduralDemoCharacter/);
+  assert.match(readiness, /proceduralFallback/);
+  assert.doesNotMatch(readiness, /generatedImageUrl/,
+    'a generated scene background is not proof that a character is visible');
   assert.match(appSource.slice(blocker, blocker + 900), /Фоновое видео вместо мультфильма создавать не будем/);
 });
