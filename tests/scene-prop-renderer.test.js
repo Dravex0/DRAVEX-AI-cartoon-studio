@@ -142,15 +142,18 @@ test('uses an explicitly authored grip point transformed by the posed hand rotat
 
 test('preserves pickup and drop as two ordered transitions for the same prop', () => {
   const sequence = {
-    actionTimeline: { phases: [{ phase: 'action', start: 0, end: 1 }] },
+    actionTimeline: { phases: [{ phase: 'action', start: 0, end: 1, steps: [
+      { intent: 'pick_up', start: 0.1, end: 0.2 },
+      { intent: 'drop', start: 0.8, end: 0.9 }
+    ] }] },
     stateChanges: [
-      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: null, value: 'Fox', actorId: 'Fox', evidence: 'Fox picks up the key.' },
-      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: 'Fox', value: null, actorId: 'Fox', evidence: 'Fox throws the key away.' }
+      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: null, value: 'Fox', actorId: 'Fox', actionIntent: 'pick_up', evidence: 'Fox picks up the key.' },
+      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: 'Fox', value: null, actorId: 'Fox', actionIntent: 'drop', evidence: 'Fox drops the key.' }
     ]
   };
-  const start = buildScenePropRenderPlan(sequence, layers, 0)[0];
-  const carried = buildScenePropRenderPlan(sequence, layers, 0.4)[0];
-  const released = buildScenePropRenderPlan(sequence, layers, 1)[0];
+  const start = buildScenePropRenderPlan(sequence, layers, 0.05)[0];
+  const carried = buildScenePropRenderPlan(sequence, layers, 0.5)[0];
+  const released = buildScenePropRenderPlan(sequence, layers, 0.95)[0];
   assert.equal(start.held, false);
   assert.equal(carried.held, true);
   assert.equal(released.held, false);
