@@ -165,3 +165,31 @@ test('injects previous-scene memory and current causal timeline into provider wo
   assert.match(prompt, /Unified current-scene memory/);
   assert.match(prompt, /stone bridge/);
 });
+
+
+test('carries canonical character appearance profiles across adjacent scene work orders', async () => {
+  const { buildSceneProductionInstructions } = await import('../src/scene-production-instructions.js');
+  const characterBible = [
+    { characterId: 'Mira', species: 'human', visualDescription: 'short silver hair and green eyes',
+      clothing: 'blue travel coat', colors: 'navy and silver', distinctiveFeatures: 'small star-shaped scar' },
+    { characterId: 'Leo', species: 'robot', visualDescription: 'round brass body with a square glass face',
+      signatureAccessories: 'red scarf' },
+    { characterId: 'Unused', species: 'animal', visualDescription: 'must not leak into unrelated scenes' }
+  ];
+  const context = buildSceneProductionContext([
+    { id: 'scene-one', characters: ['Mira'], storyDetail: 'Mira waits at the gate.' },
+    { id: 'scene-two', characters: ['Mira', 'Leo'], storyDetail: 'Mira meets Leo at the gate.' }
+  ], { language: 'en', characterBible });
+  const firstPlan = context.productionPlan.scenes[0];
+  const secondPlan = context.productionPlan.scenes[1];
+  const prompt = buildSceneProductionInstructions(secondPlan);
+
+  assert.equal(firstPlan.characterProfiles.length, 1);
+  assert.equal(firstPlan.characterProfiles[0].characterId, 'Mira');
+  assert.deepEqual(secondPlan.characterProfiles.map(profile => profile.characterId), ['Mira', 'Leo']);
+  assert.deepEqual(secondPlan.filmMemoryContext.previousScene.characterProfiles.map(profile => profile.characterId), ['Mira']);
+  assert.match(prompt, /short silver hair and green eyes/);
+  assert.match(prompt, /round brass body with a square glass face/);
+  assert.match(prompt, /Previous-scene character appearance locks/);
+  assert.doesNotMatch(prompt, /must not leak into unrelated scenes/);
+});

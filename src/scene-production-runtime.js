@@ -7,6 +7,19 @@ import { buildSceneProductionPlan } from './scene-production-plan.js';
 import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-state-memory.js';
 import { buildSceneFilmMemory } from './scene-film-memory.js';
 
+const cleanProfileField = value => String(value ?? '').trim().slice(0, 1200);
+function normalizeSceneCharacterProfile(profile) {
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return null;
+  const characterId = cleanProfileField(profile.characterId).slice(0, 120);
+  if (!characterId) return null;
+  const normalized = { characterId };
+  for (const field of ['species', 'ageRange', 'visualDescription', 'bodyShape', 'hair', 'eyeColor', 'silhouette', 'clothing', 'colors', 'signatureAccessories', 'distinctiveFeatures']) {
+    const value = cleanProfileField(profile[field]);
+    if (value) normalized[field] = value;
+  }
+  return normalized;
+}
+
 /**
  * Assemble the complete deterministic production context for the exact scene
  * list about to be rendered. Rebuild it at render time so edited scenes,
@@ -32,7 +45,13 @@ export function buildSceneProductionContext(scenes = [], options = {}) {
     worldModel, physicsModel, causalModel, stateContinuity
   });
   const filmScenes = new Map(filmMemory.scenes.map(scene => [scene.sceneId, scene]));
+  const characterProfiles = new Map((Array.isArray(options.characterBible) ? options.characterBible : [])
+    .map(normalizeSceneCharacterProfile).filter(Boolean)
+    .map(profile => [profile.characterId.toLocaleLowerCase(), profile]));
   for (const scenePlan of productionPlan.scenes) {
+    scenePlan.characterProfiles = scenePlan.cast
+      .map(characterId => characterProfiles.get(characterId.toLocaleLowerCase()))
+      .filter(Boolean);
     scenePlan.continuityIssues = stateContinuity.issues.filter(issue =>
       issue.sceneId === scenePlan.sceneId || issue.previousSceneId === scenePlan.sceneId
     );
@@ -47,7 +66,8 @@ export function buildSceneProductionContext(scenes = [], options = {}) {
       characters: memory.characters.map(entity => ({ id: entity.id, kind: entity.kind })),
       objects: memory.objects.map(entity => ({ id: entity.id, kind: entity.kind })),
       finalEvents: memory.timeline.slice(-6),
-      holderTransitions: memory.holderTransitions.slice(-6)
+      holderTransitions: memory.holderTransitions.slice(-6),
+      characterProfiles: memory.characters.map(entity => characterProfiles.get(entity.id.toLocaleLowerCase())).filter(Boolean)
     }) : null;
     scenePlan.filmMemoryContext = {
       schemaVersion: filmMemory.schemaVersion,
@@ -60,6 +80,7 @@ export function buildSceneProductionContext(scenes = [], options = {}) {
         entities: memoryScene.entities.map(entity => ({
           id: entity.id, kind: entity.kind, attributes: entity.attributes
         })),
+        characterProfiles: scenePlan.characterProfiles,
         startState: memoryScene.state.start,
         endState: memoryScene.state.end,
         stateChanges: memoryScene.state.changes,
