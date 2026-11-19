@@ -146,7 +146,7 @@ function buildStructuredStateMemory(modelScenes, baselineScenes) {
     return { supplied: true, report: { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-memory-error', severity: 'error' }] } };
   }
 }
-function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null, physicsModel = null }) {
+function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null, physicsModel = null, editingPlan = null, editDecisions = null }) {
   const requiredDetails = basePlan.scenes.map((scene, index) => ({
     scene: index + 1,
     sourceDetail: clean(scene.storyDetail, 1_200),
@@ -176,6 +176,14 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'Preserve each character\'s visual description, clothing, colors, and distinctive features in every image and motion prompt where that character appears.',
     'Main character reference: ' + clean(character, 120) + '.',
     'Write all scene text in ' + clean(language, 30) + '.',
+    'FILM LANGUAGE AND COVERAGE: Think like a cinematographer and editor, not a text summarizer. Choose shot size (establishing/wide/medium/close-up/insert), camera angle, lens perspective, camera movement and subject screen position to communicate the beat. Use wide shots to establish geography, medium shots for readable body interaction, close-ups for expressions and important details, and inserts only for story-relevant objects. Do not change shot size without a visual or dramatic reason.',
+    'CONTINUITY GRAMMAR: Maintain screen direction, axis of action and eyelines across connected shots. Keep character positions and prop positions consistent. Use shot/reverse-shot only when two participants are explicitly present and interacting. Use match-on-action only when the same documented action continues across the cut. Never cross the 180-degree line or reverse left/right screen direction without an explicitly motivated transition.',
+    'SCENE DRAMATURGY: Make each scene a complete filmable unit with a clear visual purpose, readable setup, central action, supported reaction and visible result when the source provides them. Establish who is present, where they are, what changes, and what the viewer should notice. Do not pad scenes with empty movement or repeat the same beat. An establishing scene may have no character action.',
+    'MOTION DIRECTION: Describe start pose, anticipation, main movement, follow-through, secondary motion and settle only when appropriate to the action. Specify which actor moves, which target/object responds, direction, contact point and timing only when supported by source facts. Keep the action physically legible; avoid simultaneous contradictory motions and teleporting.',
+    'EDITING KNOWLEDGE: Respect the supplied shot plan and editorial decisions. Prefer continuity cuts for connected action, match cuts for a documented visual/action match, reaction cuts for a documented reaction, and location/time transitions only when the story supports them. Avoid arbitrary jump cuts, decorative whip pans, dissolves or repeated close-ups. Preserve chronology, causal order, action direction, state hand-offs and audio cue timing. A cut must not invent an event or hide a missing action.',
+    'LOCKED SEMANTIC SHOT PLAN: ' + JSON.stringify(editingPlan),
+    'LOCKED EDITORIAL DECISIONS: ' + JSON.stringify(editDecisions),
+    'Use the shot plan as production guidance; it does not authorize adding scenes, actors, props, actions or causal links.',
     'Keep imagePrompt focused on one still frame; keep motionPrompt focused on movement.',
     'For each scene, provide actionTimeline.phases in normalized scene time from 0 to 1. Include only phases supported by the scene: preparation, action, reaction, result. Any supplied timeline must include one central action phase; preparation ends before action, reaction starts after action, and result starts after the action and any reaction. Every phase needs an assigned actorId, a concrete description, and evidence copied exactly from locked storyDetail or sourceEvents. Use only characters assigned to that scene. Do not invent reactions or targets; targetId may be null. If the scene is an establishing shot with no character action, set actionTimeline to null.',
     'Build a strict scene-to-scene hand-off: scene N+1 startState must continue scene N endState. Preserve the exact positions and states of characters, props, clothing, lighting, weather, and location unless the supplied story explicitly changes them.',
@@ -237,7 +245,7 @@ export async function directStoryboardWithLocalAI({
 
   let generated;
   try {
-    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel, physicsModel, causalModel, editingPlan }, physicsModel }), {
+    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel, physicsModel, causalModel, editingPlan }, physicsModel, editingPlan, editDecisions }), {
       maxNewTokens: tokenBudget,
       temperature: 0.15,
       signal
