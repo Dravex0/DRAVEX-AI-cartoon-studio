@@ -104,6 +104,7 @@ export function normalizeScene(input = {}, index = 0) {
       })) : [],
     stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(change => change && typeof change === 'object' && !Array.isArray(change)).slice(0, 30).map(change => {
       const position = normalizedScenePoint(change.position);
+      const previousPosition = normalizedScenePoint(change.previousPosition);
       return {
         entityType: text(change.entityType, 20),
         entityId: text(change.entityId, 120),
@@ -113,7 +114,8 @@ export function normalizeScene(input = {}, index = 0) {
         actorId: text(change.actorId, 120),
         evidence: text(change.evidence, 1_200),
         ...(change.actionIntent == null || change.actionIntent === '' ? {} : { actionIntent: text(change.actionIntent, 40) }),
-        ...(position ? { position } : {})
+        ...(position ? { position } : {}),
+        ...(previousPosition ? { previousPosition } : {})
       };
     }) : [],
     interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
