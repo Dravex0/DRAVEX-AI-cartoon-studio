@@ -11,6 +11,7 @@ import { normalizeCharacterFacialRig, normalizeCharacterFacialExpressions } from
 
 const text = (value, max = 10_000) => String(value ?? '').trim().slice(0, max);
 const uniqueStrings = values => [...new Set((Array.isArray(values) ? values : []).map(value => text(value, 160)).filter(Boolean))];
+// Prop state-change positions are authored in normalized viewport coordinates (0..1), not physics meters.
 const normalizedScenePoint = value => value && typeof value === 'object' && !Array.isArray(value)
   && typeof value.x === 'number' && Number.isFinite(value.x) && value.x >= 0 && value.x <= 1
   && typeof value.y === 'number' && Number.isFinite(value.y) && value.y >= 0 && value.y <= 1
