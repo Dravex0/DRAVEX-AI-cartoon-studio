@@ -5,6 +5,7 @@ import { buildSceneWorldModel } from './scene-world-model.js';
 import { buildSemanticEditingPlan } from './semantic-editing-plan.js';
 import { buildEditDecisionPlan } from './edit-decision-engine.js';
 import { buildScenePhysicsModel } from './scene-physics-model.js';
+import { buildSceneCausalModel } from './scene-causal-model.js';
 import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-state-memory.js';
 
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
@@ -154,7 +155,8 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     lockedInteraction: scene.interaction || null,
     lockedCausalLink: scene.causalLink || null,
     lockedStateChanges: scene.stateChanges || [],
-    lockedPhysics: { physics: scene.physics || null, physicsEvents: scene.physicsEvents || [] }
+    lockedPhysics: { physics: scene.physics || null, physicsEvents: scene.physicsEvents || [] },
+    lockedCausalEvents: Array.isArray(scene.causalEvents) ? scene.causalEvents : []
   }));
   return [
     'You are DRAVEX, a careful animation film director.',
@@ -183,6 +185,8 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'The source details below are locked facts. Do not rewrite, reorder, omit, or duplicate them.',
     'LOCKED SOURCE DETAILS: ' + JSON.stringify(requiredDetails),
     'LOCKED EVENT CHAIN: ' + JSON.stringify(eventChain),
+    'LOCKED CAUSAL INTERACTION MODEL: ' + JSON.stringify(eventChain?.causalModel || null),
+    'Preserve every explicit causal event ID, type, actor, target, entity, evidence, causedByEventId and physicsEventId. Never create a cause/effect link merely because events are adjacent or physically plausible. Unresolved references remain unresolved.',
     'Treat the event chain as immutable source-grounded structure. Preserve actor-to-target direction, explicit consequences, and state changes. Do not invent a reaction-to link or causal edge when it is absent.',
     'ORIGINAL STORY: ' + clean(storyText, 12_000)
   ].join('\n\n');
@@ -210,6 +214,7 @@ export async function directStoryboardWithLocalAI({
   const eventChain = buildStoryEventChain(fallback);
   const worldModel = buildSceneWorldModel(fallback, { language });
   const physicsModel = buildScenePhysicsModel(fallback, worldModel);
+  const causalModel = buildSceneCausalModel(fallback, worldModel, physicsModel);
   const editingPlan = buildSemanticEditingPlan(fallback, worldModel);
   const editDecisions = buildEditDecisionPlan(editingPlan, fallback, worldModel);
   const fallbackResult = (reason, evaluation = null) => ({
@@ -221,6 +226,7 @@ export async function directStoryboardWithLocalAI({
     eventChain,
     worldModel,
     physicsModel,
+    causalModel,
     editingPlan,
     editDecisions
   });
@@ -231,7 +237,7 @@ export async function directStoryboardWithLocalAI({
 
   let generated;
   try {
-    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel, physicsModel, editingPlan }, physicsModel }), {
+    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel, physicsModel, causalModel, editingPlan }, physicsModel }), {
       maxNewTokens: tokenBudget,
       temperature: 0.15,
       signal
@@ -303,6 +309,7 @@ export async function directStoryboardWithLocalAI({
 
   const acceptedWorldModel = buildSceneWorldModel(candidate, { language });
   const acceptedPhysicsModel = buildScenePhysicsModel(candidate, acceptedWorldModel);
+  const acceptedCausalModel = buildSceneCausalModel(candidate, acceptedWorldModel, acceptedPhysicsModel);
   const acceptedEditingPlan = buildSemanticEditingPlan(candidate, acceptedWorldModel);
   const acceptedEditDecisions = buildEditDecisionPlan(acceptedEditingPlan, candidate, acceptedWorldModel);
 
@@ -312,6 +319,7 @@ export async function directStoryboardWithLocalAI({
     eventChain,
     worldModel: acceptedWorldModel,
     physicsModel: acceptedPhysicsModel,
+    causalModel: acceptedCausalModel,
     editingPlan: acceptedEditingPlan,
     editDecisions: acceptedEditDecisions,
     evaluation,
