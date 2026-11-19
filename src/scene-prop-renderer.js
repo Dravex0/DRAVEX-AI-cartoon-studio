@@ -174,6 +174,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     positionByProp.get(propKey).push(change);
   }
 
+  const claimedPositionSteps = new Set();
   for (const [propKey, history] of positionByProp) {
     const existing = holderPlans.find(item => key(item.id) === propKey);
     // A held prop follows its holder anchor; world-space motion cannot detach it.
@@ -185,7 +186,13 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       const from = normalizedPoint(change.previousPosition) || current;
       const to = normalizedPoint(change.position);
       if (!to) continue;
-      const matchedStep = timelineSteps.find(step => clean(step.intent) === clean(change.actionIntent));
+      const actionIntent = clean(change.actionIntent);
+      const matchedStepIndex = actionIntent
+        ? timelineSteps.findIndex((step, stepIndex) => !claimedPositionSteps.has(stepIndex)
+          && clean(step.intent) === actionIntent)
+        : -1;
+      const matchedStep = matchedStepIndex >= 0 ? timelineSteps[matchedStepIndex] : null;
+      if (matchedStep) claimedPositionSteps.add(matchedStepIndex);
       const start = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
       const end = matchedStep ? matchedStep.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
       if (!from) {
