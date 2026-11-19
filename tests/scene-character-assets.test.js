@@ -54,7 +54,7 @@ test('full-film export waits for character images before starting MediaRecorder'
 
 test('direct WebM export applies the shared character-visual gate before MediaRecorder starts', () => {
   const start = appSource.indexOf('async function exportFilm(');
-  const end = appSource.indexOf("\\n$('export').onclick", start);
+  const end = appSource.indexOf("$('export').onclick", start);
   assert.ok(start >= 0 && end > start, 'exportFilm must be present');
   const block = appSource.slice(start, end);
   const gate = block.indexOf('getMissingCharacterVisualCount(exportProtagonistId)');
