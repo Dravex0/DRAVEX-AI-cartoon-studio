@@ -108,3 +108,59 @@ test('handles malformed scene lists and event entries safely', () => {
   assert.equal(model.eventCount, 0);
   assert.equal(model.validation.issues.length, 2);
 });
+
+
+test('models grounded throw and catch actions with explicit participants and contact', () => {
+  const model = buildScenePhysicsModel([{
+    id: 'throw-catch',
+    storyDetail: 'Mira throws the ball to Noah. Noah catches the ball.',
+    physicsEvents: [
+      { id: 'throw', type: 'throw', entityId: 'ball', actorId: 'Mira', targetId: 'Noah',
+        contact: true, evidence: 'Mira throws the ball to Noah.' },
+      { id: 'catch', type: 'catch', entityId: 'ball', actorId: 'Noah', targetId: 'ball',
+        contact: true, evidence: 'Noah catches the ball.' }
+    ]
+  }], { entities: [{ id: 'Mira' }, { id: 'Noah' }, { id: 'ball' }] });
+
+  assert.equal(model.groundedEventCount, 2);
+  assert.equal(model.events[0].type, 'throw');
+  assert.equal(model.events[0].actorId, 'Mira');
+  assert.equal(model.events[0].targetId, 'Noah');
+  assert.equal(model.events[0].contactKnown, true);
+  assert.equal(model.events[1].type, 'catch');
+  assert.equal(model.events[1].actorId, 'Noah');
+  assert.equal(model.events[1].targetId, 'ball');
+  assert.equal(model.validation.issues.length, 0);
+});
+
+test('keeps missing physical actors and holder transitions unresolved', () => {
+  const model = buildScenePhysicsModel([{
+    id: 'uncertain-transfer',
+    storyDetail: 'The key changes hands.',
+    physicsEvents: [
+      { id: 'push', type: 'push', entityId: 'cart', evidence: 'The key changes hands.' },
+      { id: 'handoff', type: 'transfer', entityId: 'key', evidence: 'The key changes hands.' }
+    ]
+  }]);
+
+  assert.ok(model.validation.issues.some(issue => issue.code === 'physical-action-missing-actor'));
+  assert.ok(model.validation.issues.some(issue => issue.code === 'transfer-missing-holder-transition'));
+  assert.equal(model.events[1].fromEntityId, null);
+  assert.equal(model.events[1].toEntityId, null);
+});
+
+test('checks physical participants against the known scene world', () => {
+  const model = buildScenePhysicsModel([{
+    id: 'scene-physical',
+    storyDetail: 'Mira pushes the cart.',
+    physicsEvents: [{
+      id: 'push-cart', type: 'push', entityId: 'cart', actorId: 'Mira',
+      evidence: 'Mira pushes the cart.'
+    }]
+  }], { entities: [{ id: 'cart' }] });
+
+  assert.ok(model.validation.issues.some(issue =>
+    issue.code === 'physics-participant-not-in-world-model'
+    && issue.role === 'actor' && issue.entityId === 'Mira'
+  ));
+});
