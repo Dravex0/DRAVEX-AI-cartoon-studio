@@ -40,10 +40,12 @@ export function isProceduralFoxCharacter(profile = {}) {
 export function resolveProceduralDemoCharacter({ requestedCharacter = '', protagonistId = '', protagonistProfile = null } = {}) {
   const requested = String(requestedCharacter ?? '').trim();
   const id = String(protagonistId ?? protagonistProfile?.characterId ?? '').trim();
-  if (!requested && DEFAULT_FALLBACK_NAMES.has(id)) return true;
   const profile = protagonistProfile && typeof protagonistProfile === 'object' && !Array.isArray(protagonistProfile)
     ? protagonistProfile
     : { characterId: id };
+  const hasExplicitAppearance = ['species', 'visualDescription', 'clothing', 'colors', 'distinctiveFeatures']
+    .some(field => String(profile[field] ?? '').trim().length > 0);
+  if (!requested && DEFAULT_FALLBACK_NAMES.has(id) && !hasExplicitAppearance) return true;
   return isProceduralFoxCharacter(profile);
 }
 

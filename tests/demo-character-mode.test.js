@@ -48,6 +48,30 @@ test('resolves the same procedural fallback for deterministic and local-AI story
   assert.equal(resolveProceduralDemoCharacter({ requestedCharacter: 'Foxy', protagonistId: 'Foxy', protagonistProfile: { characterId: 'Foxy', species: 'robot' } }), false);
 });
 
+test('respects an explicit non-fox appearance when the protagonist uses the default placeholder name', () => {
+  assert.equal(resolveProceduralDemoCharacter({
+    requestedCharacter: '',
+    protagonistId: 'Main character',
+    protagonistProfile: {
+      characterId: 'Main character',
+      species: 'robot',
+      visualDescription: 'a small blue robot with glowing eyes'
+    }
+  }), false);
+  assert.equal(resolveProceduralDemoCharacter({
+    requestedCharacter: '',
+    protagonistId: 'Main character',
+    protagonistProfile: {
+      characterId: 'Main character',
+      visualDescription: 'a small orange fox with a blue scarf'
+    }
+  }), true);
+  assert.equal(resolveProceduralDemoCharacter({
+    requestedCharacter: '',
+    protagonistId: 'Main character'
+  }), true);
+});
+
 test('recognizes a valid image-backed rig as a renderable character visual', () => {
   const rig = {
     schemaVersion: 1,
