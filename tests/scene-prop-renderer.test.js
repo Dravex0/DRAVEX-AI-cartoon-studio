@@ -215,3 +215,34 @@ test('does not guess which hand holds a prop when both hands lack an authored gr
   assert.equal(plan.x, 0.62);
   assert.equal(plan.y, 0.62);
 });
+
+
+test('selects a semantic gripAnchor marker without relying on part ID naming', () => {
+  const rig = {
+    schemaVersion: 1, characterId: 'Mira',
+    bones: [{ id: 'root', parentId: null }, { id: 'leftHand', parentId: 'root' }, { id: 'rightHand', parentId: 'root' }],
+    parts: [
+      { id: 'leftHand', boneId: 'leftHand', imageUrl: 'https://assets.example/left.png', x: 0.3, y: 0.6, width: 0.08, height: 0.08 },
+      { id: 'contact-point-02', boneId: 'rightHand', imageUrl: 'https://assets.example/right.png', x: 0.7, y: 0.55, width: 0.08, height: 0.08, gripAnchor: true }
+    ]
+  };
+  const miraScene = { ...scene, stateChanges: scene.stateChanges.map(change => ({ ...change, value: 'Mira', actorId: 'Mira' })) };
+  const plan = buildScenePropRenderPlan(miraScene, [{ characterId: 'Mira', x: 0.5, y: 0.7 }], 1, { characterRigs: [rig] })[0];
+  assert.ok(Math.abs(plan.x - 0.7) < 1e-9);
+  assert.ok(Math.abs(plan.y - 0.55) < 1e-9);
+});
+
+test('does not choose between multiple semantic grip anchors', () => {
+  const rig = {
+    schemaVersion: 1, characterId: 'Mira',
+    bones: [{ id: 'root', parentId: null }, { id: 'leftHand', parentId: 'root' }, { id: 'rightHand', parentId: 'root' }],
+    parts: [
+      { id: 'left-contact', boneId: 'leftHand', imageUrl: 'https://assets.example/left.png', x: 0.3, y: 0.6, width: 0.08, height: 0.08, gripAnchor: true },
+      { id: 'right-contact', boneId: 'rightHand', imageUrl: 'https://assets.example/right.png', x: 0.7, y: 0.55, width: 0.08, height: 0.08, gripAnchor: true }
+    ]
+  };
+  const miraScene = { ...scene, stateChanges: scene.stateChanges.map(change => ({ ...change, value: 'Mira', actorId: 'Mira' })) };
+  const plan = buildScenePropRenderPlan(miraScene, [{ characterId: 'Mira', x: 0.5, y: 0.7 }], 1, { characterRigs: [rig] })[0];
+  assert.equal(plan.x, 0.62);
+  assert.equal(plan.y, 0.62);
+});
