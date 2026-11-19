@@ -202,7 +202,7 @@ export async function directStoryboardWithLocalAI({
     ? estimateDirectorTokenBudget(fallback.length)
     : Math.max(16, Math.min(1024, Math.round(Number(maxNewTokens) || estimateDirectorTokenBudget(fallback.length))));
   const eventChain = buildStoryEventChain(fallback);
-  const worldModel = buildSceneWorldModel(fallback);
+  const worldModel = buildSceneWorldModel(fallback, { language });
   const fallbackResult = (reason, evaluation = null) => ({
     usedLocalModel: false,
     scenes: fallback,
