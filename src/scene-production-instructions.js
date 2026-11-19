@@ -33,9 +33,12 @@ export function buildSceneProductionInstructions(plan) {
     clean(plan.continuity?.startState, 700) && 'Continuity start state: ' + clean(plan.continuity.startState, 700),
     clean(plan.continuity?.endState, 700) && 'Continuity end state: ' + clean(plan.continuity.endState, 700),
     records(plan.continuity?.stateChanges).length && 'Continuity state changes: ' + records(plan.continuity.stateChanges).slice(0, 16).map(item => compact(item, 400)).join('; '),
+    plan.filmMemoryContext?.previousScene && 'Previous scene ending (continuity reference only; do not replay it): ' + compact(plan.filmMemoryContext.previousScene, 1800),
+    plan.filmMemoryContext?.currentScene && 'Unified current-scene memory (preserve entity identities, starting state, ordered actions, object handoffs and explicit causal links): ' + compact(plan.filmMemoryContext.currentScene, 2600),
+    records(plan.filmMemoryContext?.continuityIssues).length && 'Film-memory continuity warnings: ' + records(plan.filmMemoryContext.continuityIssues).slice(0, 10).map(item => compact(item, 350)).join('; '),
     records(plan.continuityIssues).length && 'Continuity QA warnings to reconcile without inventing events: ' + records(plan.continuityIssues).slice(0, 12).map(item => compact(item, 450)).join('; '),
     Array.isArray(plan.requiredPasses) && plan.requiredPasses.length && 'Requested production passes: ' + plan.requiredPasses.map(value => clean(value, 80)).filter(Boolean).join(', '),
-    'Execution constraints: keep all listed characters and entities visually distinct; show cause before effect; maintain object ownership and contact through handoffs; preserve physical direction and scene continuity; make each timed beat visibly legible; do not replace character action with camera movement or a static background.',
+    'Execution constraints: keep each entity identity and appearance consistent with its supplied attributes; keep all listed characters and entities visually distinct; show cause before effect; maintain object ownership and contact through handoffs; preserve physical direction and scene continuity; make each timed beat visibly legible; do not replace character action with camera movement or a static background. Treat the previous-scene ending as continuity evidence, not as an instruction to replay it.',
     records(plan.continuityIssues).length && 'When continuity QA warnings are supplied, reconcile the depicted transition only when supported by the story; never invent a journey, handoff, disappearance, costume change, or state change merely to hide a warning.',
     'This is a provider instruction, not proof that the provider supports or has completed every requested pass.'
   ].filter(Boolean);
