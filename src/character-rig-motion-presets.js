@@ -379,7 +379,7 @@ function poseFor(rig, preset, phase) {
       if (role === 'rightLowerArm') rotation = -0.42 * embrace;
       if (role === 'head') rotation = 0.06 * embrace;
     } else if (preset === 'point') {
-      const gesture = Math.sin(Math.PI * Math.min(phase * 2.2, 1));
+      const gesture = clamp(phase * 2.2, 0, 1);
       if (role === 'rightArm' || role === 'arm') rotation = -0.92 * gesture;
       if (role === 'rightLowerArm') rotation = 0.08 * gesture;
       if (role === 'leftArm') rotation = -0.08 * gesture;
