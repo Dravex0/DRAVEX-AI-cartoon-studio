@@ -45,6 +45,7 @@ function normalizePart(input = {}, index = 0) {
     rotation: clamp(source.rotation, -Math.PI * 2, Math.PI * 2),
     gripOffsetX: clamp(source.gripOffsetX, -1, 1),
     gripOffsetY: clamp(source.gripOffsetY, -1, 1),
+    gripAnchor: source.gripAnchor === true,
     zIndex: Math.round(clamp(source.zIndex, -1000, 1000, index))
   };
 }
