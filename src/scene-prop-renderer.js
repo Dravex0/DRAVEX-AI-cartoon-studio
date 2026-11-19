@@ -152,7 +152,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       held = holder != null;
     }
 
-    const point = holderPoint(holder, history[activeIndex]?.position);
+    const finalPositionChange = history[activeIndex >= 0 ? activeIndex : 0];
+    const point = holderPoint(holder, finalPositionChange?.position);
     return {
       id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
       rotation: point.rotation || 0, held, visible: true, scale: 1,
