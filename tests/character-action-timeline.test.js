@@ -235,3 +235,19 @@ test('rejects unordered or ungrounded action substeps', () => {
   assert.ok(report.issues.some(item => item.code === 'action-step-timing-invalid'));
   assert.ok(report.issues.some(item => item.code === 'action-step-evidence-ungrounded'));
 });
+
+
+test('normalizes and validates explicit target positions without inventing missing coordinates', () => {
+  const candidate = structuredClone(scene);
+  candidate.actionTimeline.phases[1].targetPosition = { x: 0.72, y: 0.55 };
+  const normalized = normalizeCharacterActionTimeline(candidate.actionTimeline);
+  assert.deepEqual(normalized.phases[1].targetPosition, { x: 0.72, y: 0.55 });
+  assert.equal(validateCharacterActionTimeline(candidate).passed, true);
+
+  delete candidate.actionTimeline.phases[1].targetPosition;
+  assert.equal(Object.hasOwn(normalizeCharacterActionTimeline(candidate.actionTimeline).phases[1], 'targetPosition'), false);
+
+  candidate.actionTimeline.phases[1].targetPosition = { x: 1.2, y: 0.55 };
+  const invalid = validateCharacterActionTimeline(candidate);
+  assert.ok(invalid.issues.some(item => item.code === 'phase-target-position-invalid'));
+});
