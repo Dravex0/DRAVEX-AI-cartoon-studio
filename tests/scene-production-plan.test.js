@@ -128,6 +128,9 @@ test('schedules complete grounded causal interaction chains in scene work orders
   assert.deepEqual(plan.scenes.map(scene => scene.causalChainRefs[0]?.chainId), [
     'cart-chain', 'cart-chain', 'cart-chain'
   ]);
+  assert.deepEqual(plan.scenes.map(scene =>
+    scene.causalChainDetails[0]?.events.filter(event => event.occursInCurrentScene).map(event => event.id)
+  ), [['push', 'move'], ['collision', 'crate-falls'], ['react']]);
   assert.ok(plan.scenes.every(scene => scene.requiredPasses.includes('causal-interaction-sequence')));
 });
 
