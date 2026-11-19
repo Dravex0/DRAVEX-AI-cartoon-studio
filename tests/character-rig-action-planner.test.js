@@ -340,3 +340,53 @@ test('does not invent a target or apply IK when an action has only a target ID',
   assert.equal(result.status, 'generated');
   assert.equal(Object.hasOwn(result.mappedActions[0], 'targetedReach'), false);
 });
+
+
+test('resolves an IK target from the uniquely matching explicitly positioned prop state change', () => {
+  const targetPosition = { x: 0.72, y: 0.55 };
+  const armRig = {
+    schemaVersion: 1,
+    characterId: 'Foxy',
+    bones: [
+      { id: 'root', parentId: null },
+      { id: 'leftArm', parentId: 'root', pivotX: 0.5, pivotY: 0.4 },
+      { id: 'leftForearm', parentId: 'leftArm', pivotX: 0.65, pivotY: 0.4 },
+      { id: 'leftHand', parentId: 'leftForearm', pivotX: 0.8, pivotY: 0.4 }
+    ],
+    parts: [
+      { id: 'body', boneId: 'root', imageUrl: 'https://assets.example/body.png', x: 0.5, y: 0.5 },
+      { id: 'hand', boneId: 'leftHand', imageUrl: 'https://assets.example/hand.png', x: 0.8, y: 0.4 }
+    ]
+  };
+  const candidate = makeScene('picks up the silver key');
+  candidate.stateChanges = [{
+    entityType: 'prop', entityId: 'silver key', property: 'holder',
+    previousValue: null, value: 'Foxy', actionIntent: 'pick_up',
+    position: targetPosition, evidence: 'Foxy picks up the silver key'
+  }];
+  candidate.actionTimeline.phases[0].steps = [{
+    intent: 'pick_up', motionCue: 'turn', start: 0.2, end: 0.8,
+    actorId: 'Foxy', targetId: 'silver key',
+    description: 'Foxy picks up the silver key', evidence: 'picks up the silver key'
+  }];
+  const result = createCharacterRigTimelineFromActionTimeline(candidate, [armRig]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.mappedActions[0].targetedReach, 'solved');
+  assert.equal(result.mappedActions[0].targetPositionSource, 'prop-state-change');
+});
+
+test('does not resolve an ambiguous prop target from multiple unmatched position records', () => {
+  const candidate = makeScene('picks up the silver key');
+  candidate.stateChanges = [
+    { entityType: 'prop', entityId: 'silver key', property: 'holder', position: { x: 0.72, y: 0.55 } },
+    { entityType: 'prop', entityId: 'silver key', property: 'holder', position: { x: 0.2, y: 0.3 } }
+  ];
+  candidate.actionTimeline.phases[0].steps = [{
+    intent: 'pick_up', motionCue: 'turn', start: 0.2, end: 0.8,
+    actorId: 'Foxy', targetId: 'silver key',
+    description: 'Foxy picks up the silver key', evidence: 'picks up the silver key'
+  }];
+  const result = createCharacterRigTimelineFromActionTimeline(candidate, [rig()]);
+  assert.equal(result.status, 'generated');
+  assert.equal(Object.hasOwn(result.mappedActions[0], 'targetedReach'), false);
+});
