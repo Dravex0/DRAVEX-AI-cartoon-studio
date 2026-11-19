@@ -49,3 +49,11 @@ test('reports missing camera coverage and invalid shot durations', () => {
   assert.ok(plan.validation.issues.some(issue => issue.code === 'non-positive-shot-duration'));
   assert.ok(plan.validation.issues.some(issue => issue.code === 'camera-coverage-unspecified'));
 });
+
+test('does not mistake planner fallback cut metadata for an authored transition', () => {
+  const plan = buildEditDecisionPlan({ shots: [
+    { id: 'a', sceneId: 's1', durationSeconds: 2, continuity: {} },
+    { id: 'b', sceneId: 's1', durationSeconds: 2, cut: { type: 'cut', reason: 'planner default' }, continuity: {} }
+  ] }, [{ id: 's1' }]);
+  assert.equal(plan.cuts[0].type, 'continuous_action');
+});
