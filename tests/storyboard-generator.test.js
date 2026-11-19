@@ -282,6 +282,6 @@ test('assigns a shouted command to the speaker and its target, not the speaker',
   assert.equal(command.interactionType, 'command');
   assert.equal(step.actorId, 'Officer');
   assert.equal(step.targetId, 'Robber');
-  assert.match(scene.motionGenerationPrompt, /Officer → Robber: shout_command/);
+  assert.match(scene.motionGenerationPrompt, /actor: Officer; target: Robber/);
   assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
 });
