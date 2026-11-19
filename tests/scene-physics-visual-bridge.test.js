@@ -10,7 +10,8 @@ test('samples grounded events with explicit viewport trajectories', () => {
   const sample = buildGroundedPhysicsVisualPlan(scene, model, 0.5)[0];
   assert.equal(sample.eventId, 'ball-flight');
   assert.equal(sample.active, true);
-  assert.deepEqual({ x: sample.x, y: sample.y }, { x: 0.5, y: 0.5 });
+  assert.ok(Math.abs(sample.x - 0.5) < 1e-12);
+  assert.ok(Math.abs(sample.y - 0.5) < 1e-12);
 });
 test('does not reinterpret physics meter positions as viewport coordinates', () => {
   const meterOnly = { physicsEvents: [{ id: 'ball-flight', entityId: 'ball',
