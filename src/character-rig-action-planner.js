@@ -4,6 +4,7 @@ import { createCharacterRigMotionPreset } from './character-rig-motion-presets.j
 import { sampleCharacterRigTimeline, validateCharacterRigTimeline } from './character-rig-timeline.js';
 import { compileDoodleSceneMotion } from './doodle-rig-adapter.js';
 import { solveCharacterRigLimbPose } from './character-rig-ik.js';
+import { buildScenePhysicsModel } from './scene-physics-model.js';
 
 const clean = value => String(value ?? '').trim();
 const key = value => clean(value).toLocaleLowerCase();
@@ -53,6 +54,47 @@ function resolvePropTargetPosition(scene, phase) {
   return candidates.length === 1
     ? { x: candidates[0].position.x, y: candidates[0].position.y }
     : null;
+}
+
+const PHYSICS_TARGET_TYPES_BY_INTENT = Object.freeze({
+  pick_up: ['grasp'], grasp: ['grasp'], catch: ['catch'],
+  carry: ['carry'], throw: ['throw'], release: ['release'],
+  push: ['push'], pull: ['pull']
+});
+
+function normalizedViewportPoint(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    && Number.isFinite(value.x) && value.x >= 0 && value.x <= 1
+    && Number.isFinite(value.y) && value.y >= 0 && value.y <= 1
+    ? { x: value.x, y: value.y } : null;
+}
+
+/** Resolve a contact point only from one grounded, actor-matched physics event. */
+function resolveGroundedPhysicsTargetPosition(scene, phase) {
+  const intent = key(phase?.intent);
+  const targetId = key(phase?.targetId);
+  const actorId = key(phase?.actorId);
+  const allowedTypes = PHYSICS_TARGET_TYPES_BY_INTENT[intent] || [];
+  if (!targetId || !actorId || !allowedTypes.length) return null;
+
+  const physicsModel = buildScenePhysicsModel([scene]);
+  const candidates = physicsModel.events.filter(event =>
+    event.grounded === true
+    && key(event.entityId) === targetId
+    && key(event.actorId) === actorId
+    && allowedTypes.includes(key(event.type))
+  );
+  const evidenceMatches = candidates.filter(event => key(event.evidence) === key(phase.evidence));
+  const selected = evidenceMatches.length ? evidenceMatches : candidates;
+  if (selected.length !== 1) return null;
+
+  const source = (Array.isArray(scene?.physicsEvents) ? scene.physicsEvents : [])
+    .find(event => key(event?.id) === key(selected[0].id));
+  if (!source) return null;
+  // A catch meets the incoming object at the end of its authored path.
+  // Grasp/pick-up/push/pull/throw/release begin at the object's authored start.
+  const rawPoint = intent === 'catch' ? source.visualEndPosition : source.visualStartPosition;
+  return normalizedViewportPoint(rawPoint);
 }
 
 function solveTargetedArmPose(rig, target) {
@@ -156,8 +198,12 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     let timeline = result.timeline;
     let targetedReach = null;
     const resolvedPropPosition = phase.targetPosition ? null : resolvePropTargetPosition(scene, phase);
-    const targetPosition = phase.targetPosition || resolvedPropPosition;
-    const targetPositionSource = phase.targetPosition ? 'action-timeline' : resolvedPropPosition ? 'prop-state-change' : null;
+    const resolvedPhysicsPosition = phase.targetPosition || resolvedPropPosition
+      ? null : resolveGroundedPhysicsTargetPosition(scene, phase);
+    const targetPosition = phase.targetPosition || resolvedPropPosition || resolvedPhysicsPosition;
+    const targetPositionSource = phase.targetPosition ? 'action-timeline'
+      : resolvedPropPosition ? 'prop-state-change'
+      : resolvedPhysicsPosition ? 'grounded-physics-event' : null;
     if (targetPosition) {
       const armSolution = solveTargetedArmPose(rig, targetPosition);
       targetedReach = armSolution.status;
