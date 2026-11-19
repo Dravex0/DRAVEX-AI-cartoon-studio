@@ -162,3 +162,23 @@ test('preserves pickup and drop as two ordered transitions for the same prop', (
   assert.equal(carried.transitionIndex, 0);
   assert.equal(released.transitionIndex, 1);
 });
+
+test('animates an explicitly authored prop handoff between two characters', () => {
+  const handoff = {
+    actionTimeline: { phases: [{ phase: 'action', start: 0, end: 1 }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'key', property: 'holder',
+      previousValue: 'Fox', value: 'Bird', actorId: 'Fox',
+      evidence: 'Fox hands the key to Bird.'
+    }]
+  };
+  const cast = [...layers, { characterId: 'Bird', x: 0.8, y: 0.65 }];
+  const before = buildScenePropRenderPlan(handoff, cast, 0.1)[0];
+  const middle = buildScenePropRenderPlan(handoff, cast, 0.5)[0];
+  const after = buildScenePropRenderPlan(handoff, cast, 0.9)[0];
+  assert.ok(before.x < middle.x);
+  assert.ok(middle.x < after.x);
+  assert.equal(before.held, true);
+  assert.equal(after.held, true);
+  assert.equal(after.x, 0.92);
+});
