@@ -43,3 +43,30 @@ test('returns no extra provider instruction when no validated production plan ex
     'This is a provider instruction, not proof that the provider supports or has completed every requested pass.'
   ].join('\n'));
 });
+
+
+test('passes the ordered cross-scene causal sequence with current-scene markers to providers', () => {
+  const instructions = buildSceneProductionInstructions({
+    sceneId: 'scene-impact',
+    causalChainDetails: [{
+      chainId: 'push-to-fall',
+      events: [
+        { id: 'push', sceneId: 'scene-start', sequence: 1, type: 'action',
+          actorId: 'Mira', entityId: 'cart', evidence: 'Mira pushes the cart.',
+          occursInCurrentScene: false },
+        { id: 'impact', sceneId: 'scene-impact', sequence: 2, type: 'physical_event',
+          entityId: 'cart', targetId: 'crate', physicsEventId: 'collision-1',
+          evidence: 'The cart hits the crate.', occursInCurrentScene: true },
+        { id: 'fall', sceneId: 'scene-impact', sequence: 3, type: 'effect',
+          entityId: 'crate', evidence: 'The crate falls.', occursInCurrentScene: true }
+      ]
+    }]
+  });
+
+  assert.match(instructions, /Ordered grounded causal interaction chains/);
+  assert.ok(instructions.indexOf('"id":"push"') < instructions.indexOf('"id":"impact"'));
+  assert.ok(instructions.indexOf('"id":"impact"') < instructions.indexOf('"id":"fall"'));
+  assert.match(instructions, /"occursInCurrentScene":false/);
+  assert.match(instructions, /"occursInCurrentScene":true/);
+  assert.match(instructions, /collision-1/);
+});
