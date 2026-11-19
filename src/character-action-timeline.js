@@ -22,6 +22,15 @@ function normalizeMotionPose(rawPose) {
   return Object.keys(pose).length ? pose : null;
 }
 
+function normalizeTargetPosition(rawPosition) {
+  if (!isRecord(rawPosition)
+    || typeof rawPosition.x !== 'number' || !Number.isFinite(rawPosition.x)
+    || typeof rawPosition.y !== 'number' || !Number.isFinite(rawPosition.y)
+    || rawPosition.x < 0 || rawPosition.x > 1
+    || rawPosition.y < 0 || rawPosition.y > 1) return null;
+  return { x: rawPosition.x, y: rawPosition.y };
+}
+
 function normalizePhaseMotion(rawMotion) {
   if (!isRecord(rawMotion)) return null;
   const to = normalizeMotionPose(rawMotion.to);
@@ -46,12 +55,14 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
       const start = Number(phase.start);
       const end = Number(phase.end);
       const motion = phase.motion == null ? undefined : normalizePhaseMotion(phase.motion);
+      const targetPosition = phase.targetPosition == null ? undefined : normalizeTargetPosition(phase.targetPosition);
       return {
         phase: clean(phase.phase, 24),
         start: Number.isFinite(start) ? start : null,
         end: Number.isFinite(end) ? end : null,
         actorId: clean(phase.actorId, 120),
         targetId: clean(phase.targetId, 120) || null,
+        ...(phase.targetPosition == null ? {} : { targetPosition }),
         description: clean(phase.description, 700),
         evidence: clean(phase.evidence, 500),
         ...(phase.easing == null ? {} : { easing: clean(phase.easing, 24) }),
@@ -61,6 +72,7 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
             if (!isRecord(step)) return null;
             const stepStart = Number(step.start);
             const stepEnd = Number(step.end);
+            const targetPosition = step.targetPosition == null ? undefined : normalizeTargetPosition(step.targetPosition);
             return {
               intent: clean(step.intent, 80),
               motionCue: clean(step.motionCue, 40),
@@ -68,6 +80,7 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
               end: Number.isFinite(stepEnd) ? stepEnd : null,
               actorId: clean(step.actorId, 120),
               targetId: clean(step.targetId, 120) || null,
+              ...(step.targetPosition == null ? {} : { targetPosition }),
               description: clean(step.description, 500),
               evidence: clean(step.evidence, 300)
             };
@@ -135,6 +148,9 @@ export function validateCharacterActionTimeline(scene = {}) {
     }
 
     if (!normalized.description) issues.push(issue('phase-description-missing', name, 'Every phase needs a concrete visible description.'));
+    if (phase.targetPosition != null && !normalized.targetPosition) {
+      issues.push(issue('phase-target-position-invalid', name, 'A target position must contain finite normalized x/y coordinates from 0 to 1.'));
+    }
     if (phase.motion != null && !normalized.motion) issues.push(issue('phase-motion-invalid', name, 'Motion must provide a numeric target pose with at least one supported transform property.'));
     if (phase.easing != null && !MOTION_EASINGS.has(normalized.easing)) issues.push(issue('phase-easing-invalid', name, 'Motion easing must be linear, ease-in, ease-out, or ease-in-out.'));
     if (!normalized.actorId) issues.push(issue('phase-actor-missing', name, 'Every phase needs an acting character ID.'));
@@ -177,6 +193,9 @@ export function validateCharacterActionTimeline(scene = {}) {
         }
         if (!evidenceSources.some(source => source.includes(step.evidence))) {
           issues.push(issue('action-step-evidence-ungrounded', 'action', `Action substep ${index + 1} evidence must exactly match locked story evidence.`));
+        }
+        if (step.targetPosition != null && !step.targetPosition) {
+          issues.push(issue('action-step-target-position-invalid', 'action', `Action substep ${index + 1} target position must contain finite normalized x/y coordinates from 0 to 1.`));
         }
         if (step.actorId && castWasExplicit && !cast.has(step.actorId.toLocaleLowerCase())) {
           issues.push(issue('action-step-actor-not-in-cast', 'action', `Action substep ${index + 1} actor must belong to the scene cast.`));
