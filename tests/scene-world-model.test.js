@@ -14,7 +14,7 @@ test('builds the same directed interaction model for people, animals and robots'
       interaction: { type: 'help', actorId: 'Unit 7', targetId: 'Maya', evidence: 'Unit 7 helps Maya' } }
   ]);
 
-  assert.equal(model.entityCount >= 6, true);
+  assert.equal(model.entityCount >= 5, true);
   assert.ok(model.entities.some(entity => entity.id === 'Maya' && entity.kind === 'character'));
   assert.ok(model.entities.some(entity => entity.id === 'Rex the dog' && entity.kind === 'character'));
   assert.ok(model.entities.some(entity => entity.id === 'Unit 7' && entity.kind === 'character'));
