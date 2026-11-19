@@ -1,0 +1,137 @@
+/**
+ * Deterministic production blueprint for complete animation scenes.
+ * Joins existing source-grounded story, world, physics, causal and edit data
+ * into ordered passes for a renderer. It plans work; it does not claim to
+ * render assets or invent missing actions, participants, timing or audio.
+ */
+const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const clean = (value, max = 500) => String(value ?? '').trim().slice(0, max);
+const finite = value => typeof value === 'number' && Number.isFinite(value);
+
+function unique(values) {
+  return [...new Set(values.map(value => clean(value, 160)).filter(Boolean))];
+}
+
+function normalizePhases(scene) {
+  const phases = Array.isArray(scene.actionTimeline?.phases) ? scene.actionTimeline.phases : [];
+  return phases.filter(record).map((phase, index) => ({
+    id: clean(phase.id, 120) || `${clean(scene.id, 120)}_phase_${index + 1}`,
+    phase: clean(phase.phase, 40) || 'action',
+    start: finite(phase.start) ? phase.start : null,
+    end: finite(phase.end) ? phase.end : null,
+    actorId: clean(phase.actorId, 160) || null,
+    targetId: clean(phase.targetId, 160) || null,
+    description: clean(phase.description, 700),
+    evidence: clean(phase.evidence, 500)
+  })).sort((a, b) => (a.start ?? 0) - (b.start ?? 0));
+}
+
+/** Build renderer-facing work orders from already validated semantic models. */
+export function buildSceneProductionPlan(scenes = [], context = {}) {
+  const list = Array.isArray(scenes) ? scenes.filter(record) : [];
+  const world = context.worldModel || null;
+  const physics = context.physicsModel || null;
+  const causal = context.causalModel || null;
+  const editing = context.editingPlan || null;
+  const decisions = context.editDecisions || null;
+  const scenePlans = [];
+  const issues = [];
+  let cursor = 0;
+
+  list.forEach((scene, index) => {
+    const sceneId = clean(scene.id, 120) || `scene_${index + 1}`;
+    const duration = finite(scene.durationSeconds) && scene.durationSeconds > 0
+      ? scene.durationSeconds : 3;
+    const cast = unique(Array.isArray(scene.characters) ? scene.characters : []);
+    const phases = normalizePhases(scene);
+    const shots = (Array.isArray(editing?.shots) ? editing.shots : [])
+      .filter(shot => record(shot) && shot.sceneId === sceneId);
+    const physicsEvents = (Array.isArray(physics?.events) ? physics.events : [])
+      .filter(event => record(event) && event.sceneId === sceneId);
+    const causalEvents = (Array.isArray(causal?.events) ? causal.events : [])
+      .filter(event => record(event) && event.sceneId === sceneId);
+    const causalEdges = (Array.isArray(causal?.edges) ? causal.edges : [])
+      .filter(edge => record(edge) && (edge.fromSceneId === sceneId || edge.toSceneId === sceneId));
+    const shotIds = new Set(shots.map(shot => shot.id));
+    const editCuts = (Array.isArray(decisions?.cuts) ? decisions.cuts : [])
+      .filter(cut => record(cut) && (shotIds.has(cut.fromShotId) || shotIds.has(cut.toShotId)));
+    const dialogue = (Array.isArray(scene.dialogue) ? scene.dialogue : [])
+      .filter(line => record(line) && clean(line.text, 2000))
+      .map(line => ({ characterId: clean(line.characterId, 120) || null,
+        text: clean(line.text, 2000), language: clean(line.language, 12) || null }));
+    const audioCues = (Array.isArray(scene.audioCues) ? scene.audioCues : [])
+      .filter(record).map(cue => ({ type: clean(cue.type, 60) || 'unspecified',
+        startSeconds: finite(cue.startSeconds) ? cue.startSeconds : null,
+        endSeconds: finite(cue.endSeconds) ? cue.endSeconds : null,
+        description: clean(cue.description || cue.source, 300) }));
+    const worldEvent = (Array.isArray(world?.events) ? world.events : [])
+      .find(event => record(event) && event.sceneId === sceneId) || null;
+    const requiredPasses = [];
+    if (clean(scene.imagePrompt, 4000) || clean(scene.prompt, 4000)) requiredPasses.push('visual-establishing-frame');
+    if (cast.length) requiredPasses.push('character-layer-composition');
+    if (phases.length || clean(scene.motionPrompt, 3000) || clean(scene.visibleAction, 1000)) {
+      requiredPasses.push('character-and-object-motion');
+    }
+    if (physicsEvents.some(event => event.grounded)) requiredPasses.push('grounded-physical-interaction');
+    if (dialogue.length) requiredPasses.push('dialogue-voice-and-timing');
+    if (dialogue.length || audioCues.length || clean(scene.sound, 1000)) requiredPasses.push('scene-audio-mix');
+    if (requiredPasses.length) requiredPasses.push('scene-compositing-and-export');
+
+    if (!cast.length && (phases.some(phase => phase.actorId) || causalEvents.some(event => event.actorId))) {
+      issues.push({ code: 'production-actor-not-in-scene-cast', severity: 'warning', sceneId });
+    }
+    if (shots.length && shots.some(shot => !finite(shot.startSeconds) || !finite(shot.endSeconds)
+      || shot.endSeconds <= shot.startSeconds)) {
+      issues.push({ code: 'production-shot-timing-invalid', severity: 'error', sceneId });
+    }
+    if (dialogue.some(line => line.characterId && cast.length && !cast.includes(line.characterId))) {
+      issues.push({ code: 'dialogue-speaker-not-in-scene-cast', severity: 'warning', sceneId });
+    }
+
+    scenePlans.push({
+      sceneId,
+      sceneOrder: index + 1,
+      timeline: { startSeconds: Number(cursor.toFixed(3)),
+        endSeconds: Number((cursor + duration).toFixed(3)), durationSeconds: duration },
+      dramaticPurpose: clean(scene.purpose, 500),
+      setting: { location: clean(scene.location, 500) || null,
+        environment: clean(scene.environmentDescription, 1000) || null,
+        lighting: clean(scene.environmentLighting, 300) || null,
+        timeOfDay: clean(scene.timeOfDay, 120) || null },
+      cast,
+      visual: { imagePrompt: clean(scene.imagePrompt || scene.prompt, 4000),
+        camera: clean(scene.camera, 1000), motionPrompt: clean(scene.motionPrompt, 3000) },
+      actionBeats: phases,
+      worldActions: Array.isArray(worldEvent?.actions) ? worldEvent.actions : [],
+      physicalBeats: physicsEvents,
+      causalBeats: causalEvents,
+      causalEdges,
+      shots,
+      editCuts,
+      dialogue,
+      audioCues,
+      continuity: { startState: clean(scene.startState, 1000),
+        endState: clean(scene.endState, 1000),
+        stateChanges: Array.isArray(scene.stateChanges) ? scene.stateChanges.filter(record) : [] },
+      requiredPasses
+    });
+    cursor += duration;
+  });
+
+  const shotCount = scenePlans.reduce((sum, scene) => sum + scene.shots.length, 0);
+  return {
+    schemaVersion: 1,
+    sceneCount: scenePlans.length,
+    shotCount,
+    totalDurationSeconds: Number(cursor.toFixed(3)),
+    scenes: scenePlans,
+    validation: { passed: !issues.some(issue => issue.severity === 'error'), issues },
+    constraints: [
+      'Production passes are work orders, not proof that a renderer completed them.',
+      'Only grounded physics events are scheduled as physical interactions.',
+      'Action beats, dialogue, audio cues and shot timing retain supplied source data.',
+      'Missing actors, props, assets, measurements and causal links are never fabricated.',
+      'Scene order and timeline follow the supplied storyboard order.'
+    ]
+  };
+}
