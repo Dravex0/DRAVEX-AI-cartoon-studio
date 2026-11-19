@@ -28,6 +28,15 @@ export function buildSceneProductionInstructions(plan) {
     records(plan.propActions).length && 'Prop state transitions (show the transition and resulting state): ' + records(plan.propActions).slice(0, 16).map(item => compact(item, 500)).join('; '),
     records(plan.physicalBeats).length && 'Grounded physical beats: ' + records(plan.physicalBeats).slice(0, 12).map(item => compact(item, 650)).join('; '),
     records(plan.causalBeats).length && 'Grounded causal beats: ' + records(plan.causalBeats).slice(0, 12).map(item => compact(item, 650)).join('; '),
+    records(plan.causalChainDetails).length && 'Ordered grounded causal interaction chains (full sequence; events marked occursInCurrentScene belong to this scene, other events are continuity context): ' + records(plan.causalChainDetails).slice(0, 8).map(chain => compact({
+      chainId: chain.chainId,
+      events: records(chain.events).slice(0, 16).map(event => ({
+        id: event.id, sceneId: event.sceneId, occursInCurrentScene: event.occursInCurrentScene,
+        sequence: event.sequence, type: event.type, actorId: event.actorId,
+        targetId: event.targetId, entityId: event.entityId,
+        physicsEventId: event.physicsEventId, evidence: event.evidence
+      }))
+    }, 2400)).join('; '),
     records(plan.shots).length && 'Shot coverage and timing: ' + records(plan.shots).slice(0, 12).map(item => compact(item, 500)).join('; '),
     records(plan.dialogue).length && 'Dialogue (preserve exact words and speaker assignment; do not fabricate speech): ' + records(plan.dialogue).slice(0, 16).map(item => compact(item, 400)).join('; '),
     records(plan.audioCues).length && 'Audio cues: ' + records(plan.audioCues).slice(0, 16).map(item => compact(item, 350)).join('; '),
@@ -41,7 +50,7 @@ export function buildSceneProductionInstructions(plan) {
     records(plan.filmMemoryContext?.continuityIssues).length && 'Film-memory continuity warnings: ' + records(plan.filmMemoryContext.continuityIssues).slice(0, 10).map(item => compact(item, 350)).join('; '),
     records(plan.continuityIssues).length && 'Continuity QA warnings to reconcile without inventing events: ' + records(plan.continuityIssues).slice(0, 12).map(item => compact(item, 450)).join('; '),
     Array.isArray(plan.requiredPasses) && plan.requiredPasses.length && 'Requested production passes: ' + plan.requiredPasses.map(value => clean(value, 80)).filter(Boolean).join(', '),
-    'Execution constraints: keep each entity identity and appearance consistent with its supplied attributes; keep all listed characters and entities visually distinct; show cause before effect; maintain object ownership and contact through handoffs; preserve physical direction and scene continuity; make each timed beat visibly legible; do not replace character action with camera movement or a static background. Treat the previous-scene ending as continuity evidence, not as an instruction to replay it.',
+    "Execution constraints: keep each entity identity and appearance consistent with its supplied attributes; keep all listed characters and entities visually distinct; show every supplied causal event in its declared order; distinguish this scene\'s events from prior/future continuity context; show cause before effect; maintain object ownership and contact through handoffs; preserve physical direction and scene continuity; make each timed beat visibly legible; do not replace character action with camera movement or a static background. Treat the previous-scene ending as continuity evidence, not as an instruction to replay it.",
     records(plan.continuityIssues).length && 'When continuity QA warnings are supplied, reconcile the depicted transition only when supported by the story; never invent a journey, handoff, disappearance, costume change, or state change merely to hide a warning.',
     'This is a provider instruction, not proof that the provider supports or has completed every requested pass.'
   ].filter(Boolean);

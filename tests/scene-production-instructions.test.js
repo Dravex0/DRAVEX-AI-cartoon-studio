@@ -39,7 +39,34 @@ test('returns no extra provider instruction when no validated production plan ex
   assert.equal(buildSceneProductionInstructions({ sceneId: 'empty' }), [
     'GROUNDED SCENE PRODUCTION WORK ORDER',
     'Treat the following as the authoritative scene specification. Do not invent entities, props, actions, dialogue, causal events, or state changes.',
-    'Execution constraints: keep each entity identity and appearance consistent with its supplied attributes; keep all listed characters and entities visually distinct; show cause before effect; maintain object ownership and contact through handoffs; preserve physical direction and scene continuity; make each timed beat visibly legible; do not replace character action with camera movement or a static background. Treat the previous-scene ending as continuity evidence, not as an instruction to replay it.',
+    "Execution constraints: keep each entity identity and appearance consistent with its supplied attributes; keep all listed characters and entities visually distinct; show every supplied causal event in its declared order; distinguish this scene's events from prior/future continuity context; show cause before effect; maintain object ownership and contact through handoffs; preserve physical direction and scene continuity; make each timed beat visibly legible; do not replace character action with camera movement or a static background. Treat the previous-scene ending as continuity evidence, not as an instruction to replay it.",
     'This is a provider instruction, not proof that the provider supports or has completed every requested pass.'
   ].join('\n'));
+});
+
+
+test('passes the ordered cross-scene causal sequence with current-scene markers to providers', () => {
+  const instructions = buildSceneProductionInstructions({
+    sceneId: 'scene-impact',
+    causalChainDetails: [{
+      chainId: 'push-to-fall',
+      events: [
+        { id: 'push', sceneId: 'scene-start', sequence: 1, type: 'action',
+          actorId: 'Mira', entityId: 'cart', evidence: 'Mira pushes the cart.',
+          occursInCurrentScene: false },
+        { id: 'impact', sceneId: 'scene-impact', sequence: 2, type: 'physical_event',
+          entityId: 'cart', targetId: 'crate', physicsEventId: 'collision-1',
+          evidence: 'The cart hits the crate.', occursInCurrentScene: true },
+        { id: 'fall', sceneId: 'scene-impact', sequence: 3, type: 'effect',
+          entityId: 'crate', evidence: 'The crate falls.', occursInCurrentScene: true }
+      ]
+    }]
+  });
+
+  assert.match(instructions, /Ordered grounded causal interaction chains/);
+  assert.ok(instructions.indexOf('"id":"push"') < instructions.indexOf('"id":"impact"'));
+  assert.ok(instructions.indexOf('"id":"impact"') < instructions.indexOf('"id":"fall"'));
+  assert.match(instructions, /"occursInCurrentScene":false/);
+  assert.match(instructions, /"occursInCurrentScene":true/);
+  assert.match(instructions, /collision-1/);
 });

@@ -193,3 +193,43 @@ test('carries canonical character appearance profiles across adjacent scene work
   assert.match(prompt, /Previous-scene character appearance locks/);
   assert.doesNotMatch(prompt, /must not leak into unrelated scenes/);
 });
+
+
+test('threads source-grounded causal chains from runtime context into each scene provider work order', async () => {
+  const { buildSceneProductionInstructions } = await import('../src/scene-production-instructions.js');
+  const scenes = [
+    {
+      id: 'scene-push',
+      characters: ['Mira'],
+      storyDetail: 'Mira pushes the cart.',
+      visibleAction: 'Mira pushes the cart.',
+      causalEvents: [{
+        id: 'push-cart', type: 'action', actorId: 'Mira', entityId: 'cart',
+        evidence: 'Mira pushes the cart.'
+      }]
+    },
+    {
+      id: 'scene-impact',
+      characters: ['Mira'],
+      storyDetail: 'The cart hits the crate.',
+      visibleAction: 'The cart hits the crate.',
+      causalEvents: [{
+        id: 'cart-impact', type: 'physical_event', actorId: 'Mira',
+        entityId: 'cart', targetId: 'crate', causedByEventId: 'push-cart',
+        evidence: 'The cart hits the crate.'
+      }]
+    }
+  ];
+  const context = buildSceneProductionContext(scenes, { language: 'en' });
+  const impactPlan = context.productionPlan.scenes[1];
+  const instructions = buildSceneProductionInstructions(impactPlan);
+
+  assert.equal(context.causalModel.edges.length, 1);
+  assert.equal(context.productionPlan.causalChains.length, 1);
+  assert.deepEqual(impactPlan.causalChainDetails[0].events.map(event => event.id),
+    ['push-cart', 'cart-impact']);
+  assert.deepEqual(impactPlan.causalChainDetails[0].events.map(event => event.occursInCurrentScene),
+    [false, true]);
+  assert.match(instructions, /Mira pushes the cart/);
+  assert.match(instructions, /The cart hits the crate/);
+});
