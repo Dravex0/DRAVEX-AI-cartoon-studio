@@ -234,7 +234,7 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     timeline: report.timeline,
     generatedCount: accepted.length,
     skipped,
-    mappedActions: accepted.map(({ actorId, preset, doodleAction, targetedReach, start, end }) => ({
+    mappedActions: accepted.map(({ actorId, preset, doodleAction, targetedReach, targetPositionSource, start, end }) => ({
       actorId, preset, start, end,
       ...(doodleAction ? { doodleAction } : {}),
       ...(targetedReach ? { targetedReach, targetPositionSource } : {})
