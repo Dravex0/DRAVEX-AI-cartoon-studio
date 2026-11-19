@@ -362,14 +362,16 @@ test('matches repeated prop motion intents to distinct authored action steps', (
     actionTimeline: { schemaVersion: 1, phases: [{
       phase: 'action', start: 0.1, end: 0.9, actorId: 'Fox',
       steps: [
-        { intent: 'throw', start: 0.1, end: 0.4, actorId: 'Fox', description: 'Throw the first ball' },
-        { intent: 'throw', start: 0.6, end: 0.9, actorId: 'Fox', description: 'Throw the second ball' }
+        { intent: 'throw', start: 0.1, end: 0.4, actorId: 'Fox', targetId: 'ball-one', evidence: 'Fox throws the first ball.', description: 'Throw the first ball' },
+        { intent: 'throw', start: 0.6, end: 0.9, actorId: 'Fox', targetId: 'ball-two', evidence: 'Fox throws the second ball.', description: 'Throw the second ball' }
       ]
     }] },
     stateChanges: [
       { entityType: 'prop', entityId: 'ball-one', property: 'position', actionIntent: 'throw',
+        actorId: 'Fox', evidence: 'Fox throws the first ball.',
         previousPosition: { x: 0.1, y: 0.2 }, position: { x: 0.4, y: 0.5 } },
       { entityType: 'prop', entityId: 'ball-two', property: 'position', actionIntent: 'throw',
+        actorId: 'Fox', evidence: 'Fox throws the second ball.',
         previousPosition: { x: 0.6, y: 0.7 }, position: { x: 0.9, y: 0.4 } }
     ]
   };
