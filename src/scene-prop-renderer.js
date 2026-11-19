@@ -1,4 +1,6 @@
 import { applyCharacterRigPose, validateCharacterRig } from './character-rig.js';
+import { buildScenePhysicsModel } from './scene-physics-model.js';
+import { buildGroundedPhysicsVisualPlan } from './scene-physics-visual-bridge.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const clean = value => String(value ?? '').trim();
@@ -229,6 +231,30 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       evidence: clean(active?.change?.evidence),
       transitionIndex: active?.index ?? -1,
       transitionProgress: active?.progress ?? 1
+    };
+    if (existing) Object.assign(existing, plan);
+    else holderPlans.push(plan);
+  }
+  const physicsModel = buildScenePhysicsModel([scene]);
+  const physicsVisuals = buildGroundedPhysicsVisualPlan(scene, physicsModel, p);
+  for (const visual of physicsVisuals) {
+    const existing = holderPlans.find(item => key(item.id) === key(visual.id));
+    // A prop attached to a character remains controlled by its holder anchor.
+    if (existing?.held) continue;
+    const plan = {
+      ...(existing || {}),
+      id: visual.id,
+      kind: propKind(visual.id),
+      x: visual.x,
+      y: visual.y,
+      rotation: existing?.rotation || 0,
+      held: false,
+      visible: true,
+      scale: existing?.scale || 1,
+      evidence: visual.evidence,
+      physicsEventId: visual.eventId,
+      physicsEventType: visual.eventType,
+      transitionProgress: visual.progress
     };
     if (existing) Object.assign(existing, plan);
     else holderPlans.push(plan);
