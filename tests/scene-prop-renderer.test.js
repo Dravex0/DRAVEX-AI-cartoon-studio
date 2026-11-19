@@ -386,7 +386,7 @@ test('matches repeated prop motion intents to distinct authored action steps', (
 test('does not match an untargeted prop change to an action step with no intent', () => {
   const scene = {
     actionTimeline: { schemaVersion: 1, phases: [{
-      phase: 'action', start: 0.1, end: 0.9,
+      phase: 'action', start: 0.3, end: 0.9,
       steps: [{ start: 0.1, end: 0.9, description: 'Unclassified action' }]
     }] },
     stateChanges: [{
