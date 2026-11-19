@@ -80,3 +80,15 @@ test('does not invent a directed relation when the source action has no named ta
   }]);
   assert.equal(model.relations.filter(relation => relation.type === 'acts_on').length, 0);
 });
+
+
+test('auto-detects Spanish source text when the scene language is unspecified', () => {
+  const model = buildSceneWorldModel([{
+    characters: ['Maya', 'Noah'],
+    storyDetail: 'Maya ayuda a Noah.'
+  }], { language: 'auto' });
+  assert.ok(model.relations.some(relation =>
+    relation.type === 'acts_on' && relation.from === 'Maya'
+    && relation.to === 'Noah' && relation.action === 'help'
+  ));
+});
