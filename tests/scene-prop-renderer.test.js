@@ -355,3 +355,46 @@ test('keeps a held prop attached to its holder instead of overriding it with wor
   assert.ok(plan.x < 0.6);
   assert.ok(plan.y < 0.7);
 });
+
+
+test('matches repeated prop motion intents to distinct authored action steps', () => {
+  const repeated = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.1, end: 0.9, actorId: 'Fox',
+      steps: [
+        { intent: 'throw', start: 0.1, end: 0.4, actorId: 'Fox', description: 'Throw the first ball' },
+        { intent: 'throw', start: 0.6, end: 0.9, actorId: 'Fox', description: 'Throw the second ball' }
+      ]
+    }] },
+    stateChanges: [
+      { entityType: 'prop', entityId: 'ball-one', property: 'position', actionIntent: 'throw',
+        previousPosition: { x: 0.1, y: 0.2 }, position: { x: 0.4, y: 0.5 } },
+      { entityType: 'prop', entityId: 'ball-two', property: 'position', actionIntent: 'throw',
+        previousPosition: { x: 0.6, y: 0.7 }, position: { x: 0.9, y: 0.4 } }
+    ]
+  };
+  const firstBefore = buildScenePropRenderPlan(repeated, [], 0.05).find(item => item.id === 'ball-one');
+  const firstAfter = buildScenePropRenderPlan(repeated, [], 0.5).find(item => item.id === 'ball-one');
+  const secondBefore = buildScenePropRenderPlan(repeated, [], 0.5).find(item => item.id === 'ball-two');
+  const secondAfter = buildScenePropRenderPlan(repeated, [], 0.95).find(item => item.id === 'ball-two');
+  assert.ok(Math.abs(firstBefore.x - 0.1) < 1e-9);
+  assert.ok(Math.abs(firstAfter.x - 0.4) < 1e-9);
+  assert.ok(Math.abs(secondBefore.x - 0.6) < 1e-9);
+  assert.ok(Math.abs(secondAfter.x - 0.9) < 1e-9);
+});
+
+test('does not match an untargeted prop change to an action step with no intent', () => {
+  const scene = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.1, end: 0.9,
+      steps: [{ start: 0.1, end: 0.9, description: 'Unclassified action' }]
+    }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'crate', property: 'position',
+      previousPosition: { x: 0.2, y: 0.3 }, position: { x: 0.8, y: 0.7 }
+    }]
+  };
+  const beforeFallback = buildScenePropRenderPlan(scene, [], 0.2)[0];
+  assert.ok(Math.abs(beforeFallback.x - 0.2) < 1e-9);
+  assert.ok(Math.abs(beforeFallback.y - 0.3) < 1e-9);
+});
