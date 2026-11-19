@@ -209,3 +209,13 @@ describe('authored prop grip offsets', () => {
     assert.equal(authored.parts[0].gripOffsetY, -0.25);
   });
 });
+
+
+describe('semantic prop grip anchors', () => {
+  it('preserves an explicit gripAnchor marker through rig normalization', () => {
+    const rig = normalizeCharacterRig({ ...validRig(), parts: [{ ...validRig().parts[0], gripAnchor: true }] });
+    assert.equal(rig.parts[0].gripAnchor, true);
+    assert.equal(normalizeCharacterRig(rig).parts[0].gripAnchor, true);
+    assert.equal(normalizeCharacterRig(validRig()).parts[0].gripAnchor, false);
+  });
+});
