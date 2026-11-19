@@ -76,3 +76,17 @@ test('keeps multiple directed interactions within their own sentences', () => {
     { actorId: 'Snowball', targetId: 'Mira', type: 'rescue' }
   ]);
 });
+
+test('resolves the speaker as actor and the addressed character as target for commands', () => {
+  const english = inferCharacterInteraction('Officer shouts to Robber: Hands up!', ['Robber', 'Officer'], 'en');
+  const russian = inferCharacterInteraction('Полицейский кричит преступнику: Руки вверх!', ['Преступник', 'Полицейский'], 'ru');
+  const ukrainian = inferCharacterInteraction('Поліцейський наказує грабіжнику: Руки вгору!', ['Грабіжник', 'Поліцейський'], 'uk');
+  const spanish = inferCharacterInteraction('El policía ordena al ladrón: ¡Manos arriba!', ['ladrón', 'policía'], 'es');
+  for (const result of [english, russian, ukrainian, spanish]) {
+    assert.equal(result?.type, 'command');
+  }
+  assert.deepEqual([english.actorId, english.targetId], ['Officer', 'Robber']);
+  assert.deepEqual([russian.actorId, russian.targetId], ['Полицейский', 'Преступник']);
+  assert.deepEqual([ukrainian.actorId, ukrainian.targetId], ['Поліцейський', 'грабіжнику']);
+  assert.deepEqual([spanish.actorId, spanish.targetId], ['policía', 'ladrón']);
+});
