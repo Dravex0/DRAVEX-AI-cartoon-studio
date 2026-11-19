@@ -28,7 +28,7 @@ const rig = () => ({
 
 describe('procedural character rig motion presets', () => {
   it('exposes the supported starter movement library', () => {
-    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'wave', 'dance', 'attack', 'defend', 'listen', 'draw_weapon', 'aim_weapon', 'hands_up', 'take_cover', 'drop_weapon', 'freeze']);
+    assert.deepEqual(listCharacterRigMotionPresets().map(item => item.id), ['idle', 'walk', 'run', 'jump', 'dodge', 'wave', 'dance', 'attack', 'defend', 'listen', 'draw_weapon', 'aim_weapon', 'hands_up', 'take_cover', 'drop_weapon', 'freeze', 'pick_up', 'grasp', 'release', 'carry', 'throw', 'catch', 'push', 'pull', 'hug', 'point', 'sit']);
   });
 
   it('creates a validated walk cycle with explicit start and end frames', () => {
