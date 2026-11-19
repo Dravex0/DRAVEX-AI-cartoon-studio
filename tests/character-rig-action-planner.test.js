@@ -276,7 +276,10 @@ test('keeps object-interaction poses deterministic for rigs with different chara
     storyDetail: 'Mira throws the ball',
     actionTimeline: { schemaVersion: 1, phases: [{
       ...scene.actionTimeline.phases[0], actorId: 'Mira',
-      description: 'Mira throws the ball', evidence: 'Mira throws the ball'
+      description: 'Mira throws the ball', evidence: 'Mira throws the ball',
+      steps: scene.actionTimeline.phases[0].steps.map(step => ({
+        ...step, actorId: 'Mira', description: 'Mira throws the ball', evidence: 'Mira throws the ball'
+      }))
     }] }
   }, [rig('Mira')]);
   assert.equal(first.status, 'generated');
