@@ -53,6 +53,7 @@ import { createSceneVideoStorage, persistSceneVideoBestEffort } from "./scene-vi
 import { createFacialAssetStorage } from "./facial-asset-storage.js";
 import { createCharacterReferenceImageStorage } from "./character-reference-image-storage.js";
 import { generateStoryboardVideos, readVideoProgressPercent } from "./scene-video-batch.js";
+import { buildSceneProductionInstructions } from "./scene-production-instructions.js";
 import { createHuggingFaceZeroGPUVideoProvider, HUGGING_FACE_ZERO_GPU_SPACE_ID } from "./huggingface-zerogpu-video-provider.js";
 import { fitSceneVideoToDuration, syncSceneVideoPlayback } from "./scene-video-transport.js";
 import { waitForSceneVideoReady, rewindSceneVideoAndWait, waitForSceneImageReady, isSceneVideoDecoded } from "./scene-video-readiness.js";
@@ -3605,9 +3606,14 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     const imageInput=await loadSceneImageBlob(imageSource,{signal});
     assertSceneIdentityCurrent();
     const taskType=resolveSceneVideoTaskType({mode,imageSourceKind:imageSource.kind});
+    const productionScenePlan=Array.isArray(currentStoryboardPlan?.productionPlan?.scenes)
+     ?currentStoryboardPlan.productionPlan.scenes.find(item=>String(item.sceneId||'')===generationSceneId)
+     :null;
+    const productionInstructions=buildSceneProductionInstructions(productionScenePlan);
+    const motionPrompt=buildMotionGenerationPrompt(meta,characterBible);
     const prompt=taskType==='text-to-video'
-     ?[buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value}),buildMotionGenerationPrompt(meta,characterBible)].filter(Boolean).join('\n\nMotion direction: ')
-     :buildMotionGenerationPrompt(meta,characterBible);
+     ?[buildImageGenerationPrompt(meta,characterBible,{includeNegative:false,visualStyle:$('style').value}),motionPrompt,productionInstructions].filter(Boolean).join('\n\n')
+     :[motionPrompt,productionInstructions].filter(Boolean).join('\n\n');
     const requestedDuration=Math.max(0.25,Math.min(30,Number(meta.durationSeconds??meta.duration??$('duration').value)||3));
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
     const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
