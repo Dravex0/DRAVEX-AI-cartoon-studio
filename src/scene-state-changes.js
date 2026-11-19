@@ -5,28 +5,28 @@
  */
 const VERBS = {
   en: [
-    { re: /(?:picks up|takes|grabs|holds)/iu, property: 'holder', value: 'actor' },
-    { re: /(?:drops|puts down|leaves behind)/iu, property: 'holder', value: null },
-    { re: /opens/iu, property: 'openState', value: 'open' },
-    { re: /closes/iu, property: 'openState', value: 'closed' }
+    { re: /(?:picks up|takes|grabs|holds)/iu, property: 'holder', value: 'actor', actionIntent: 'pick_up' },
+    { re: /(?:drops|puts down|leaves behind)/iu, property: 'holder', value: null, actionIntent: 'drop' },
+    { re: /opens/iu, property: 'openState', value: 'open', actionIntent: 'open' },
+    { re: /closes/iu, property: 'openState', value: 'closed', actionIntent: 'close' }
   ],
   ru: [
-    { re: /(?:поднимает|бер[её]т|забирает|держит)/iu, property: 'holder', value: 'actor' },
-    { re: /(?:роняет|клад[её]т|оставляет)/iu, property: 'holder', value: null },
-    { re: /открывает/iu, property: 'openState', value: 'open' },
-    { re: /закрывает/iu, property: 'openState', value: 'closed' }
+    { re: /(?:поднимает|бер[её]т|забирает|держит)/iu, property: 'holder', value: 'actor', actionIntent: 'pick_up' },
+    { re: /(?:роняет|клад[её]т|оставляет)/iu, property: 'holder', value: null, actionIntent: 'drop' },
+    { re: /открывает/iu, property: 'openState', value: 'open', actionIntent: 'open' },
+    { re: /закрывает/iu, property: 'openState', value: 'closed', actionIntent: 'close' }
   ],
   uk: [
-    { re: /(?:піднімає|бере|забирає|тримає)/iu, property: 'holder', value: 'actor' },
-    { re: /(?:роняє|кладе|залишає)/iu, property: 'holder', value: null },
-    { re: /відкриває/iu, property: 'openState', value: 'open' },
-    { re: /закриває/iu, property: 'openState', value: 'closed' }
+    { re: /(?:піднімає|бере|забирає|тримає)/iu, property: 'holder', value: 'actor', actionIntent: 'pick_up' },
+    { re: /(?:роняє|кладе|залишає)/iu, property: 'holder', value: null, actionIntent: 'drop' },
+    { re: /відкриває/iu, property: 'openState', value: 'open', actionIntent: 'open' },
+    { re: /закриває/iu, property: 'openState', value: 'closed', actionIntent: 'close' }
   ],
   es: [
-    { re: /(?:recoge|toma|agarra|sostiene)/iu, property: 'holder', value: 'actor' },
-    { re: /(?:suelta|deja caer|deja)/iu, property: 'holder', value: null },
-    { re: /abre/iu, property: 'openState', value: 'open' },
-    { re: /cierra/iu, property: 'openState', value: 'closed' }
+    { re: /(?:recoge|toma|agarra|sostiene)/iu, property: 'holder', value: 'actor', actionIntent: 'pick_up' },
+    { re: /(?:suelta|deja caer|deja)/iu, property: 'holder', value: null, actionIntent: 'drop' },
+    { re: /abre/iu, property: 'openState', value: 'open', actionIntent: 'open' },
+    { re: /cierra/iu, property: 'openState', value: 'closed', actionIntent: 'close' }
   ]
 };
 
@@ -104,7 +104,7 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
           const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
           const value = verb.value === 'actor' ? actorId : verb.value;
           if (previousValue === value) continue;
-          changes.push({ entityType: 'prop', entityId, property, previousValue, value, actorId, evidence: found.evidence });
+          changes.push({ entityType: 'prop', entityId, property, previousValue, value, actorId, evidence: found.evidence, actionIntent: verb.actionIntent || null });
           knownStates.set(key, value);
         }
         const actor = new RegExp(boundary + escapeRegExp(actorId) + tailBoundary, 'iu');

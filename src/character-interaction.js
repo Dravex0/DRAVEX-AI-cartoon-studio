@@ -10,6 +10,7 @@ const RELATIONS = {
     ['guide', /\b(guides?|leads?|shows)\b/iu],
     ['give', /\b(gives?|hands?|offers?)\b/iu],
     ['warn', /\b(warns?|alerts?)\b/iu],
+    ['command', /\b(orders?|commands?|shouts?|yells?|instructs?)\b/iu],
     ['talk', /\b(tells?|asks?|answers?|speaks?\s+to|talks?\s+to)\b/iu]
   ],
   ru: [
@@ -20,6 +21,7 @@ const RELATIONS = {
     ['guide', /вед[её]т|направля(?:ет|ют)|показыва(?:ет|ют)\s+(?:путь|дорогу)/iu],
     ['give', /да[её]т|переда[её]т|вруча(?:ет|ют)/iu],
     ['warn', /предупрежда(?:ет|ют)|предостерега(?:ет|ют)/iu],
+    ['command', /кричит|приказыва(?:ет|ют)|команду(?:ет|ют)|требу(?:ет|ют)/iu],
     ['talk', /говорит\s+с|рассказыва(?:ет|ют)|спрашива(?:ет|ют)|отвеча(?:ет|ют)/iu]
   ],
   uk: [
@@ -30,6 +32,7 @@ const RELATIONS = {
     ['guide', /веде|спрямову[єе]|показу[єе]\s+(?:шлях|дорогу)/iu],
     ['give', /да[єе]|переда[єе]|вруча[єе]/iu],
     ['warn', /попереджа[єе]|застеріга[єе]/iu],
+    ['command', /наказу[єе]|команду[єе]|кричить|вимага[єе]/iu],
     ['talk', /говорить\s+з|розповіда[єе]|запиту[єе]|відповіда[єе]/iu]
   ],
   es: [
@@ -40,6 +43,7 @@ const RELATIONS = {
     ['guide', /\b(guía|guia|dirige|conduce)\b/iu],
     ['give', /\b(da|entrega|ofrece)\b/iu],
     ['warn', /\b(avisa|advierte)\b/iu],
+    ['command', /\b(ordena|manda|grita|exige)\b/iu],
     ['talk', /\b(dice|pregunta|responde|habla\s+a)\b/iu]
   ]
 };

@@ -65,7 +65,8 @@ export function normalizeScene(input = {}, index = 0) {
       previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
       value: change.value == null ? null : text(change.value, 160),
       actorId: text(change.actorId, 120),
-      evidence: text(change.evidence, 1_200)
+      evidence: text(change.evidence, 1_200),
+      ...(change.actionIntent == null || change.actionIntent === '' ? {} : { actionIntent: text(change.actionIntent, 40) })
     })) : [],
     interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
       type: text(item.type, 40), actorId: text(item.actorId, 120), targetId: text(item.targetId, 120),

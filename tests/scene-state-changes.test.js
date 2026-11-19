@@ -10,9 +10,11 @@ test('tracks an explicitly picked-up prop and carries its holder into later scen
   ], 'en');
   assert.equal(changes[0][0].property, 'holder');
   assert.equal(changes[0][0].value, 'Foxy');
+  assert.equal(changes[0][0].actionIntent, 'pick_up');
   assert.deepEqual(changes[1], []);
   assert.equal(changes[2][0].previousValue, 'Foxy');
   assert.equal(changes[2][0].value, null);
+  assert.equal(changes[2][0].actionIntent, 'drop');
 });
 
 test('tracks explicit door state changes in Russian and Ukrainian', () => {

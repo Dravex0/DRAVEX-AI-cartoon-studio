@@ -14,7 +14,8 @@ test('plans a grounded pickup and moves the prop from the ground to the named ac
   const early = buildScenePropRenderPlan(scene, layers, 0.1)[0];
   const late = buildScenePropRenderPlan(scene, layers, 1)[0];
   assert.equal(early.kind, 'star');
-  assert.equal(early.held, true);
+  assert.equal(early.held, false);
+  assert.equal(late.held, true);
   assert.ok(early.y > late.y);
   assert.ok(late.x > 0.4 && late.x < 0.6);
   assert.equal(late.evidence, 'Fox picks up the glowing star.');
@@ -137,4 +138,47 @@ test('uses an explicitly authored grip point transformed by the posed hand rotat
   assert.ok(Math.abs(plan.x - 0.5) < 1e-9);
   assert.ok(Math.abs(plan.y - 0.54) < 1e-9);
   assert.ok(Math.abs(plan.rotation - Math.PI / 2) < 1e-9);
+});
+
+test('preserves pickup and drop as two ordered transitions for the same prop', () => {
+  const sequence = {
+    actionTimeline: { phases: [{ phase: 'action', start: 0, end: 1, steps: [
+      { intent: 'pick_up', start: 0.1, end: 0.2 },
+      { intent: 'drop', start: 0.8, end: 0.9 }
+    ] }] },
+    stateChanges: [
+      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: null, value: 'Fox', actorId: 'Fox', actionIntent: 'pick_up', evidence: 'Fox picks up the key.' },
+      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: 'Fox', value: null, actorId: 'Fox', actionIntent: 'drop', evidence: 'Fox drops the key.' }
+    ]
+  };
+  const start = buildScenePropRenderPlan(sequence, layers, 0.05)[0];
+  const carried = buildScenePropRenderPlan(sequence, layers, 0.5)[0];
+  const released = buildScenePropRenderPlan(sequence, layers, 0.95)[0];
+  assert.equal(start.held, false);
+  assert.equal(carried.held, true);
+  assert.equal(released.held, false);
+  assert.ok(start.x > carried.x);
+  assert.ok(released.x > carried.x);
+  assert.equal(carried.transitionIndex, 0);
+  assert.equal(released.transitionIndex, 1);
+});
+
+test('animates an explicitly authored prop handoff between two characters', () => {
+  const handoff = {
+    actionTimeline: { phases: [{ phase: 'action', start: 0, end: 1 }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'key', property: 'holder',
+      previousValue: 'Fox', value: 'Bird', actorId: 'Fox',
+      evidence: 'Fox hands the key to Bird.'
+    }]
+  };
+  const cast = [...layers, { characterId: 'Bird', x: 0.8, y: 0.65 }];
+  const before = buildScenePropRenderPlan(handoff, cast, 0.1)[0];
+  const middle = buildScenePropRenderPlan(handoff, cast, 0.5)[0];
+  const after = buildScenePropRenderPlan(handoff, cast, 1)[0];
+  assert.ok(before.x < middle.x);
+  assert.ok(middle.x < after.x);
+  assert.equal(before.held, true);
+  assert.equal(after.held, true);
+  assert.equal(after.x, 0.92);
 });

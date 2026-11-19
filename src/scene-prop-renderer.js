@@ -58,43 +58,95 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       && Number.isFinite(phase.start) && Number.isFinite(phase.end)
       && phase.start >= 0 && phase.start < phase.end && phase.end <= 1)
     : null;
-  // Prefer authored action timing; retain a stable fallback for older scenes.
-  const transitionStart = actionPhase ? actionPhase.start : 0.52;
-  const transitionEnd = actionPhase ? actionPhase.end : 0.8;
-  const transition = clamp((p - transitionStart) / (transitionEnd - transitionStart), 0, 1);
-  const eased = transition * transition * (3 - 2 * transition);
-  const latest = new Map();
+  const phaseStart = actionPhase ? actionPhase.start : 0.52;
+  const phaseEnd = actionPhase ? actionPhase.end : 0.8;
+  const timelineSteps = (Array.isArray(scene?.actionTimeline?.phases) ? scene.actionTimeline.phases : [])
+    .flatMap(phase => Array.isArray(phase?.steps) ? phase.steps : [])
+    .filter(step => Number.isFinite(step?.start) && Number.isFinite(step?.end)
+      && step.start >= 0 && step.start < step.end && step.end <= 1);
+  const claimedSteps = new Set();
+  const matchedStepByChange = new Map();
+  for (const change of changes) {
+    const intent = clean(change?.actionIntent);
+    if (!intent) continue;
+    const compatible = intent === 'drop' ? new Set(['drop', 'drop_weapon', 'throw']) : new Set([intent]);
+    const stepIndex = timelineSteps.findIndex((step, index) =>
+      !claimedSteps.has(index) && compatible.has(clean(step.intent))
+    );
+    if (stepIndex >= 0) {
+      claimedSteps.add(stepIndex);
+      matchedStepByChange.set(change, timelineSteps[stepIndex]);
+    }
+  }
+  const byProp = new Map();
   for (const change of changes) {
     if (!change || change.entityType !== 'prop' || change.property !== 'holder') continue;
     const entityId = clean(change.entityId);
     if (!entityId) continue;
-    latest.set(key(entityId), change);
+    const propKey = key(entityId);
+    if (!byProp.has(propKey)) byProp.set(propKey, []);
+    byProp.get(propKey).push(change);
   }
-  return [...latest.values()].map(change => {
-    const actorId = clean(change.actorId);
+
+  const ground = { x: 0.68, y: 0.79, rotation: 0 };
+  const holderPoint = holderId => {
+    if (holderId == null || !clean(holderId)) return ground;
+    const actorId = clean(holderId);
     const actor = layers.find(layer => key(layer?.characterId) === key(actorId));
     const actorX = Number.isFinite(actor?.x) ? actor.x : 0.5;
     const actorY = Number.isFinite(actor?.y) ? actor.y : 0.68;
-    const heldByActor = change.value != null && key(change.value) === key(actorId);
-    const wasHeldByActor = change.previousValue != null && key(change.previousValue) === key(actorId);
-    const ground = { x: 0.68, y: 0.79 };
     const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
-    const hand = rigAnchor
+    return rigAnchor
       ? { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation }
-      : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96), y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
-    const from = wasHeldByActor ? hand : ground;
-    const to = heldByActor ? hand : ground;
-    const x = from.x + (to.x - from.x) * eased;
-    const y = from.y + (to.y - from.y) * eased;
-    const rotation = (from.rotation || 0) + ((to.rotation || 0) - (from.rotation || 0)) * eased;
+      : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96),
+          y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
+  };
+
+  return [...byProp.values()].map(history => {
+    const entityId = clean(history[0].entityId);
+    const interval = (phaseEnd - phaseStart) / Math.max(1, history.length);
+    let holder = history[0].previousValue ?? null;
+    let from = holderPoint(holder);
+    let to = from;
+    let held = holder != null;
+    let activeEvidence = clean(history[0].evidence);
+    let transitionProgress = 1;
+    let activeIndex = -1;
+
+    for (let index = 0; index < history.length; index += 1) {
+      const change = history[index];
+      const matchedStep = matchedStepByChange.get(change);
+      const start = matchedStep ? matchedStep.start : phaseStart + interval * index;
+      const end = matchedStep ? matchedStep.end : start + interval;
+      const nextHolder = change.value ?? null;
+      if (p < start) break;
+      from = holderPoint(holder);
+      to = holderPoint(nextHolder);
+      activeEvidence = clean(change.evidence);
+      activeIndex = index;
+      if (p <= end) {
+        transitionProgress = clamp((p - start) / Math.max(0.000001, end - start), 0, 1);
+        const eased = transitionProgress * transitionProgress * (3 - 2 * transitionProgress);
+        const x = from.x + (to.x - from.x) * eased;
+        const y = from.y + (to.y - from.y) * eased;
+        const rotation = (from.rotation || 0) + ((to.rotation || 0) - (from.rotation || 0)) * eased;
+        return {
+          id: entityId, kind: propKind(entityId), x, y, rotation,
+          held: transitionProgress >= 0.5 ? nextHolder != null : holder != null,
+          visible: true, scale: 1, evidence: activeEvidence,
+          transitionIndex: index, transitionProgress
+        };
+      }
+      holder = nextHolder;
+      held = holder != null;
+    }
+
+    const point = holderPoint(holder);
     return {
-      id: clean(change.entityId),
-      kind: propKind(change.entityId),
-      x, y, rotation,
-      held: heldByActor,
-      visible: true,
-      scale: 1,
-      evidence: clean(change.evidence)
+      id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
+      rotation: point.rotation || 0, held, visible: true, scale: 1,
+      evidence: activeEvidence, transitionIndex: activeIndex,
+      transitionProgress: 1
     };
   });
 }
