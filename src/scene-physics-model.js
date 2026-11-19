@@ -8,7 +8,7 @@
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const clean = (value, max = 500) => String(value ?? '').trim().slice(0, max);
 const finite = value => typeof value === 'number' && Number.isFinite(value);
-const TYPES = new Set(['collision', 'fall', 'support', 'motion', 'contact', 'transfer']);
+const TYPES = new Set(['collision', 'fall', 'support', 'motion', 'contact', 'transfer', 'push', 'pull', 'carry', 'throw', 'catch', 'grasp', 'release']);
 const AXES = ['x', 'y', 'z'];
 
 function vector(value) {
@@ -62,6 +62,15 @@ function validateEvent(event, grounded, sceneId) {
   if (event.type === 'fall' && !vector(event.startPosition) && !vector(event.endPosition)) {
     issues.push({ code: 'fall-without-measured-position', severity: 'warning' });
   }
+  if (['push', 'pull', 'carry', 'throw', 'catch', 'grasp', 'release'].includes(event.type) && !event.actorId) {
+    issues.push({ code: 'physical-action-missing-actor', severity: 'warning' });
+  }
+  if (event.type === 'transfer' && (!event.fromEntityId || !event.toEntityId)) {
+    issues.push({ code: 'transfer-missing-holder-transition', severity: 'warning' });
+  }
+  if (event.type === 'catch' && !event.targetId) {
+    issues.push({ code: 'catch-missing-incoming-entity', severity: 'warning' });
+  }
   return issues.map(issue => ({ ...issue, sceneId, eventId: event.id }));
 }
 
@@ -96,9 +105,14 @@ export function buildScenePhysicsModel(scenes = [], worldModel = null) {
         entityId: clean(raw.entityId, 160) || null,
         otherEntityId: clean(raw.otherEntityId, 160) || null,
         supportEntityId: clean(raw.supportEntityId, 160) || null,
+        actorId: clean(raw.actorId, 160) || null,
+        targetId: clean(raw.targetId, 160) || null,
+        fromEntityId: clean(raw.fromEntityId, 160) || null,
+        toEntityId: clean(raw.toEntityId, 160) || null,
         evidence: evidence || null,
         grounded,
         contact: raw.contact === true,
+        contactKnown: typeof raw.contact === 'boolean',
         startPosition: vector(raw.startPosition),
         endPosition: vector(raw.endPosition),
         durationSeconds: finite(raw.durationSeconds) && raw.durationSeconds > 0
@@ -140,6 +154,15 @@ export function buildScenePhysicsModel(scenes = [], worldModel = null) {
       issues.push({ code: 'physics-entity-not-in-world-model', severity: 'warning',
         sceneId: event.sceneId, eventId: event.id, entityId: event.entityId });
     }
+    if (event.grounded && knownEntities.size) {
+      for (const [role, value] of [['other-body', event.otherEntityId], ['support-surface', event.supportEntityId],
+        ['actor', event.actorId], ['target', event.targetId], ['from-holder', event.fromEntityId], ['to-holder', event.toEntityId]]) {
+        if (value && !knownEntities.has(value)) issues.push({
+          code: 'physics-participant-not-in-world-model', severity: 'warning',
+          sceneId: event.sceneId, eventId: event.id, role, entityId: value
+        });
+      }
+    }
     if (event.grounded && event.type === 'fall' && !environments.some(item => item.sceneId === event.sceneId)) {
       issues.push({ code: 'fall-gravity-unknown', severity: 'info',
         sceneId: event.sceneId, eventId: event.id });
@@ -158,9 +181,9 @@ export function buildScenePhysicsModel(scenes = [], worldModel = null) {
       issues
     },
     constraints: [
-      'Only explicit structured physics events are modeled; prose is not silently converted into collisions or falls.',
+      'Only explicit structured physics events are modeled; prose is not silently converted into physical actions.',
       'Evidence must occur in the scene source text or source events before any physical quantity is derived.',
-      'Gravity, mass, contact, position and velocity remain unknown unless explicitly supplied.',
+      'Actor, target, holder transitions, gravity, mass, contact, position and velocity remain unknown unless explicitly supplied.',
       'Average velocity and impulse are arithmetic derivations from supplied measurements, not a full physics simulation.',
       'Unknown values are preserved as null and never replaced with plausible guesses.'
     ]
