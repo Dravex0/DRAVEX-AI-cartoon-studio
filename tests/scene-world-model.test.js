@@ -54,3 +54,29 @@ test('handles an empty or malformed scene list safely', () => {
   assert.equal(buildSceneWorldModel(null).entityCount, 0);
   assert.equal(buildSceneWorldModel([null, {}, 'invalid']).events.length, 3);
 });
+
+test('grounds explicit natural-language actions for all supported story languages', () => {
+  const samples = [
+    { language: 'en', detail: 'Maya helps Noah.', expected: 'help' },
+    { language: 'ru', detail: 'Майя помогает Noah.', expected: 'help' },
+    { language: 'uk', detail: 'Майя допомагає Noah.', expected: 'help' },
+    { language: 'es', detail: 'Maya ayuda a Noah.', expected: 'help' }
+  ];
+  for (const sample of samples) {
+    const model = buildSceneWorldModel([{
+      id: sample.language, language: sample.language,
+      characters: ['Maya', 'Noah'], storyDetail: sample.detail
+    }]);
+    assert.ok(model.relations.some(relation =>
+      relation.type === 'acts_on' && relation.from === 'Maya'
+      && relation.to === 'Noah' && relation.action === sample.expected
+    ), sample.language);
+  }
+});
+
+test('does not invent a directed relation when the source action has no named target', () => {
+  const model = buildSceneWorldModel([{
+    characters: ['Maya', 'Noah'], storyDetail: 'Maya runs across the room.'
+  }]);
+  assert.equal(model.relations.filter(relation => relation.type === 'acts_on').length, 0);
+});
