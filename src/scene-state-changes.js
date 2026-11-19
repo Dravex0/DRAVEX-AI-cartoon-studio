@@ -122,6 +122,19 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
       ?.map(sentence => sentence.trim()).filter(Boolean) ?? [source];
     for (const actorId of cast) {
       for (const sentence of sourceSentences) {
+        const transfer = parseTransfer(sentence, actorId, cast, locale);
+        if (transfer) {
+          const property = 'holder';
+          const key = 'prop:' + transfer.entityId.toLocaleLowerCase() + ':' + property;
+          const previousValue = knownStates.has(key) ? knownStates.get(key) : null;
+          // A transfer is only grounded when this actor is already known to hold the named prop.
+          if (previousValue === actorId) {
+            changes.push({ entityType: 'prop', entityId: transfer.entityId, property,
+              previousValue, value: transfer.recipientId, actorId,
+              evidence: transfer.evidence, actionIntent: 'handoff' });
+            knownStates.set(key, transfer.recipientId);
+          }
+        }
         for (const verb of VERBS[locale]) {
           const found = findEntity(sentence, actorId, verb);
           if (!found) continue;
