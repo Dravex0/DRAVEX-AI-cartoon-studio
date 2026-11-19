@@ -4,6 +4,8 @@
  * humans, animals, robots, vehicles, props and newly introduced entity kinds
  * can all participate through the same IDs and relation model.
  */
+import { inferCharacterInteractions } from './character-interaction.js';
+
 const clean = (value, max = 1200) => String(value ?? '').trim().slice(0, max);
 const record = value => value && typeof value === 'object' && !Array.isArray(value);
 const keyOf = value => clean(value, 160).toLocaleLowerCase();
@@ -26,7 +28,21 @@ function addEntity(map, id, kind, sceneId, attributes = {}) {
  * It deliberately does not guess missing participants, object identities,
  * transfers, or physical outcomes from vague prose.
  */
-export function buildSceneWorldModel(scenes = []) {
+function resolveSceneLanguage(scene, fallback = 'en') {
+  const requested = clean(scene?.language || scene?.lang || fallback, 40).toLocaleLowerCase();
+  if (/^(ru|russian|рус)/u.test(requested)) return 'ru';
+  if (/^(uk|ua|ukrainian|укра)/u.test(requested)) return 'uk';
+  if (/^(es|spanish|español|исп)/u.test(requested)) return 'es';
+  if (/^(en|english|англ)/u.test(requested)) return 'en';
+  const text = clean(scene?.storyDetail || scene?.visibleAction, 1200);
+  if (/[іїєґ]/iu.test(text)) return 'uk';
+  if (/[а-яё]/iu.test(text)) return 'ru';
+  if (/\\b(?:el|la|los|las|una|uno|un|por|para|con|ayuda|entrega)\\b/iu.test(text)) return 'es';
+  return 'en';
+}
+
+export function buildSceneWorldModel(scenes = [], options = {}) {
+  const fallbackLanguage = clean(options?.language, 40) || 'en';
   const list = Array.isArray(scenes) ? scenes : [];
   const entities = new Map();
   const relations = [];
@@ -55,10 +71,23 @@ export function buildSceneWorldModel(scenes = []) {
     const sceneEvents = [];
     const addRelation = relation => {
       if (!relation.from || !relation.to || !relation.type) return;
-      relations.push({ sceneId, ...relation });
+      const duplicate = relations.some(item => item.sceneId === sceneId && item.type === relation.type
+        && item.from === relation.from && item.to === relation.to
+        && item.action === relation.action && item.property === relation.property);
+      if (!duplicate) relations.push({ sceneId, ...relation });
     };
 
-    for (const interaction of (Array.isArray(scene.interactions) ? scene.interactions : [scene.interaction]).filter(record)) {
+    const explicitInteractions = (Array.isArray(scene.interactions) ? scene.interactions : [scene.interaction]).filter(record);
+    const sourceText = clean(scene.storyDetail || scene.visibleAction, 1200);
+    const language = resolveSceneLanguage(scene, fallbackLanguage);
+    const inferredInteractions = sourceText
+      ? inferCharacterInteractions(sourceText, participants, language)
+      : [];
+    const interactionKeys = new Set();
+    for (const interaction of [...explicitInteractions, ...inferredInteractions]) {
+      const interactionKey = [interaction.type, interaction.actorId, interaction.targetId].map(keyOf).join(':');
+      if (interactionKeys.has(interactionKey)) continue;
+      interactionKeys.add(interactionKey);
       const actor = clean(interaction.actorId, 160);
       const target = clean(interaction.targetId, 160);
       if (!actor || !target) continue;
@@ -121,7 +150,7 @@ export function buildSceneWorldModel(scenes = []) {
     }
 
     events.push({ id: `event_${index + 1}`, sceneId, sequence: index + 1,
-      sourceEvidence: clean(scene.storyDetail, 1200), participants: participants.map(value => clean(value, 160)).filter(Boolean),
+      sourceEvidence: sourceText, participants: participants.map(value => clean(value, 160)).filter(Boolean),
       location: location || null, actions: sceneEvents });
   });
 
@@ -131,5 +160,6 @@ export function buildSceneWorldModel(scenes = []) {
       .filter(action => action.type === 'state_continuity_conflict')) },
     principles: ['Entity identities are independent of species or character archetype.',
       'Relations preserve actor-to-target direction.',
-      'Only explicit structured facts become world-model relations; ambiguous facts remain unresolved.'] };
+      'Natural-language relations are added only when named participants and an explicit action are grounded in the same sentence.',
+      'Ambiguous or unlinked facts remain unresolved.'] };
 }
