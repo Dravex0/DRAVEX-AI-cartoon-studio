@@ -164,3 +164,49 @@ test('checks physical participants against the known scene world', () => {
     && issue.role === 'actor' && issue.entityId === 'Mira'
   ));
 });
+
+
+test('tracks grounded grasp, transfer and release as a continuous object-holder timeline', () => {
+  const model = buildScenePhysicsModel([{
+    id: 'handoff',
+    storyDetail: 'Mira grasps the key. Mira gives the key to Noah. Noah releases the key.',
+    physicsEvents: [
+      { id: 'grasp', type: 'grasp', entityId: 'key', actorId: 'Mira', evidence: 'Mira grasps the key.' },
+      { id: 'transfer', type: 'transfer', entityId: 'key', fromEntityId: 'Mira', toEntityId: 'Noah', evidence: 'Mira gives the key to Noah.' },
+      { id: 'release', type: 'release', entityId: 'key', actorId: 'Noah', evidence: 'Noah releases the key.' }
+    ]
+  }]);
+
+  assert.deepEqual(model.holderTimeline.map(item => item.holderAfter), ['Mira', 'Noah', null]);
+  assert.deepEqual(model.holderTimeline.map(item => item.transition), [
+    'holder-acquired', 'holder-transferred', 'holder-released'
+  ]);
+  assert.equal(model.validation.issues.length, 0);
+});
+
+test('warns when a transfer claims a holder different from the known current holder', () => {
+  const model = buildScenePhysicsModel([{
+    id: 'wrong-holder',
+    storyDetail: 'Mira grasps the key. Leo gives the key to Noah.',
+    physicsEvents: [
+      { id: 'grasp', type: 'grasp', entityId: 'key', actorId: 'Mira', evidence: 'Mira grasps the key.' },
+      { id: 'transfer', type: 'transfer', entityId: 'key', fromEntityId: 'Leo', toEntityId: 'Noah', evidence: 'Leo gives the key to Noah.' }
+    ]
+  }]);
+
+  assert.ok(model.validation.issues.some(issue => issue.code === 'object-transferred-by-non-holder'));
+  assert.equal(model.holderTimeline[1].transition, 'conflict');
+  assert.equal(model.holderTimeline[1].holderAfter, 'Mira');
+});
+
+test('does not change holder state from ungrounded physical claims', () => {
+  const model = buildScenePhysicsModel([{
+    id: 'ungrounded',
+    storyDetail: 'Mira looks at the key.',
+    physicsEvents: [{ id: 'fake-grasp', type: 'grasp', entityId: 'key', actorId: 'Mira',
+      evidence: 'Mira grasps the key.' }]
+  }]);
+
+  assert.equal(model.holderTimeline.length, 0);
+  assert.equal(model.events[0].grounded, false);
+});
