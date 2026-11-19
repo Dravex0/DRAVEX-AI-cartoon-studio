@@ -175,7 +175,7 @@ test('animates an explicitly authored prop handoff between two characters', () =
   const cast = [...layers, { characterId: 'Bird', x: 0.8, y: 0.65 }];
   const before = buildScenePropRenderPlan(handoff, cast, 0.1)[0];
   const middle = buildScenePropRenderPlan(handoff, cast, 0.5)[0];
-  const after = buildScenePropRenderPlan(handoff, cast, 0.9)[0];
+  const after = buildScenePropRenderPlan(handoff, cast, 1)[0];
   assert.ok(before.x < middle.x);
   assert.ok(middle.x < after.x);
   assert.equal(before.held, true);
