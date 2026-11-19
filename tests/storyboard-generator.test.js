@@ -270,7 +270,7 @@ test('passes a sensory tactical story sequence into the actual scene motion prom
 
 test('assigns a shouted command to the speaker and its target, not the speaker', () => {
   const result = buildStoryboardFromText(
-    'Characters:\nOfficer — police officer in uniform.\nRobber — masked robber.\n\nScene 1: Arrest\nOfficer shouts to Robber: "Hands up!"',
+    'Characters:\nOfficer — police officer in uniform.\nRobber — masked robber.\n\nScene 1: Arrest\nOfficer shouts "Hands up!" at Robber.',
     'en',
     'Officer'
   );
