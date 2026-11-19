@@ -172,3 +172,15 @@ test('scene normalization preserves physics actors, targets, transfers, and unkn
   assert.equal(physics.events[1].toEntityId, 'Noah');
   assert.equal(physics.events[2].contactKnown, false);
 });
+
+
+test('scene normalization preserves explicit normalized prop positions and rejects invalid coordinates', () => {
+  const scene = normalizeScene({
+    stateChanges: [
+      { entityType: 'prop', entityId: 'silver key', property: 'holder', previousValue: null, value: 'Mira', position: { x: 0.72, y: 0.55 } },
+      { entityType: 'prop', entityId: 'broken key', property: 'holder', position: { x: 1.4, y: 0.55 } }
+    ]
+  });
+  assert.deepEqual(scene.stateChanges[0].position, { x: 0.72, y: 0.55 });
+  assert.equal(Object.hasOwn(scene.stateChanges[1], 'position'), false);
+});

@@ -3,6 +3,7 @@ import { detectSceneAction, inferSceneActionIntent } from './scene-action.js';
 import { createCharacterRigMotionPreset } from './character-rig-motion-presets.js';
 import { sampleCharacterRigTimeline, validateCharacterRigTimeline } from './character-rig-timeline.js';
 import { compileDoodleSceneMotion } from './doodle-rig-adapter.js';
+import { solveCharacterRigLimbPose } from './character-rig-ik.js';
 
 const clean = value => String(value ?? '').trim();
 const key = value => clean(value).toLocaleLowerCase();
@@ -35,6 +36,79 @@ function doodleActionForDescription(description) {
     return 'scared';
   }
   return null;
+}
+
+
+const normalizedBoneId = value => String(value ?? '').toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
+
+function resolvePropTargetPosition(scene, phase) {
+  const targetKey = key(phase?.targetId);
+  if (!targetKey) return null;
+  const matches = (Array.isArray(scene?.stateChanges) ? scene.stateChanges : [])
+    .filter(change => change?.entityType === 'prop' && key(change.entityId) === targetKey
+      && Number.isFinite(change.position?.x) && change.position.x >= 0 && change.position.x <= 1
+      && Number.isFinite(change.position?.y) && change.position.y >= 0 && change.position.y <= 1);
+  const intentMatches = matches.filter(change => key(change.actionIntent) === key(phase.intent));
+  const candidates = intentMatches.length ? intentMatches : matches;
+  return candidates.length === 1
+    ? { x: candidates[0].position.x, y: candidates[0].position.y }
+    : null;
+}
+
+function solveTargetedArmPose(rig, target) {
+  const bones = Array.isArray(rig?.bones) ? rig.bones : [];
+  const upperBones = bones.filter(bone => {
+    const id = normalizedBoneId(bone.id);
+    return /arm|shoulder/.test(id) && !/forearm|lowerarm/.test(id);
+  });
+  const lowerBones = bones.filter(bone => /forearm|lowerarm/.test(normalizedBoneId(bone.id)));
+  const endBones = bones.filter(bone => /hand|wrist|paw/.test(normalizedBoneId(bone.id)));
+  const candidates = [];
+  for (const upper of upperBones) {
+    for (const lower of lowerBones.filter(item => item.parentId?.toLowerCase() === upper.id.toLowerCase())) {
+      for (const end of endBones.filter(item => item.parentId?.toLowerCase() === lower.id.toLowerCase())) {
+        const solved = solveCharacterRigLimbPose(rig, {
+          upperBoneId: upper.id, lowerBoneId: lower.id, endBoneId: end.id, target
+        });
+        if (solved.status === 'solved' && solved.reachable === true) {
+          candidates.push({
+            solved,
+            restDistance: Math.hypot(end.pivotX - target.x, end.pivotY - target.y)
+          });
+        }
+      }
+    }
+  }
+  candidates.sort((a, b) => a.restDistance - b.restDistance);
+  if (!candidates.length) return { status: 'unavailable' };
+  if (candidates.length > 1 && Math.abs(candidates[0].restDistance - candidates[1].restDistance) < 1e-6) {
+    return { status: 'ambiguous' };
+  }
+  return { status: 'solved', pose: candidates[0].solved.pose };
+}
+
+function applyTargetedArmPose(timeline, actorId, targetPose) {
+  const frames = timeline.keyframes || [];
+  const firstPose = frames.find(frame => frame.poses?.[actorId])?.poses?.[actorId] || {};
+  const boneIds = Object.keys(targetPose);
+  return {
+    ...timeline,
+    keyframes: frames.map(frame => {
+      const currentActorPose = frame.poses?.[actorId];
+      if (!currentActorPose) return frame;
+      const pose = { ...currentActorPose };
+      const eased = frame.time * frame.time * (3 - 2 * frame.time);
+      for (const boneId of boneIds) {
+        const startRotation = Number.isFinite(firstPose[boneId]?.rotation) ? firstPose[boneId].rotation : 0;
+        const targetRotation = targetPose[boneId].rotation;
+        pose[boneId] = {
+          ...(pose[boneId] || {}),
+          rotation: startRotation + (targetRotation - startRotation) * eased
+        };
+      }
+      return { ...frame, poses: { ...frame.poses, [actorId]: pose } };
+    })
+  };
 }
 
 /**
@@ -79,13 +153,31 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
       skipped.push({ actorId, phase: phase.phase, reason: 'invalid-rig-or-preset', issues: result.issues || [] });
       continue;
     }
+    let timeline = result.timeline;
+    let targetedReach = null;
+    const resolvedPropPosition = phase.targetPosition ? null : resolvePropTargetPosition(scene, phase);
+    const targetPosition = phase.targetPosition || resolvedPropPosition;
+    const targetPositionSource = phase.targetPosition ? 'action-timeline' : resolvedPropPosition ? 'prop-state-change' : null;
+    if (targetPosition) {
+      const armSolution = solveTargetedArmPose(rig, targetPosition);
+      targetedReach = armSolution.status;
+      if (armSolution.status === 'solved') {
+        timeline = applyTargetedArmPose(timeline, rig.characterId, armSolution.pose);
+      } else {
+        skipped.push({
+          actorId, phase: phase.phase,
+          reason: armSolution.status === 'ambiguous' ? 'targeted-arm-chain-ambiguous' : 'targeted-arm-ik-unavailable'
+        });
+      }
+    }
     segments.push({
       actorId: rig.characterId,
       start: phase.start,
       end: phase.end,
       preset: preset || result.actions?.[0]?.preset || 'idle',
       doodleAction,
-      timeline: result.timeline
+      ...(targetedReach ? { targetedReach, targetPositionSource } : {}),
+      timeline
     });
   }
 
@@ -142,8 +234,10 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     timeline: report.timeline,
     generatedCount: accepted.length,
     skipped,
-    mappedActions: accepted.map(({ actorId, preset, doodleAction, start, end }) => ({
-      actorId, preset, start, end, ...(doodleAction ? { doodleAction } : {})
+    mappedActions: accepted.map(({ actorId, preset, doodleAction, targetedReach, targetPositionSource, start, end }) => ({
+      actorId, preset, start, end,
+      ...(doodleAction ? { doodleAction } : {}),
+      ...(targetedReach ? { targetedReach, targetPositionSource } : {})
     }))
   };
 }
