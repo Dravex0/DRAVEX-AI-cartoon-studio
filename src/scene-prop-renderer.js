@@ -32,7 +32,10 @@ export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}
     || /hand|paw|wrist|кисть|лап/i.test(part.boneId));
   // Rigs with two hands need an explicit grip/contact anchor. Never choose
   // left or right arbitrarily: that would make held props jump to the wrong hand.
-  const authoredGripParts = handParts.filter(part => /grip|propanchor|contacthand|holdinghand/i.test(part.id));
+  const semanticGripParts = handParts.filter(part => part.gripAnchor === true);
+  const authoredGripParts = semanticGripParts.length
+    ? semanticGripParts
+    : handParts.filter(part => /grip|propanchor|contacthand|holdinghand/i.test(part.id));
   const anchors = authoredGripParts.length ? authoredGripParts : handParts;
   if (anchors.length !== 1) return null;
   const anchor = anchors[0];
