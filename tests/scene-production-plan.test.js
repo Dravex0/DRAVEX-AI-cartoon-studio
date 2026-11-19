@@ -69,3 +69,32 @@ test('reports missing cast attribution and dialogue speakers outside the cast', 
   }]);
   assert.ok(plan.validation.issues.some(issue => issue.code === 'production-actor-not-in-scene-cast'));
 });
+
+
+test('exposes the complete scene world and explicit prop hand-offs to renderer work orders', () => {
+  const plan = buildSceneProductionPlan([{
+    id: 's-world',
+    characters: ['Mira'],
+    stateChanges: [{ entityType: 'prop', entityId: 'key', property: 'holder',
+      previousValue: 'Mira', value: 'robot-1', actorId: 'Mira', actionIntent: 'hand',
+      evidence: 'Mira gives the key to the robot.' }]
+  }], {
+    worldModel: {
+      entities: [
+        { id: 'Mira', kind: 'character', scenes: ['s-world'], attributes: {} },
+        { id: 'robot-1', kind: 'robot', scenes: ['s-world'], attributes: { material: 'metal' } },
+        { id: 'key', kind: 'prop', scenes: ['s-world'], attributes: {} },
+        { id: 'street', kind: 'location', scenes: ['other-scene'], attributes: {} }
+      ],
+      relations: [{ sceneId: 's-world', type: 'acts_on', from: 'Mira', to: 'robot-1', action: 'give' }],
+      events: [{ sceneId: 's-world', actions: [{ type: 'give', actorId: 'Mira', targetId: 'robot-1' }] }]
+    }
+  });
+  const scene = plan.scenes[0];
+  assert.deepEqual(scene.worldEntities.map(entity => entity.id), ['Mira', 'robot-1', 'key']);
+  assert.equal(scene.worldEntities.find(entity => entity.id === 'robot-1').kind, 'robot');
+  assert.equal(scene.worldRelations[0].to, 'robot-1');
+  assert.equal(scene.propActions[0].value, 'robot-1');
+  assert.ok(scene.requiredPasses.includes('multi-entity-interaction'));
+  assert.ok(scene.requiredPasses.includes('prop-state-and-motion'));
+});

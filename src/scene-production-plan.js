@@ -12,6 +12,11 @@ function unique(values) {
   return [...new Set(values.map(value => clean(value, 160)).filter(Boolean))];
 }
 
+function worldActionsHaveParticipants(event) {
+  return Array.isArray(event?.actions) && event.actions.some(action => record(action)
+    && clean(action.actorId, 160) && clean(action.targetId, 160));
+}
+
 function normalizePhases(scene) {
   const phases = Array.isArray(scene.actionTimeline?.phases) ? scene.actionTimeline.phases : [];
   return phases.filter(record).map((phase, index) => ({
@@ -68,12 +73,28 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
         description: clean(cue.description || cue.source, 300) }));
     const worldEvent = (Array.isArray(world?.events) ? world.events : [])
       .find(event => record(event) && event.sceneId === sceneId) || null;
+    const worldEntities = (Array.isArray(world?.entities) ? world.entities : [])
+      .filter(entity => record(entity) && Array.isArray(entity.scenes) && entity.scenes.includes(sceneId))
+      .map(entity => ({ id: clean(entity.id, 160), kind: clean(entity.kind, 80) || 'entity',
+        attributes: record(entity.attributes) ? entity.attributes : {} }));
+    const worldRelations = (Array.isArray(world?.relations) ? world.relations : [])
+      .filter(relation => record(relation) && relation.sceneId === sceneId);
+    const propActions = (Array.isArray(scene.stateChanges) ? scene.stateChanges : [])
+      .filter(change => record(change) && change.entityType === 'prop' && clean(change.entityId, 160))
+      .map(change => ({ entityId: clean(change.entityId, 160), property: clean(change.property, 60),
+        previousValue: change.previousValue ?? null, value: change.value ?? null,
+        actorId: clean(change.actorId, 160) || null, actionIntent: clean(change.actionIntent, 60) || null,
+        evidence: clean(change.evidence, 500) }));
     const requiredPasses = [];
     if (clean(scene.imagePrompt, 4000) || clean(scene.prompt, 4000)) requiredPasses.push('visual-establishing-frame');
     if (cast.length) requiredPasses.push('character-layer-composition');
     if (phases.length || clean(scene.motionPrompt, 3000) || clean(scene.visibleAction, 1000)) {
       requiredPasses.push('character-and-object-motion');
     }
+    if (worldRelations.length || worldActionsHaveParticipants(worldEvent)) {
+      requiredPasses.push('multi-entity-interaction');
+    }
+    if (propActions.length) requiredPasses.push('prop-state-and-motion');
     if (groundedPhysicsEvents.length) requiredPasses.push('grounded-physical-interaction');
     if (dialogue.length) requiredPasses.push('dialogue-voice-and-timing');
     if (dialogue.length || audioCues.length || clean(scene.sound, 1000)) requiredPasses.push('scene-audio-mix');
@@ -105,6 +126,9 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
         camera: clean(scene.camera, 1000), motionPrompt: clean(scene.motionPrompt, 3000) },
       actionBeats: phases,
       worldActions: Array.isArray(worldEvent?.actions) ? worldEvent.actions : [],
+      worldEntities,
+      worldRelations,
+      propActions,
       physicalBeats: groundedPhysicsEvents,
       unresolvedPhysicalBeats: physicsEvents.filter(event => event.grounded !== true),
       causalBeats: groundedCausalEvents,
