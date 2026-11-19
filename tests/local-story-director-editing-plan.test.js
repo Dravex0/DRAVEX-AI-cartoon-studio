@@ -14,4 +14,7 @@ test('local director exposes editing plan even when optional local inference is 
   assert.equal(result.editingPlan.shotCount, 1);
   assert.equal(result.editingPlan.shots[0].continuity.participantIds.includes('Maya'), true);
   assert.equal(result.editingPlan.shots[0].continuity.relations[0].from, 'Maya');
+  assert.equal(result.editDecisions.shotCount, 1);
+  assert.deepEqual(result.editDecisions.cuts, []);
+  assert.equal(result.editDecisions.pacing[0].pace, 'steady');
 });
