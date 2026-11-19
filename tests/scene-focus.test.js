@@ -78,5 +78,5 @@ test('the shared preview and export draw path applies the resolved focus and off
   assert.match(appSource, /const sceneFocus=resolveSceneFocus\(/);
   assert.match(appSource, /const renderCameraPlan=\{\.\.\.cameraPlan,offsetY:sceneFocus\.offsetY\}/);
   assert.match(appSource, /ctx\.translate\(w\/2,h\/2\+renderCameraPlan\.offsetY\)/);
-  assert.match(appSource, /camera:renderCameraPlan,focusX,focusY/);
+  assert.match(appSource, /camera:\\s*renderCameraPlan,\\s*focusX,\\s*focusY/);
 });
