@@ -113,7 +113,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
           y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
   };
 
-  return [...byProp.values()].map(history => {
+  const holderPlans = [...byProp.values()].map(history => {
     const entityId = clean(history[0].entityId);
     const interval = (phaseEnd - phaseStart) / Math.max(1, history.length);
     let holder = history[0].previousValue ?? null;
@@ -161,8 +161,73 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       transitionProgress: 1
     };
   });
-}
 
+  // Explicit position changes are rendered only when both endpoints are known.
+  // A missing start position stays static rather than inventing a trajectory.
+  const positionByProp = new Map();
+  for (const change of changes) {
+    if (!change || change.entityType !== 'prop' || change.property !== 'position') continue;
+    const entityId = clean(change.entityId);
+    if (!entityId || !normalizedPoint(change.position)) continue;
+    const propKey = key(entityId);
+    if (!positionByProp.has(propKey)) positionByProp.set(propKey, []);
+    positionByProp.get(propKey).push(change);
+  }
+
+  for (const [propKey, history] of positionByProp) {
+    const existing = holderPlans.find(item => key(item.id) === propKey);
+    // A held prop follows its holder anchor; world-space motion cannot detach it.
+    if (existing?.held) continue;
+    let current = null;
+    let active = null;
+    for (let index = 0; index < history.length; index += 1) {
+      const change = history[index];
+      const from = normalizedPoint(change.previousPosition) || current;
+      const to = normalizedPoint(change.position);
+      if (!to) continue;
+      const matchedStep = matchedStepByChange.get(change);
+      const start = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
+      const end = matchedStep ? matchedStep.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
+      if (!from) {
+        current = to;
+        active = { change, index, progress: 1 };
+        continue;
+      }
+      if (p < start) {
+        current = from;
+        active = { change, index, progress: 0 };
+        break;
+      }
+      if (p <= end) {
+        const progress = clamp((p - start) / Math.max(0.000001, end - start), 0, 1);
+        const eased = progress * progress * (3 - 2 * progress);
+        current = { x: from.x + (to.x - from.x) * eased, y: from.y + (to.y - from.y) * eased };
+        active = { change, index, progress };
+        break;
+      }
+      current = to;
+      active = { change, index, progress: 1 };
+    }
+    if (!current) continue;
+    const plan = {
+      ...(existing || {}),
+      id: clean(history[0].entityId),
+      kind: propKind(history[0].entityId),
+      x: current.x,
+      y: current.y,
+      rotation: existing?.rotation || 0,
+      held: existing?.held === true,
+      visible: true,
+      scale: existing?.scale || 1,
+      evidence: clean(active?.change?.evidence),
+      transitionIndex: active?.index ?? -1,
+      transitionProgress: active?.progress ?? 1
+    };
+    if (existing) Object.assign(existing, plan);
+    else holderPlans.push(plan);
+  }
+  return holderPlans;
+}
 function drawStar(context, size) {
   context.beginPath();
   for (let i = 0; i < 10; i++) {
