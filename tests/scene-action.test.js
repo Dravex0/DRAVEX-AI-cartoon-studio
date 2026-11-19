@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { detectSceneAction } from '../src/scene-action.js';
+import { detectSceneAction, detectSceneActionAtProgress } from '../src/scene-action.js';
 
 const cases = [
   ['Лисёнок исчезает за деревом', 'vanish'],
@@ -354,4 +354,42 @@ test('recognizes torture as a visible threat and does not confuse weapon drawing
     extractSceneActionSequence('The child draws a map.').map(event => event.intent),
     ['write_draw']
   );
+});
+
+test('samples source-ordered action timeline steps at the current scene progress', () => {
+  const scene = {
+    storyDetail: 'The fox walks, waves to a star, and continues walking.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action',
+        start: 0,
+        end: 1,
+        steps: [
+          { start: 0, end: 0.34, intent: 'walk', motionCue: 'walk' },
+          { start: 0.34, end: 0.67, intent: 'wave', motionCue: 'wave' },
+          { start: 0.67, end: 1, intent: 'walk', motionCue: 'walk' }
+        ]
+      }]
+    }
+  };
+  assert.equal(detectSceneActionAtProgress(scene, 0.1), 'walk');
+  assert.equal(detectSceneActionAtProgress(scene, 0.5), 'wave');
+  assert.equal(detectSceneActionAtProgress(scene, 0.9), 'walk');
+  assert.equal(detectSceneActionAtProgress(scene, 1), 'walk');
+});
+
+test('keeps the lexical action fallback when no supported timeline step is available', () => {
+  assert.equal(detectSceneActionAtProgress({
+    storyDetail: 'The fox waves to the glowing star.',
+    actionTimeline: { schemaVersion: 1, phases: [{ phase: 'action', start: 0, end: 1, steps: [] }] }
+  }, 0.5), 'wave');
+});
+
+test('does not let malformed or unsupported timeline cues override the scene action', () => {
+  assert.equal(detectSceneActionAtProgress({
+    storyDetail: 'The fox walks through the forest.',
+    actionTimeline: { schemaVersion: 1, phases: [{ phase: 'action', start: 0, end: 1,
+      steps: [{ start: 0, end: 1, intent: 'unknown', motionCue: 'unregistered-motion' }] }] }
+  }, 0.5), 'walk');
 });
