@@ -192,7 +192,8 @@ test('selects the explicitly named grip hand when a rig has two hands', () => {
       { id: 'rightHand-prop-grip', boneId: 'rightHand', imageUrl: 'https://assets.example/right.png', x: 0.7, y: 0.55, width: 0.08, height: 0.08 }
     ]
   };
-  const plan = buildScenePropRenderPlan(scene, [{ characterId: 'Mira', x: 0.5, y: 0.7 }], 1, { characterRigs: [rig] })[0];
+  const miraScene = { ...scene, stateChanges: scene.stateChanges.map(change => ({ ...change, value: 'Mira', actorId: 'Mira' })) };
+  const plan = buildScenePropRenderPlan(miraScene, [{ characterId: 'Mira', x: 0.5, y: 0.7 }], 1, { characterRigs: [rig] })[0];
   assert.equal(plan.held, true);
   assert.ok(Math.abs(plan.x - 0.7) < 1e-9);
   assert.ok(Math.abs(plan.y - 0.55) < 1e-9);
@@ -207,7 +208,8 @@ test('does not guess which hand holds a prop when both hands lack an authored gr
       { id: 'rightHand', boneId: 'rightHand', imageUrl: 'https://assets.example/right.png', x: 0.7, y: 0.55, width: 0.08, height: 0.08 }
     ]
   };
-  const plan = buildScenePropRenderPlan(scene, [{ characterId: 'Mira', x: 0.5, y: 0.7 }], 1, { characterRigs: [rig] })[0];
+  const miraScene = { ...scene, stateChanges: scene.stateChanges.map(change => ({ ...change, value: 'Mira', actorId: 'Mira' })) };
+  const plan = buildScenePropRenderPlan(miraScene, [{ characterId: 'Mira', x: 0.5, y: 0.7 }], 1, { characterRigs: [rig] })[0];
   // Keep the documented legacy estimate only as a fallback, but never silently
   // attach the prop to an arbitrary hand.
   assert.equal(plan.x, 0.62);
