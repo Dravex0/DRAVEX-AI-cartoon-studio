@@ -246,3 +246,40 @@ test('does not choose between multiple semantic grip anchors', () => {
   assert.equal(plan.x, 0.62);
   assert.equal(plan.y, 0.62);
 });
+
+
+test('held props follow the same sampled rig timeline pose as the character hand', () => {
+  const pickupScene = {
+    stateChanges: [{
+      entityType: 'prop', entityId: 'book', property: 'holder',
+      previousValue: null, value: 'Mira', actorId: 'Mira',
+      actionIntent: 'pick_up', evidence: 'Mira picks up the book.'
+    }]
+  };
+  const rig = {
+    schemaVersion: 1, characterId: 'Mira',
+    bones: [{ id: 'root', parentId: null }, { id: 'rightHand', parentId: 'root' }],
+    parts: [{
+      id: 'contact-point', boneId: 'rightHand', imageUrl: 'https://assets.example/hand.png',
+      x: 0.7, y: 0.55, width: 0.08, height: 0.08, gripAnchor: true
+    }]
+  };
+  const timeline = {
+    schemaVersion: 1,
+    keyframes: [
+      { time: 0, poses: { Mira: { rightHand: { x: 0, y: 0 } } } },
+      { time: 1, poses: { Mira: { rightHand: { x: 0.18, y: -0.05 } } } }
+    ]
+  };
+  const layer = [{ characterId: 'Mira', x: 0.5, y: 0.7 }];
+  const atStart = buildScenePropRenderPlan(pickupScene, layer, 1, {
+    characterRigs: [rig], rigPoses: sampleCharacterRigTimeline(timeline, 0)
+  })[0];
+  const atEnd = buildScenePropRenderPlan(pickupScene, layer, 1, {
+    characterRigs: [rig], rigPoses: sampleCharacterRigTimeline(timeline, 1)
+  })[0];
+  assert.equal(atStart.held, true);
+  assert.equal(atEnd.held, true);
+  assert.ok(Math.abs((atEnd.x - atStart.x) - 0.18) < 1e-9);
+  assert.ok(Math.abs((atEnd.y - atStart.y) + 0.05) < 1e-9);
+});
