@@ -246,3 +246,14 @@ test('does not choose between multiple semantic grip anchors', () => {
   assert.equal(plan.x, 0.62);
   assert.equal(plan.y, 0.62);
 });
+
+
+test('uses an explicit prop position as the pickup origin instead of the generic ground fallback', () => {
+  const positioned = {
+    ...scene,
+    stateChanges: scene.stateChanges.map(change => ({ ...change, position: { x: 0.23, y: 0.41 } }))
+  };
+  const before = buildScenePropRenderPlan(positioned, layers, 0.1)[0];
+  assert.equal(before.x, 0.23);
+  assert.equal(before.y, 0.41);
+});
