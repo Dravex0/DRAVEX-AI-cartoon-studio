@@ -99,7 +99,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     // Backward compatibility: older scenes have no actor/target/evidence keys.
     // Keep their historical stable order, but never use this fallback when
     // any grounding identity was authored or when evidence is ambiguous.
-    if (!actorId && !targetId && !evidence) {
+    if (!actorId && !evidence && !timelineSteps.some(step => clean(step.targetId))) {
       return timelineSteps.map((step, index) => ({ step, index }))
         .find(({step,index}) => !claimed.has(index) && compatibleIntents.has(clean(step.intent))) || null;
     }
