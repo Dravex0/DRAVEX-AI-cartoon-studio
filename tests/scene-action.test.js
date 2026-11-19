@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { detectSceneAction } from '../src/scene-action.js';
+import { detectSceneAction, detectSceneActionAtProgress } from '../src/scene-action.js';
 
 const cases = [
   ['Лисёнок исчезает за деревом', 'vanish'],
@@ -354,4 +354,87 @@ test('recognizes torture as a visible threat and does not confuse weapon drawing
     extractSceneActionSequence('The child draws a map.').map(event => event.intent),
     ['write_draw']
   );
+});
+
+test('samples source-ordered action timeline steps at the current scene progress', () => {
+  const scene = {
+    storyDetail: 'The fox walks, waves to a star, and continues walking.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action',
+        start: 0,
+        end: 1,
+        steps: [
+          { start: 0, end: 0.34, intent: 'walk', motionCue: 'walk' },
+          { start: 0.34, end: 0.67, intent: 'wave', motionCue: 'wave' },
+          { start: 0.67, end: 1, intent: 'walk', motionCue: 'walk' }
+        ]
+      }]
+    }
+  };
+  assert.equal(detectSceneActionAtProgress(scene, 0.1), 'walk');
+  assert.equal(detectSceneActionAtProgress(scene, 0.5), 'wave');
+  assert.equal(detectSceneActionAtProgress(scene, 0.9), 'walk');
+  assert.equal(detectSceneActionAtProgress(scene, 1), 'walk');
+});
+
+test('procedural action selection follows preparation, action substeps, reaction, and result phases', () => {
+  const scene = {
+    storyDetail: 'The fox turns toward the star, walks closer, waves, smiles happily, and waits beside it.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [
+        { phase: 'preparation', start: 0, end: 0.2, actorId: 'Foxy',
+          description: 'The fox turns toward the star.' },
+        { phase: 'action', start: 0.2, end: 0.7, actorId: 'Foxy',
+          description: 'The fox walks closer and waves.', steps: [
+            { start: 0.2, end: 0.45, motionCue: 'walk', description: 'Walk closer' },
+            { start: 0.45, end: 0.7, motionCue: 'wave', description: 'Wave to the star' }
+          ] },
+        { phase: 'reaction', start: 0.7, end: 0.85, actorId: 'Foxy',
+          description: 'The fox smiles happily.' },
+        { phase: 'result', start: 0.85, end: 1, actorId: 'Foxy',
+          description: 'The fox waits beside the star.' }
+      ]
+    }
+  };
+
+  assert.equal(detectSceneActionAtProgress(scene, 0.1), 'turn');
+  assert.equal(detectSceneActionAtProgress(scene, 0.3), 'walk');
+  assert.equal(detectSceneActionAtProgress(scene, 0.6), 'wave');
+  assert.equal(detectSceneActionAtProgress(scene, 0.75), 'happy');
+  assert.equal(detectSceneActionAtProgress(scene, 0.95), 'idle');
+  assert.equal(detectSceneActionAtProgress(scene, 1), 'idle');
+});
+
+test('holds the procedural character idle in gaps between valid timeline phases', () => {
+  const scene = {
+    storyDetail: 'The fox runs toward the star.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [
+        { phase: 'preparation', start: 0.1, end: 0.3, description: 'The fox turns.' },
+        { phase: 'action', start: 0.5, end: 0.8, description: 'The fox runs.' }
+      ]
+    }
+  };
+  assert.equal(detectSceneActionAtProgress(scene, 0.05), 'idle');
+  assert.equal(detectSceneActionAtProgress(scene, 0.4), 'idle');
+  assert.equal(detectSceneActionAtProgress(scene, 0.9), 'idle');
+});
+
+test('keeps the lexical action fallback when no supported timeline step is available', () => {
+  assert.equal(detectSceneActionAtProgress({
+    storyDetail: 'The fox waves to the glowing star.',
+    actionTimeline: { schemaVersion: 1, phases: [{ phase: 'action', start: 0, end: 1, steps: [] }] }
+  }, 0.5), 'wave');
+});
+
+test('does not let malformed or unsupported timeline cues override the scene action', () => {
+  assert.equal(detectSceneActionAtProgress({
+    storyDetail: 'The fox walks through the forest.',
+    actionTimeline: { schemaVersion: 1, phases: [{ phase: 'action', start: 0, end: 1,
+      steps: [{ start: 0, end: 1, intent: 'unknown', motionCue: 'unregistered-motion' }] }] }
+  }, 0.5), 'walk');
 });
