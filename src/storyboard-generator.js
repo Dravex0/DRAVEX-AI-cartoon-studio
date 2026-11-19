@@ -164,7 +164,21 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     // Semantic story intent is separate from renderer movement presets and is now
     // carried into the actual motion prompt and validated action timeline.
     const semanticIntent = inferSceneActionIntent(scene.storyDetail);
-    const actionSequence = extractSceneActionSequence(scene.storyDetail);
+    const extractedActions = extractSceneActionSequence(scene.storyDetail);
+    // Link each source-ordered action to a directed interaction only when their
+    // source spans overlap. Never borrow a target from a different sentence.
+    const actionSequence = extractedActions.map(event => {
+      const linkedInteraction = scene.interactions.find(interaction =>
+        Number.isInteger(interaction.sourceStart) && Number.isInteger(interaction.sourceEnd)
+        && event.startIndex < interaction.sourceEnd && event.endIndex > interaction.sourceStart
+      );
+      return {
+        ...event,
+        actorId: linkedInteraction?.actorId || scene.characters[0] || '',
+        targetId: linkedInteraction?.targetId || null,
+        interactionType: linkedInteraction?.type || null
+      };
+    });
     scene.actionSequence = actionSequence;
     scene.semanticActionIntent = semanticIntent;
     const semanticIsActionable = !['unknown', 'descriptive'].includes(semanticIntent.intent);
@@ -172,7 +186,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
       ? `Perform the story event "${semanticIntent.intent}" using this source-grounded action: ${scene.storyDetail}`
       : '';
     const orderedActionInstruction = actionSequence.length > 1
-      ? `Follow this exact source-grounded action order without skipping or rearranging steps: ${actionSequence.map((event, eventIndex) => `${eventIndex + 1}. ${event.intent} (${event.evidence})`).join('; ')}. Keep the same actor, objects, and scene continuity across the sequence.`
+      ? `Follow this exact source-grounded action order without skipping or rearranging steps: ${actionSequence.map((event, eventIndex) => `${eventIndex + 1}. ${event.actorId || 'unresolved actor'}${event.targetId ? ` → ${event.targetId}` : ''}: ${event.intent} (${event.evidence})`).join('; ')}. Preserve each explicitly identified actor and target; do not transfer a command or action to another character.`
       : '';
     scene.motionPrompt = [scene.visibleAction, semanticMotionInstruction, orderedActionInstruction].filter(Boolean).join('. ');
     // Add one action phase only when source text supports a movement, semantic event,
@@ -218,8 +232,8 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
                   motionCue: event.motionCue,
                   start,
                   end,
-                  actorId: actionActor,
-                  targetId: null,
+                  actorId: event.actorId || actionActor,
+                  targetId: event.targetId || null,
                   description: `Perform the ${event.intent} action: ${event.evidence}`,
                   evidence: event.evidence
                 };
