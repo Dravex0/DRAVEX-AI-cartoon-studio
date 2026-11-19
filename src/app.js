@@ -3170,7 +3170,7 @@ async function generateRemoteSceneVideoForUniversal({signal,reportProgress,hasCo
  const readField=(id,key)=>isCurrent?$(id).value.trim():String(originalMeta[key]||'').trim();
  const motionText=readField('sceneMotionPrompt','motionPrompt')||String(originalMeta.visibleAction||'');
  const motionScene={...originalMeta,title:readField('sceneTitle','title')||titles[index],description:readField('sceneDescription','description')||descriptions[index],motionPrompt:motionText,visibleAction:motionText,camera:readField('sceneCamera','camera'),startState:readField('sceneStartState','startState'),endState:readField('sceneEndState','endState'),negativePrompt:readField('sceneNegativePrompt','negativePrompt'),continuityLock:readField('sceneContinuityLock','continuityLock'),characters:isCurrent?normalizeSceneCast($('sceneCharacters').value,originalMeta.characters):(Array.isArray(originalMeta.characters)?originalMeta.characters:[])};
- const productionContext=buildSceneProductionContext([motionScene],{language:storyLanguage()});
+ const productionContext=buildSceneProductionContext([motionScene],{language:storyLanguage(),characterBible});
  const productionInstructions=buildSceneProductionInstructions(productionContext.productionPlan.scenes[0]);
  const prompt=[buildMotionGenerationPrompt(motionScene,characterBible),productionInstructions].filter(Boolean).join('\n\n');
  if(!prompt.trim())throw new Error('Add a motion instruction before remote video generation.');
@@ -3240,7 +3240,7 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  }
  if(imageBlob&&!imageBlob.size)throw new Error('Исходное изображение сцены пустое.');
  const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind:imageBlob?'blob':'missing'});
- const productionContext=buildSceneProductionContext([motionScene],{language:storyLanguage()});
+ const productionContext=buildSceneProductionContext([motionScene],{language:storyLanguage(),characterBible});
  const productionInstructions=buildSceneProductionInstructions(productionContext.productionPlan.scenes[0]);
  const motionPrompt=buildMotionGenerationPrompt(motionScene,characterBible);
  const prompt=taskType==='text-to-video'
@@ -3371,7 +3371,7 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  const selectedSceneImage=comfySourceImageForScene(index);
  const imageSourceKind=selectedSceneImage?'blob':imageUrl?'url':'missing';
  const taskType=resolveSceneVideoTaskType({mode:'comfyui',imageSourceKind});
- const productionContext=buildSceneProductionContext([motionScene],{language:storyLanguage()});
+ const productionContext=buildSceneProductionContext([motionScene],{language:storyLanguage(),characterBible});
  const productionInstructions=buildSceneProductionInstructions(productionContext.productionPlan.scenes[0]);
  const motionPrompt=buildMotionGenerationPrompt(motionScene,characterBible);
  const prompt=taskType==='text-to-video'
@@ -3542,7 +3542,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   }
   // Refresh scene snapshots after optional dialogue/voice preparation, then build the exact work orders sent to video providers.
   scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
-  const productionContext=buildSceneProductionContext(scenes,{language:storyLanguage()});
+  const productionContext=buildSceneProductionContext(scenes,{language:storyLanguage(),characterBible});
   currentStoryboardPlan={...(currentStoryboardPlan||{}),...productionContext,scenes};
   if(mode==='huggingface'){
    const tooShortIndex=scenes.findIndex(scene=>{
