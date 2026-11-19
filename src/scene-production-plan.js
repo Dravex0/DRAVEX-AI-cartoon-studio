@@ -100,8 +100,14 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
     const groundedCausalEvents = causalEvents.filter(event => event.grounded === true);
     const causalEdges = (Array.isArray(causal?.edges) ? causal.edges : [])
       .filter(edge => record(edge) && (edge.fromSceneId === sceneId || edge.toSceneId === sceneId));
-    const causalChainRefs = causalChains.filter(chain => chain.sceneIds.includes(sceneId))
-      .map(chain => ({ chainId: chain.id, eventIds: chain.eventIds }));
+    const causalChainDetails = causalChains.filter(chain => chain.sceneIds.includes(sceneId))
+      .map(chain => ({
+        chainId: chain.id,
+        events: chain.events.map(event => ({ ...event, occursInCurrentScene: event.sceneId === sceneId }))
+      }));
+    const causalChainRefs = causalChainDetails.map(chain => ({
+      chainId: chain.chainId, eventIds: chain.events.map(event => event.id)
+    }));
     const shotIds = new Set(shots.map(shot => shot.id));
     const editCuts = (Array.isArray(decisions?.cuts) ? decisions.cuts : [])
       .filter(cut => record(cut) && (shotIds.has(cut.fromShotId) || shotIds.has(cut.toShotId)));
@@ -179,6 +185,7 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
       unresolvedCausalBeats: causalEvents.filter(event => event.grounded !== true),
       causalEdges,
       causalChainRefs,
+      causalChainDetails,
       shots,
       editCuts,
       dialogue,
