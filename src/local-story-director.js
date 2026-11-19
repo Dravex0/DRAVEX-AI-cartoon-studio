@@ -4,6 +4,7 @@ import { buildStoryEventChain } from './story-event-chain.js';
 import { buildSceneWorldModel } from './scene-world-model.js';
 import { buildSemanticEditingPlan } from './semantic-editing-plan.js';
 import { buildEditDecisionPlan } from './edit-decision-engine.js';
+import { buildScenePhysicsModel } from './scene-physics-model.js';
 import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-state-memory.js';
 
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
@@ -144,7 +145,7 @@ function buildStructuredStateMemory(modelScenes, baselineScenes) {
     return { supplied: true, report: { passed: false, checkedTransitions: 0, issues: [{ code: 'structured-state-memory-error', severity: 'error' }] } };
   }
 }
-function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null }) {
+function buildDirectorPrompt({ basePlan, storyText, language, character, characterBible = [], eventChain = null, physicsModel = null }) {
   const requiredDetails = basePlan.scenes.map((scene, index) => ({
     scene: index + 1,
     sourceDetail: clean(scene.storyDetail, 1_200),
@@ -152,7 +153,8 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     assignedCharacters: Array.isArray(scene.characters) ? scene.characters : [],
     lockedInteraction: scene.interaction || null,
     lockedCausalLink: scene.causalLink || null,
-    lockedStateChanges: scene.stateChanges || []
+    lockedStateChanges: scene.stateChanges || [],
+    lockedPhysics: { physics: scene.physics || null, physicsEvents: scene.physicsEvents || [] }
   }));
   return [
     'You are DRAVEX, a careful animation film director.',
@@ -166,6 +168,8 @@ function buildDirectorPrompt({ basePlan, storyText, language, character, charact
     'Preserve every supplied lockedInteraction exactly: actorId is the acting character, targetId is the recipient, and type is the directed action. Never reverse participants or invent a relationship when lockedInteraction is null.',
     'Preserve every supplied lockedCausalLink exactly. A causal link is valid only when its causeSceneId, effectSceneId, marker, causeEvidence, and evidence remain unchanged. Do not invent causes, consequences, or links when lockedCausalLink is null.',
     'Preserve every supplied lockedStateChanges record exactly, including entity, property, previousValue, value, actorId, and source evidence. Never invent a prop transfer, door state, or character location change.',
+    'PHYSICS MODEL (source-grounded only): ' + JSON.stringify(physicsModel),
+    'Preserve supplied physical event identities, participants, evidence, and measured values. Never invent collisions, falls, contact, support, mass, gravity, forces, coordinates, or velocities. Unknown physical values must remain unknown.',
     'CHARACTER BIBLE (locked visual references): ' + JSON.stringify(characterBible),
     'Preserve each character\'s visual description, clothing, colors, and distinctive features in every image and motion prompt where that character appears.',
     'Main character reference: ' + clean(character, 120) + '.',
@@ -205,6 +209,7 @@ export async function directStoryboardWithLocalAI({
     : Math.max(16, Math.min(1024, Math.round(Number(maxNewTokens) || estimateDirectorTokenBudget(fallback.length))));
   const eventChain = buildStoryEventChain(fallback);
   const worldModel = buildSceneWorldModel(fallback, { language });
+  const physicsModel = buildScenePhysicsModel(fallback, worldModel);
   const editingPlan = buildSemanticEditingPlan(fallback, worldModel);
   const editDecisions = buildEditDecisionPlan(editingPlan, fallback, worldModel);
   const fallbackResult = (reason, evaluation = null) => ({
@@ -215,6 +220,7 @@ export async function directStoryboardWithLocalAI({
     modelId: runtime?.status?.modelId || null,
     eventChain,
     worldModel,
+    physicsModel,
     editingPlan,
     editDecisions
   });
@@ -225,7 +231,7 @@ export async function directStoryboardWithLocalAI({
 
   let generated;
   try {
-    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel, editingPlan } }), {
+    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel, physicsModel, editingPlan }, physicsModel }), {
       maxNewTokens: tokenBudget,
       temperature: 0.15,
       signal
@@ -296,6 +302,7 @@ export async function directStoryboardWithLocalAI({
   if (!evaluation.passed) return fallbackResult('candidate-failed-story-quality-gate', evaluation);
 
   const acceptedWorldModel = buildSceneWorldModel(candidate, { language });
+  const acceptedPhysicsModel = buildScenePhysicsModel(candidate, acceptedWorldModel);
   const acceptedEditingPlan = buildSemanticEditingPlan(candidate, acceptedWorldModel);
   const acceptedEditDecisions = buildEditDecisionPlan(acceptedEditingPlan, candidate, acceptedWorldModel);
 
@@ -304,6 +311,7 @@ export async function directStoryboardWithLocalAI({
     scenes: candidate,
     eventChain,
     worldModel: acceptedWorldModel,
+    physicsModel: acceptedPhysicsModel,
     editingPlan: acceptedEditingPlan,
     editDecisions: acceptedEditDecisions,
     evaluation,
