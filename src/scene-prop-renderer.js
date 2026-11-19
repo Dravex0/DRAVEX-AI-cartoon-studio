@@ -60,6 +60,24 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     : null;
   const phaseStart = actionPhase ? actionPhase.start : 0.52;
   const phaseEnd = actionPhase ? actionPhase.end : 0.8;
+  const timelineSteps = (Array.isArray(scene?.actionTimeline?.phases) ? scene.actionTimeline.phases : [])
+    .flatMap(phase => Array.isArray(phase?.steps) ? phase.steps : [])
+    .filter(step => Number.isFinite(step?.start) && Number.isFinite(step?.end)
+      && step.start >= 0 && step.start < step.end && step.end <= 1);
+  const claimedSteps = new Set();
+  const matchedStepByChange = new Map();
+  for (const change of changes) {
+    const intent = clean(change?.actionIntent);
+    if (!intent) continue;
+    const compatible = intent === 'drop' ? new Set(['drop', 'drop_weapon', 'throw']) : new Set([intent]);
+    const stepIndex = timelineSteps.findIndex((step, index) =>
+      !claimedSteps.has(index) && compatible.has(clean(step.intent))
+    );
+    if (stepIndex >= 0) {
+      claimedSteps.add(stepIndex);
+      matchedStepByChange.set(change, timelineSteps[stepIndex]);
+    }
+  }
   const byProp = new Map();
   for (const change of changes) {
     if (!change || change.entityType !== 'prop' || change.property !== 'holder') continue;
@@ -97,8 +115,9 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
 
     for (let index = 0; index < history.length; index += 1) {
       const change = history[index];
-      const start = phaseStart + interval * index;
-      const end = start + interval;
+      const matchedStep = matchedStepByChange.get(change);
+      const start = matchedStep ? matchedStep.start : phaseStart + interval * index;
+      const end = matchedStep ? matchedStep.end : start + interval;
       const nextHolder = change.value ?? null;
       if (p < start) break;
       from = holderPoint(holder);
