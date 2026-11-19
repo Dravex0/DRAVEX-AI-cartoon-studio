@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildScenePropRenderPlan, drawSceneProps } from '../src/scene-prop-renderer.js';
+import { normalizeScene } from '../src/scene-model.js';
 import { sampleCharacterRigTimeline } from '../src/character-rig-timeline.js';
 
 const scene = {
@@ -294,4 +295,106 @@ test('uses an explicit prop position as the pickup origin instead of the generic
   const before = buildScenePropRenderPlan(positioned, layers, 0.1)[0];
   assert.equal(before.x, 0.23);
   assert.equal(before.y, 0.41);
+});
+
+
+test('normalizes explicit previous and destination prop positions', () => {
+  const normalized = normalizeScene({ stateChanges: [{
+    entityType: 'prop', entityId: 'ball', property: 'position',
+    previousPosition: { x: 0.2, y: 0.3 }, position: { x: 0.8, y: 0.7 }
+  }] });
+  assert.deepEqual(normalized.stateChanges[0].previousPosition, { x: 0.2, y: 0.3 });
+  assert.deepEqual(normalized.stateChanges[0].position, { x: 0.8, y: 0.7 });
+});
+
+test('animates an explicitly grounded prop position between authored endpoints', () => {
+  const moving = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.2, end: 0.8, actorId: 'Fox',
+      description: 'Fox throws the ball', evidence: 'Fox throws the ball',
+      steps: [{ intent: 'throw', start: 0.2, end: 0.8, actorId: 'Fox',
+        description: 'Throw the ball', evidence: 'Fox throws the ball' }]
+    }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'ball', property: 'position',
+      previousPosition: { x: 0.2, y: 0.3 }, position: { x: 0.8, y: 0.7 },
+      actionIntent: 'throw', evidence: 'Fox throws the ball'
+    }]
+  };
+  const start = buildScenePropRenderPlan(moving, [], 0.2)[0];
+  const middle = buildScenePropRenderPlan(moving, [], 0.5)[0];
+  const end = buildScenePropRenderPlan(moving, [], 0.8)[0];
+  assert.ok(Math.abs(start.x - 0.2) < 1e-9);
+  assert.ok(Math.abs(start.y - 0.3) < 1e-9);
+  assert.ok(Math.abs(middle.x - 0.5) < 1e-9);
+  assert.ok(Math.abs(middle.y - 0.5) < 1e-9);
+  assert.ok(Math.abs(end.x - 0.8) < 1e-9);
+  assert.ok(Math.abs(end.y - 0.7) < 1e-9);
+});
+
+test('does not invent prop travel when the starting position is unknown', () => {
+  const unknownStart = { stateChanges: [{
+    entityType: 'prop', entityId: 'chest', property: 'position',
+    position: { x: 0.75, y: 0.65 }, evidence: 'The chest moves'
+  }] };
+  const plan = buildScenePropRenderPlan(unknownStart, [], 0.5)[0];
+  assert.equal(plan.x, 0.75);
+  assert.equal(plan.y, 0.65);
+  assert.equal(plan.transitionProgress, 1);
+});
+
+test('keeps a held prop attached to its holder instead of overriding it with world position', () => {
+  const heldAndMoving = {
+    stateChanges: [
+      { entityType: 'prop', entityId: 'book', property: 'holder', previousValue: null, value: 'Fox', evidence: 'Fox picks up the book' },
+      { entityType: 'prop', entityId: 'book', property: 'position', previousPosition: { x: 0.1, y: 0.2 }, position: { x: 0.9, y: 0.8 }, evidence: 'The book moves' }
+    ]
+  };
+  const plan = buildScenePropRenderPlan(heldAndMoving, layers, 1)[0];
+  assert.equal(plan.held, true);
+  assert.ok(plan.x < 0.6);
+  assert.ok(plan.y < 0.7);
+});
+
+
+test('matches repeated prop motion intents to distinct authored action steps', () => {
+  const repeated = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.1, end: 0.9, actorId: 'Fox',
+      steps: [
+        { intent: 'throw', start: 0.1, end: 0.4, actorId: 'Fox', description: 'Throw the first ball' },
+        { intent: 'throw', start: 0.6, end: 0.9, actorId: 'Fox', description: 'Throw the second ball' }
+      ]
+    }] },
+    stateChanges: [
+      { entityType: 'prop', entityId: 'ball-one', property: 'position', actionIntent: 'throw',
+        previousPosition: { x: 0.1, y: 0.2 }, position: { x: 0.4, y: 0.5 } },
+      { entityType: 'prop', entityId: 'ball-two', property: 'position', actionIntent: 'throw',
+        previousPosition: { x: 0.6, y: 0.7 }, position: { x: 0.9, y: 0.4 } }
+    ]
+  };
+  const firstBefore = buildScenePropRenderPlan(repeated, [], 0.05).find(item => item.id === 'ball-one');
+  const firstAfter = buildScenePropRenderPlan(repeated, [], 0.5).find(item => item.id === 'ball-one');
+  const secondBefore = buildScenePropRenderPlan(repeated, [], 0.5).find(item => item.id === 'ball-two');
+  const secondAfter = buildScenePropRenderPlan(repeated, [], 0.95).find(item => item.id === 'ball-two');
+  assert.ok(Math.abs(firstBefore.x - 0.1) < 1e-9);
+  assert.ok(Math.abs(firstAfter.x - 0.4) < 1e-9);
+  assert.ok(Math.abs(secondBefore.x - 0.6) < 1e-9);
+  assert.ok(Math.abs(secondAfter.x - 0.9) < 1e-9);
+});
+
+test('does not match an untargeted prop change to an action step with no intent', () => {
+  const scene = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.3, end: 0.9,
+      steps: [{ start: 0.1, end: 0.9, description: 'Unclassified action' }]
+    }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'crate', property: 'position',
+      previousPosition: { x: 0.2, y: 0.3 }, position: { x: 0.8, y: 0.7 }
+    }]
+  };
+  const beforeFallback = buildScenePropRenderPlan(scene, [], 0.2)[0];
+  assert.ok(Math.abs(beforeFallback.x - 0.2) < 1e-9);
+  assert.ok(Math.abs(beforeFallback.y - 0.3) < 1e-9);
 });
