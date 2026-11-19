@@ -4,6 +4,7 @@ import { buildSceneCausalModel } from './scene-causal-model.js';
 import { buildSemanticEditingPlan } from './semantic-editing-plan.js';
 import { buildEditDecisionPlan } from './edit-decision-engine.js';
 import { buildSceneProductionPlan } from './scene-production-plan.js';
+import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-state-memory.js';
 
 /**
  * Assemble the complete deterministic production context for the exact scene
@@ -23,5 +24,14 @@ export function buildSceneProductionContext(scenes = [], options = {}) {
   const productionPlan = buildSceneProductionPlan(list, {
     worldModel, physicsModel, causalModel, editingPlan, editDecisions
   });
-  return { worldModel, physicsModel, causalModel, editingPlan, editDecisions, productionPlan };
+  const stateMemory = buildSceneStateMemory(list);
+  const stateContinuity = validateSceneStateContinuity(stateMemory);
+  productionPlan.continuityValidation = stateContinuity;
+  for (const scenePlan of productionPlan.scenes) {
+    scenePlan.continuityIssues = stateContinuity.issues.filter(issue =>
+      issue.sceneId === scenePlan.sceneId || issue.previousSceneId === scenePlan.sceneId
+    );
+  }
+  return { worldModel, physicsModel, causalModel, editingPlan, editDecisions,
+    stateMemory, stateContinuity, productionPlan };
 }
