@@ -41,6 +41,20 @@ function doodleActionForDescription(description) {
 
 const normalizedBoneId = value => String(value ?? '').toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
 
+function resolvePropTargetPosition(scene, phase) {
+  const targetKey = key(phase?.targetId);
+  if (!targetKey) return null;
+  const matches = (Array.isArray(scene?.stateChanges) ? scene.stateChanges : [])
+    .filter(change => change?.entityType === 'prop' && key(change.entityId) === targetKey
+      && Number.isFinite(change.position?.x) && change.position.x >= 0 && change.position.x <= 1
+      && Number.isFinite(change.position?.y) && change.position.y >= 0 && change.position.y <= 1);
+  const intentMatches = matches.filter(change => key(change.actionIntent) === key(phase.intent));
+  const candidates = intentMatches.length ? intentMatches : matches;
+  return candidates.length === 1
+    ? { x: candidates[0].position.x, y: candidates[0].position.y }
+    : null;
+}
+
 function solveTargetedArmPose(rig, target) {
   const bones = Array.isArray(rig?.bones) ? rig.bones : [];
   const upperBones = bones.filter(bone => {
@@ -141,8 +155,11 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     }
     let timeline = result.timeline;
     let targetedReach = null;
-    if (phase.targetPosition) {
-      const armSolution = solveTargetedArmPose(rig, phase.targetPosition);
+    const resolvedPropPosition = phase.targetPosition ? null : resolvePropTargetPosition(scene, phase);
+    const targetPosition = phase.targetPosition || resolvedPropPosition;
+    const targetPositionSource = phase.targetPosition ? 'action-timeline' : resolvedPropPosition ? 'prop-state-change' : null;
+    if (targetPosition) {
+      const armSolution = solveTargetedArmPose(rig, targetPosition);
       targetedReach = armSolution.status;
       if (armSolution.status === 'solved') {
         timeline = applyTargetedArmPose(timeline, rig.characterId, armSolution.pose);
@@ -220,7 +237,7 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     mappedActions: accepted.map(({ actorId, preset, doodleAction, targetedReach, start, end }) => ({
       actorId, preset, start, end,
       ...(doodleAction ? { doodleAction } : {}),
-      ...(targetedReach ? { targetedReach } : {})
+      ...(targetedReach ? { targetedReach, targetPositionSource } : {})
     }))
   };
 }
