@@ -2,6 +2,8 @@ import { evaluateStoryboard } from './ai-evaluation.js';
 import { normalizeScenes } from './scene-model.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildSceneWorldModel } from './scene-world-model.js';
+import { buildSemanticEditingPlan } from './semantic-editing-plan.js';
+import { buildEditDecisionPlan } from './edit-decision-engine.js';
 import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-state-memory.js';
 
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
@@ -203,6 +205,8 @@ export async function directStoryboardWithLocalAI({
     : Math.max(16, Math.min(1024, Math.round(Number(maxNewTokens) || estimateDirectorTokenBudget(fallback.length))));
   const eventChain = buildStoryEventChain(fallback);
   const worldModel = buildSceneWorldModel(fallback, { language });
+  const editingPlan = buildSemanticEditingPlan(fallback, worldModel);
+  const editDecisions = buildEditDecisionPlan(editingPlan, fallback, worldModel);
   const fallbackResult = (reason, evaluation = null) => ({
     usedLocalModel: false,
     scenes: fallback,
@@ -210,7 +214,9 @@ export async function directStoryboardWithLocalAI({
     fallbackReason: reason,
     modelId: runtime?.status?.modelId || null,
     eventChain,
-    worldModel
+    worldModel,
+    editingPlan,
+    editDecisions
   });
 
   if (signal?.aborted) return fallbackResult('cancelled');
@@ -219,7 +225,7 @@ export async function directStoryboardWithLocalAI({
 
   let generated;
   try {
-    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel } }), {
+    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel, editingPlan } }), {
       maxNewTokens: tokenBudget,
       temperature: 0.15,
       signal
@@ -289,11 +295,17 @@ export async function directStoryboardWithLocalAI({
   }
   if (!evaluation.passed) return fallbackResult('candidate-failed-story-quality-gate', evaluation);
 
+  const acceptedWorldModel = buildSceneWorldModel(candidate, { language });
+  const acceptedEditingPlan = buildSemanticEditingPlan(candidate, acceptedWorldModel);
+  const acceptedEditDecisions = buildEditDecisionPlan(acceptedEditingPlan, candidate, acceptedWorldModel);
+
   return {
     usedLocalModel: true,
     scenes: candidate,
     eventChain,
-    worldModel,
+    worldModel: acceptedWorldModel,
+    editingPlan: acceptedEditingPlan,
+    editDecisions: acceptedEditDecisions,
     evaluation,
     fallbackReason: null,
     modelId: generated.modelId || runtime.status?.modelId || null,
