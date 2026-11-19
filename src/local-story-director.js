@@ -1,6 +1,7 @@
 import { evaluateStoryboard } from './ai-evaluation.js';
 import { normalizeScenes } from './scene-model.js';
 import { buildStoryEventChain } from './story-event-chain.js';
+import { buildSceneWorldModel } from './scene-world-model.js';
 import { buildSceneStateMemory, validateSceneStateContinuity } from './scene-state-memory.js';
 
 const clean = (value, max = 2_000) => String(value ?? '').trim().slice(0, max);
@@ -201,13 +202,15 @@ export async function directStoryboardWithLocalAI({
     ? estimateDirectorTokenBudget(fallback.length)
     : Math.max(16, Math.min(1024, Math.round(Number(maxNewTokens) || estimateDirectorTokenBudget(fallback.length))));
   const eventChain = buildStoryEventChain(fallback);
+  const worldModel = buildSceneWorldModel(fallback);
   const fallbackResult = (reason, evaluation = null) => ({
     usedLocalModel: false,
     scenes: fallback,
     evaluation,
     fallbackReason: reason,
     modelId: runtime?.status?.modelId || null,
-    eventChain
+    eventChain,
+    worldModel
   });
 
   if (signal?.aborted) return fallbackResult('cancelled');
@@ -216,7 +219,7 @@ export async function directStoryboardWithLocalAI({
 
   let generated;
   try {
-    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain }), {
+    generated = await runtime.generate(buildDirectorPrompt({ basePlan: { scenes: fallback }, storyText, language, character, characterBible, eventChain: { ...eventChain, worldModel } }), {
       maxNewTokens: tokenBudget,
       temperature: 0.15,
       signal
@@ -290,6 +293,7 @@ export async function directStoryboardWithLocalAI({
     usedLocalModel: true,
     scenes: candidate,
     eventChain,
+    worldModel,
     evaluation,
     fallbackReason: null,
     modelId: generated.modelId || runtime.status?.modelId || null,
