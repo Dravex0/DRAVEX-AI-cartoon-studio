@@ -48,8 +48,10 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
       .filter(shot => record(shot) && shot.sceneId === sceneId);
     const physicsEvents = (Array.isArray(physics?.events) ? physics.events : [])
       .filter(event => record(event) && event.sceneId === sceneId);
+    const groundedPhysicsEvents = physicsEvents.filter(event => event.grounded === true);
     const causalEvents = (Array.isArray(causal?.events) ? causal.events : [])
       .filter(event => record(event) && event.sceneId === sceneId);
+    const groundedCausalEvents = causalEvents.filter(event => event.grounded === true);
     const causalEdges = (Array.isArray(causal?.edges) ? causal.edges : [])
       .filter(edge => record(edge) && (edge.fromSceneId === sceneId || edge.toSceneId === sceneId));
     const shotIds = new Set(shots.map(shot => shot.id));
@@ -72,7 +74,7 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
     if (phases.length || clean(scene.motionPrompt, 3000) || clean(scene.visibleAction, 1000)) {
       requiredPasses.push('character-and-object-motion');
     }
-    if (physicsEvents.some(event => event.grounded)) requiredPasses.push('grounded-physical-interaction');
+    if (groundedPhysicsEvents.length) requiredPasses.push('grounded-physical-interaction');
     if (dialogue.length) requiredPasses.push('dialogue-voice-and-timing');
     if (dialogue.length || audioCues.length || clean(scene.sound, 1000)) requiredPasses.push('scene-audio-mix');
     if (requiredPasses.length) requiredPasses.push('scene-compositing-and-export');
@@ -103,8 +105,10 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
         camera: clean(scene.camera, 1000), motionPrompt: clean(scene.motionPrompt, 3000) },
       actionBeats: phases,
       worldActions: Array.isArray(worldEvent?.actions) ? worldEvent.actions : [],
-      physicalBeats: physicsEvents,
-      causalBeats: causalEvents,
+      physicalBeats: groundedPhysicsEvents,
+      unresolvedPhysicalBeats: physicsEvents.filter(event => event.grounded !== true),
+      causalBeats: groundedCausalEvents,
+      unresolvedCausalBeats: causalEvents.filter(event => event.grounded !== true),
       causalEdges,
       shots,
       editCuts,
@@ -128,7 +132,7 @@ export function buildSceneProductionPlan(scenes = [], context = {}) {
     validation: { passed: !issues.some(issue => issue.severity === 'error'), issues },
     constraints: [
       'Production passes are work orders, not proof that a renderer completed them.',
-      'Only grounded physics events are scheduled as physical interactions.',
+      'Only grounded physics and causal events are scheduled as production beats; unresolved events remain diagnostic data.',
       'Action beats, dialogue, audio cues and shot timing retain supplied source data.',
       'Missing actors, props, assets, measurements and causal links are never fabricated.',
       'Scene order and timeline follow the supplied storyboard order.'
