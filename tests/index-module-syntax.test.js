@@ -161,7 +161,7 @@ test('does not publish a successful WebM after MediaRecorder reports an error', 
 
 test('cinematic camera transform covers generated media, props, and rigged characters while keeping the title overlay fixed', () => {
   const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
-  const cameraStart = app.indexOf('ctx.save();ctx.translate(w/2,h/2+cameraPlan.offsetY);');
+  const cameraStart = app.indexOf('ctx.save();ctx.translate(w/2,h/2+renderCameraPlan.offsetY);');
   const mediaDraw = app.indexOf('drawImageCover(ctx,generatedVideo,w,h,motionTransform)', cameraStart);
   const propsDraw = app.indexOf('drawSceneProps(ctx,currentSceneData', cameraStart);
   const characterDraw = app.indexOf('drawCharacterLayers(ctx,currentSceneData.characterLayers', cameraStart);
