@@ -371,19 +371,52 @@ export function detectSceneActionForScene(scene = {}, fallbackTitle = '', fallba
  */
 export function detectSceneActionAtProgress(scene = {}, progress = 0, fallbackTitle = '', fallbackDescription = '') {
   const phases = Array.isArray(scene?.actionTimeline?.phases) ? scene.actionTimeline.phases : [];
-  if (phases.length === 1) {
-    const steps = Array.isArray(phases[0]?.steps) ? phases[0].steps : [];
-    const normalizedProgress = Math.max(0, Math.min(1, Number.isFinite(Number(progress)) ? Number(progress) : 0));
-    const activeStep = steps.find((step, index) => {
-      const start = Number(step?.start);
-      const end = Number(step?.end);
-      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return false;
-      return normalizedProgress >= start
-        && (normalizedProgress < end || (index === steps.length - 1 && normalizedProgress <= end));
+  const normalizedProgress = Math.max(0, Math.min(1, Number.isFinite(Number(progress)) ? Number(progress) : 0));
+  const hasTimedPhases = phases.some(phase => {
+    const start = Number(phase?.start);
+    const end = Number(phase?.end);
+    return Number.isFinite(start) && Number.isFinite(end) && end > start;
+  });
+
+  if (hasTimedPhases) {
+    let activePhase = null;
+    phases.forEach((phase, index) => {
+      const start = Number(phase?.start);
+      const end = Number(phase?.end);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return;
+      const isActive = normalizedProgress >= start
+        && (normalizedProgress < end || (index === phases.length - 1 && normalizedProgress <= end));
+      if (isActive) activePhase = phase;
     });
-    const cue = String(activeStep?.motionCue ?? '').trim();
-    if (cue === 'idle' || ACTION_PATTERNS.some(entry => entry.action === cue)) return cue;
+
+    // A validated timeline is authoritative: gaps between phases are deliberate holds.
+    if (!activePhase) return 'idle';
+
+    const steps = Array.isArray(activePhase.steps) ? activePhase.steps : [];
+    if (steps.length) {
+      const activeStep = steps.find((step, index) => {
+        const start = Number(step?.start);
+        const end = Number(step?.end);
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return false;
+        return normalizedProgress >= start
+          && (normalizedProgress < end || (index === steps.length - 1 && normalizedProgress <= end));
+      });
+      if (!activeStep) return 'idle';
+      const cue = String(activeStep.motionCue ?? '').trim();
+      if (cue === 'idle' || ACTION_PATTERNS.some(entry => entry.action === cue)) return cue;
+      const stepDescription = String(activeStep.description ?? '').trim();
+      if (stepDescription) {
+        const detected = detectSceneAction(stepDescription);
+        if (detected !== 'idle') return detected;
+      }
+      const phaseDescription = String(activePhase.description ?? '').trim();
+      return phaseDescription ? detectSceneAction(phaseDescription) : detectSceneActionForScene(scene, fallbackTitle, fallbackDescription);
+    }
+
+    const phaseDescription = String(activePhase.description ?? '').trim();
+    return phaseDescription ? detectSceneAction(phaseDescription) : detectSceneActionForScene(scene, fallbackTitle, fallbackDescription);
   }
+
   return detectSceneActionForScene(scene, fallbackTitle, fallbackDescription);
 }
 
