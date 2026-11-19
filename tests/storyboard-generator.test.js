@@ -267,3 +267,21 @@ test('passes a sensory tactical story sequence into the actual scene motion prom
   for (const intent of expected) assert.ok(scene.motionGenerationPrompt.includes(intent), intent);
   assert.match(scene.motionGenerationPrompt, /exact source-grounded action order/i);
 });
+
+test('assigns a shouted command to the speaker and its target, not the speaker', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nOfficer — police officer in uniform.\nRobber — masked robber.\n\nScene 1: Arrest\nOfficer shouts to Robber: "Hands up!"',
+    'en',
+    'Officer'
+  );
+  const scene = result.scenes[0];
+  const command = scene.actionSequence.find(event => event.intent === 'shout_command');
+  const step = scene.actionTimeline.phases[0].steps.find(item => item.intent === 'shout_command');
+  assert.equal(command.actorId, 'Officer');
+  assert.equal(command.targetId, 'Robber');
+  assert.equal(command.interactionType, 'command');
+  assert.equal(step.actorId, 'Officer');
+  assert.equal(step.targetId, 'Robber');
+  assert.match(scene.motionGenerationPrompt, /Officer → Robber: shout_command/);
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+});
