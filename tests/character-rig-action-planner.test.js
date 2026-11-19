@@ -230,3 +230,59 @@ test('maps distinct tactical intents to dedicated rig poses instead of generic t
     'listen', 'draw_weapon', 'aim_weapon', 'hands_up', 'take_cover', 'drop_weapon', 'freeze'
   ]);
 });
+
+
+test('maps grounded object handling and social interaction intents to dedicated articulated poses', () => {
+  const actions = [
+    ['pick_up', 'Pick up the stone', 'pick_up'],
+    ['grasp', 'Grasp the handle', 'grasp'],
+    ['release', 'Release the handle', 'release'],
+    ['carry', 'Carry the box', 'carry'],
+    ['throw', 'Throw the ball', 'throw'],
+    ['catch', 'Catch the ball', 'catch'],
+    ['push', 'Push the cart', 'push'],
+    ['pull', 'Pull the rope', 'pull'],
+    ['hug', 'Hug the traveler', 'hug'],
+    ['point', 'Point toward the door', 'point'],
+    ['sit', 'Sit on the bench', 'sit']
+  ];
+  for (const [intent, description, expectedPreset] of actions) {
+    const scene = makeScene(description);
+    scene.actionTimeline.phases[0].steps = [{
+      intent, motionCue: 'turn', start: 0.2, end: 0.8, actorId: 'Foxy',
+      description, evidence: description
+    }];
+    const result = createCharacterRigTimelineFromActionTimeline(scene, [rig()]);
+    assert.equal(result.status, 'generated', intent);
+    assert.equal(result.mappedActions[0].preset, expectedPreset, intent);
+    const pose = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+    assert.ok(pose && Object.values(pose).some(bonePose =>
+      Math.abs(bonePose.x || 0) > 0.01 || Math.abs(bonePose.y || 0) > 0.01
+      || Math.abs(bonePose.rotation || 0) > 0.08
+    ), intent);
+  }
+});
+
+test('keeps object-interaction poses deterministic for rigs with different character IDs', () => {
+  const scene = makeScene('throws the ball');
+  scene.actionTimeline.phases[0].steps = [{
+    intent: 'throw', motionCue: 'run', start: 0.2, end: 0.8,
+    actorId: 'Foxy', description: 'throws the ball', evidence: 'throws the ball'
+  }];
+  const first = createCharacterRigTimelineFromActionTimeline(scene, [rig('Foxy')]);
+  const second = createCharacterRigTimelineFromActionTimeline({
+    ...scene,
+    characters: ['Mira'],
+    storyDetail: 'Mira throws the ball',
+    actionTimeline: { schemaVersion: 1, phases: [{
+      ...scene.actionTimeline.phases[0], actorId: 'Mira',
+      description: 'Mira throws the ball', evidence: 'Mira throws the ball'
+    }] }
+  }, [rig('Mira')]);
+  assert.equal(first.status, 'generated');
+  assert.equal(second.status, 'generated');
+  assert.deepEqual(
+    sampleCharacterRigTimeline(first.timeline, 0.5).Foxy,
+    sampleCharacterRigTimeline(second.timeline, 0.5).Mira
+  );
+});
