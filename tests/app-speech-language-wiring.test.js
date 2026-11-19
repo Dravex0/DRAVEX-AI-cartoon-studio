@@ -63,7 +63,7 @@ test('blocks local-canvas export when a scene background is present but characte
   assert.ok(handler >= 0 && gate > handler && evaluate > gate && blocker > evaluate,
     'character visual readiness must be checked before local-canvas export starts');
   const readiness = appSource.slice(gate, evaluate);
-  assert.match(readiness, /getMissingCharacterVisualCount\\(requestedCharacter\\)/);
+  assert.ok(readiness.includes('getMissingCharacterVisualCount(requestedCharacter)'));
   const helperStart = appSource.indexOf('function getMissingCharacterVisualCount(');
   const helperEnd = appSource.indexOf("$('makeFilm').addEventListener", helperStart);
   assert.ok(helperStart >= 0 && helperEnd > helperStart, 'shared character visual readiness helper must exist before the start handler');
