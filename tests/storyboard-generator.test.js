@@ -239,7 +239,7 @@ test('preserves a multi-step scene as ordered motion instructions', () => {
   ]);
   assert.equal(scene.actionTimeline.phases[0].actorId, 'Foxy');
   assert.equal(scene.actionTimeline.phases[0].evidence, scene.storyDetail);
-  assert.match(scene.motionGenerationPrompt, /1\. walk \(walks\); 2\. pick_up \(picks up\); 3\. open \(opens\); 4\. throw \(throws\)/);
+  assert.match(scene.motionGenerationPrompt, /1\. Foxy: walk \(walks\); 2\. Foxy: pick_up \(picks up\); 3\. Foxy: open \(opens\); 4\. Foxy: throw \(throws\)/);
   assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
 });
 
