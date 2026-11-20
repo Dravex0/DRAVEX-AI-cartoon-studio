@@ -253,14 +253,19 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
         : null;
       // Reuse the release event's action phase so the flight starts at the
       // same midpoint where the holder plan detaches the prop.
-      const releaseStep = release ? matchedStepByChange.get(release) : null;
-      const releaseStepIndex = releaseStep ? timelineSteps.indexOf(releaseStep) : -1;
-      const match = releaseStep
-        ? { step: releaseStep, index: releaseStepIndex }
+      // The holder change and position change can carry different evidence
+      // strings for the same throw. Prefer the holder's matched step, but when
+      // that evidence does not match, reuse the trajectory's grounded step so
+      // release and flight still share the exact authored midpoint.
+      const holderReleaseStep = release ? matchedStepByChange.get(release) : null;
+      const match = holderReleaseStep
+        ? { step: holderReleaseStep, index: timelineSteps.indexOf(holderReleaseStep) }
         : (actionIntent
           ? matchActionStep(change, new Set([actionIntent]), claimedPositionSteps)
           : null);
       const matchedStep = match?.step || null;
+      const releaseStep = release ? (holderReleaseStep || matchedStep) : null;
+      const releaseStepIndex = releaseStep ? timelineSteps.indexOf(releaseStep) : -1;
       if (match && releaseStepIndex < 0) claimedPositionSteps.add(match.index);
       const actionStart = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
       const end = matchedStep ? matchedStep.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
