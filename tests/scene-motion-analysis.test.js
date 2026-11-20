@@ -22,6 +22,9 @@ function makeCanvasFactory(video, moving) {
     return {width:0,height:0,getContext:()=>context};
   };
 }
+function makeSeekableRange(start, end) {
+  return { length: 1, start: () => start, end: () => end };
+}
 test("flags a decoded clip with no sampled pixel changes as likely static",async()=>{
   const video=new FakeVideo();
   const report=await analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,false)});
@@ -32,6 +35,43 @@ test("detects pixel changes in a moving test clip",async()=>{
   const report=await analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,true)});
   assert.equal(report.status,"visible-change");assert.ok(report.meanPixelChange>0);
 });
+test("detects color-only frame changes that luminance sampling can miss", async () => {
+  const video = new FakeVideo();
+  const canvasFactory = () => ({
+    width: 0, height: 0,
+    getContext: () => ({
+      drawImage() {},
+      getImageData(_x, _y, width, height) {
+        const data = new Uint8ClampedArray(width * height * 4);
+        const isAfterColorChange = video.currentTime >= 2;
+        for (let pixel = 0; pixel < width * height; pixel += 1) {
+          const offset = pixel * 4;
+          data[offset] = isAfterColorChange ? 0 : 255;
+          data[offset + 1] = isAfterColorChange ? 76 : 0;
+          data[offset + 2] = 0;
+          data[offset + 3] = 255;
+        }
+        return { data, width, height };
+      }
+    })
+  });
+  const report = await analyzeSceneVideoMotion(video, { canvasFactory });
+  assert.equal(report.status, "visible-change");
+  assert.ok(report.meanPixelChange < 0.008, "the luminance difference should remain below the static threshold");
+  assert.ok(report.meanColorChange > 0.1, "RGB sampling should detect the chromatic change");
+  assert.ok(report.colorChangedPixelRatio > 0);
+});
+
+test("zero pixel delta threshold does not classify an unchanged local clip as moving", async () => {
+  const video = new FakeVideo();
+  const report = await analyzeSceneVideoMotion(video, {
+    pixelDeltaThreshold: 0,
+    canvasFactory: makeCanvasFactory(video, false)
+  });
+  assert.equal(report.status, "likely-static");
+  assert.equal(report.colorChangedPixelRatio, 0);
+});
+
 test("restores the original playback position and paused state",async()=>{
   const video=new FakeVideo();video.currentTime=1.25;video.paused=false;
   await analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,true)});
@@ -40,6 +80,19 @@ test("restores the original playback position and paused state",async()=>{
 test("rejects videos without decoded frames",async()=>{
   const video=new FakeVideo();video.readyState=1;
   await assert.rejects(analyzeSceneVideoMotion(video,{canvasFactory:makeCanvasFactory(video,false)}),/decoded frame/);
+});
+
+test("analyzes an infinite-duration WebM from its finite seekable range", async () => {
+  const video = new FakeVideo();
+  video.duration = Infinity;
+  video.seekable = makeSeekableRange(1, 5);
+  video.currentTime = 2.5;
+  const report = await analyzeSceneVideoMotion(video, {
+    canvasFactory: makeCanvasFactory(video, true)
+  });
+  assert.equal(report.status, "visible-change");
+  assert.ok(report.meanColorChange > 0);
+  assert.ok(Math.abs(video.currentTime - 2.5) < 0.015);
 });
 test("validates sampling limits",async()=>{
   const video=new FakeVideo();
@@ -69,3 +122,23 @@ test("rejects unsafe frame sample counts", async () => {
   const video = new FakeVideo();
   await assert.rejects(captureSceneVideoFrameSamples(video, { sampleCount: 6 }), /sampleCount/);
 });
+
+test("captures frame samples from an infinite-duration WebM seekable range", async () => {
+  const video = new FakeVideo();
+  video.duration = Infinity;
+  video.seekable = makeSeekableRange(1, 5);
+  video.currentTime = 2.5;
+  const canvasFactory = () => ({
+    width: 0,
+    height: 0,
+    getContext: () => ({ drawImage() {} }),
+    toDataURL: () => "data:image/jpeg;base64,ZmFrZQ=="
+  });
+  const samples = await captureSceneVideoFrameSamples(video, { canvasFactory });
+  assert.equal(samples.length, 3);
+  assert.ok(samples[0].time >= 1);
+  assert.ok(samples[2].time <= 5);
+  assert.ok(samples[0].time < samples[1].time && samples[1].time < samples[2].time);
+  assert.ok(Math.abs(video.currentTime - 2.5) < 0.015);
+});
+
