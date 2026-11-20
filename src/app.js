@@ -2268,6 +2268,14 @@ function prepareAutomaticCharacterMotion(){
  return {rigBatch,spriteBatch};
 }
 
+function getMissingCharacterVisualCount(protagonistId = currentStoryboardPlan?.sourceCharacter || $('character').value.trim()) {
+ return countScenesMissingCharacterVisuals(sceneMetadata,{
+  protagonistId,
+  proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true,
+  hasSceneVideo:(scene,index)=>Boolean(sceneVideoCache.get(sceneVideoKey(index,scene))?.video)
+ });
+}
+
 $('makeFilm').addEventListener('click',async()=>{
  if(fullFilmAbortController||$('export').disabled){
   $('status').textContent=uiLang==='ru'?'Создание или экспорт уже выполняется. Дождись завершения или нажми «Отменить».':'A film generation or export is already running. Wait for it to finish or cancel the current run.';
@@ -2353,11 +2361,7 @@ $('makeFilm').addEventListener('click',async()=>{
   return source.kind==='missing'&&!cachedVideo?.video;
  }).length;
  const missingCharacterAssetCount=mode==='local-canvas'
-  ?countScenesMissingCharacterVisuals(sceneMetadata,{
-   protagonistId:requestedCharacter,
-   proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true,
-   hasSceneVideo:(scene,index)=>Boolean(sceneVideoCache.get(sceneVideoKey(index,scene))?.video)
-  })
+  ?getMissingCharacterVisualCount(requestedCharacter)
   :0;
  const gate=evaluatePromptToFilmStart({
   mode,
@@ -2611,7 +2615,14 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
     :'Warning: selected main character "'+requestedCharacter+'" is not mentioned in the story text. Check the selection; it will not be changed automatically.';
    $('qaReport').appendChild(warning);
   }
+  const missingCharacterVisualCount=$('videoGenerationMode').value==='local-canvas'
+   ?getMissingCharacterVisualCount(character):0;
   status.textContent=uiLang==='ru'?'Раскадровка создана локальным движком DRAVEX.':'Storyboard created by the local DRAVEX engine.';
+  if(missingCharacterVisualCount>0){
+   status.textContent+=uiLang==='ru'
+    ?' Локальный предпросмотр пока показывает только фон: в '+missingCharacterVisualCount+' сценах нет изображения или рига персонажа. Добавь спрайты/риги либо выбери AI-видеогенератор.'
+    :' The local preview currently shows only the scene background: '+missingCharacterVisualCount+' scene(s) have no character image or rig. Add character sprites/rigs or choose an AI video provider.';
+  }
   status.scrollIntoView({behavior:'smooth',block:'nearest'});
   return currentStoryboardPlan;
  }catch(error){
@@ -3794,6 +3805,16 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     $('status').textContent=uiLang==='ru'?'Сначала создай раскадровку.':'Create a storyboard before exporting.';
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Нет сцен для экспорта','No scenes to export'),$('status').textContent);filmProgressTracking=false;}
     return {status:'failed',reason:'There are no storyboard scenes to export.'};
+  }
+  const exportProtagonistId=String(currentStoryboardPlan?.sourceCharacter||$('character').value||'').trim();
+  const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId);
+  if(missingCharacterAssetCount>0){
+    const message=uiLang==='ru'
+      ?'Экспорт остановлен: в '+missingCharacterAssetCount+' сценах нет изображения персонажа, рига или видеоклипа сцены. Добавь спрайты/риги либо сначала создай видеосцены; экспорт одного фона заблокирован.'
+      :'Export stopped: '+missingCharacterAssetCount+' scenes have no character image, rig or scene video. Add character sprites/rigs or generate scene videos first; background-only export is blocked.';
+    $('status').textContent=message;
+    if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Экспорт остановлен','Export stopped'),message);filmProgressTracking=false;}
+    return {status:'failed',reason:message,missingCharacterAssetCount};
   }
   button.disabled=true;
   $('audioFile').disabled=true;

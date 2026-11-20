@@ -63,10 +63,15 @@ test('blocks local-canvas export when a scene background is present but characte
   assert.ok(handler >= 0 && gate > handler && evaluate > gate && blocker > evaluate,
     'character visual readiness must be checked before local-canvas export starts');
   const readiness = appSource.slice(gate, evaluate);
-  assert.match(readiness, /countScenesMissingCharacterVisuals/);
-  assert.match(readiness, /sceneVideoCache/);
-  assert.match(readiness, /proceduralFallback/);
-  assert.doesNotMatch(readiness, /generatedImageUrl/,
+  assert.ok(readiness.includes('getMissingCharacterVisualCount(requestedCharacter)'));
+  const helperStart = appSource.indexOf('function getMissingCharacterVisualCount(');
+  const helperEnd = appSource.indexOf("$('makeFilm').addEventListener", helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart, 'shared character visual readiness helper must exist before the start handler');
+  const helper = appSource.slice(helperStart, helperEnd);
+  assert.match(helper, /countScenesMissingCharacterVisuals/);
+  assert.match(helper, /sceneVideoCache/);
+  assert.match(helper, /proceduralFallback/);
+  assert.doesNotMatch(helper, /generatedImageUrl/,
     'a generated scene background is not proof that a character is visible');
   assert.match(appSource.slice(blocker, blocker + 900), /Фоновое видео вместо мультфильма создавать не будем/);
 });
