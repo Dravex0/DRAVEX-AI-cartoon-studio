@@ -74,5 +74,5 @@ test('blocks local-canvas export when a scene background is present but characte
     'a cached full-scene video may contain only scenery and must not bypass the character-asset gate');
   assert.doesNotMatch(helper, /generatedImageUrl/,
     'a generated scene background is not proof that a character is visible');
-  assert.match(appSource.slice(blocker, blocker + 900), /Фоновое видео вместо мультфильма создавать не будем/);
+  assert.match(appSource.slice(blocker, blocker + 900), /Кэшированный фон не заменяет персонажа/);
 });
