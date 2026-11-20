@@ -184,7 +184,11 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
             id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
             rotation: point.rotation || 0, held: !released,
             visible: true, scale: 1, evidence: activeEvidence,
-            transitionIndex: index, transitionProgress
+            transitionIndex: index, transitionProgress,
+            // Preserve the exact contact sampled by the holder state machine.
+            // The later world-space trajectory must start from this same point,
+            // not independently resample a pose through a second code path.
+            releasePoint: released ? { x: releasePoint.x, y: releasePoint.y } : null
           };
         }
         const eased = transitionProgress * transitionProgress * (3 - 2 * transitionProgress);
@@ -264,7 +268,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
         ? releaseStep.start + (releaseStep.end - releaseStep.start) * 0.5
         : actionStart;
       const releasePoint = release
-        ? releasePointFor(release, release.previousValue, releaseProgress)
+        ? (normalizedPoint(existing?.releasePoint)
+          || releasePointFor(release, release.previousValue, releaseProgress))
         : null;
       if (releasePoint && index === 0) from = releasePoint;
       const start = releaseStep ? releaseProgress : actionStart;
