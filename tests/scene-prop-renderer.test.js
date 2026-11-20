@@ -509,7 +509,7 @@ test('keeps a thrown prop on the posed hand until the exact release frame, then 
   assert.equal(after.held, false);
   assert.ok(Math.abs(before.x - 0.79) < 1e-5);
   assert.ok(Math.abs(before.y - 0.525) < 1e-5);
-  assert.ok(Math.abs(release.x - before.x) < 1e-5);
+  assert.ok(Math.abs(release.x - before.x) < 1e-5, JSON.stringify({ before, release }));
   assert.ok(Math.abs(release.y - before.y) < 1e-5);
   assert.ok(Math.abs(after.x - release.x) < 1e-5);
   assert.ok(Math.abs(after.y - release.y) < 1e-5);
