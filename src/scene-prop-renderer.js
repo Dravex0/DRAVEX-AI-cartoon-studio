@@ -165,8 +165,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       const end = matchedStep ? matchedStep.end : start + interval;
       const nextHolder = change.value ?? null;
       if (p < start) break;
-      from = holderPoint(holder, change.position);
-      to = holderPoint(nextHolder, change.position);
+      from = holderPoint(holder, change.position, posesAt(p));
+      to = holderPoint(nextHolder, change.position, posesAt(p));
       activeEvidence = clean(change.evidence);
       activeIndex = index;
       if (p <= end) {
@@ -203,7 +203,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     }
 
     const finalPositionChange = history[activeIndex >= 0 ? activeIndex : 0];
-    const point = holderPoint(holder, finalPositionChange?.position);
+    const point = holderPoint(holder, finalPositionChange?.position, posesAt(p));
     return {
       id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
       rotation: point.rotation || 0, held, visible: true, scale: 1,
