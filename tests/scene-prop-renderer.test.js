@@ -430,3 +430,31 @@ test('matches prop trajectories by actor, target entity, and evidence instead of
   assert.ok(Math.abs(second.x - 0.75) < 1e-9);
   assert.ok(Math.abs(second.y - 0.55) < 1e-9);
 });
+
+
+test('starts a thrown prop trajectory at the holder release contact, not a stale previousPosition', () => {
+  const throwing = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.2, end: 0.8, actorId: 'Fox',
+      steps: [{ intent: 'throw', start: 0.2, end: 0.8, actorId: 'Fox',
+        targetId: 'ball', evidence: 'Fox throws the ball' }]
+    }] },
+    stateChanges: [
+      { entityType: 'prop', entityId: 'ball', property: 'holder',
+        previousValue: 'Fox', value: null, actorId: 'Fox', actionIntent: 'throw',
+        position: { x: 0.52, y: 0.62 }, evidence: 'Fox releases the ball' },
+      { entityType: 'prop', entityId: 'ball', property: 'position',
+        previousPosition: { x: 0.08, y: 0.12 }, position: { x: 0.9, y: 0.3 },
+        actorId: 'Fox', actionIntent: 'throw', evidence: 'Fox throws the ball' }
+    ]
+  };
+  const start = buildScenePropRenderPlan(throwing, layers, 0.2)[0];
+  const middle = buildScenePropRenderPlan(throwing, layers, 0.5)[0];
+  const end = buildScenePropRenderPlan(throwing, layers, 0.8)[0];
+  assert.ok(Math.abs(start.x - 0.52) < 1e-9);
+  assert.ok(Math.abs(start.y - 0.62) < 1e-9);
+  assert.ok(Math.abs(middle.x - 0.71) < 1e-9);
+  assert.ok(Math.abs(middle.y - 0.46) < 1e-9);
+  assert.ok(Math.abs(end.x - 0.9) < 1e-9);
+  assert.ok(Math.abs(end.y - 0.3) < 1e-9);
+});

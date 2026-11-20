@@ -171,7 +171,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
         const rotation = (from.rotation || 0) + ((to.rotation || 0) - (from.rotation || 0)) * eased;
         return {
           id: entityId, kind: propKind(entityId), x, y, rotation,
-          held: transitionProgress >= 0.5 ? nextHolder != null : holder != null,
+          held: transitionProgress >= 0.5 - 1e-9 ? nextHolder != null : holder != null,
           visible: true, scale: 1, evidence: activeEvidence,
           transitionIndex: index, transitionProgress
         };
@@ -211,15 +211,37 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     let active = null;
     for (let index = 0; index < history.length; index += 1) {
       const change = history[index];
-      const from = normalizedPoint(change.previousPosition) || current;
+      let from = normalizedPoint(change.previousPosition) || current;
       const to = normalizedPoint(change.position);
       if (!to) continue;
       const actionIntent = clean(change.actionIntent);
-      const match = actionIntent
-        ? matchActionStep(change, new Set([actionIntent]), claimedPositionSteps)
+      // A throw must begin at the prop's actual release contact, not at a
+      // stale world-space previousPosition supplied by an earlier planning pass.
+      // Otherwise the prop can visibly teleport when the holder flag changes.
+      const release = actionIntent === 'throw'
+        ? (byProp.get(propKey) || []).find(item => item.entityType === 'prop'
+          && item.property === 'holder' && item.value == null
+          && clean(item.actionIntent) === actionIntent
+          && (!clean(change.actorId) || !clean(item.actorId)
+            || key(change.actorId) === key(item.actorId)))
         : null;
+      const releasePoint = release
+        ? (normalizedPoint(release.position) || holderPoint(release.previousValue, release.position))
+        : null;
+      if (releasePoint && index === 0) from = releasePoint;
+      // The holder-release event and its paired position trajectory describe
+      // the same authored action. Reuse the release's already matched phase;
+      // otherwise the holder event consumes the only throw step and the
+      // trajectory falls back to a later synthetic interval.
+      const releaseStep = release ? matchedStepByChange.get(release) : null;
+      const releaseStepIndex = releaseStep ? timelineSteps.indexOf(releaseStep) : -1;
+      const match = releaseStep
+        ? { step: releaseStep, index: releaseStepIndex }
+        : (actionIntent
+          ? matchActionStep(change, new Set([actionIntent]), claimedPositionSteps)
+          : null);
       const matchedStep = match?.step || null;
-      if (match) claimedPositionSteps.add(match.index);
+      if (match && releaseStepIndex < 0) claimedPositionSteps.add(match.index);
       const start = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
       const end = matchedStep ? matchedStep.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
       if (!from) {
