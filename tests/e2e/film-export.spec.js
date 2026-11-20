@@ -176,7 +176,7 @@ test('blocks direct WebM export when a named protagonist has no character artwor
   await expect(page.locator('#status')).toContainText(/local preview currently shows only the scene background/i);
 
   await page.locator('#export').click();
-  await expect(page.locator('#status')).toContainText(/export stopped: .*no character image, rig or scene video/i);
+  await expect(page.locator('#status')).toContainText(/\/export stopped: .*no visible sprite or validated rig for local canvas export\/i/);
   await expect(page.locator('#finalFilmResult')).toBeHidden();
   expect(pageErrors, 'a background-only direct export should be blocked without browser errors').toEqual([]);
 });
