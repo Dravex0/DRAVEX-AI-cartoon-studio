@@ -128,18 +128,24 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   }
 
   const ground = { x: 0.68, y: 0.79, rotation: 0 };
-  const holderPoint = (holderId, loosePosition = null) => {
+  const holderPoint = (holderId, loosePosition = null, rigPoses = runtime.rigPoses) => {
     if (holderId == null || !clean(holderId)) return normalizedPoint(loosePosition) || ground;
     const actorId = clean(holderId);
     const actor = layers.find(layer => key(layer?.characterId) === key(actorId));
     const actorX = Number.isFinite(actor?.x) ? actor.x : 0.5;
     const actorY = Number.isFinite(actor?.y) ? actor.y : 0.68;
-    const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
+    const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, rigPoses);
     return rigAnchor
       ? { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation }
       : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96),
           y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
   };
+  const posesAt = progress => typeof runtime.rigPosesAtProgress === 'function'
+    ? runtime.rigPosesAtProgress(progress)
+    : runtime.rigPoses;
+  const releasePointFor = (change, actorId, releaseProgress) =>
+    normalizedPoint(change?.position)
+    || holderPoint(actorId, change?.position, posesAt(releaseProgress));
 
   const holderPlans = [...byProp.values()].map(history => {
     const entityId = clean(history[0].entityId);
@@ -165,6 +171,22 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       activeIndex = index;
       if (p <= end) {
         transitionProgress = clamp((p - start) / Math.max(0.000001, end - start), 0, 1);
+        const isThrowRelease = clean(change.actionIntent) === 'throw'
+          && holder != null && nextHolder == null;
+        if (isThrowRelease) {
+          // Keep the prop attached to the posed hand until the authored throw
+          // midpoint. At that exact frame, detach at the hand's release pose.
+          const releaseProgress = start + (end - start) * 0.5;
+          const releasePoint = releasePointFor(change, holder, releaseProgress);
+          const released = p >= releaseProgress - 1e-9;
+          const point = released ? releasePoint : from;
+          return {
+            id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
+            rotation: point.rotation || 0, held: !released,
+            visible: true, scale: 1, evidence: activeEvidence,
+            transitionIndex: index, transitionProgress
+          };
+        }
         const eased = transitionProgress * transitionProgress * (3 - 2 * transitionProgress);
         const x = from.x + (to.x - from.x) * eased;
         const y = from.y + (to.y - from.y) * eased;
@@ -225,14 +247,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
           && (!clean(change.actorId) || !clean(item.actorId)
             || key(change.actorId) === key(item.actorId)))
         : null;
-      const releasePoint = release
-        ? (normalizedPoint(release.position) || holderPoint(release.previousValue, release.position))
-        : null;
-      if (releasePoint && index === 0) from = releasePoint;
-      // The holder-release event and its paired position trajectory describe
-      // the same authored action. Reuse the release's already matched phase;
-      // otherwise the holder event consumes the only throw step and the
-      // trajectory falls back to a later synthetic interval.
+      // Reuse the release event's action phase so the flight starts at the
+      // same midpoint where the holder plan detaches the prop.
       const releaseStep = release ? matchedStepByChange.get(release) : null;
       const releaseStepIndex = releaseStep ? timelineSteps.indexOf(releaseStep) : -1;
       const match = releaseStep
@@ -242,8 +258,16 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
           : null);
       const matchedStep = match?.step || null;
       if (match && releaseStepIndex < 0) claimedPositionSteps.add(match.index);
-      const start = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
+      const actionStart = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
       const end = matchedStep ? matchedStep.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
+      const releaseProgress = releaseStep
+        ? releaseStep.start + (releaseStep.end - releaseStep.start) * 0.5
+        : actionStart;
+      const releasePoint = release
+        ? releasePointFor(release, release.previousValue, releaseProgress)
+        : null;
+      if (releasePoint && index === 0) from = releasePoint;
+      const start = releaseStep ? releaseProgress : actionStart;
       if (!from) {
         current = to;
         active = { change, index, progress: 1 };
