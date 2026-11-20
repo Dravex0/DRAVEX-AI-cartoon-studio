@@ -104,3 +104,40 @@ test('changes the identity seed when the canonical appearance changes', () => {
   }, [{ ...bible[0], clothing: 'Green coat' }])[0];
   assert.notEqual(original.identitySeed, redesigned.identitySeed);
 });
+
+import { buildCharacterSpriteBatchPlan } from '../src/character-sprite-batch-plan.js';
+
+test('builds sprite plans for every scene and preserves scene-specific actions', () => {
+  const scenes = [
+    { id: 'scene-a', characters: ['Foxy'], visibleAction: 'Foxy waves.' },
+    { id: 'scene-b', characters: ['Foxy'], visibleAction: 'Foxy runs.' }
+  ];
+  const batch = buildCharacterSpriteBatchPlan(scenes, bible);
+  assert.equal(batch.length, 2);
+  assert.equal(batch[0].plans[0].sceneId, 'scene-a');
+  assert.match(batch[0].plans[0].action, /waves/);
+  assert.match(batch[1].plans[0].action, /runs/);
+  assert.notEqual(batch[0].plans[0].assetId, batch[1].plans[0].assetId);
+  assert.equal(batch[0].plans[0].identitySeed, batch[1].plans[0].identitySeed);
+});
+
+test('applies unsaved editor overrides only to the currently open scene', () => {
+  const scenes = [
+    { id: 'scene-a', characters: ['Foxy'], visibleAction: 'Saved action A.' },
+    { id: 'scene-b', characters: ['Bird'], visibleAction: 'Saved action B.' }
+  ];
+  const batch = buildCharacterSpriteBatchPlan(scenes, bible, {
+    currentSceneIndex: 1,
+    currentSceneOverrides: { characters: ['Foxy'], visibleAction: 'Unsaved action B.' }
+  });
+  assert.equal(batch[0].plans[0].characterId, 'Foxy');
+  assert.match(batch[0].plans[0].action, /Saved action A/);
+  assert.equal(batch[1].plans[0].characterId, 'Foxy');
+  assert.match(batch[1].plans[0].action, /Unsaved action B/);
+  assert.equal(scenes[1].characters[0], 'Bird');
+});
+
+test('keeps scenes without cast out of the batch and returns no plans for invalid input', () => {
+  assert.deepEqual(buildCharacterSpriteBatchPlan([{ id: 'empty', characters: [] }], bible), []);
+  assert.deepEqual(buildCharacterSpriteBatchPlan(null, bible), []);
+});

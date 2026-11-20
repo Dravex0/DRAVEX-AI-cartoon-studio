@@ -92,6 +92,7 @@ import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-vi
 import { createVideoProviderRegistry, generateVideoWithProvider } from "./video-provider-contract.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildSceneIdentitySeed, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from "./scene-production.js";
 import { buildCharacterSpriteAssetPlan } from "./character-sprite-asset-plan.js";
+import { buildCharacterSpriteBatchPlan } from "./character-sprite-batch-plan.js";
 import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
 import { generateCharacterSpriteAsset } from "./character-sprite-generation.js";
@@ -2810,35 +2811,60 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
  const button=$('generateCharacterSprites'),status=$('characterSpriteStatus');
  if(!$('spriteHordeConsent').checked){status.textContent=uiLang==='ru'?'Сначала подтверди отдельное согласие на отправку промптов персонажей.':'First confirm separate consent to send character prompts.';return}
  if(button.disabled)return;
- const targetIndex=sceneIndex,meta=sceneMetadata[targetIndex]||{};
- const targetId=String(meta.id||('scene_'+(targetIndex+1)));
- const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
- const plans=buildCharacterSpriteAssetPlan(scene,characterBible);
- const ready=plans.filter(plan=>plan.status==='ready');
- if(!ready.length){status.textContent=uiLang==='ru'?'Нет готовых планов. Проверь состав сцены, справочник внешности и действия персонажей.':'No ready sprite plans. Check the scene cast, character appearance references, and character actions.';return}
+ const currentMeta=sceneMetadata[sceneIndex]||{};
+ const currentSceneOverrides={
+  title:$('sceneTitle').value.trim()||titles[sceneIndex],
+  description:$('sceneDescription').value.trim(),
+  imagePrompt:$('sceneImagePrompt').value.trim(),
+  motionPrompt:$('sceneMotionPrompt').value.trim(),
+  visibleAction:$('sceneMotionPrompt').value.trim(),
+  camera:$('sceneCamera').value.trim(),
+  characters:normalizeSceneCast($('sceneCharacters').value,currentMeta.characters),
+  startState:$('sceneStartState').value.trim(),
+  endState:$('sceneEndState').value.trim(),
+  continuityLock:$('sceneContinuityLock').value.trim(),
+  negativePrompt:$('sceneNegativePrompt').value.trim()
+ };
+ const batch=buildCharacterSpriteBatchPlan(sceneMetadata,characterBible,{currentSceneIndex:sceneIndex,currentSceneOverrides});
+ const readyGroups=batch.map(group=>({...group,plans:group.plans.filter(plan=>plan.planningStatus==='ready'||plan.status==='ready')})).filter(group=>group.plans.length);
+ const blockedCount=batch.reduce((total,group)=>total+group.plans.filter(plan=>plan.planningStatus!=='ready'&&plan.status!=='ready').length,0);
+ const taskCount=readyGroups.reduce((total,group)=>total+group.plans.length,0);
+ if(!taskCount){status.textContent=uiLang==='ru'?'Нет готовых планов для всех сцен. Проверь состав сцен, справочник внешности и индивидуальные действия персонажей.':'No ready plans across the storyboard. Check scene casts, character appearance references, and actor-specific actions.';return}
  button.disabled=true;
- const existing=Array.isArray(meta.characterSpriteAssets)?[...meta.characterSpriteAssets]:[];
- let completed=0,failed=0;
+ let completed=0,failed=0,reused=0;
  try{
-  for(const plan of ready){
-   status.textContent=uiLang==='ru'?'Генерация '+(completed+failed+1)+' из '+ready.length+': '+plan.characterId+'…':'Generating '+(completed+failed+1)+' of '+ready.length+': '+plan.characterId+'…';
-   try{
-    const asset=await generateCharacterSpriteAsset({plan,consentAccepted:$('spriteHordeConsent').checked===true,onProgress:progress=>{
-     const pos=progress.queuePosition===null?'?':progress.queuePosition;
-     status.textContent=(uiLang==='ru'?'AI Horde · ':'AI Horde · ')+plan.characterId+' · очередь: '+pos;
-    }});
-    const oldIndex=existing.findIndex(item=>item&&item.assetId===asset.assetId);
-    if(oldIndex>=0)existing[oldIndex]=asset;else existing.push(asset);
-    completed++;
-   }catch(error){
-    failed++;
-    console.error('Character sprite generation failed:',plan.characterId,error);
+  for(const group of readyGroups){
+   for(const plan of group.plans){
+    const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===group.sceneId);
+    const targetIndex=resolvedIndex>=0?resolvedIndex:group.sceneIndex;
+    const targetMeta=sceneMetadata[targetIndex]||{};
+    const existing=Array.isArray(targetMeta.characterSpriteAssets)?[...targetMeta.characterSpriteAssets]:[];
+    const existingIndex=existing.findIndex(item=>item&&item.assetId===plan.assetId&&/^https:\/\//i.test(String(item.imageUrl||'')));
+    if(existingIndex>=0){reused++;continue}
+    status.textContent=uiLang==='ru'
+     ?'Сцена '+(group.sceneIndex+1)+' · спрайт '+(completed+failed+reused+1)+' из '+taskCount+': '+plan.characterId+'…'
+     :'Scene '+(group.sceneIndex+1)+' · sprite '+(completed+failed+reused+1)+' of '+taskCount+': '+plan.characterId+'…';
+    try{
+     const asset=await generateCharacterSpriteAsset({plan,consentAccepted:$('spriteHordeConsent').checked===true,onProgress:progress=>{
+      const pos=progress.queuePosition===null?'?':progress.queuePosition;
+      status.textContent='AI Horde · '+plan.characterId+' · queue: '+pos;
+     }});
+     const oldIndex=existing.findIndex(item=>item&&item.assetId===asset.assetId);
+     if(oldIndex>=0)existing[oldIndex]=asset;else existing.push(asset);
+     completed++;
+    }catch(error){
+     failed++;
+     console.error('Character sprite generation failed:',plan.sceneId,plan.characterId,error);
+    }
+    const saveIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===group.sceneId);
+    const resolvedSaveIndex=saveIndex>=0?saveIndex:group.sceneIndex;
+    if(sceneMetadata[resolvedSaveIndex])sceneMetadata[resolvedSaveIndex]={...sceneMetadata[resolvedSaveIndex],characterSpriteAssets:[...existing]};
+    if(sceneIndex===resolvedSaveIndex)renderCharacterSpriteAssets();
    }
-   const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id)===targetId);
-   if(resolvedIndex>=0)sceneMetadata[resolvedIndex]={...sceneMetadata[resolvedIndex],characterSpriteAssets:[...existing]};
-   if(sceneIndex===resolvedIndex)renderCharacterSpriteAssets();
   }
-  status.textContent=uiLang==='ru'?'Готово: '+completed+' · ошибок: '+failed+'. Сохрани черновик, чтобы сохранить ссылки.':'Finished: '+completed+' generated · '+failed+' failed. Save the draft to keep the links.';
+  status.textContent=uiLang==='ru'
+   ?'Пакет завершён: создано '+completed+' · повторно использовано '+reused+' · ошибок '+failed+' · заблокировано '+blockedCount+'. Сохрани черновик.'
+   :'Batch finished: '+completed+' generated · '+reused+' reused · '+failed+' failed · '+blockedCount+' blocked. Save the draft.';
  }finally{
   button.disabled=!$('spriteHordeConsent').checked;
  }
