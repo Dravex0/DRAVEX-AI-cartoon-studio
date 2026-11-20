@@ -188,7 +188,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
             // Preserve the exact contact sampled by the holder state machine.
             // The later world-space trajectory must start from this same point,
             // not independently resample a pose through a second code path.
-            releasePoint: released ? { x: releasePoint.x, y: releasePoint.y } : null
+            releasePoint: released ? { x: releasePoint.x, y: releasePoint.y } : null,
+            releaseChange: released ? change : null
           };
         }
         const eased = transitionProgress * transitionProgress * (3 - 2 * transitionProgress);
@@ -244,13 +245,24 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       // A throw must begin at the prop's actual release contact, not at a
       // stale world-space previousPosition supplied by an earlier planning pass.
       // Otherwise the prop can visibly teleport when the holder flag changes.
-      const release = actionIntent === 'throw'
-        ? (byProp.get(propKey) || []).find(item => item.entityType === 'prop'
+      const releaseCandidates = actionIntent === 'throw'
+        ? (byProp.get(propKey) || []).filter(item => item.entityType === 'prop'
           && item.property === 'holder' && item.value == null
           && clean(item.actionIntent) === actionIntent
           && (!clean(change.actorId) || !clean(item.actorId)
             || key(change.actorId) === key(item.actorId)))
+        : [];
+      // Resolve this position change's own authored step independently of
+      // the shared claimed-step set. A holder-release event may already have
+      // claimed that same throw step during the first pass.
+      const trajectoryStep = actionIntent
+        ? matchActionStep(change, new Set([actionIntent]), new Set())?.step || null
         : null;
+      const release = trajectoryStep
+        ? (releaseCandidates.find(item => matchedStepByChange.get(item) === trajectoryStep
+          || matchActionStep(item, new Set([actionIntent]), new Set())?.step === trajectoryStep)
+          || (releaseCandidates.length === 1 ? releaseCandidates[0] : null))
+        : (releaseCandidates.length === 1 ? releaseCandidates[0] : null);
       // Reuse the release event's action phase so the flight starts at the
       // same midpoint where the holder plan detaches the prop.
       // The holder change and position change can carry different evidence
@@ -273,10 +285,12 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
         ? releaseStep.start + (releaseStep.end - releaseStep.start) * 0.5
         : actionStart;
       const releasePoint = release
-        ? (normalizedPoint(existing?.releasePoint)
+        ? ((existing?.releaseChange === release ? normalizedPoint(existing?.releasePoint) : null)
           || releasePointFor(release, release.previousValue, releaseProgress))
         : null;
-      if (releasePoint && index === 0) from = releasePoint;
+      // Each authored throw has its own release contact, including later
+      // trajectories for the same prop. Never reuse another throw's contact.
+      if (releasePoint) from = releasePoint;
       const start = releaseStep ? releaseProgress : actionStart;
       if (!from) {
         current = to;
@@ -284,7 +298,9 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
         continue;
       }
       if (p < start) {
-        current = from;
+        // A future trajectory must not replace the endpoint of an earlier
+        // completed movement while the prop waits for its next action.
+        if (!current) current = from;
         active = { change, index, progress: 0 };
         break;
       }
