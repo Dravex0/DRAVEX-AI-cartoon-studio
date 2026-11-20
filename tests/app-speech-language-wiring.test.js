@@ -76,3 +76,14 @@ test('blocks local-canvas export when a scene background is present but characte
     'a generated scene background is not proof that a character is visible');
   assert.match(appSource.slice(blocker, blocker + 900), /Кэшированный фон не заменяет персонажа/);
 });
+
+test('requires character art for local canvas but not for a full-scene video export', () => {
+  const start = appSource.indexOf('async function exportFilm(');
+  const end = appSource.indexOf("$('export').onclick", start);
+  assert.ok(start >= 0 && end > start, 'film export function must exist');
+  const exportBlock = appSource.slice(start, end);
+  assert.match(exportBlock, /const missingCharacterAssetCount=requireAllVideos\?0:getMissingCharacterVisualCount\(exportProtagonistId\)/);
+  assert.match(exportBlock, /if\(missingCharacterAssetCount>0\)/);
+  assert.match(exportBlock, /assertRequiredSceneSnapshot\(\)/,
+    'full-scene video exports must still require every generated scene clip to be decoded and unchanged');
+});
