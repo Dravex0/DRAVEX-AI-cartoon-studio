@@ -20,7 +20,8 @@ const uniqueIds = values => {
 export function countScenesMissingCharacterVisuals(scenes, {
   protagonistId = '',
   proceduralFallback = false,
-  hasSceneVideo = () => false
+  hasSceneVideo = () => false,
+  canDrawProceduralCharacter = () => false
 } = {}) {
   const protagonist = cleanId(protagonistId);
   const list = Array.isArray(scenes) ? scenes : [];
@@ -35,6 +36,8 @@ export function countScenesMissingCharacterVisuals(scenes, {
         && protagonist
         && characterId.toLocaleLowerCase() === protagonist.toLocaleLowerCase();
       if (isProceduralProtagonist) return false;
+      if (typeof canDrawProceduralCharacter === 'function'
+        && canDrawProceduralCharacter(characterId, scene, index) === true) return false;
       return !hasRenderableCharacterLayer(scene, characterId)
         && !hasRenderableCharacterRig(scene, characterId);
     });
