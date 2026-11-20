@@ -211,10 +211,24 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     let active = null;
     for (let index = 0; index < history.length; index += 1) {
       const change = history[index];
-      const from = normalizedPoint(change.previousPosition) || current;
+      let from = normalizedPoint(change.previousPosition) || current;
       const to = normalizedPoint(change.position);
       if (!to) continue;
       const actionIntent = clean(change.actionIntent);
+      // A throw must begin at the prop's actual release contact, not at a
+      // stale world-space previousPosition supplied by an earlier planning pass.
+      // Otherwise the prop can visibly teleport when the holder flag changes.
+      const release = actionIntent === 'throw'
+        ? (byProp.get(propKey) || []).find(item => item.entityType === 'prop'
+          && item.property === 'holder' && item.value == null
+          && clean(item.actionIntent) === actionIntent
+          && (!clean(change.actorId) || !clean(item.actorId)
+            || key(change.actorId) === key(item.actorId)))
+        : null;
+      const releasePoint = release
+        ? (normalizedPoint(release.position) || holderPoint(release.previousValue, release.position))
+        : null;
+      if (releasePoint && index === 0) from = releasePoint;
       const match = actionIntent
         ? matchActionStep(change, new Set([actionIntent]), claimedPositionSteps)
         : null;
