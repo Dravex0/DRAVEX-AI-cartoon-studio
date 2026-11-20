@@ -82,6 +82,15 @@ async function seedThreeToneDialogue(page) {
       const sceneId = 'audio-audit-scene-' + (index + 1);
       sceneMetadata.push({
         id: sceneId,
+        characterLayers: [{
+          characterId: 'Narrator',
+          imageUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 160"><circle cx="50" cy="24" r="18" fill="#222"/><path d="M50 44 L50 112 M50 65 L20 92 M50 65 L80 92 M50 112 L28 154 M50 112 L72 154" stroke="#222" stroke-width="12" stroke-linecap="round" fill="none"/></svg>'),
+          x: 0.5,
+          y: 0.58,
+          width: 0.24,
+          height: 0.48,
+          visible: true
+        }],
         title: titles[index],
         description: descriptions[index],
         visibleAction: descriptions[index],
