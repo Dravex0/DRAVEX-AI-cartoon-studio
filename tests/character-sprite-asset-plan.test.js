@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCharacterSpriteAssetPlan, CHARACTER_SPRITE_SCENE_LIMIT } from '../src/character-sprite-asset-plan.js';
+import { buildCharacterSpriteBatchPlan } from '../src/character-sprite-batch-plan.js';
 
 const bible = [
   { characterId: 'Foxy', species: 'Anthropomorphic fox', visualDescription: 'Small orange fox', clothing: 'Blue scarf', distinctiveFeatures: 'White tail tip' },
@@ -105,8 +106,6 @@ test('changes the identity seed when the canonical appearance changes', () => {
   assert.notEqual(original.identitySeed, redesigned.identitySeed);
 });
 
-import { buildCharacterSpriteBatchPlan } from '../src/character-sprite-batch-plan.js';
-
 test('builds sprite plans for every scene and preserves scene-specific actions', () => {
   const scenes = [
     { id: 'scene-a', characters: ['Foxy'], visibleAction: 'Foxy waves.' },
@@ -140,4 +139,12 @@ test('applies unsaved editor overrides only to the currently open scene', () => 
 test('keeps scenes without cast out of the batch and returns no plans for invalid input', () => {
   assert.deepEqual(buildCharacterSpriteBatchPlan([{ id: 'empty', characters: [] }], bible), []);
   assert.deepEqual(buildCharacterSpriteBatchPlan(null, bible), []);
+});
+
+test('uses saved motion prompts as scene actions when no explicit visibleAction exists', () => {
+  const batch = buildCharacterSpriteBatchPlan([
+    { id: 'scene-motion', characters: ['Foxy'], motionPrompt: 'Foxy jumps over a log.' }
+  ], bible);
+  assert.equal(batch[0].plans[0].status, 'ready');
+  assert.match(batch[0].plans[0].action, /jumps over a log/);
 });

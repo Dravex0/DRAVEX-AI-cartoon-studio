@@ -18,6 +18,7 @@ export function buildCharacterSpriteBatchPlan(scenes = [], characterBible = [], 
       ...(sceneIndex === currentSceneIndex && currentSceneOverrides && typeof currentSceneOverrides === 'object'
         ? currentSceneOverrides
         : {}),
+      visibleAction: source.visibleAction || source.motionPrompt || '',
       id: sceneId
     };
     const plans = buildCharacterSpriteAssetPlan(scene, characterBible);
