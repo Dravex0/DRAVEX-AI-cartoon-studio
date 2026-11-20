@@ -171,7 +171,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
         const rotation = (from.rotation || 0) + ((to.rotation || 0) - (from.rotation || 0)) * eased;
         return {
           id: entityId, kind: propKind(entityId), x, y, rotation,
-          held: transitionProgress >= 0.5 ? nextHolder != null : holder != null,
+          held: transitionProgress >= 0.5 - 1e-9 ? nextHolder != null : holder != null,
           visible: true, scale: 1, evidence: activeEvidence,
           transitionIndex: index, transitionProgress
         };
