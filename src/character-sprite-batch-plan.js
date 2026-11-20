@@ -20,6 +20,7 @@ export function buildCharacterSpriteBatchPlan(scenes = [], characterBible = [], 
         : {}),
       id: sceneId
     };
+    // Resolve this after editor overrides so unsaved motionPrompt values win.
     scene.visibleAction = scene.visibleAction || scene.motionPrompt || '';
     const plans = buildCharacterSpriteAssetPlan(scene, characterBible);
     return plans.length ? [{ sceneIndex, sceneId, plans }] : [];
