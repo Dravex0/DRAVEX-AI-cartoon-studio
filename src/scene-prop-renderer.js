@@ -128,18 +128,24 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   }
 
   const ground = { x: 0.68, y: 0.79, rotation: 0 };
-  const holderPoint = (holderId, loosePosition = null) => {
+  const holderPoint = (holderId, loosePosition = null, rigPoses = runtime.rigPoses) => {
     if (holderId == null || !clean(holderId)) return normalizedPoint(loosePosition) || ground;
     const actorId = clean(holderId);
     const actor = layers.find(layer => key(layer?.characterId) === key(actorId));
     const actorX = Number.isFinite(actor?.x) ? actor.x : 0.5;
     const actorY = Number.isFinite(actor?.y) ? actor.y : 0.68;
-    const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
+    const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, rigPoses);
     return rigAnchor
       ? { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation }
       : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96),
           y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
   };
+  const posesAt = progress => typeof runtime.rigPosesAtProgress === 'function'
+    ? runtime.rigPosesAtProgress(progress)
+    : runtime.rigPoses;
+  const releasePointFor = (change, actorId, releaseProgress) =>
+    normalizedPoint(change?.position)
+    || holderPoint(actorId, change?.position, posesAt(releaseProgress));
 
   const holderPlans = [...byProp.values()].map(history => {
     const entityId = clean(history[0].entityId);
@@ -159,12 +165,33 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       const end = matchedStep ? matchedStep.end : start + interval;
       const nextHolder = change.value ?? null;
       if (p < start) break;
-      from = holderPoint(holder, change.position);
-      to = holderPoint(nextHolder, change.position);
+      from = holderPoint(holder, change.position, posesAt(p));
+      to = holderPoint(nextHolder, change.position, posesAt(p));
       activeEvidence = clean(change.evidence);
       activeIndex = index;
       if (p <= end) {
         transitionProgress = clamp((p - start) / Math.max(0.000001, end - start), 0, 1);
+        const isThrowRelease = clean(change.actionIntent) === 'throw'
+          && holder != null && nextHolder == null;
+        if (isThrowRelease) {
+          // Keep the prop attached to the posed hand until the authored throw
+          // midpoint. At that exact frame, detach at the hand's release pose.
+          const releaseProgress = start + (end - start) * 0.5;
+          const releasePoint = releasePointFor(change, holder, releaseProgress);
+          const released = p >= releaseProgress - 1e-9;
+          const point = released ? releasePoint : from;
+          return {
+            id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
+            rotation: point.rotation || 0, held: !released,
+            visible: true, scale: 1, evidence: activeEvidence,
+            transitionIndex: index, transitionProgress,
+            // Preserve the exact contact sampled by the holder state machine.
+            // The later world-space trajectory must start from this same point,
+            // not independently resample a pose through a second code path.
+            releasePoint: released ? { x: releasePoint.x, y: releasePoint.y } : null,
+            releaseChange: released ? change : null
+          };
+        }
         const eased = transitionProgress * transitionProgress * (3 - 2 * transitionProgress);
         const x = from.x + (to.x - from.x) * eased;
         const y = from.y + (to.y - from.y) * eased;
@@ -181,7 +208,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     }
 
     const finalPositionChange = history[activeIndex >= 0 ? activeIndex : 0];
-    const point = holderPoint(holder, finalPositionChange?.position);
+    const point = holderPoint(holder, finalPositionChange?.position, posesAt(p));
     return {
       id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
       rotation: point.rotation || 0, held, visible: true, scale: 1,
@@ -218,39 +245,62 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       // A throw must begin at the prop's actual release contact, not at a
       // stale world-space previousPosition supplied by an earlier planning pass.
       // Otherwise the prop can visibly teleport when the holder flag changes.
-      const release = actionIntent === 'throw'
-        ? (byProp.get(propKey) || []).find(item => item.entityType === 'prop'
+      const releaseCandidates = actionIntent === 'throw'
+        ? (byProp.get(propKey) || []).filter(item => item.entityType === 'prop'
           && item.property === 'holder' && item.value == null
           && clean(item.actionIntent) === actionIntent
           && (!clean(change.actorId) || !clean(item.actorId)
             || key(change.actorId) === key(item.actorId)))
+        : [];
+      // Resolve this position change's own authored step independently of
+      // the shared claimed-step set. A holder-release event may already have
+      // claimed that same throw step during the first pass.
+      const trajectoryStep = actionIntent
+        ? matchActionStep(change, new Set([actionIntent]), new Set())?.step || null
         : null;
-      const releasePoint = release
-        ? (normalizedPoint(release.position) || holderPoint(release.previousValue, release.position))
-        : null;
-      if (releasePoint && index === 0) from = releasePoint;
-      // The holder-release event and its paired position trajectory describe
-      // the same authored action. Reuse the release's already matched phase;
-      // otherwise the holder event consumes the only throw step and the
-      // trajectory falls back to a later synthetic interval.
-      const releaseStep = release ? matchedStepByChange.get(release) : null;
-      const releaseStepIndex = releaseStep ? timelineSteps.indexOf(releaseStep) : -1;
-      const match = releaseStep
-        ? { step: releaseStep, index: releaseStepIndex }
+      const release = trajectoryStep
+        ? (releaseCandidates.find(item => matchedStepByChange.get(item) === trajectoryStep
+          || matchActionStep(item, new Set([actionIntent]), new Set())?.step === trajectoryStep)
+          || (releaseCandidates.length === 1 ? releaseCandidates[0] : null))
+        : (releaseCandidates.length === 1 ? releaseCandidates[0] : null);
+      // Reuse the release event's action phase so the flight starts at the
+      // same midpoint where the holder plan detaches the prop.
+      // The holder change and position change can carry different evidence
+      // strings for the same throw. Prefer the holder's matched step, but when
+      // that evidence does not match, reuse the trajectory's grounded step so
+      // release and flight still share the exact authored midpoint.
+      const holderReleaseStep = release ? matchedStepByChange.get(release) : null;
+      const match = holderReleaseStep
+        ? { step: holderReleaseStep, index: timelineSteps.indexOf(holderReleaseStep) }
         : (actionIntent
           ? matchActionStep(change, new Set([actionIntent]), claimedPositionSteps)
           : null);
       const matchedStep = match?.step || null;
+      const releaseStep = release ? (holderReleaseStep || matchedStep) : null;
+      const releaseStepIndex = releaseStep ? timelineSteps.indexOf(releaseStep) : -1;
       if (match && releaseStepIndex < 0) claimedPositionSteps.add(match.index);
-      const start = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
+      const actionStart = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
       const end = matchedStep ? matchedStep.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
+      const releaseProgress = releaseStep
+        ? releaseStep.start + (releaseStep.end - releaseStep.start) * 0.5
+        : actionStart;
+      const releasePoint = release
+        ? ((existing?.releaseChange === release ? normalizedPoint(existing?.releasePoint) : null)
+          || releasePointFor(release, release.previousValue, releaseProgress))
+        : null;
+      // Each authored throw has its own release contact, including later
+      // trajectories for the same prop. Never reuse another throw's contact.
+      if (releasePoint) from = releasePoint;
+      const start = releaseStep ? releaseProgress : actionStart;
       if (!from) {
         current = to;
         active = { change, index, progress: 1 };
         continue;
       }
       if (p < start) {
-        current = from;
+        // A future trajectory must not replace the endpoint of an earlier
+        // completed movement while the prop waits for its next action.
+        if (!current) current = from;
         active = { change, index, progress: 0 };
         break;
       }
@@ -273,6 +323,9 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       y: current.y,
       rotation: existing?.rotation || 0,
       held: existing?.held === true,
+      // Explicit scene-authored position trajectories are authoritative for this
+      // prop at the current frame; the physics bridge must not overwrite them.
+      explicitPosition: true,
       visible: true,
       scale: existing?.scale || 1,
       evidence: clean(active?.change?.evidence),
@@ -286,8 +339,9 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   const physicsVisuals = buildGroundedPhysicsVisualPlan(scene, physicsModel, p);
   for (const visual of physicsVisuals) {
     const existing = holderPlans.find(item => key(item.id) === key(visual.id));
-    // A prop attached to a character remains controlled by its holder anchor.
-    if (existing?.held) continue;
+    // A held prop follows its hand anchor; an explicit authored trajectory
+    // controls free flight. Physics visuals only fill gaps without either source.
+    if (existing?.held || existing?.explicitPosition) continue;
     const plan = {
       ...(existing || {}),
       id: visual.id,

@@ -449,12 +449,128 @@ test('starts a thrown prop trajectory at the holder release contact, not a stale
     ]
   };
   const start = buildScenePropRenderPlan(throwing, layers, 0.2)[0];
-  const middle = buildScenePropRenderPlan(throwing, layers, 0.5)[0];
+  const release = buildScenePropRenderPlan(throwing, layers, 0.5)[0];
+  const flightMidpoint = buildScenePropRenderPlan(throwing, layers, 0.65)[0];
   const end = buildScenePropRenderPlan(throwing, layers, 0.8)[0];
   assert.ok(Math.abs(start.x - 0.52) < 1e-9);
   assert.ok(Math.abs(start.y - 0.62) < 1e-9);
-  assert.ok(Math.abs(middle.x - 0.71) < 1e-9);
-  assert.ok(Math.abs(middle.y - 0.46) < 1e-9);
+  // Flight begins at the authored release midpoint; it must not advance
+  // along the trajectory before the holder has detached the prop.
+  assert.ok(Math.abs(release.x - 0.52) < 1e-9);
+  assert.ok(Math.abs(release.y - 0.62) < 1e-9);
+  assert.ok(Math.abs(flightMidpoint.x - 0.71) < 1e-9);
+  assert.ok(Math.abs(flightMidpoint.y - 0.46) < 1e-9);
   assert.ok(Math.abs(end.x - 0.9) < 1e-9);
   assert.ok(Math.abs(end.y - 0.3) < 1e-9);
+});
+
+
+test('keeps a thrown prop on the posed hand until the exact release frame, then starts flight without a snap', () => {
+  const throwing = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.2, end: 0.8, actorId: 'Fox',
+      steps: [{ intent: 'throw', start: 0.2, end: 0.8, actorId: 'Fox',
+        targetId: 'ball', evidence: 'Fox throws the ball' }]
+    }] },
+    stateChanges: [
+      { entityType: 'prop', entityId: 'ball', property: 'holder',
+        previousValue: 'Fox', value: null, actorId: 'Fox', actionIntent: 'throw',
+        evidence: 'Fox releases the ball' },
+      { entityType: 'prop', entityId: 'ball', property: 'position',
+        previousPosition: { x: 0.08, y: 0.12 }, position: { x: 0.9, y: 0.3 },
+        actorId: 'Fox', actionIntent: 'throw', evidence: 'Fox throws the ball' }
+    ]
+  };
+  const rig = {
+    schemaVersion: 1, characterId: 'Fox',
+    bones: [{ id: 'root', parentId: null }, { id: 'rightHand', parentId: 'root' }],
+    parts: [{
+      id: 'contact-point', boneId: 'rightHand', imageUrl: 'https://assets.example/hand.png',
+      x: 0.7, y: 0.55, width: 0.08, height: 0.08, gripAnchor: true
+    }]
+  };
+  const timeline = {
+    schemaVersion: 1,
+    keyframes: [
+      { time: 0, poses: { Fox: { rightHand: { x: 0, y: 0 } } } },
+      { time: 1, poses: { Fox: { rightHand: { x: 0.18, y: -0.05 } } } }
+    ]
+  };
+  const layer = [{ characterId: 'Fox', x: 0.5, y: 0.7 }];
+  const planAt = progress => buildScenePropRenderPlan(throwing, layer, progress, {
+    characterRigs: [rig],
+    rigPoses: sampleCharacterRigTimeline(timeline, progress),
+    rigPosesAtProgress: value => sampleCharacterRigTimeline(timeline, value)
+  })[0];
+
+  const before = planAt(0.499999);
+  const release = planAt(0.5);
+  const after = planAt(0.500001);
+  const midFlight = planAt(0.65);
+  const landed = planAt(0.8);
+
+  assert.equal(before.held, true);
+  assert.equal(release.held, false);
+  assert.equal(after.held, false);
+  assert.ok(Math.abs(before.x - 0.79) < 1e-5);
+  assert.ok(Math.abs(before.y - 0.525) < 1e-5);
+  assert.ok(Math.abs(release.x - before.x) < 1e-5, JSON.stringify({ before, release }));
+  assert.ok(Math.abs(release.y - before.y) < 1e-5);
+  assert.ok(Math.abs(after.x - release.x) < 1e-5);
+  assert.ok(Math.abs(after.y - release.y) < 1e-5);
+  assert.ok(midFlight.x > release.x && midFlight.x < landed.x);
+  assert.ok(midFlight.y < release.y && midFlight.y > landed.y);
+  assert.ok(Math.abs(landed.x - 0.9) < 1e-9);
+  assert.ok(Math.abs(landed.y - 0.3) < 1e-9);
+});
+
+test('associates repeated throws of the same prop with their own release contacts and timeline steps', () => {
+  const repeated = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.1, end: 0.9, actorId: 'Fox',
+      steps: [
+        { intent: 'throw', start: 0.1, end: 0.3, actorId: 'Fox', targetId: 'ball',
+          evidence: 'Fox throws the first ball' },
+        { intent: 'catch', start: 0.4, end: 0.6, actorId: 'Fox', targetId: 'ball',
+          evidence: 'Fox catches the ball' },
+        { intent: 'throw', start: 0.7, end: 0.9, actorId: 'Fox', targetId: 'ball',
+          evidence: 'Fox throws the second ball' }
+      ]
+    }] },
+    stateChanges: [
+      { entityType: 'prop', entityId: 'ball', property: 'holder',
+        previousValue: 'Fox', value: null, actorId: 'Fox', actionIntent: 'throw',
+        position: { x: 0.2, y: 0.2 }, evidence: 'Fox throws the first ball' },
+      { entityType: 'prop', entityId: 'ball', property: 'holder',
+        previousValue: null, value: 'Fox', actorId: 'Fox', actionIntent: 'catch',
+        position: { x: 0.4, y: 0.4 }, evidence: 'Fox catches the ball' },
+      { entityType: 'prop', entityId: 'ball', property: 'holder',
+        previousValue: 'Fox', value: null, actorId: 'Fox', actionIntent: 'throw',
+        position: { x: 0.6, y: 0.6 }, evidence: 'Fox throws the second ball' },
+      { entityType: 'prop', entityId: 'ball', property: 'position',
+        previousPosition: { x: 0.1, y: 0.1 }, position: { x: 0.35, y: 0.3 },
+        actorId: 'Fox', actionIntent: 'throw', evidence: 'Fox throws the first ball' },
+      { entityType: 'prop', entityId: 'ball', property: 'position',
+        previousPosition: { x: 0.55, y: 0.55 }, position: { x: 0.9, y: 0.3 },
+        actorId: 'Fox', actionIntent: 'throw', evidence: 'Fox throws the second ball' }
+    ]
+  };
+  const planAt = progress => buildScenePropRenderPlan(repeated, layers, progress)
+    .find(item => item.id === 'ball');
+
+  const betweenThrows = planAt(0.35);
+  const heldBeforeSecondRelease = planAt(0.75);
+  const secondRelease = planAt(0.8);
+  const secondFlight = planAt(0.85);
+  const secondLanding = planAt(0.9);
+
+  assert.ok(Math.abs(betweenThrows.x - 0.35) < 1e-9, JSON.stringify(betweenThrows));
+  assert.ok(Math.abs(betweenThrows.y - 0.3) < 1e-9, JSON.stringify(betweenThrows));
+  assert.equal(heldBeforeSecondRelease.held, true);
+  assert.ok(Math.abs(secondRelease.x - 0.6) < 1e-9, JSON.stringify(secondRelease));
+  assert.ok(Math.abs(secondRelease.y - 0.6) < 1e-9, JSON.stringify(secondRelease));
+  assert.ok(secondFlight.x > 0.6 && secondFlight.x < 0.9, JSON.stringify(secondFlight));
+  assert.ok(secondFlight.y < 0.6 && secondFlight.y > 0.3, JSON.stringify(secondFlight));
+  assert.ok(Math.abs(secondLanding.x - 0.9) < 1e-9);
+  assert.ok(Math.abs(secondLanding.y - 0.3) < 1e-9);
 });
