@@ -449,12 +449,17 @@ test('starts a thrown prop trajectory at the holder release contact, not a stale
     ]
   };
   const start = buildScenePropRenderPlan(throwing, layers, 0.2)[0];
-  const middle = buildScenePropRenderPlan(throwing, layers, 0.5)[0];
+  const release = buildScenePropRenderPlan(throwing, layers, 0.5)[0];
+  const flightMidpoint = buildScenePropRenderPlan(throwing, layers, 0.65)[0];
   const end = buildScenePropRenderPlan(throwing, layers, 0.8)[0];
   assert.ok(Math.abs(start.x - 0.52) < 1e-9);
   assert.ok(Math.abs(start.y - 0.62) < 1e-9);
-  assert.ok(Math.abs(middle.x - 0.71) < 1e-9);
-  assert.ok(Math.abs(middle.y - 0.46) < 1e-9);
+  // Flight begins at the authored release midpoint; it must not advance
+  // along the trajectory before the holder has detached the prop.
+  assert.ok(Math.abs(release.x - 0.52) < 1e-9);
+  assert.ok(Math.abs(release.y - 0.62) < 1e-9);
+  assert.ok(Math.abs(flightMidpoint.x - 0.71) < 1e-9);
+  assert.ok(Math.abs(flightMidpoint.y - 0.46) < 1e-9);
   assert.ok(Math.abs(end.x - 0.9) < 1e-9);
   assert.ok(Math.abs(end.y - 0.3) < 1e-9);
 });
