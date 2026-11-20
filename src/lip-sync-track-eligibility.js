@@ -29,7 +29,8 @@ export function selectRenderableLipSyncTracks({
   voiceTracks = [],
   sceneMetadata = [],
   mainCharacterKey = "",
-  storyUsesFallback = false
+  storyUsesFallback = false,
+  canRenderProceduralCharacter = () => false
 } = {}) {
   if (!Array.isArray(voiceTracks) || !Array.isArray(sceneMetadata)) return [];
   const mainKey = cleanKey(mainCharacterKey);
@@ -38,6 +39,8 @@ export function selectRenderableLipSyncTracks({
     if (!Number.isInteger(sceneIndex) || sceneIndex < 0) return false;
     const scene = sceneMetadata[sceneIndex] || {};
     if (hasRenderableMouthRig(scene, track)) return true;
+    if (typeof canRenderProceduralCharacter === "function"
+      && canRenderProceduralCharacter(track, scene, sceneIndex) === true) return true;
     if (!mainKey || cleanKey(track?.characterName) !== mainKey) return false;
     return shouldShowProceduralDemoCharacter({
       storyUsesFallback,
