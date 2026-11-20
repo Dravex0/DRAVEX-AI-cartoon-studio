@@ -58,3 +58,33 @@ test('accepts a cached full-scene video as the visual scene resource', () => {
     hasSceneVideo: () => true
   }), 0);
 });
+
+
+test('accepts a procedural fallback only for cast members explicitly confirmed renderable', () => {
+  const scene = { characters: ['Kael', 'Wolf'] };
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Kael',
+    canDrawProceduralCharacter: characterId => characterId === 'Kael'
+  }), 1);
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Kael',
+    canDrawProceduralCharacter: characterId => ['Kael', 'Wolf'].includes(characterId)
+  }), 0);
+});
+
+test('passes the exact scene and index to procedural readiness checks', () => {
+  const scenes = [{ characters: ['Kael'] }, { characters: ['Nox'] }];
+  const seen = [];
+  const missing = countScenesMissingCharacterVisuals(scenes, {
+    canDrawProceduralCharacter: (characterId, scene, index) => {
+      seen.push({ characterId, scene, index });
+      return index === 0 && characterId === 'Kael';
+    }
+  });
+  assert.equal(missing, 1);
+  assert.equal(seen.length, 2);
+  assert.equal(seen[0].scene, scenes[0]);
+  assert.equal(seen[0].index, 0);
+  assert.equal(seen[1].scene, scenes[1]);
+  assert.equal(seen[1].index, 1);
+});
