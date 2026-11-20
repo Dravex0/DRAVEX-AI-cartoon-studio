@@ -51,10 +51,28 @@ test('the procedural fallback covers only the protagonist, not missing secondary
   }), 1);
 });
 
-test('accepts a cached full-scene video as the visual scene resource', () => {
-  const scene = { characters: ['Foxy'], generatedImageUrl: 'blob:forest-background' };
+test('does not accept a cached full-scene video as proof that the cast is visible', () => {
+  const scene = {
+    characters: ['Foxy'],
+    generatedImageUrl: 'blob:forest-background',
+    generatedVideoUrl: 'blob:forest-video'
+  };
   assert.equal(countScenesMissingCharacterVisuals([scene], {
     protagonistId: 'Foxy',
+    // Legacy callers must not be able to bypass character evidence with a video flag.
     hasSceneVideo: () => true
-  }), 0);
+  }), 1);
+});
+
+test('does not accept a zero-opacity sprite as character evidence for local-canvas export', () => {
+  const scene = {
+    characters: ['Foxy'],
+    characterLayers: [{
+      characterId: 'Foxy',
+      imageUrl: 'blob:transparent-fox',
+      visible: true,
+      opacity: 0
+    }]
+  };
+  assert.equal(countScenesMissingCharacterVisuals([scene], { protagonistId: 'Foxy' }), 1);
 });
