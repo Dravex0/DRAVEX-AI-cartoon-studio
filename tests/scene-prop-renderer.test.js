@@ -523,3 +523,54 @@ test('keeps a thrown prop on the posed hand until the exact release frame, then 
   assert.ok(Math.abs(landed.x - 0.9) < 1e-9);
   assert.ok(Math.abs(landed.y - 0.3) < 1e-9);
 });
+
+test('associates repeated throws of the same prop with their own release contacts and timeline steps', () => {
+  const repeated = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.1, end: 0.9, actorId: 'Fox',
+      steps: [
+        { intent: 'throw', start: 0.1, end: 0.3, actorId: 'Fox', targetId: 'ball',
+          evidence: 'Fox throws the first ball' },
+        { intent: 'catch', start: 0.4, end: 0.6, actorId: 'Fox', targetId: 'ball',
+          evidence: 'Fox catches the ball' },
+        { intent: 'throw', start: 0.7, end: 0.9, actorId: 'Fox', targetId: 'ball',
+          evidence: 'Fox throws the second ball' }
+      ]
+    }] },
+    stateChanges: [
+      { entityType: 'prop', entityId: 'ball', property: 'holder',
+        previousValue: 'Fox', value: null, actorId: 'Fox', actionIntent: 'throw',
+        position: { x: 0.2, y: 0.2 }, evidence: 'Fox throws the first ball' },
+      { entityType: 'prop', entityId: 'ball', property: 'holder',
+        previousValue: null, value: 'Fox', actorId: 'Fox', actionIntent: 'catch',
+        position: { x: 0.4, y: 0.4 }, evidence: 'Fox catches the ball' },
+      { entityType: 'prop', entityId: 'ball', property: 'holder',
+        previousValue: 'Fox', value: null, actorId: 'Fox', actionIntent: 'throw',
+        position: { x: 0.6, y: 0.6 }, evidence: 'Fox throws the second ball' },
+      { entityType: 'prop', entityId: 'ball', property: 'position',
+        previousPosition: { x: 0.1, y: 0.1 }, position: { x: 0.35, y: 0.3 },
+        actorId: 'Fox', actionIntent: 'throw', evidence: 'Fox throws the first ball' },
+      { entityType: 'prop', entityId: 'ball', property: 'position',
+        previousPosition: { x: 0.55, y: 0.55 }, position: { x: 0.9, y: 0.3 },
+        actorId: 'Fox', actionIntent: 'throw', evidence: 'Fox throws the second ball' }
+    ]
+  };
+  const planAt = progress => buildScenePropRenderPlan(repeated, layers, progress)
+    .find(item => item.id === 'ball');
+
+  const betweenThrows = planAt(0.35);
+  const heldBeforeSecondRelease = planAt(0.75);
+  const secondRelease = planAt(0.8);
+  const secondFlight = planAt(0.85);
+  const secondLanding = planAt(0.9);
+
+  assert.ok(Math.abs(betweenThrows.x - 0.35) < 1e-9, JSON.stringify(betweenThrows));
+  assert.ok(Math.abs(betweenThrows.y - 0.3) < 1e-9, JSON.stringify(betweenThrows));
+  assert.equal(heldBeforeSecondRelease.held, true);
+  assert.ok(Math.abs(secondRelease.x - 0.6) < 1e-9, JSON.stringify(secondRelease));
+  assert.ok(Math.abs(secondRelease.y - 0.6) < 1e-9, JSON.stringify(secondRelease));
+  assert.ok(secondFlight.x > 0.6 && secondFlight.x < 0.9, JSON.stringify(secondFlight));
+  assert.ok(secondFlight.y < 0.6 && secondFlight.y > 0.3, JSON.stringify(secondFlight));
+  assert.ok(Math.abs(secondLanding.x - 0.9) < 1e-9);
+  assert.ok(Math.abs(secondLanding.y - 0.3) < 1e-9);
+});
