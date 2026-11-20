@@ -63,3 +63,16 @@ test('does not accept a cached full-scene video as proof that the cast is visibl
     hasSceneVideo: () => true
   }), 1);
 });
+
+test('does not accept a zero-opacity sprite as character evidence for local-canvas export', () => {
+  const scene = {
+    characters: ['Foxy'],
+    characterLayers: [{
+      characterId: 'Foxy',
+      imageUrl: 'blob:transparent-fox',
+      visible: true,
+      opacity: 0
+    }]
+  };
+  assert.equal(countScenesMissingCharacterVisuals([scene], { protagonistId: 'Foxy' }), 1);
+});
