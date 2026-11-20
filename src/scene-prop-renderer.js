@@ -229,11 +229,19 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
         ? (normalizedPoint(release.position) || holderPoint(release.previousValue, release.position))
         : null;
       if (releasePoint && index === 0) from = releasePoint;
-      const match = actionIntent
-        ? matchActionStep(change, new Set([actionIntent]), claimedPositionSteps)
-        : null;
+      // The holder-release event and its paired position trajectory describe
+      // the same authored action. Reuse the release's already matched phase;
+      // otherwise the holder event consumes the only throw step and the
+      // trajectory falls back to a later synthetic interval.
+      const releaseStep = release ? matchedStepByChange.get(release) : null;
+      const releaseStepIndex = releaseStep ? timelineSteps.indexOf(releaseStep) : -1;
+      const match = releaseStep
+        ? { step: releaseStep, index: releaseStepIndex }
+        : (actionIntent
+          ? matchActionStep(change, new Set([actionIntent]), claimedPositionSteps)
+          : null);
       const matchedStep = match?.step || null;
-      if (match) claimedPositionSteps.add(match.index);
+      if (match && releaseStepIndex < 0) claimedPositionSteps.add(match.index);
       const start = matchedStep ? matchedStep.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
       const end = matchedStep ? matchedStep.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
       if (!from) {
