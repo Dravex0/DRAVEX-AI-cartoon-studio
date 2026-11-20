@@ -2386,8 +2386,8 @@ $('makeFilm').addEventListener('click',async()=>{
    ?'Для '+gate.missingImageCount+' сцен ещё нет изображений. Отдельно подтверди отправку только текстовых промптов в AI Horde либо добавь изображения вручную.'
    :' '+gate.missingImageCount+' scene image(s) are missing. Separately allow sending text prompts to AI Horde, or add scene images manually.');
   if(gate.blockers.includes('character-visual-assets-required'))messages.push(ru
-   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах нет изображений или видеоклипов персонажей. Добавь изображения/спрайты героев через инструменты генерации сцен и персонажей либо выбери Hugging Face или локальный ComfyUI. Фоновое видео вместо мультфильма создавать не будем.'
-   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes have no character images or video clips. Add character images/sprites with the scene and character tools, or choose Hugging Face or local ComfyUI. A background-only video will not be exported.');
+   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах нет видимого спрайта или проверенного рига нужного персонажа. Добавь спрайт/риг через инструменты генерации персонажей либо выбери Hugging Face или локальный ComfyUI для генерации видеосцены. Кэшированный фон не заменяет персонажа.'
+   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes have no visible sprite or validated rig for the required cast. Add character sprites/rigs, or switch to Hugging Face or local ComfyUI to generate full-scene video. A cached background clip is not character evidence.');
   $('status').textContent=messages.join(' ');
   if(mode==='huggingface')$('hfVideoPanel').open=true;
   if(mode==='comfyui')$('comfyPanel').open=true;
