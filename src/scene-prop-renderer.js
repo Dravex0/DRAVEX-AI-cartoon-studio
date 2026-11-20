@@ -297,6 +297,9 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       y: current.y,
       rotation: existing?.rotation || 0,
       held: existing?.held === true,
+      // Explicit scene-authored position trajectories are authoritative for this
+      // prop at the current frame; the physics bridge must not overwrite them.
+      explicitPosition: true,
       visible: true,
       scale: existing?.scale || 1,
       evidence: clean(active?.change?.evidence),
@@ -310,8 +313,9 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   const physicsVisuals = buildGroundedPhysicsVisualPlan(scene, physicsModel, p);
   for (const visual of physicsVisuals) {
     const existing = holderPlans.find(item => key(item.id) === key(visual.id));
-    // A prop attached to a character remains controlled by its holder anchor.
-    if (existing?.held) continue;
+    // A held prop follows its hand anchor; an explicit authored trajectory
+    // controls free flight. Physics visuals only fill gaps without either source.
+    if (existing?.held || existing?.explicitPosition) continue;
     const plan = {
       ...(existing || {}),
       id: visual.id,
