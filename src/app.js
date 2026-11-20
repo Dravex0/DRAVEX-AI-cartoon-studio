@@ -2271,8 +2271,7 @@ function prepareAutomaticCharacterMotion(){
 function getMissingCharacterVisualCount(protagonistId = currentStoryboardPlan?.sourceCharacter || $('character').value.trim()) {
  return countScenesMissingCharacterVisuals(sceneMetadata,{
   protagonistId,
-  proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true,
-  hasSceneVideo:(scene,index)=>Boolean(sceneVideoCache.get(sceneVideoKey(index,scene))?.video)
+  proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true
  });
 }
 
