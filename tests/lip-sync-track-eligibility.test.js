@@ -140,3 +140,29 @@ test("keeps the procedural fallback eligible when a character layer has no image
   });
   assert.deepEqual(result, [candidate]);
 });
+
+
+test("allows lip sync for a procedural human fallback only when the scene renderer confirms that speaker", () => {
+  const candidate = track("Kael");
+  const scene = { characters: ["Kael"] };
+  const result = selectRenderableLipSyncTracks({
+    voiceTracks: [candidate],
+    sceneMetadata: [scene],
+    canRenderProceduralCharacter: (voiceTrack, currentScene, sceneIndex) =>
+      voiceTrack.characterId === "Kael"
+      && currentScene.characters.includes("Kael")
+      && sceneIndex === 0
+  });
+  assert.deepEqual(result, [candidate]);
+});
+
+test("does not allow a procedural fallback lip sync track for a different or unrendered speaker", () => {
+  const kael = track("Kael");
+  const nox = track("Nox");
+  const result = selectRenderableLipSyncTracks({
+    voiceTracks: [kael, nox],
+    sceneMetadata: [{ characters: ["Kael", "Nox"] }],
+    canRenderProceduralCharacter: voiceTrack => voiceTrack.characterId === "Kael"
+  });
+  assert.deepEqual(result, [kael]);
+});
