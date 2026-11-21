@@ -176,3 +176,43 @@ test('merges sprite editor overrides into a scene snapshot and synchronizes the 
   assert.equal(saved.prompt, 'Saved image prompt');
   assert.deepEqual(saved.characters, ['Bird']);
 });
+
+
+test('changes a scene sprite asset ID when the character action changes but keeps the identity seed', () => {
+  const waving = buildCharacterSpriteAssetPlan({
+    id: 'scene-action',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves to the camera.'
+  }, bible)[0];
+  const running = buildCharacterSpriteAssetPlan({
+    id: 'scene-action',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy runs toward the gate.'
+  }, bible)[0];
+  const repeated = buildCharacterSpriteAssetPlan({
+    id: 'scene-action',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves to the camera.'
+  }, bible)[0];
+
+  assert.notEqual(waving.assetId, running.assetId);
+  assert.equal(waving.assetId, repeated.assetId);
+  assert.equal(waving.identitySeed, running.identitySeed);
+});
+
+test('changes a scene sprite asset ID when canonical character appearance changes', () => {
+  const original = buildCharacterSpriteAssetPlan({
+    id: 'scene-appearance',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves.'
+  }, bible)[0];
+  const redesigned = buildCharacterSpriteAssetPlan({
+    id: 'scene-appearance',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves.'
+  }, [{ ...bible[0], clothing: 'Green coat' }])[0];
+
+  assert.notEqual(original.assetId, redesigned.assetId);
+  assert.notEqual(original.identitySeed, redesigned.identitySeed);
+  assert.ok(original.assetId.length <= 240);
+});
