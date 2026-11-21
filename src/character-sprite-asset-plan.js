@@ -13,13 +13,27 @@ function profileAppearance(profile = {}) {
 }
 
 function characterIdentitySeed(characterId, appearance) {
-  const source = key(characterId) + '|' + key(appearance);
+  const source = clean(characterId, 120).toLocaleLowerCase() + '|' + clean(appearance, 8000).toLocaleLowerCase();
   let hash = 0x811c9dc5;
   for (let index = 0; index < source.length; index++) {
     hash ^= source.charCodeAt(index);
     hash = Math.imul(hash, 0x01000193);
   }
   return hash >>> 0;
+}
+
+function characterSpriteAssetFingerprint(characterId, appearance, action) {
+  const source = [
+    clean(characterId, 120).toLocaleLowerCase(),
+    clean(appearance, 8000).toLocaleLowerCase(),
+    clean(action, 1000).toLocaleLowerCase()
+  ].join('|');
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < source.length; index++) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash.toString(16).padStart(8, '0');
 }
 
 function characterAction(scene, characterId, castSize) {
@@ -81,7 +95,8 @@ export function buildCharacterSpriteAssetPlan(scene = {}, characterBible = []) {
     ].filter(Boolean).join(' ');
 
     return {
-      assetId: `${clean(scene.id, 120) || 'scene'}:${characterId}`,
+      // Include canonical appearance and this scene's action so edits cannot reuse a stale pose.
+      assetId: `${clean(scene.id, 120) || 'scene'}:${clean(characterId, 80)}:${characterSpriteAssetFingerprint(characterId, appearance, action)}`,
       sceneId: clean(scene.id, 120),
       characterId,
       order: index,
