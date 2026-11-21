@@ -91,7 +91,7 @@ import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
 import { createVideoProviderRegistry, generateVideoWithProvider } from "./video-provider-contract.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildSceneIdentitySeed, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from "./scene-production.js";
-import { buildCharacterSpriteBatchPlan } from "./character-sprite-batch-plan.js";
+import { buildCharacterSpriteBatchPlan, mergeCharacterSpriteSceneOverrides } from "./character-sprite-batch-plan.js";
 import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
 import { generateCharacterSpriteAsset } from "./character-sprite-generation.js";
@@ -2814,9 +2814,9 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
  const currentSceneOverrides={
   title:$('sceneTitle').value.trim()||titles[sceneIndex],
   description:$('sceneDescription').value.trim(),
-  imagePrompt:$('sceneImagePrompt').value.trim(),
-  motionPrompt:$('sceneMotionPrompt').value.trim(),
-  visibleAction:$('sceneMotionPrompt').value.trim(),
+  imagePrompt:$('sceneImagePrompt').value.trim()||$('sceneDescription').value.trim(),
+  motionPrompt:$('sceneMotionPrompt').value.trim()||$('sceneDescription').value.trim(),
+  visibleAction:$('sceneMotionPrompt').value.trim()||$('sceneDescription').value.trim(),
   camera:$('sceneCamera').value.trim(),
   characters:normalizeSceneCast($('sceneCharacters').value,currentMeta.characters),
   startState:$('sceneStartState').value.trim(),
@@ -2829,6 +2829,19 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
  const blockedCount=batch.reduce((total,group)=>total+group.plans.filter(plan=>plan.planningStatus!=='ready'&&plan.status!=='ready').length,0);
  const taskCount=readyGroups.reduce((total,group)=>total+group.plans.length,0);
  if(!taskCount){status.textContent=uiLang==='ru'?'Нет готовых планов для всех сцен. Проверь состав сцен, справочник внешности и индивидуальные действия персонажей.':'No ready plans across the storyboard. Check scene casts, character appearance references, and actor-specific actions.';return}
+ // The planner intentionally reads unsaved editor values. Persist those same values
+ // into the scene metadata before attaching generated assets, so the saved cast/action
+ // cannot disagree with the sprite that was just requested.
+ const updatedCurrentScene=mergeCharacterSpriteSceneOverrides(currentMeta,currentSceneOverrides);
+ if(updatedCurrentScene){
+  sceneMetadata[sceneIndex]=updatedCurrentScene;
+  titles[sceneIndex]=updatedCurrentScene.title||titles[sceneIndex];
+  descriptions[sceneIndex]=updatedCurrentScene.description||descriptions[sceneIndex];
+  if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,titles:[...titles],descriptions:[...descriptions],eventChain:buildStoryEventChain(sceneMetadata)};
+  $('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];
+  renderScenes();
+  updateStoryQA();
+ }
  button.disabled=true;
  let completed=0,failed=0,reused=0;
  try{

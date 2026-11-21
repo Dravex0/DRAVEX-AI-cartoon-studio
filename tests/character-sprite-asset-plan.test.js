@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCharacterSpriteAssetPlan, CHARACTER_SPRITE_SCENE_LIMIT } from '../src/character-sprite-asset-plan.js';
-import { buildCharacterSpriteBatchPlan } from '../src/character-sprite-batch-plan.js';
+import { buildCharacterSpriteBatchPlan, mergeCharacterSpriteSceneOverrides } from '../src/character-sprite-batch-plan.js';
 
 const bible = [
   { characterId: 'Foxy', species: 'Anthropomorphic fox', visualDescription: 'Small orange fox', clothing: 'Blue scarf', distinctiveFeatures: 'White tail tip' },
@@ -147,4 +147,32 @@ test('uses saved motion prompts as scene actions when no explicit visibleAction 
   ], bible);
   assert.equal(batch[0].plans[0].status, 'ready');
   assert.match(batch[0].plans[0].action, /jumps over a log/);
+});
+
+
+test('merges sprite editor overrides into a scene snapshot and synchronizes the canonical image prompt', () => {
+  const saved = {
+    id: 'scene-edit',
+    title: 'Saved title',
+    prompt: 'Saved image prompt',
+    imagePrompt: 'Saved image prompt',
+    motionPrompt: 'Saved action',
+    visibleAction: 'Saved action',
+    characters: ['Bird']
+  };
+  const updated = mergeCharacterSpriteSceneOverrides(saved, {
+    title: 'Edited title',
+    imagePrompt: 'Edited image prompt',
+    motionPrompt: 'Foxy jumps.',
+    visibleAction: 'Foxy jumps.',
+    characters: ['Foxy']
+  });
+  assert.equal(updated.title, 'Edited title');
+  assert.equal(updated.prompt, 'Edited image prompt');
+  assert.equal(updated.imagePrompt, 'Edited image prompt');
+  assert.equal(updated.visibleAction, 'Foxy jumps.');
+  assert.deepEqual(updated.characters, ['Foxy']);
+  assert.equal(saved.title, 'Saved title');
+  assert.equal(saved.prompt, 'Saved image prompt');
+  assert.deepEqual(saved.characters, ['Bird']);
 });
