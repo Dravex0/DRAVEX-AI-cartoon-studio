@@ -13,7 +13,7 @@ function profileAppearance(profile = {}) {
 }
 
 function characterIdentitySeed(characterId, appearance) {
-  const source = key(characterId) + '|' + key(appearance);
+  const source = clean(characterId, 120).toLocaleLowerCase() + '|' + clean(appearance, 8000).toLocaleLowerCase();
   let hash = 0x811c9dc5;
   for (let index = 0; index < source.length; index++) {
     hash ^= source.charCodeAt(index);
@@ -23,7 +23,11 @@ function characterIdentitySeed(characterId, appearance) {
 }
 
 function characterSpriteAssetFingerprint(characterId, appearance, action) {
-  const source = [key(characterId), key(appearance), key(action)].join('|');
+  const source = [
+    clean(characterId, 120).toLocaleLowerCase(),
+    clean(appearance, 8000).toLocaleLowerCase(),
+    clean(action, 1000).toLocaleLowerCase()
+  ].join('|');
   let hash = 0x811c9dc5;
   for (let index = 0; index < source.length; index++) {
     hash ^= source.charCodeAt(index);

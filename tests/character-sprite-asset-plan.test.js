@@ -216,3 +216,21 @@ test('changes a scene sprite asset ID when canonical character appearance change
   assert.notEqual(original.identitySeed, redesigned.identitySeed);
   assert.ok(original.assetId.length <= 240);
 });
+
+
+test('includes long canonical appearance fields in the sprite fingerprint and identity seed', () => {
+  const longDescription = 'A'.repeat(160);
+  const first = buildCharacterSpriteAssetPlan({
+    id: 'scene-long-appearance',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves.'
+  }, [{ ...bible[0], visualDescription: longDescription + ' red markings' }])[0];
+  const changed = buildCharacterSpriteAssetPlan({
+    id: 'scene-long-appearance',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves.'
+  }, [{ ...bible[0], visualDescription: longDescription + ' blue markings' }])[0];
+
+  assert.notEqual(first.assetId, changed.assetId);
+  assert.notEqual(first.identitySeed, changed.identitySeed);
+});
