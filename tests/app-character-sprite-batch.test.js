@@ -20,6 +20,6 @@ test('batch sprite generation persists the same current-scene edits used by its 
 
 
 test('keeps the single-scene sprite planner imported for the live production preview', () => {
-  assert.match(app, /import\\s+\\{[^}]*\\bbuildCharacterSpriteAssetPlan\\b[^}]*\\}\\s+from\\s+['"]\\.\\/character-sprite-asset-plan\\.js['"]/);
-  assert.match(app, /buildCharacterSpriteAssetPlan\\(scene,characterBible\\)/);
+  assert.ok(app.includes('import { buildCharacterSpriteAssetPlan } from "./character-sprite-asset-plan.js";'));
+  assert.ok(app.includes('buildCharacterSpriteAssetPlan(scene,characterBible)'));
 });
