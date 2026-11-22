@@ -91,7 +91,7 @@ import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
 import { createVideoProviderRegistry, generateVideoWithProvider } from "./video-provider-contract.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildSceneIdentitySeed, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from "./scene-production.js";
-import { buildCharacterSpriteAssetPlan } from "./character-sprite-asset-plan.js";
+import { buildCharacterSpriteAssetPlan, isCurrentCharacterSpriteAsset } from "./character-sprite-asset-plan.js";
 import { buildCharacterSpriteBatchPlan, mergeCharacterSpriteSceneOverrides } from "./character-sprite-batch-plan.js";
 import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
@@ -1078,7 +1078,9 @@ function renderCharacterSpriteAssets(){
   const title=document.createElement('strong');title.textContent=String(asset.characterId||'Character');
   const note=document.createElement('small');
   const initialTransparency=asset.transparencyStatus||'unverified';
-  note.textContent=uiLang==='ru'?'Прозрачность: '+initialTransparency+' · сходство не проверено · общий seed помогает повторяемости, но не гарантирует одинаковый образ':'Transparency: '+initialTransparency+' · identity not verified · shared seed helps repeatability but does not guarantee an identical design';
+  const isCurrentAsset=isCurrentCharacterSpriteAsset(sceneMetadata[sceneIndex]||{},characterBible,asset);
+  const staleAssetNote=uiLang==='ru'?'Спрайт создан для прежнего действия или внешности. Создай актуальный спрайт перед добавлением.':'This sprite belongs to an earlier action or appearance. Generate the current sprite before attaching it.';
+  note.textContent=(uiLang==='ru'?'Прозрачность: '+initialTransparency+' · сходство не проверено · общий seed помогает повторяемости, но не гарантирует одинаковый образ':'Transparency: '+initialTransparency+' · identity not verified · shared seed helps repeatability but does not guarantee an identical design')+(isCurrentAsset?'':' · '+staleAssetNote);
   const sceneId=String(sceneMetadata[sceneIndex]?.id||'');
   const assetId=String(asset.assetId||'');
   const updateTransparency=(status,check=null)=>{
@@ -1092,6 +1094,11 @@ function renderCharacterSpriteAssets(){
      // Alpha-channel verification is the minimum safe gate before the sprite
      // becomes a visible character layer. Identity/anatomy remain unverified.
      const verifiedAsset=updatedAssets.find(item=>item&&String(item.assetId||'')===assetId);
+     if(!isCurrentCharacterSpriteAsset(updatedScene,characterBible,verifiedAsset)){
+      note.textContent=staleAssetNote;
+      if(typeof addButton!=='undefined')addButton.disabled=true;
+      return;
+     }
      const attached=attachVerifiedCharacterSpriteToSceneLayers(updatedScene,verifiedAsset);
      if(attached.status==='added'||attached.status==='updated'){
       updatedScene={...updatedScene,characterLayers:attached.layers};
@@ -1121,9 +1128,11 @@ function renderCharacterSpriteAssets(){
     context.drawImage(verificationImage,0,0);
     const check=verifySpriteTransparency(context.getImageData(0,0,canvas.width,canvas.height),canvas.width,canvas.height);
     updateTransparency(check.status,check);
-    note.textContent=uiLang==='ru'
+    const liveSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===sceneId);
+    const stillCurrent=liveSceneIndex>=0&&isCurrentCharacterSpriteAsset(sceneMetadata[liveSceneIndex],characterBible,asset);
+    note.textContent=!stillCurrent?staleAssetNote:(uiLang==='ru'
       ?(check.passed?'Прозрачность подтверждена':'Прозрачность не пройдена')+' · сходство персонажа не проверено'
-      :(check.passed?'Transparency verified':'Transparency check failed')+' · character identity not verified';
+      :(check.passed?'Transparency verified':'Transparency check failed')+' · character identity not verified');
    }catch(error){
     updateTransparency('unverified',{reason:'image-pixels-unavailable'});
     note.textContent=uiLang==='ru'?'Пиксели недоступны (CORS) · проверка не выполнена':'Image pixels unavailable (CORS) · verification not performed';
@@ -1136,11 +1145,17 @@ function renderCharacterSpriteAssets(){
   image.src=asset.imageUrl;
   verificationImage.src=asset.imageUrl;
   const addButton=document.createElement('button');addButton.type='button';addButton.className='secondary';
+  addButton.disabled=!isCurrentAsset;
   const alreadyAttached=(Array.isArray(sceneMetadata[sceneIndex]?.characterLayers)?sceneMetadata[sceneIndex].characterLayers:[]).some(layer=>String(layer?.characterId||'').toLocaleLowerCase()===String(asset.characterId||'').toLocaleLowerCase());
   addButton.textContent=alreadyAttached?(uiLang==='ru'?'Обновить на сцене':'Update on scene'):(uiLang==='ru'?'Добавить на сцену':'Add to scene');
   addButton.addEventListener('click',()=>{
    const resolvedSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===sceneId);
    if(resolvedSceneIndex<0)return;
+   if(!isCurrentCharacterSpriteAsset(sceneMetadata[resolvedSceneIndex],characterBible,asset)){
+    $('status').textContent=staleAssetNote;
+    addButton.disabled=true;
+    return;
+   }
    const result=attachCharacterSpriteToSceneLayers(sceneMetadata[resolvedSceneIndex],asset);
    if(result.status==='invalid'){
     $('status').textContent=uiLang==='ru'?'Не удалось добавить спрайт: проверь имя персонажа и HTTPS-ссылку.':'Could not attach sprite: check character ID and HTTPS image URL.';
