@@ -91,6 +91,7 @@ import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
 import { createVideoProviderRegistry, generateVideoWithProvider } from "./video-provider-contract.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildSceneIdentitySeed, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from "./scene-production.js";
+import { buildCharacterSpriteAssetPlan } from "./character-sprite-asset-plan.js";
 import { buildCharacterSpriteBatchPlan, mergeCharacterSpriteSceneOverrides } from "./character-sprite-batch-plan.js";
 import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
