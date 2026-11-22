@@ -47,7 +47,7 @@ function characterAction(scene, characterId, castSize) {
     return [...new Set(phases)].join(' ');
   }
   // A general action can be assigned safely only when the scene has one character.
-  return castSize === 1 ? clean(scene.visibleAction, 1000) : '';
+  return castSize === 1 ? clean(scene.visibleAction || scene.motionPrompt, 1000) : '';
 }
 
 /**
