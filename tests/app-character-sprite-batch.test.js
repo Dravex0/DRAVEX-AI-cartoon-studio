@@ -23,3 +23,15 @@ test('keeps the single-scene sprite planner imported for the live production pre
   assert.ok(app.includes('import { buildCharacterSpriteAssetPlan } from "./character-sprite-asset-plan.js";'));
   assert.ok(app.includes('buildCharacterSpriteAssetPlan(scene,characterBible)'));
 });
+
+
+test('prevents historical action/appearance sprites from overwriting the current scene character layer', () => {
+  const renderer = app.indexOf('function renderCharacterSpriteAssets()');
+  const end = app.indexOf('function renderCharacterRigPartSets', renderer);
+  assert.ok(renderer >= 0 && end > renderer);
+  const block = app.slice(renderer, end);
+  assert.match(block, /isCurrentCharacterSpriteAsset\(sceneMetadata\[sceneIndex\]\|\|\{\},characterBible,asset\)/);
+  assert.match(block, /if\(!isCurrentCharacterSpriteAsset\(updatedScene,characterBible,verifiedAsset\)\)/);
+  assert.match(block, /if\(!isCurrentCharacterSpriteAsset\(sceneMetadata\[resolvedSceneIndex\],characterBible,asset\)\)/);
+  assert.match(block, /addButton\.disabled=!isCurrentAsset/);
+});
