@@ -23,6 +23,35 @@ export function sceneHasFacialRigForSpeaker(facialRigs, characterId, characterNa
 }
 
 /**
+ * Select the active mouth track for one specific character.
+ * This is used by the procedural fallback renderer, which has one mouth rather
+ * than a per-character facial-rig map. Other speakers must never drive it.
+ */
+export function findActiveCharacterLipSyncTrack(tracks, sceneIndex, elapsedMs, characterId, characterName = '') {
+  const speakerKeys = new Set([characterId, characterName]
+    .map(value => cleanId(value).toLowerCase())
+    .filter(Boolean));
+  if (!Array.isArray(tracks) || !Number.isInteger(sceneIndex) || !Number.isFinite(elapsedMs)
+    || elapsedMs < 0 || !speakerKeys.size) return null;
+
+  let selected = null;
+  for (const track of tracks.slice(0, MAX_TRACKS)) {
+    if (!isRecord(track) || track.sceneIndex !== sceneIndex || !Number.isFinite(track.startMs)
+      || !isRecord(track.envelope) || !isRecord(track.visemes)) continue;
+    const durationMs = Number(track.envelope.durationMs);
+    if (!Number.isFinite(durationMs) || durationMs <= 0) continue;
+    const trackKeys = [track.characterId, track.characterName]
+      .map(value => cleanId(value).toLowerCase())
+      .filter(Boolean);
+    if (!trackKeys.some(key => speakerKeys.has(key))) continue;
+    const localTimeMs = elapsedMs - track.startMs;
+    if (localTimeMs < 0 || localTimeMs >= durationMs) continue;
+    if (!selected || track.startMs >= selected.startMs) selected = track;
+  }
+  return selected;
+}
+
+/**
  * Resolve active export dialogue tracks into per-character facial controls.
  * elapsedMs and track.startMs share the export timeline clock.
  * The latest-starting active cue wins if a character has overlapping dialogue.
