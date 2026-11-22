@@ -117,4 +117,16 @@ export function buildCharacterSpriteAssetPlan(scene = {}, characterBible = []) {
   });
 }
 
+/**
+ * True only when a saved sprite still matches the current scene action and
+ * canonical character appearance. Old assets remain inspectable but cannot
+ * overwrite the current character layer after an edit.
+ */
+export function isCurrentCharacterSpriteAsset(scene = {}, characterBible = [], asset = {}) {
+  const assetId = clean(asset?.assetId, 240);
+  if (!assetId) return false;
+  return buildCharacterSpriteAssetPlan(scene, characterBible)
+    .some(plan => plan.status === 'ready' && plan.assetId === assetId);
+}
+
 export const CHARACTER_SPRITE_SCENE_LIMIT = MAX_SPRITES_PER_SCENE;
