@@ -244,3 +244,12 @@ test('rejects stored sprite assets when the scene action or canonical appearance
   assert.equal(isCurrentCharacterSpriteAsset(scene, [{ ...bible[0], clothing: 'Green coat' }, bible[1]], asset), false);
   assert.equal(isCurrentCharacterSpriteAsset(scene, [], asset), false);
 });
+
+
+test('uses a saved motion prompt as the current action when visibleAction is absent', () => {
+  const scene = { id: 'scene-motion-current', characters: ['Foxy'], motionPrompt: 'Foxy jumps over a log.' };
+  const plan = buildCharacterSpriteAssetPlan(scene, bible)[0];
+  assert.equal(plan.status, 'ready');
+  assert.match(plan.action, /jumps over a log/);
+  assert.equal(isCurrentCharacterSpriteAsset(scene, bible, { assetId: plan.assetId }), true);
+});
