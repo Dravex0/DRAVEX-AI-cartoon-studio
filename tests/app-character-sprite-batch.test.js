@@ -17,3 +17,9 @@ test('batch sprite generation persists the same current-scene edits used by its 
   assert.match(block, /titles\[sceneIndex\]=updatedCurrentScene\.title/);
   assert.match(block, /descriptions\[sceneIndex\]=updatedCurrentScene\.description/);
 });
+
+
+test('keeps the single-scene sprite planner imported for the live production preview', () => {
+  assert.match(app, /import\\s+\\{[^}]*\\bbuildCharacterSpriteAssetPlan\\b[^}]*\\}\\s+from\\s+['"]\\.\\/character-sprite-asset-plan\\.js['"]/);
+  assert.match(app, /buildCharacterSpriteAssetPlan\\(scene,characterBible\\)/);
+});
