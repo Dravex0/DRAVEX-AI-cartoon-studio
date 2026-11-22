@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCharacterSpriteAssetPlan, CHARACTER_SPRITE_SCENE_LIMIT } from '../src/character-sprite-asset-plan.js';
+import { buildCharacterSpriteAssetPlan, isCurrentCharacterSpriteAsset, CHARACTER_SPRITE_SCENE_LIMIT } from '../src/character-sprite-asset-plan.js';
 import { buildCharacterSpriteBatchPlan, mergeCharacterSpriteSceneOverrides } from '../src/character-sprite-batch-plan.js';
 
 const bible = [
@@ -233,4 +233,14 @@ test('includes long canonical appearance fields in the sprite fingerprint and id
 
   assert.notEqual(first.assetId, changed.assetId);
   assert.notEqual(first.identitySeed, changed.identitySeed);
+});
+
+
+test('rejects stored sprite assets when the scene action or canonical appearance has changed', () => {
+  const scene = { id: 'scene-currentness', characters: ['Foxy'], visibleAction: 'Foxy waves.' };
+  const asset = { assetId: buildCharacterSpriteAssetPlan(scene, bible)[0].assetId };
+  assert.equal(isCurrentCharacterSpriteAsset(scene, bible, asset), true);
+  assert.equal(isCurrentCharacterSpriteAsset({ ...scene, visibleAction: 'Foxy runs.' }, bible, asset), false);
+  assert.equal(isCurrentCharacterSpriteAsset(scene, [{ ...bible[0], clothing: 'Green coat' }, bible[1]], asset), false);
+  assert.equal(isCurrentCharacterSpriteAsset(scene, [], asset), false);
 });
