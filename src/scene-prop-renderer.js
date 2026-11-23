@@ -194,7 +194,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     }
 
     const finalPositionChange = history[activeIndex >= 0 ? activeIndex : 0];
-    const point = holderPoint(holder, finalPositionChange?.position, finalPositionChange?.gripHand || finalPositionChange?.hand);
+    const point = holderPoint(holder, finalPositionChange?.position, finalPositionChange?.toGripHand || finalPositionChange?.gripHand || finalPositionChange?.hand);
     return {
       id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
       rotation: point.rotation || 0, held, visible: true, scale: 1,
