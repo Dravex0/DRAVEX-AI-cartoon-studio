@@ -455,7 +455,7 @@ export function createProceduralActorLayers(scene = {}, progress = 0, runtime = 
   // planner must know where non-procedural cast members are standing.
   const proceduralIds = new Set(anchors.map(layer => key(layer.characterId)));
   const positionedAuthoredLayers = layers.filter(layer =>
-    isRecord(layer) && cleanLayerId(layer.characterId)
+    record(layer) && cleanLayerId(layer.characterId)
     && layer.visible !== false
     && !proceduralIds.has(key(layer.characterId))
     && Number.isFinite(layer.x) && Number.isFinite(layer.y)
