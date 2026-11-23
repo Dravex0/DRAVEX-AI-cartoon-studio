@@ -289,7 +289,7 @@ test('assigns a shouted command to the speaker and its target, not the speaker',
 
 test('wires an explicitly named chase into the action timeline and ordered motion steps', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nFoxy — a small orange fox.\\nBird — a small yellow bird.\\n\\nScene 1: Pursuit\\nFoxy chases Bird through the forest.',
+    'Characters:\nFoxy — a small orange fox.\nBird — a small yellow bird.\n\nScene 1: Pursuit\nFoxy chases Bird through the forest.',
     'en',
     'Foxy'
   );
