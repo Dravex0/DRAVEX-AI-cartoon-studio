@@ -336,6 +336,50 @@ export function drawFigure(context, pose = {}, options = {}) {
   return true;
 }
 
+
+/**
+ * Compute the exact canvas-space wrist contacts used by drawFigure.
+ * Keeping these anchors derived from the same pose and transform prevents
+ * procedural actors' held props from floating beside their drawn hands.
+ */
+export function resolveProceduralHandAnchors(layer = {}, pose = {}, width, height, size) {
+  const canvasWidth = Number(width), canvasHeight = Number(height), figureSize = Number(size);
+  if (![canvasWidth, canvasHeight, figureSize, layer.x, layer.y].every(Number.isFinite)
+    || canvasWidth <= 0 || canvasHeight <= 0 || figureSize <= 0) return null;
+  const unit = figureSize / 220;
+  const flip = layer.flipX === true ? -1 : 1;
+  const lean = clamp(pose.lean, -0.5, 0.5, 0);
+  const cosine = Math.cos(lean), sine = Math.sin(lean);
+  const centerX = layer.x * canvasWidth + (Number(pose.shiftX) || 0) * figureSize;
+  const centerY = layer.y * canvasHeight + (Number(pose.bob) || 0) * figureSize;
+  const hand = (side) => {
+    const isLeft = side === 'left';
+    const baseX = isLeft ? -25 : 25;
+    const baseY = -7;
+    const angle = Number.isFinite(pose[isLeft ? 'leftArm' : 'rightArm'])
+      ? pose[isLeft ? 'leftArm' : 'rightArm'] : (isLeft ? -0.18 : 0.18);
+    const elbowX = baseX + Math.sin(angle) * 24;
+    const elbowY = baseY - Math.cos(angle) * 24;
+    const wristAngle = angle * 0.78;
+    const localX = elbowX + Math.sin(wristAngle) * 19;
+    const localY = elbowY - Math.cos(wristAngle) * 19;
+    const scaledX = localX * unit * flip;
+    const scaledY = localY * unit;
+    const x = centerX + scaledX * cosine - scaledY * sine;
+    const y = centerY + scaledX * sine + scaledY * cosine;
+    const tangentX = Math.sin(wristAngle) * unit * flip;
+    const tangentY = -Math.cos(wristAngle) * unit;
+    const rotatedTangentX = tangentX * cosine - tangentY * sine;
+    const rotatedTangentY = tangentX * sine + tangentY * cosine;
+    return {
+      x: x / canvasWidth,
+      y: y / canvasHeight,
+      rotation: Math.atan2(rotatedTangentY, rotatedTangentX)
+    };
+  };
+  return { leftHand: hand('left'), rightHand: hand('right') };
+}
+
 function activeActorStep(scene, actorId, progress, timelineValid) {
   if (!timelineValid) return null;
   const phases = Array.isArray(scene?.actionTimeline?.phases) ? scene.actionTimeline.phases : [];
@@ -440,6 +484,7 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     if (id && Number.isFinite(layer?.x)) actorXById.set(id, layer.x);
   }
   let drawn = 0, skipped = 0;
+  const propAnchors = {};
   for (const layer of layers) {
     const active = activeActorStep(actorScene, layer.characterId, progress, timelineValid);
     const targetId = key(active?.step?.targetId || active?.phase?.targetId);
@@ -461,6 +506,8 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     const mouthOpenness = /(?:AA|AE|AH|AO|AW|EH|ER|IH|IY|OH|OW|UH|UW|open)/i.test(viseme)
       ? Math.max(mouth, 0.55) : mouth;
     const size = Math.min(width * layer.width, height * layer.height);
+    const handAnchors = resolveProceduralHandAnchors(layer, pose, width, height, size);
+    if (handAnchors) propAnchors[layer.characterId] = handAnchors;
     const x = layer.x * width;
     const y = layer.y * height;
     if (drawFigure(context, pose, {
@@ -469,7 +516,7 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     })) drawn++;
     else skipped++;
   }
-  return { drawn, layers, skipped, castCount: cast.length };
+  return { drawn, layers, skipped, castCount: cast.length, propAnchors };
 }
 
 /** Standalone Doodle scene for legacy callers; production app uses its shared scene renderer. */
