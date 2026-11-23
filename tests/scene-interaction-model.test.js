@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSceneInteractionModel, formatSceneInteractionInstructions } from '../src/scene-interaction-model.js';
+import { buildMotionGenerationPrompt } from '../src/scene-production.js';
 
 test('builds grounded interaction links between actor, object and receiver', () => {
   const scene = {
@@ -61,4 +62,38 @@ test('models a single-holder handoff and prevents simultaneous ownership', () =>
   });
   assert.deepEqual(model.holderTimeline.map(item => item.holderAfter), ['Mira', 'Noah']);
   assert.match(formatSceneInteractionInstructions(model), /at most one holder at a time/);
+});
+
+test('adds only evidence-backed prop state changes to the interaction graph', () => {
+  const model = buildSceneInteractionModel({
+    storyDetail: 'Foxy picks up the silver key and opens the ancient door.',
+    stateChanges: [
+      { entityType: 'prop', entityId: 'silver key', property: 'holder', previousValue: null,
+        value: 'Foxy', actionIntent: 'pick_up', position: { x: 0.72, y: 0.55 },
+        evidence: 'Foxy picks up the silver key' },
+      { entityType: 'prop', entityId: 'ancient door', property: 'open', previousValue: false,
+        value: true, actionIntent: 'open', evidence: 'opens the ancient door' },
+      { entityType: 'prop', entityId: 'secret portal', property: 'visible', previousValue: false,
+        value: true, evidence: 'a secret portal appears' }
+    ]
+  });
+  assert.equal(model.stateTransitionCount, 2);
+  assert.deepEqual(model.stateTransitions.map(item => item.entityId), ['silver key', 'ancient door']);
+  assert.match(formatSceneInteractionInstructions(model), /silver key.holder/);
+  assert.match(formatSceneInteractionInstructions(model), /ancient door.open/);
+  assert.doesNotMatch(formatSceneInteractionInstructions(model), /secret portal/);
+});
+
+test('injects grounded interaction rules into the final motion-generation prompt', () => {
+  const prompt = buildMotionGenerationPrompt({
+    visibleAction: 'Mira gives the key to Noah.',
+    storyDetail: 'Mira gives the key to Noah.',
+    physicsEvents: [{
+      id: 'handoff', type: 'transfer', entityId: 'key', fromEntityId: 'Mira',
+      toEntityId: 'Noah', evidence: 'Mira gives the key to Noah.'
+    }]
+  });
+  assert.match(prompt, /Grounded entity-interaction graph/);
+  assert.match(prompt, /continuous handoff/i);
+  assert.match(prompt, /never duplicate the object/i);
 });
