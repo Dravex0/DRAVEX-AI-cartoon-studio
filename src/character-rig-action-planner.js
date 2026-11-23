@@ -30,6 +30,7 @@ function presetForDescription(description) {
   if (intent.intent === 'dodge') return 'dodge';
   if (intent.intent === 'attack') return 'attack';
   if (intent.intent === 'defend') return 'defend';
+  if (PRESET_BY_INTENT[intent.intent]) return PRESET_BY_INTENT[intent.intent];
   const action = detectSceneAction(description);
   return PRESET_BY_ACTION[action] || null;
 }
