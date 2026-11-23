@@ -55,11 +55,13 @@ export function buildSceneInteractionModel(scene = {}) {
 
   for (const event of physics.events) {
     if (!event.grounded || !INTERACTION_RULES[event.type]) continue;
-    const raw = rawEvents.find(item => isRecord(item) && (
-      (item.id && clean(item.id) === event.id)
-      || (!item.id && clean(item.type).toLocaleLowerCase() === event.type
-        && clean(item.evidence) === event.evidence && clean(item.entityId) === event.entityId)
-    ));
+    const explicitRaw = rawEvents.find(item => isRecord(item)
+      && item.id && clean(item.id) === event.id);
+    const generatedIndex = event.id.match(/_physics_(\d+)$/u);
+    const generatedRaw = generatedIndex
+      ? rawEvents[Number(generatedIndex[1]) - 1]
+      : null;
+    const raw = explicitRaw || (isRecord(generatedRaw) && !generatedRaw.id ? generatedRaw : null);
     if (!raw || !sourceHasEvidence(scene, event.evidence)) continue;
 
     addEntity(event.entityId, 'entity');
