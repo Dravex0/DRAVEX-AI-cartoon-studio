@@ -106,7 +106,7 @@ export function validateCharacterActionTimeline(scene = {}) {
   const castWasExplicit = typeof scene.characterCastProvided === 'boolean'
     ? scene.characterCastProvided
     : Array.isArray(scene.characters);
-  const evidenceSources = [scene.storyDetail, ...(Array.isArray(scene.sourceEvents) ? scene.sourceEvents : [])]
+  const evidenceSources = [scene.storyDetail, scene.visibleAction, ...(Array.isArray(scene.sourceEvents) ? scene.sourceEvents : [])]
     .map(value => clean(value, 2_000)).filter(Boolean);
   const seen = new Set();
   let previousRank = -1;
