@@ -207,3 +207,30 @@ test('does not accept a persistent snapshot without a matching prior world state
   assert.equal(model.entities.some(entity => entity.id === 'magic key'), false);
   assert.equal(model.events[0].actions.some(action => action.type === 'state_snapshot'), false);
 });
+
+
+test('does not let a different sentence authorize an action substep interaction', () => {
+  const model = buildSceneWorldModel([{
+    id: 'cross-sentence-step',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira throws the ball to Noah. Noah waves.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira',
+        description: 'Mira throws the ball to Noah.',
+        evidence: 'Mira throws the ball to Noah.',
+        steps: [{
+          intent: 'throw', motionCue: 'throw', start: 0, end: 1,
+          actorId: 'Mira', targetId: 'Noah',
+          description: 'Mira throws the ball to Noah.',
+          evidence: 'Noah waves.'
+        }]
+      }]
+    }
+  }]);
+  assert.equal(model.relations.some(relation => relation.type === 'acts_on'
+    && relation.from === 'Mira' && relation.to === 'Noah'), false);
+  assert.ok(model.events[0].actions.some(action => action.type === 'unresolved_action_step'
+    && action.reason === 'step-participants-not-grounded-in-step-evidence'));
+});
