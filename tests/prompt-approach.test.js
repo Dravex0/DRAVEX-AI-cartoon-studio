@@ -40,6 +40,7 @@ test('adds directing guidance without changing source events or character member
   assert.equal(result.promptApproach.primary, 'combat');
   assert.match(result.motionPrompt, /Prompt-specific directing approach/);
   assert.match(result.motionPrompt, /do not add actions/i);
+  assert.match(result.camera, /wide geography/i);
 });
 
 test('assigns a separate approach to each storyboard scene', () => {
@@ -50,7 +51,7 @@ test('assigns a separate approach to each storyboard scene', () => {
   );
   assert.equal(result.scenes[0].promptApproach.primary, 'discovery');
   assert.equal(result.scenes[1].promptApproach.primary, 'chase');
-  assert.equal(result.promptApproach.primary, 'discovery');
+  assert.equal(result.promptApproach.primary, 'chase');
   assert.match(result.scenes[0].motionGenerationPrompt, /investigation/i);
   assert.match(result.scenes[1].motionGenerationPrompt, /pursuit/i);
 });
