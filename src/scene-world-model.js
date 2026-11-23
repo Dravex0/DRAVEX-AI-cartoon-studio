@@ -132,6 +132,26 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
         expectedPreviousValue: previous, declaredPreviousValue: declaredPrevious });
     }
 
+    // Persistent snapshots keep the same prop identity and known state alive
+    // across scene cuts, even when the next scene contains no new state delta.
+    const snapshots = Array.isArray(scene.stateSnapshot) ? scene.stateSnapshot : [];
+    for (const snapshot of snapshots.filter(record)) {
+      const entityId = clean(snapshot.entityId, 160);
+      const entityKind = clean(snapshot.entityType, 40) || 'entity';
+      const property = clean(snapshot.property, 60);
+      if (!entityId || !property) continue;
+      addEntity(entities, entityId, entityKind, sceneId);
+      const stateKey = entityKind + ':' + keyOf(entityId) + ':' + property;
+      const value = snapshot.value ?? null;
+      if (state.has(stateKey) && state.get(stateKey) !== value) {
+        sceneEvents.push({ type: 'state_snapshot_conflict', entityId, property,
+          currentValue: state.get(stateKey), snapshotValue: value });
+      }
+      state.set(stateKey, value);
+      sceneEvents.push({ type: 'state_snapshot', entityId, property, value,
+        evidence: clean(snapshot.evidence, 500) });
+    }
+
     // Add physical relations only when the event's exact evidence is present
     // in this scene. Unverified event metadata never enters the world graph.
     const rawPhysicsEvents = Array.isArray(scene.physicsEvents) ? scene.physicsEvents : [];
