@@ -131,6 +131,13 @@ test('maps semantic interaction intents to explicit Doodle acting poses', () => 
   assert.equal(actionForStep({ intent: 'catch', motionCue: 'turn' }), 'catch');
   assert.equal(actionForStep({ intent: 'give', motionCue: 'talk' }), 'give');
   assert.equal(actionForStep({ intent: 'point', motionCue: 'turn' }), 'point');
+  assert.equal(actionForStep({ intent: 'pick_up', motionCue: 'turn' }), 'take');
+  assert.equal(actionForStep({ intent: 'drop_weapon', motionCue: 'turn' }), 'put_down');
+  assert.equal(actionForStep({ intent: 'take_cover', motionCue: 'jump' }), 'defend');
+  assert.equal(actionForStep({ intent: 'aim_weapon', motionCue: 'turn' }), 'point');
+  assert.equal(actionForStep({ intent: 'draw_weapon', motionCue: 'turn' }), 'take');
+  assert.equal(actionForStep({ intent: 'hug', motionCue: 'happy' }), 'happy');
+  assert.equal(actionForStep({ intent: 'swim', motionCue: 'float' }), 'float');
   assert.equal(actionForStep({ intent: 'unrecognized', motionCue: 'wave' }), 'wave');
 });
 
@@ -184,4 +191,14 @@ test('moves a procedural actor toward a named character using the validated moti
   assert.equal(start[0].x, 0.28);
   assert.ok(middle[0].x > start[0].x);
   assert.equal(middle[1].x, 0.72);
+});
+
+
+test('combines authored layer opacity with pose opacity instead of overriding a fade', () => {
+  const { context } = mockCanvas();
+  context.globalAlpha = 0.8;
+  assert.equal(drawFigure(context, { action: 'vanish', opacity: 0.25 }, {
+    x: 320, y: 250, size: 220, characterId: 'Foxy', opacity: 0.5
+  }), true);
+  assert.equal(context.globalAlpha, 0.1);
 });
