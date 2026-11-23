@@ -11,6 +11,7 @@ import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
 import { classifyPromptApproach, applyPromptApproach } from './prompt-approach.js';
 import { detectSceneAction, inferSceneActionIntent, extractSceneActionSequence } from './scene-action.js';
+import { understandScenePrompt } from './scene-understanding.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -163,6 +164,12 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     scene.interactions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
       : [];
+    // Interpret only entities, perception cues, and events grounded in this scene's own source text.
+    scene.sceneUnderstanding = understandScenePrompt(scene.storyDetail, {
+      characters: scene.characters,
+      interactions: scene.interactions,
+      locale
+    });
     // Semantic story intent is separate from renderer movement presets and is now
     // carried into the actual motion prompt and validated action timeline.
     const semanticIntent = inferSceneActionIntent(scene.storyDetail);
