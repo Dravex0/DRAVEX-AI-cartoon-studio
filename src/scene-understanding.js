@@ -7,16 +7,16 @@ const OBJECTS = Object.freeze({
   es: ['puerta','llave','espada','escudo','pelota','manzana','caja','libro','cuerda','escalera','piedra','estrella','mapa','taza','botella','teléfono','radio','bolsa','flor','coche']
 });
 const PERCEPTION_PATTERNS = [
-  { type: 'visual_attention', patterns: [/\\b(?:sees?|spots?|notices?|observes?|looks? at|stares? at)\\b/iu, /видит|замеча[ею]т|смотрит на|наблюда[ею]т/iu, /бачить|поміча[єе]|дивиться на|спостеріга[єе]/iu, /ve|observa|mira a|nota/iu] },
-  { type: 'auditory_attention', patterns: [/\\b(?:hears?|listens? to|overhears?)\\b/iu, /слышит|прислушива[ею]тся|услышал/iu, /чує|прислуха[єе]ться|почув/iu, /oye|escucha/iu] },
-  { type: 'touch_contact', patterns: [/\\b(?:touches?|feels?|grabs?|picks? up|catches?)\\b/iu, /трога[ею]т|касается|хвата[ею]т|подбира[ею]т|ловит/iu, /торка[єе]ться|доторка[єе]ться|хапа[єе]|підбира[єе]|ловить/iu, /toca|agarra|recoge|atrapa/iu] },
-  { type: 'object_possession', patterns: [/\\b(?:holds?|carries?|wears?|keeps?)\\b/iu, /держит|нес[её]т|носит/iu, /трима[єе]|несе|носить/iu, /sostiene|lleva|porta/iu] },
-  { type: 'spatial_entry', patterns: [/\\b(?:enters?|exits?|leaves?|approaches?|moves away from)\\b/iu, /входит|выходит|покида[ею]т|подходит к|отходит от/iu, /входить|виходить|залиша[єе]|підходить до|відходить від/iu, /entra|sale|se acerca a|se aleja de/iu] },
-  { type: 'speech', patterns: [/\\b(?:says?|asks?|replies?|shouts?|whispers?|tells?)\\b/iu, /говорит|спрашива[ею]т|отвеча[ею]т|кричит|шепчет/iu, /каже|запитує|відповіда[єе]|кричить|шепоче/iu, /dice|pregunta|responde|grita|susurra/iu] }
+  { type: 'visual_attention', patterns: [/\b(?:sees?|spots?|notices?|observes?|looks? at|stares? at)\b/iu, /видит|замеча[ею]т|смотрит на|наблюда[ею]т/iu, /бачить|поміча[єе]|дивиться на|спостеріга[єе]/iu, /ve|observa|mira a|nota/iu] },
+  { type: 'auditory_attention', patterns: [/\b(?:hears?|listens? to|overhears?)\b/iu, /слышит|прислушива[ею]тся|услышал/iu, /чує|прислуха[єе]ться|почув/iu, /oye|escucha/iu] },
+  { type: 'touch_contact', patterns: [/\b(?:touches?|feels?|grabs?|picks? up|catches?)\b/iu, /трога[ею]т|касается|хвата[ею]т|подбира[ею]т|ловит/iu, /торка[єе]ться|доторка[єе]ться|хапа[єе]|підбира[єе]|ловить/iu, /toca|agarra|recoge|atrapa/iu] },
+  { type: 'object_possession', patterns: [/\b(?:holds?|carries?|wears?|keeps?)\b/iu, /держит|нес[её]т|носит/iu, /трима[єе]|несе|носить/iu, /sostiene|lleva|porta/iu] },
+  { type: 'spatial_entry', patterns: [/\b(?:enters?|exits?|leaves?|approaches?|moves away from)\b/iu, /входит|выходит|покида[ею]т|подходит к|отходит от/iu, /входить|виходить|залиша[єе]|підходить до|відходить від/iu, /entra|sale|se acerca a|se aleja de/iu] },
+  { type: 'speech', patterns: [/\b(?:says?|asks?|replies?|shouts?|whispers?|tells?)\b/iu, /говорит|спрашива[ею]т|отвеча[ею]т|кричит|шепчет/iu, /каже|запитує|відповіда[єе]|кричить|шепоче/iu, /dice|pregunta|responde|grita|susurra/iu] }
 ];
-const escapeRegex = value => String(value).replace(/[.*+?^|[\]\\\\]/g, '\\\\$&');
+const escapeRegex = value => String(value).replace(/[.*+?^|[\]\\]/g, '\\$&');
 function containsName(source, name) {
-  return new RegExp('(?<![\\\\p{L}\\\\p{N}])' + escapeRegex(name) + '(?![\\\\p{L}\\\\p{N}])', 'iu').test(source);
+  return new RegExp('(?<![\\p{L}\\p{N}])' + escapeRegex(name) + '(?![\\p{L}\\p{N}])', 'iu').test(source);
 }
 function evidenceMatches(source, patterns, type) {
   const found = [];
@@ -25,7 +25,7 @@ function evidenceMatches(source, patterns, type) {
     let match;
     while ((match = scanner.exec(source))) {
       const prefix = source.slice(Math.max(0, match.index - 24), match.index);
-      if (!/(?:\\\\b(?:not|never|no|without|doesn't|don't|didn't)\\\\s*|не\\\\s*|ні\\\\s*)$/iu.test(prefix)) {
+      if (!/(?:\\b(?:not|never|no|without|doesn't|don't|didn't)\\s*|не\\s*|ні\\s*)$/iu.test(prefix)) {
         found.push({ type, evidence: match[0], startIndex: match.index, endIndex: match.index + match[0].length, confidence: 0.85 });
       }
       if (!match[0]) scanner.lastIndex++;
@@ -83,5 +83,5 @@ export function formatSceneUnderstandingForMotion(understanding = {}) {
     perception.length ? 'Perception cues: ' + perception.join(' | ') : 'Perception cues: none explicitly stated.',
     (understanding.unresolved || []).length ? 'Unresolved details (do not guess): ' + understanding.unresolved.map(item => item.intent + ' target unresolved').join('; ') : '',
     'Do not invent visual observations, participants, object ownership, physical contact, or consequences.'
-  ].filter(Boolean).join('\\n');
+  ].filter(Boolean).join('\n');
 }
