@@ -434,3 +434,48 @@ test('preserves the previous action pose through an idle gap before the next act
   assert.ok(Math.abs(afterTransition.rightArm.rotation) > Math.abs(duringTransition.rightArm.rotation),
     'the transition should progress toward the next action pose');
 });
+
+
+test('preserves reaction phase semantics for a second character after an authored attack', () => {
+  const scene = {
+    characters: ['Foxy', 'Bird'],
+    characterCastProvided: true,
+    storyDetail: 'Foxy attacks Bird. Bird raises both hands in response.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [
+        {
+          phase: 'action', start: 0.2, end: 0.55, actorId: 'Foxy',
+          description: 'Foxy attacks Bird', evidence: 'Foxy attacks Bird',
+          steps: [{
+            intent: 'attack', motionCue: 'attack', start: 0.2, end: 0.55,
+            actorId: 'Foxy', targetId: 'Bird',
+            description: 'Foxy attacks Bird', evidence: 'Foxy attacks Bird'
+          }]
+        },
+        {
+          phase: 'reaction', start: 0.56, end: 0.9, actorId: 'Bird',
+          description: 'Bird raises both hands in response',
+          evidence: 'Bird raises both hands in response',
+          steps: [{
+            intent: 'hands_up', motionCue: 'surprised', start: 0.56, end: 0.9,
+            actorId: 'Bird', targetId: 'Foxy',
+            description: 'Bird raises both hands in response',
+            evidence: 'Bird raises both hands in response'
+          }]
+        }
+      ]
+    }
+  };
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig('Foxy'), rig('Bird')]);
+  assert.equal(result.status, 'generated');
+  assert.deepEqual(
+    result.mappedActions.map(({ actorId, preset, phase }) => ({ actorId, preset, phase })),
+    [
+      { actorId: 'Foxy', preset: 'attack', phase: 'action' },
+      { actorId: 'Bird', preset: 'hands_up', phase: 'reaction' }
+    ]
+  );
+  assert.ok(sampleCharacterRigTimeline(result.timeline, 0.4).Foxy);
+  assert.ok(sampleCharacterRigTimeline(result.timeline, 0.72).Bird);
+});
