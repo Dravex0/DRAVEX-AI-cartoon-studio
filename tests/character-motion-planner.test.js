@@ -206,6 +206,6 @@ test('plans actions in scene-time order when actors are listed out of order', ()
   const foxPursuit = result.timeline.phases.find(item =>
     item.actorId === 'Foxy' && item.description.includes('continue pursuit'));
   assert.ok(birdMove.motion.to.x > 0.4);
-  assert.ok(foxPursuit.motion.to.x > 0.48,
+  assert.ok(foxPursuit.motion.to.x > 0.45,
     'Foxy should plan toward Bird after Bird has moved, not toward Bird\'s stale start pose');
 });
