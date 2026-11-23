@@ -326,3 +326,15 @@ test('attaches source-grounded scene understanding to each production scene', ()
   assert.match(scene.motionGenerationPrompt, /Source-grounded scene understanding/);
   assert.match(scene.motionGenerationPrompt, /Do not invent visual observations/);
 });
+
+test('storyboard carries a persistent object snapshot into the next scene', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — a small orange fox.\n\nScene 1: The key\nFoxy picks up the silver key.\n\nScene 2: The gate\nFoxy walks through the ancient gate.',
+    'en',
+    'Foxy'
+  );
+  assert.ok(result.scenes[0].stateSnapshot.some(item => item.entityId === 'silver key'
+    && item.property === 'holder' && item.value === 'Foxy'));
+  assert.ok(result.scenes[1].stateSnapshot.some(item => item.entityId === 'silver key'
+    && item.property === 'holder' && item.value === 'Foxy'));
+});
