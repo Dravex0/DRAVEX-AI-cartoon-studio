@@ -96,7 +96,10 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       ...step,
       actorId: clean(step.actorId) || clean(phase.actorId),
       targetId: clean(step.targetId) || clean(phase.targetId),
-      evidence: clean(step.evidence) || clean(phase.evidence)
+      evidence: clean(step.evidence) || clean(phase.evidence),
+      gripHand: clean(step.gripHand) || clean(phase.gripHand),
+      fromGripHand: clean(step.fromGripHand) || clean(phase.fromGripHand),
+      toGripHand: clean(step.toGripHand) || clean(phase.toGripHand)
     })) : [])
     .filter(step => Number.isFinite(step?.start) && Number.isFinite(step?.end)
       && step.start >= 0 && step.start < step.end && step.end <= 1);
@@ -176,7 +179,10 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     const entityId = clean(history[0].entityId);
     const interval = (phaseEnd - phaseStart) / Math.max(1, history.length);
     let holder = history[0].previousValue ?? null;
-    let from = holderPoint(holder, history[0].position, history[0].fromGripHand || history[0].gripHand || history[0].hand);
+    const firstMatchedStep = matchedStepByChange.get(history[0]);
+    let from = holderPoint(holder, history[0].position,
+      history[0].fromGripHand || history[0].gripHand
+        || firstMatchedStep?.fromGripHand || firstMatchedStep?.gripHand || history[0].hand);
     let to = from;
     let held = holder != null;
     let activeEvidence = clean(history[0].evidence);
@@ -190,8 +196,12 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       const end = matchedStep ? matchedStep.end : start + interval;
       const nextHolder = change.value ?? null;
       if (p < start) break;
-      from = holderPoint(holder, change.position, change.fromGripHand || change.gripHand || change.hand);
-      to = holderPoint(nextHolder, change.position, change.toGripHand || change.gripHand || change.hand);
+      const fromGripHand = change.fromGripHand || change.gripHand
+        || matchedStep?.fromGripHand || matchedStep?.gripHand || change.hand;
+      const toGripHand = change.toGripHand || change.gripHand
+        || matchedStep?.toGripHand || matchedStep?.gripHand || change.hand;
+      from = holderPoint(holder, change.position, fromGripHand);
+      to = holderPoint(nextHolder, change.position, toGripHand);
       activeEvidence = clean(change.evidence);
       activeIndex = index;
       if (p <= end) {
@@ -212,7 +222,10 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     }
 
     const finalPositionChange = history[activeIndex >= 0 ? activeIndex : 0];
-    const point = holderPoint(holder, finalPositionChange?.position, finalPositionChange?.toGripHand || finalPositionChange?.gripHand || finalPositionChange?.hand);
+    const finalMatchedStep = matchedStepByChange.get(finalPositionChange);
+    const point = holderPoint(holder, finalPositionChange?.position,
+      finalPositionChange?.toGripHand || finalPositionChange?.gripHand
+        || finalMatchedStep?.toGripHand || finalMatchedStep?.gripHand || finalPositionChange?.hand);
     return {
       id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
       rotation: point.rotation || 0, held, visible: true, scale: 1,
