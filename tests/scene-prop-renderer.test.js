@@ -586,3 +586,19 @@ test('classifies common interactive props into dedicated visual forms', () => {
   const plan = buildScenePropRenderPlan(scene, layers, 1);
   assert.deepEqual(plan.map(item => [item.id, item.kind]), names);
 });
+
+test('distinguishes furniture, natural objects and support surfaces', () => {
+  const names = [
+    ['wooden table', 'table'], ['wooden chair', 'chair'],
+    ['oak tree', 'tree'], ['large rock', 'rock'], ['stone platform', 'platform']
+  ];
+  const scene = {
+    stateChanges: names.map(([entityId]) => ({
+      entityType: 'prop', entityId, property: 'holder',
+      previousValue: null, value: 'Foxy', actorId: 'Foxy',
+      evidence: `Foxy moves beside the ${entityId}.`
+    }))
+  };
+  const plan = buildScenePropRenderPlan(scene, [{ characterId: 'Foxy', x: 0.5, y: 0.65 }], 1);
+  assert.deepEqual(plan.map(item => [item.id, item.kind]), names);
+});
