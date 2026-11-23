@@ -308,7 +308,7 @@ test('wires an explicitly named chase into the action timeline and ordered motio
 
 test('attaches source-grounded scene understanding to each production scene', () => {
   const result = buildStoryboardFromText(
-    'Characters:\\nFoxy — an orange fox.\\nBird — a yellow bird.\\n\\nScene 1: Discovery\\nFoxy sees a key, hears a sound, and picks up the key.',
+    'Characters:\nFoxy — an orange fox.\nBird — a yellow bird.\n\nScene 1: Discovery\nFoxy sees a key, hears a sound, and picks up the key.',
     'en',
     'Foxy'
   );
