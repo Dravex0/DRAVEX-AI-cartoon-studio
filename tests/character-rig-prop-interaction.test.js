@@ -78,7 +78,7 @@ test('keeps a picked-up prop attached to the same animated hand through the next
   };
 
   const compiled = createCharacterRigTimelineFromActionTimeline(scene, [rig]);
-  assert.equal(compiled.status, 'generated');
+  assert.equal(compiled.status, 'generated', JSON.stringify(compiled));
   assert.equal(compiled.generatedCount, 2);
   assert.equal(compiled.mappedActions[0].targetedReach, 'solved');
 
