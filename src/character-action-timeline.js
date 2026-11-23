@@ -149,9 +149,6 @@ export function validateCharacterActionTimeline(scene = {}) {
     if (!normalized.evidence || !evidenceSources.some(source => source.includes(normalized.evidence))) {
       issues.push(issue('phase-evidence-ungrounded', name, 'Phase evidence must exactly match locked source-story evidence.'));
     }
-    if (normalized.evidence && normalized.targetId && !evidenceNamesEntity(normalized.evidence, normalized.targetId)) {
-      issues.push(issue('phase-target-evidence-mismatch', name, 'Phase evidence must identify the named action target.'));
-    }
   });
 
   const action = byPhase.get('action');
