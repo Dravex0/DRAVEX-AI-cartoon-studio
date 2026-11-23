@@ -132,6 +132,50 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
         expectedPreviousValue: previous, declaredPreviousValue: declaredPrevious });
     }
 
+    // Add physical relations only when the event's exact evidence is present
+    // in this scene. Unverified event metadata never enters the world graph.
+    const rawPhysicsEvents = Array.isArray(scene.physicsEvents) ? scene.physicsEvents : [];
+    for (const physical of rawPhysicsEvents.filter(record)) {
+      const evidence = clean(physical.evidence, 500);
+      const evidenceGrounded = Boolean(evidence && (
+        sourceText.includes(evidence)
+        || (Array.isArray(scene.sourceEvents) ? scene.sourceEvents : []).some(item =>
+          typeof item === 'string' ? item.includes(evidence)
+            : record(item) && ['evidence', 'text', 'description'].some(field =>
+              typeof item[field] === 'string' && item[field].includes(evidence)))
+      ));
+      if (!evidenceGrounded) continue;
+      const type = clean(physical.type, 40).toLocaleLowerCase();
+      const entityId = clean(physical.entityId, 160);
+      const actorId = clean(physical.actorId, 160);
+      const targetId = clean(physical.targetId, 160);
+      const otherEntityId = clean(physical.otherEntityId, 160);
+      const supportEntityId = clean(physical.supportEntityId, 160);
+      const fromEntityId = clean(physical.fromEntityId, 160);
+      const toEntityId = clean(physical.toEntityId, 160);
+      const entityKind = entityId && participantKeys.has(keyOf(entityId)) ? 'character' : 'prop';
+      if (entityId) addEntity(entities, entityId, entityKind, sceneId);
+      if (actorId) addEntity(entities, actorId, 'character', sceneId);
+      if (targetId) addActionTarget(targetId);
+      if (otherEntityId) addEntity(entities, otherEntityId,
+        participantKeys.has(keyOf(otherEntityId)) ? 'character' : 'entity', sceneId);
+      if (supportEntityId) addEntity(entities, supportEntityId, 'surface', sceneId);
+      if (fromEntityId) addEntity(entities, fromEntityId, 'character', sceneId);
+      if (toEntityId) addEntity(entities, toEntityId, 'character', sceneId);
+      const event = { type: 'physics_' + (type || 'event'), actorId: actorId || null,
+        entityId: entityId || null, targetId: targetId || null,
+        otherEntityId: otherEntityId || null, supportEntityId: supportEntityId || null,
+        fromEntityId: fromEntityId || null, toEntityId: toEntityId || null, evidence };
+      sceneEvents.push(event);
+      if (actorId && entityId) addRelation({ type: 'physical_action', from: actorId, to: entityId, action: type, evidence });
+      if (entityId && otherEntityId) addRelation({ type: 'physical_contact', from: entityId, to: otherEntityId, action: type, evidence });
+      if (entityId && supportEntityId) addRelation({ type: 'supported_by', from: entityId, to: supportEntityId, action: type, evidence });
+      if (fromEntityId && toEntityId && entityId) {
+        addRelation({ type: 'transfers_ownership', from: fromEntityId, to: toEntityId,
+          action: type, property: 'holder', value: entityId, evidence });
+      }
+    }
+
     const timeline = scene.actionTimeline;
     for (const phase of (Array.isArray(timeline?.phases) ? timeline.phases : [])) {
       if (!record(phase)) continue;
