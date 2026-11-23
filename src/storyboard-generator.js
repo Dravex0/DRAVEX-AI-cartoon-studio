@@ -194,7 +194,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     // Route each scene independently: a mixed story may need dialogue in one beat
     // and chase/combat choreography in another. The classifier never changes source events.
     scene.promptApproach = classifyPromptApproach(scene.storyDetail || source);
-    Object.assign(scene, applyPromptApproach({ motionPrompt: scene.motionPrompt }, scene.promptApproach));
+    Object.assign(scene, applyPromptApproach(scene, scene.promptApproach));
     // Add one action phase only when source text supports a movement, semantic event,
     // or directed interaction. Never fabricate setup/reaction/aftermath phases.
     const sourceAction = detectSceneAction(scene.storyDetail);
