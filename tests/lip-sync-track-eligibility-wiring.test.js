@@ -10,3 +10,11 @@ test("WebM export filters lip-sync analysis to renderable facial mouths", () => 
   assert.match(app, /нет доступного лицевого рига с ртом или встроенного персонажа предпросмотра/i);
   assert.doesNotMatch(app, /return track\.characterName\.trim\(\)\.toLowerCase\(\)===mainCharacterKey\|\|hasFacialRig/);
 });
+
+
+test("procedural demo lip-sync is bound to the canonical storyboard protagonist", () => {
+  const app = readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+  assert.ok(app.includes('import { findActiveCharacterLipSyncTrack, sampleCharacterFacialLipSync } from "./facial-lipsync-runtime.js";'));
+  assert.ok(app.includes('const mainCharacterKey=String(currentStoryboardPlan?.sourceCharacter||$("character").value||"").trim();'));
+  assert.ok(app.includes("const fallbackCharacterKey=String(currentStoryboardPlan?.sourceCharacter||$('character').value||'').trim();const activeMouthTrack=findActiveCharacterLipSyncTrack(activeMouthTracks,sceneIndex,exportElapsedMs,fallbackCharacterKey,fallbackCharacterKey);"));
+});

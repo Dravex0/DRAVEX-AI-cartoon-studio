@@ -52,15 +52,17 @@ test('full-film export waits for character images before starting MediaRecorder'
 });
 
 
-test('direct WebM export applies the shared character-visual gate before MediaRecorder starts', () => {
+test('local-canvas WebM export applies the character-visual gate while full-film video export still requires decoded clips', () => {
   const start = appSource.indexOf('async function exportFilm(');
   const end = appSource.indexOf("$('export').onclick", start);
   assert.ok(start >= 0 && end > start, 'exportFilm must be present');
   const block = appSource.slice(start, end);
-  const gate = block.indexOf('getMissingCharacterVisualCount(exportProtagonistId)');
-  const blockedMessage = block.indexOf('background-only export is blocked');
+  const gate = block.indexOf('const missingCharacterAssetCount=requireAllVideos?0:getMissingCharacterVisualCount(exportProtagonistId)');
+  const blockedMessage = block.indexOf('for local Canvas export');
   const recorder = block.indexOf('recorder.start(250);');
-  assert.ok(gate >= 0, 'direct export must use the shared character-visual readiness check');
-  assert.ok(blockedMessage > gate, 'missing character visuals must produce an explicit blocker');
-  assert.ok(recorder > blockedMessage, 'MediaRecorder must not start after a blocked visual preflight');
+  const videoSnapshot = block.indexOf('assertRequiredSceneSnapshot()');
+  assert.ok(gate >= 0, 'sprite/rig readiness must gate direct local-canvas export but not full-film video mode');
+  assert.ok(blockedMessage > gate, 'missing local character visuals must produce an explicit blocker');
+  assert.ok(recorder > blockedMessage, 'MediaRecorder must not start after a blocked local visual preflight');
+  assert.ok(videoSnapshot > gate, 'full-film video mode must still validate the complete decoded scene-video snapshot');
 });

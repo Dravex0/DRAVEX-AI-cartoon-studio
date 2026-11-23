@@ -13,13 +13,27 @@ function profileAppearance(profile = {}) {
 }
 
 function characterIdentitySeed(characterId, appearance) {
-  const source = key(characterId) + '|' + key(appearance);
+  const source = clean(characterId, 120).toLocaleLowerCase() + '|' + clean(appearance, 8000).toLocaleLowerCase();
   let hash = 0x811c9dc5;
   for (let index = 0; index < source.length; index++) {
     hash ^= source.charCodeAt(index);
     hash = Math.imul(hash, 0x01000193);
   }
   return hash >>> 0;
+}
+
+function characterSpriteAssetFingerprint(characterId, appearance, action) {
+  const source = [
+    clean(characterId, 120).toLocaleLowerCase(),
+    clean(appearance, 8000).toLocaleLowerCase(),
+    clean(action, 1000).toLocaleLowerCase()
+  ].join('|');
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < source.length; index++) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash.toString(16).padStart(8, '0');
 }
 
 function characterAction(scene, characterId, castSize) {
@@ -33,7 +47,7 @@ function characterAction(scene, characterId, castSize) {
     return [...new Set(phases)].join(' ');
   }
   // A general action can be assigned safely only when the scene has one character.
-  return castSize === 1 ? clean(scene.visibleAction, 1000) : '';
+  return castSize === 1 ? clean(scene.visibleAction || scene.motionPrompt, 1000) : '';
 }
 
 /**
@@ -81,7 +95,8 @@ export function buildCharacterSpriteAssetPlan(scene = {}, characterBible = []) {
     ].filter(Boolean).join(' ');
 
     return {
-      assetId: `${clean(scene.id, 120) || 'scene'}:${characterId}`,
+      // Include canonical appearance and this scene's action so edits cannot reuse a stale pose.
+      assetId: `${clean(scene.id, 120) || 'scene'}:${clean(characterId, 80)}:${characterSpriteAssetFingerprint(characterId, appearance, action)}`,
       sceneId: clean(scene.id, 120),
       characterId,
       order: index,
@@ -100,6 +115,18 @@ export function buildCharacterSpriteAssetPlan(scene = {}, characterBible = []) {
       issues
     };
   });
+}
+
+/**
+ * True only when a saved sprite still matches the current scene action and
+ * canonical character appearance. Old assets remain inspectable but cannot
+ * overwrite the current character layer after an edit.
+ */
+export function isCurrentCharacterSpriteAsset(scene = {}, characterBible = [], asset = {}) {
+  const assetId = clean(asset?.assetId, 240);
+  if (!assetId) return false;
+  return buildCharacterSpriteAssetPlan(scene, characterBible)
+    .some(plan => plan.status === 'ready' && plan.assetId === assetId);
 }
 
 export const CHARACTER_SPRITE_SCENE_LIMIT = MAX_SPRITES_PER_SCENE;

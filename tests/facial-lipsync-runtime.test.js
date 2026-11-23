@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sampleCharacterFacialLipSync, sceneHasFacialRigForSpeaker } from "../src/facial-lipsync-runtime.js";
+import { findActiveCharacterLipSyncTrack, sampleCharacterFacialLipSync, sceneHasFacialRigForSpeaker } from "../src/facial-lipsync-runtime.js";
 
 function track(characterId, sceneIndex, startMs, shapes, openness) {
   return {
@@ -81,4 +81,22 @@ test("matches facial rigs only to the corresponding dialogue speaker", () => {
 test("does not treat the existence of an unrelated rig as a speaker match", () => {
   const rigs = [{ characterId: "Foxy", parts: [{ id: "mouth" }] }];
   assert.equal(sceneHasFacialRigForSpeaker(rigs, "Owl", "Owl"), false);
+});
+
+
+test("selects the main character mouth track when another speaker is active in the same scene", () => {
+  const owl = track("Owl", 0, 0, ["round", "round"], [0.9, 0.9]);
+  owl.characterName = "Old Owl";
+  const foxy = track("Foxy", 0, 50, ["wide", "open"], [0.6, 0.8]);
+  const selected = findActiveCharacterLipSyncTrack([owl, foxy], 0, 100, "Foxy", "Foxy");
+  assert.equal(selected, foxy);
+});
+
+test("uses the latest active cue for the requested character and ignores other scenes", () => {
+  const first = track("Foxy", 0, 0, ["wide", "wide"], [0.4, 0.4]);
+  const second = track("Foxy", 0, 50, ["round", "round"], [0.9, 0.9]);
+  const otherScene = track("Foxy", 1, 70, ["open", "open"], [1, 1]);
+  assert.equal(findActiveCharacterLipSyncTrack([first, otherScene, second], 0, 100, "Foxy"), second);
+  assert.equal(findActiveCharacterLipSyncTrack([first], 0, 250, "Foxy"), null);
+  assert.equal(findActiveCharacterLipSyncTrack([first], 0, 100, "Owl"), null);
 });

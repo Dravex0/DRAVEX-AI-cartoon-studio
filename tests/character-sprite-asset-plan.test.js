@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCharacterSpriteAssetPlan, CHARACTER_SPRITE_SCENE_LIMIT } from '../src/character-sprite-asset-plan.js';
+import { buildCharacterSpriteAssetPlan, isCurrentCharacterSpriteAsset, CHARACTER_SPRITE_SCENE_LIMIT } from '../src/character-sprite-asset-plan.js';
+import { buildCharacterSpriteBatchPlan, mergeCharacterSpriteSceneOverrides } from '../src/character-sprite-batch-plan.js';
 
 const bible = [
   { characterId: 'Foxy', species: 'Anthropomorphic fox', visualDescription: 'Small orange fox', clothing: 'Blue scarf', distinctiveFeatures: 'White tail tip' },
@@ -103,4 +104,152 @@ test('changes the identity seed when the canonical appearance changes', () => {
     id: 'scene-1', characters: ['Foxy'], visibleAction: 'Foxy waves.'
   }, [{ ...bible[0], clothing: 'Green coat' }])[0];
   assert.notEqual(original.identitySeed, redesigned.identitySeed);
+});
+
+test('builds sprite plans for every scene and preserves scene-specific actions', () => {
+  const scenes = [
+    { id: 'scene-a', characters: ['Foxy'], visibleAction: 'Foxy waves.' },
+    { id: 'scene-b', characters: ['Foxy'], visibleAction: 'Foxy runs.' }
+  ];
+  const batch = buildCharacterSpriteBatchPlan(scenes, bible);
+  assert.equal(batch.length, 2);
+  assert.equal(batch[0].plans[0].sceneId, 'scene-a');
+  assert.match(batch[0].plans[0].action, /waves/);
+  assert.match(batch[1].plans[0].action, /runs/);
+  assert.notEqual(batch[0].plans[0].assetId, batch[1].plans[0].assetId);
+  assert.equal(batch[0].plans[0].identitySeed, batch[1].plans[0].identitySeed);
+});
+
+test('applies unsaved editor overrides only to the currently open scene', () => {
+  const scenes = [
+    { id: 'scene-a', characters: ['Foxy'], visibleAction: 'Saved action A.' },
+    { id: 'scene-b', characters: ['Bird'], visibleAction: 'Saved action B.' }
+  ];
+  const batch = buildCharacterSpriteBatchPlan(scenes, bible, {
+    currentSceneIndex: 1,
+    currentSceneOverrides: { characters: ['Foxy'], visibleAction: 'Unsaved action B.' }
+  });
+  assert.equal(batch[0].plans[0].characterId, 'Foxy');
+  assert.match(batch[0].plans[0].action, /Saved action A/);
+  assert.equal(batch[1].plans[0].characterId, 'Foxy');
+  assert.match(batch[1].plans[0].action, /Unsaved action B/);
+  assert.equal(scenes[1].characters[0], 'Bird');
+});
+
+test('keeps scenes without cast out of the batch and returns no plans for invalid input', () => {
+  assert.deepEqual(buildCharacterSpriteBatchPlan([{ id: 'empty', characters: [] }], bible), []);
+  assert.deepEqual(buildCharacterSpriteBatchPlan(null, bible), []);
+});
+
+test('uses saved motion prompts as scene actions when no explicit visibleAction exists', () => {
+  const batch = buildCharacterSpriteBatchPlan([
+    { id: 'scene-motion', characters: ['Foxy'], motionPrompt: 'Foxy jumps over a log.' }
+  ], bible);
+  assert.equal(batch[0].plans[0].status, 'ready');
+  assert.match(batch[0].plans[0].action, /jumps over a log/);
+});
+
+
+test('merges sprite editor overrides into a scene snapshot and synchronizes the canonical image prompt', () => {
+  const saved = {
+    id: 'scene-edit',
+    title: 'Saved title',
+    prompt: 'Saved image prompt',
+    imagePrompt: 'Saved image prompt',
+    motionPrompt: 'Saved action',
+    visibleAction: 'Saved action',
+    characters: ['Bird']
+  };
+  const updated = mergeCharacterSpriteSceneOverrides(saved, {
+    title: 'Edited title',
+    imagePrompt: 'Edited image prompt',
+    motionPrompt: 'Foxy jumps.',
+    visibleAction: 'Foxy jumps.',
+    characters: ['Foxy']
+  });
+  assert.equal(updated.title, 'Edited title');
+  assert.equal(updated.prompt, 'Edited image prompt');
+  assert.equal(updated.imagePrompt, 'Edited image prompt');
+  assert.equal(updated.visibleAction, 'Foxy jumps.');
+  assert.deepEqual(updated.characters, ['Foxy']);
+  assert.equal(saved.title, 'Saved title');
+  assert.equal(saved.prompt, 'Saved image prompt');
+  assert.deepEqual(saved.characters, ['Bird']);
+});
+
+
+test('changes a scene sprite asset ID when the character action changes but keeps the identity seed', () => {
+  const waving = buildCharacterSpriteAssetPlan({
+    id: 'scene-action',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves to the camera.'
+  }, bible)[0];
+  const running = buildCharacterSpriteAssetPlan({
+    id: 'scene-action',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy runs toward the gate.'
+  }, bible)[0];
+  const repeated = buildCharacterSpriteAssetPlan({
+    id: 'scene-action',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves to the camera.'
+  }, bible)[0];
+
+  assert.notEqual(waving.assetId, running.assetId);
+  assert.equal(waving.assetId, repeated.assetId);
+  assert.equal(waving.identitySeed, running.identitySeed);
+});
+
+test('changes a scene sprite asset ID when canonical character appearance changes', () => {
+  const original = buildCharacterSpriteAssetPlan({
+    id: 'scene-appearance',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves.'
+  }, bible)[0];
+  const redesigned = buildCharacterSpriteAssetPlan({
+    id: 'scene-appearance',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves.'
+  }, [{ ...bible[0], clothing: 'Green coat' }])[0];
+
+  assert.notEqual(original.assetId, redesigned.assetId);
+  assert.notEqual(original.identitySeed, redesigned.identitySeed);
+  assert.ok(original.assetId.length <= 240);
+});
+
+
+test('includes long canonical appearance fields in the sprite fingerprint and identity seed', () => {
+  const longDescription = 'A'.repeat(160);
+  const first = buildCharacterSpriteAssetPlan({
+    id: 'scene-long-appearance',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves.'
+  }, [{ ...bible[0], visualDescription: longDescription + ' red markings' }])[0];
+  const changed = buildCharacterSpriteAssetPlan({
+    id: 'scene-long-appearance',
+    characters: ['Foxy'],
+    visibleAction: 'Foxy waves.'
+  }, [{ ...bible[0], visualDescription: longDescription + ' blue markings' }])[0];
+
+  assert.notEqual(first.assetId, changed.assetId);
+  assert.notEqual(first.identitySeed, changed.identitySeed);
+});
+
+
+test('rejects stored sprite assets when the scene action or canonical appearance has changed', () => {
+  const scene = { id: 'scene-currentness', characters: ['Foxy'], visibleAction: 'Foxy waves.' };
+  const asset = { assetId: buildCharacterSpriteAssetPlan(scene, bible)[0].assetId };
+  assert.equal(isCurrentCharacterSpriteAsset(scene, bible, asset), true);
+  assert.equal(isCurrentCharacterSpriteAsset({ ...scene, visibleAction: 'Foxy runs.' }, bible, asset), false);
+  assert.equal(isCurrentCharacterSpriteAsset(scene, [{ ...bible[0], clothing: 'Green coat' }, bible[1]], asset), false);
+  assert.equal(isCurrentCharacterSpriteAsset(scene, [], asset), false);
+});
+
+
+test('uses a saved motion prompt as the current action when visibleAction is absent', () => {
+  const scene = { id: 'scene-motion-current', characters: ['Foxy'], motionPrompt: 'Foxy jumps over a log.' };
+  const plan = buildCharacterSpriteAssetPlan(scene, bible)[0];
+  assert.equal(plan.status, 'ready');
+  assert.match(plan.action, /jumps over a log/);
+  assert.equal(isCurrentCharacterSpriteAsset(scene, bible, { assetId: plan.assetId }), true);
 });

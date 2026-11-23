@@ -65,7 +65,7 @@ import { buildExportTimeline } from "./export-timeline.js";
 import { captureFilmSceneSnapshot, matchesFilmSceneSnapshot } from "./film-scene-snapshot.js";
 import { createSceneGenerationGuard } from "./scene-generation-guard.js";
 import { buildAudioMouthEnvelope, sampleAudioMouthEnvelope } from "./audio-mouth-envelope.js";
-import { sampleCharacterFacialLipSync } from "./facial-lipsync-runtime.js";
+import { findActiveCharacterLipSyncTrack, sampleCharacterFacialLipSync } from "./facial-lipsync-runtime.js";
 import { createFaceLandmarkerWorkerClient } from "./face-landmarker-worker-client.js";
 import { sampleFaceLandmarkTimeline } from "./face-landmark-timeline.js";
 import { projectFaceLandmarkOverlay } from "./face-landmark-overlay.js";
@@ -91,7 +91,8 @@ import { upsertCharacterFacialPart, applyCharacterFacialExpressionToScene } from
 import { checkComfyUIConnection, createComfyUIVideoProvider } from "./comfyui-video-provider.js";
 import { createVideoProviderRegistry, generateVideoWithProvider } from "./video-provider-contract.js";
 import { buildImageGenerationPrompt, buildMotionGenerationPrompt, buildSceneIdentitySeed, sceneHasSavedCharacterImageReference, validateSceneProductionReadiness } from "./scene-production.js";
-import { buildCharacterSpriteAssetPlan } from "./character-sprite-asset-plan.js";
+import { buildCharacterSpriteAssetPlan, isCurrentCharacterSpriteAsset } from "./character-sprite-asset-plan.js";
+import { buildCharacterSpriteBatchPlan, mergeCharacterSpriteSceneOverrides } from "./character-sprite-batch-plan.js";
 import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
 import { generateCharacterSpriteAsset } from "./character-sprite-generation.js";
@@ -866,7 +867,7 @@ async function startSceneVoicePreview(index=sceneIndex){
   if(token===previewVoiceRequestToken){previewMouthTracks=[];previewMouthOriginTimeMs=null;$("status").textContent=(uiLang==="ru"?"Голосовой предпросмотр не запущен: ":"Voice preview could not start: ")+(error.message||"Unknown error");}
  }
 }
-function draw(){const animationTimeMs=animationClock.advance(performance.now(),playing),dimensions=getCanvasDimensions(activeCanvasFormat),w=dimensions.logicalWidth,h=dimensions.logicalHeight,t=animationTimeMs/1000;ctx.setTransform(canvas.width/w,0,0,canvas.height/h,0,0);ctx.clearRect(0,0,w,h);const g=ctx.createLinearGradient(0,0,0,h);const paletteSets={ 'Storybook':[['#29274d','#132b3b'],['#49304e','#192b46'],['#193f45','#102735'],['#4b3440','#20243c'],['#243c55','#102c38']], 'Anime-inspired':[['#40265f','#132b4c'],['#702f62','#172d52'],['#124e67','#172044'],['#713b48','#211c46'],['#3b3978','#12394a']], 'Flat 2D':[['#83c5be','#277da1'],['#ffafcc','#6d597a'],['#90be6d','#277da1'],['#f9c74f','#577590'],['#bde0fe','#5e548e']], 'Pixel art':[['#312e2e','#1d3557'],['#6a4c93','#1982c4'],['#386641','#1d3557'],['#bc4749','#283618'],['#3a506b','#0b132b']]};const scenePalettes=paletteSets[$('style').value]||paletteSets['Storybook'];const palette=scenePalettes[sceneIndex%scenePalettes.length];g.addColorStop(0,palette[0]);g.addColorStop(1,palette[1]);ctx.fillStyle=g;ctx.fillRect(0,0,w,h);for(let i=0;i<45;i++){let x=(i*97+25)%w,y=(i*53+17)%(h*.61);ctx.fillStyle='rgba(255,255,255,'+(0.25+0.45*Math.abs(Math.sin(t+i)))+')';ctx.fillRect(x,y,2,2)}ctx.fillStyle=sceneIndex===1?'#25434a':sceneIndex===2?'#244c3b':'#183b38';ctx.beginPath();ctx.ellipse(w/2,h*1.03,w*.453,h*.278,0,0,Math.PI*2);ctx.fill();for(let i=0;i<7;i++){let x=(i+.25)*w/7,baseY=h*.86,peakY=h*.43+(i%3)*h*.0694;ctx.fillStyle='#172d36';ctx.beginPath();ctx.moveTo(x,baseY);ctx.lineTo(x+w*.07,peakY);ctx.lineTo(x+w*.14,baseY);ctx.fill()}const currentSceneData=sceneMetadata[sceneIndex]||{title:titles[sceneIndex],visibleAction:descriptions[sceneIndex],prompt:descriptions[sceneIndex]};drawProceduralSceneEnvironment(ctx,currentSceneData,w,h,t);if(sceneMotionSceneIndex!==sceneIndex){sceneMotionSceneIndex=sceneIndex;sceneMotionStartTimeMs=animationTimeMs;rigPreviewProgress=null;if($('characterRigScrubber')){$('characterRigScrubber').value='0';$('characterRigScrubberValue').textContent='Scene clock'}syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(currentSceneData.id||('scene-index-'+sceneIndex)),shouldPlay:playing,restart:exportMouthOriginTimeMs===null})}const sceneDurationRaw=Number(currentSceneData.durationSeconds??$('duration').value);const sceneDuration=Number.isFinite(sceneDurationRaw)&&sceneDurationRaw>=0.25&&sceneDurationRaw<=30?sceneDurationRaw:3;const sceneMotionProgress=Math.max(0,Math.min(1,(animationTimeMs-sceneMotionStartTimeMs)/(sceneDuration*1000)));const rigAnimationProgress=rigPreviewProgress===null?sceneMotionProgress:rigPreviewProgress;const previousSceneData=sceneIndex>0?(sceneMetadata[sceneIndex-1]||{title:titles[sceneIndex-1],visibleAction:descriptions[sceneIndex-1],prompt:descriptions[sceneIndex-1]}):null;const previousScale=previousSceneData?calculateCinematicShot({...previousSceneData,beatIndex:sceneIndex-1}).shotScale:null;const directorShot=calculateCinematicShot({...currentSceneData,beatIndex:sceneIndex},previousScale);const cameraPlan=directorShot.cameraTransform;const composition=getSceneComposition(activeCanvasFormat,sceneIndex);const starBase=[composition.star.x*w,composition.star.y*h];const foxBase=[composition.character.x*w,composition.character.y*h];const showDemoFox=shouldShowProceduralDemoCharacter({storyUsesFallback:currentStoryboardPlan?currentStoryboardPlan.proceduralDemoCharacter===true:!String($('character').value||'').trim(),hasCharacterLayers:hasRenderableCharacterLayer(currentSceneData,currentStoryboardPlan?.sourceCharacter||$('character').value),hasCharacterRig:hasRenderableCharacterRig(currentSceneData,currentStoryboardPlan?.sourceCharacter||$('character').value)});const sceneFocus=resolveSceneFocus({fallbackCharacterVisible:showDemoFox,actorPoint:{x:foxBase[0],y:foxBase[1]},propPoint:{x:starBase[0],y:starBase[1]},focusTarget:directorShot.focusTarget,viewportWidth:w,viewportHeight:h,requestedOffsetY:cameraPlan.offsetY});const focusX=sceneFocus.x,focusY=sceneFocus.y;const renderCameraPlan={...cameraPlan,offsetY:sceneFocus.offsetY};ctx.save();ctx.translate(w/2,h/2+renderCameraPlan.offsetY);ctx.scale(renderCameraPlan.zoom,renderCameraPlan.zoom);ctx.translate(-focusX,-focusY);const action=getSceneAction(sceneIndex,sceneMotionProgress);const activeMouthTracks=exportMouthOriginTimeMs!==null?exportMouthTracks:previewMouthTracks;const mouthClockOrigin=exportMouthOriginTimeMs!==null?exportMouthOriginTimeMs:previewMouthOriginTimeMs;const exportElapsedMs=mouthClockOrigin===null?-1:performance.now()-mouthClockOrigin;const facialLipSync=sampleCharacterFacialLipSync(activeMouthTracks,sceneIndex,exportElapsedMs);const activeMouthTrack=activeMouthTracks.find(track=>track.sceneIndex===sceneIndex&&exportElapsedMs>=track.startMs&&exportElapsedMs<track.startMs+track.envelope.durationMs);const mouthTrackTimeMs=activeMouthTrack?exportElapsedMs-activeMouthTrack.startMs:-1;const exportMouthOpenness=activeMouthTrack?sampleAudioMouthEnvelope(activeMouthTrack.envelope,mouthTrackTimeMs):0;const exportViseme=activeMouthTrack?sampleVisemeTimeline(activeMouthTrack.visemes,mouthTrackTimeMs):"neutral";let sx=320,sy=300;if(showDemoFox){sx=starBase[0]+Math.sin(t*1.5)*15;sy=starBase[1]+Math.cos(t*2)*12;if(action==='run'){sx+=Math.sin(t*2)*36;sy-=Math.abs(Math.sin(t*3))*10}else if(action==='float'){sy-=Math.abs(Math.sin(t*1.4))*24}else if(action==='vanish'){sx+=Math.sin(t)*4}const starPulse=1+Math.sin(t*3)*.08;const starScale=action==='magic'?1.35:action==='vanish'?Math.max(.08,1-((frame%45)/45)):action==='float'?.88:sceneIndex===1?1.18:sceneIndex===3?1.35:sceneIndex===4?.88:1; if(sceneIndex===3){ctx.save();ctx.translate(sx,sy);ctx.strokeStyle='rgba(255,229,138,'+(.35+.25*Math.abs(Math.sin(t*3)))+')';ctx.lineWidth=3;for(let ray=0;ray<8;ray++){const a=ray*Math.PI/4+t*.08;ctx.beginPath();ctx.moveTo(Math.cos(a)*34,Math.sin(a)*34);ctx.lineTo(Math.cos(a)*48,Math.sin(a)*48);ctx.stroke()}ctx.restore()}if(sceneIndex===4){for(let spark=0;spark<7;spark++){const a=spark*Math.PI*2/7+t*.35;const px=sx+Math.cos(a)*(24+Math.sin(t*2+spark)*5),py=sy+Math.sin(a)*(24+Math.sin(t*2+spark)*5);ctx.fillStyle='rgba(255,229,138,.8)';ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);ctx.fill()}}ctx.save();ctx.translate(sx,sy);ctx.scale(starScale*starPulse,starScale*starPulse);ctx.rotate(t*.25);ctx.shadowBlur=sceneIndex===3?38:25;ctx.shadowColor='#ffe58a';ctx.fillStyle='#ffe58a';ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?13:30;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.restore();}const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
+function draw(){const animationTimeMs=animationClock.advance(performance.now(),playing),dimensions=getCanvasDimensions(activeCanvasFormat),w=dimensions.logicalWidth,h=dimensions.logicalHeight,t=animationTimeMs/1000;ctx.setTransform(canvas.width/w,0,0,canvas.height/h,0,0);ctx.clearRect(0,0,w,h);const g=ctx.createLinearGradient(0,0,0,h);const paletteSets={ 'Storybook':[['#29274d','#132b3b'],['#49304e','#192b46'],['#193f45','#102735'],['#4b3440','#20243c'],['#243c55','#102c38']], 'Anime-inspired':[['#40265f','#132b4c'],['#702f62','#172d52'],['#124e67','#172044'],['#713b48','#211c46'],['#3b3978','#12394a']], 'Flat 2D':[['#83c5be','#277da1'],['#ffafcc','#6d597a'],['#90be6d','#277da1'],['#f9c74f','#577590'],['#bde0fe','#5e548e']], 'Pixel art':[['#312e2e','#1d3557'],['#6a4c93','#1982c4'],['#386641','#1d3557'],['#bc4749','#283618'],['#3a506b','#0b132b']]};const scenePalettes=paletteSets[$('style').value]||paletteSets['Storybook'];const palette=scenePalettes[sceneIndex%scenePalettes.length];g.addColorStop(0,palette[0]);g.addColorStop(1,palette[1]);ctx.fillStyle=g;ctx.fillRect(0,0,w,h);for(let i=0;i<45;i++){let x=(i*97+25)%w,y=(i*53+17)%(h*.61);ctx.fillStyle='rgba(255,255,255,'+(0.25+0.45*Math.abs(Math.sin(t+i)))+')';ctx.fillRect(x,y,2,2)}ctx.fillStyle=sceneIndex===1?'#25434a':sceneIndex===2?'#244c3b':'#183b38';ctx.beginPath();ctx.ellipse(w/2,h*1.03,w*.453,h*.278,0,0,Math.PI*2);ctx.fill();for(let i=0;i<7;i++){let x=(i+.25)*w/7,baseY=h*.86,peakY=h*.43+(i%3)*h*.0694;ctx.fillStyle='#172d36';ctx.beginPath();ctx.moveTo(x,baseY);ctx.lineTo(x+w*.07,peakY);ctx.lineTo(x+w*.14,baseY);ctx.fill()}const currentSceneData=sceneMetadata[sceneIndex]||{title:titles[sceneIndex],visibleAction:descriptions[sceneIndex],prompt:descriptions[sceneIndex]};drawProceduralSceneEnvironment(ctx,currentSceneData,w,h,t);if(sceneMotionSceneIndex!==sceneIndex){sceneMotionSceneIndex=sceneIndex;sceneMotionStartTimeMs=animationTimeMs;rigPreviewProgress=null;if($('characterRigScrubber')){$('characterRigScrubber').value='0';$('characterRigScrubberValue').textContent='Scene clock'}syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(currentSceneData.id||('scene-index-'+sceneIndex)),shouldPlay:playing,restart:exportMouthOriginTimeMs===null})}const sceneDurationRaw=Number(currentSceneData.durationSeconds??$('duration').value);const sceneDuration=Number.isFinite(sceneDurationRaw)&&sceneDurationRaw>=0.25&&sceneDurationRaw<=30?sceneDurationRaw:3;const sceneMotionProgress=Math.max(0,Math.min(1,(animationTimeMs-sceneMotionStartTimeMs)/(sceneDuration*1000)));const rigAnimationProgress=rigPreviewProgress===null?sceneMotionProgress:rigPreviewProgress;const previousSceneData=sceneIndex>0?(sceneMetadata[sceneIndex-1]||{title:titles[sceneIndex-1],visibleAction:descriptions[sceneIndex-1],prompt:descriptions[sceneIndex-1]}):null;const previousScale=previousSceneData?calculateCinematicShot({...previousSceneData,beatIndex:sceneIndex-1}).shotScale:null;const directorShot=calculateCinematicShot({...currentSceneData,beatIndex:sceneIndex},previousScale);const cameraPlan=directorShot.cameraTransform;const composition=getSceneComposition(activeCanvasFormat,sceneIndex);const starBase=[composition.star.x*w,composition.star.y*h];const foxBase=[composition.character.x*w,composition.character.y*h];const showDemoFox=shouldShowProceduralDemoCharacter({storyUsesFallback:currentStoryboardPlan?currentStoryboardPlan.proceduralDemoCharacter===true:!String($('character').value||'').trim(),hasCharacterLayers:hasRenderableCharacterLayer(currentSceneData,currentStoryboardPlan?.sourceCharacter||$('character').value),hasCharacterRig:hasRenderableCharacterRig(currentSceneData,currentStoryboardPlan?.sourceCharacter||$('character').value)});const sceneFocus=resolveSceneFocus({fallbackCharacterVisible:showDemoFox,actorPoint:{x:foxBase[0],y:foxBase[1]},propPoint:{x:starBase[0],y:starBase[1]},focusTarget:directorShot.focusTarget,viewportWidth:w,viewportHeight:h,requestedOffsetY:cameraPlan.offsetY});const focusX=sceneFocus.x,focusY=sceneFocus.y;const renderCameraPlan={...cameraPlan,offsetY:sceneFocus.offsetY};ctx.save();ctx.translate(w/2,h/2+renderCameraPlan.offsetY);ctx.scale(renderCameraPlan.zoom,renderCameraPlan.zoom);ctx.translate(-focusX,-focusY);const action=getSceneAction(sceneIndex,sceneMotionProgress);const activeMouthTracks=exportMouthOriginTimeMs!==null?exportMouthTracks:previewMouthTracks;const mouthClockOrigin=exportMouthOriginTimeMs!==null?exportMouthOriginTimeMs:previewMouthOriginTimeMs;const exportElapsedMs=mouthClockOrigin===null?-1:performance.now()-mouthClockOrigin;const facialLipSync=sampleCharacterFacialLipSync(activeMouthTracks,sceneIndex,exportElapsedMs);const fallbackCharacterKey=String(currentStoryboardPlan?.sourceCharacter||$('character').value||'').trim();const activeMouthTrack=findActiveCharacterLipSyncTrack(activeMouthTracks,sceneIndex,exportElapsedMs,fallbackCharacterKey,fallbackCharacterKey);const mouthTrackTimeMs=activeMouthTrack?exportElapsedMs-activeMouthTrack.startMs:-1;const exportMouthOpenness=activeMouthTrack?sampleAudioMouthEnvelope(activeMouthTrack.envelope,mouthTrackTimeMs):0;const exportViseme=activeMouthTrack?sampleVisemeTimeline(activeMouthTrack.visemes,mouthTrackTimeMs):"neutral";let sx=320,sy=300;if(showDemoFox){sx=starBase[0]+Math.sin(t*1.5)*15;sy=starBase[1]+Math.cos(t*2)*12;if(action==='run'){sx+=Math.sin(t*2)*36;sy-=Math.abs(Math.sin(t*3))*10}else if(action==='float'){sy-=Math.abs(Math.sin(t*1.4))*24}else if(action==='vanish'){sx+=Math.sin(t)*4}const starPulse=1+Math.sin(t*3)*.08;const starScale=action==='magic'?1.35:action==='vanish'?Math.max(.08,1-((frame%45)/45)):action==='float'?.88:sceneIndex===1?1.18:sceneIndex===3?1.35:sceneIndex===4?.88:1; if(sceneIndex===3){ctx.save();ctx.translate(sx,sy);ctx.strokeStyle='rgba(255,229,138,'+(.35+.25*Math.abs(Math.sin(t*3)))+')';ctx.lineWidth=3;for(let ray=0;ray<8;ray++){const a=ray*Math.PI/4+t*.08;ctx.beginPath();ctx.moveTo(Math.cos(a)*34,Math.sin(a)*34);ctx.lineTo(Math.cos(a)*48,Math.sin(a)*48);ctx.stroke()}ctx.restore()}if(sceneIndex===4){for(let spark=0;spark<7;spark++){const a=spark*Math.PI*2/7+t*.35;const px=sx+Math.cos(a)*(24+Math.sin(t*2+spark)*5),py=sy+Math.sin(a)*(24+Math.sin(t*2+spark)*5);ctx.fillStyle='rgba(255,229,138,.8)';ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);ctx.fill()}}ctx.save();ctx.translate(sx,sy);ctx.scale(starScale*starPulse,starScale*starPulse);ctx.rotate(t*.25);ctx.shadowBlur=sceneIndex===3?38:25;ctx.shadowColor='#ffe58a';ctx.fillStyle='#ffe58a';ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?13:30;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.restore();}const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
 const generatedVideo=sceneVideoCache.get(String(currentSceneData.id||('scene-index-'+sceneIndex)))?.video;
 const hasGeneratedVideo=Boolean(generatedVideo&&generatedVideo.readyState>=2&&generatedVideo.videoWidth>0);
 const hasGeneratedMedia=hasGeneratedVideo||Boolean(generatedFrame);
@@ -1077,7 +1078,9 @@ function renderCharacterSpriteAssets(){
   const title=document.createElement('strong');title.textContent=String(asset.characterId||'Character');
   const note=document.createElement('small');
   const initialTransparency=asset.transparencyStatus||'unverified';
-  note.textContent=uiLang==='ru'?'Прозрачность: '+initialTransparency+' · сходство не проверено · общий seed помогает повторяемости, но не гарантирует одинаковый образ':'Transparency: '+initialTransparency+' · identity not verified · shared seed helps repeatability but does not guarantee an identical design';
+  const isCurrentAsset=isCurrentCharacterSpriteAsset(sceneMetadata[sceneIndex]||{},characterBible,asset);
+  const staleAssetNote=uiLang==='ru'?'Спрайт создан для прежнего действия или внешности. Создай актуальный спрайт перед добавлением.':'This sprite belongs to an earlier action or appearance. Generate the current sprite before attaching it.';
+  note.textContent=(uiLang==='ru'?'Прозрачность: '+initialTransparency+' · сходство не проверено · общий seed помогает повторяемости, но не гарантирует одинаковый образ':'Transparency: '+initialTransparency+' · identity not verified · shared seed helps repeatability but does not guarantee an identical design')+(isCurrentAsset?'':' · '+staleAssetNote);
   const sceneId=String(sceneMetadata[sceneIndex]?.id||'');
   const assetId=String(asset.assetId||'');
   const updateTransparency=(status,check=null)=>{
@@ -1087,10 +1090,16 @@ function renderCharacterSpriteAssets(){
     const updatedAssets=current.map(item=>item&&String(item.assetId||'')===assetId?{...item,transparencyStatus:status,transparencyCheck:check,verificationStatus:'not_verified',visualIdentityStatus:'not_verified'}:item);
     let updatedScene={...sceneMetadata[resolvedSceneIndex],characterSpriteAssets:updatedAssets};
     sceneMetadata[resolvedSceneIndex]=updatedScene;
+    if(typeof addButton!=='undefined')addButton.disabled=status!=='verified';
     if(status==='verified'){
      // Alpha-channel verification is the minimum safe gate before the sprite
      // becomes a visible character layer. Identity/anatomy remain unverified.
      const verifiedAsset=updatedAssets.find(item=>item&&String(item.assetId||'')===assetId);
+     if(!isCurrentCharacterSpriteAsset(updatedScene,characterBible,verifiedAsset)){
+      note.textContent=staleAssetNote;
+      if(typeof addButton!=='undefined')addButton.disabled=true;
+      return;
+     }
      const attached=attachVerifiedCharacterSpriteToSceneLayers(updatedScene,verifiedAsset);
      if(attached.status==='added'||attached.status==='updated'){
       updatedScene={...updatedScene,characterLayers:attached.layers};
@@ -1120,9 +1129,11 @@ function renderCharacterSpriteAssets(){
     context.drawImage(verificationImage,0,0);
     const check=verifySpriteTransparency(context.getImageData(0,0,canvas.width,canvas.height),canvas.width,canvas.height);
     updateTransparency(check.status,check);
-    note.textContent=uiLang==='ru'
+    const liveSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===sceneId);
+    const stillCurrent=liveSceneIndex>=0&&isCurrentCharacterSpriteAsset(sceneMetadata[liveSceneIndex],characterBible,asset);
+    note.textContent=!stillCurrent?staleAssetNote:(uiLang==='ru'
       ?(check.passed?'Прозрачность подтверждена':'Прозрачность не пройдена')+' · сходство персонажа не проверено'
-      :(check.passed?'Transparency verified':'Transparency check failed')+' · character identity not verified';
+      :(check.passed?'Transparency verified':'Transparency check failed')+' · character identity not verified');
    }catch(error){
     updateTransparency('unverified',{reason:'image-pixels-unavailable'});
     note.textContent=uiLang==='ru'?'Пиксели недоступны (CORS) · проверка не выполнена':'Image pixels unavailable (CORS) · verification not performed';
@@ -1135,12 +1146,24 @@ function renderCharacterSpriteAssets(){
   image.src=asset.imageUrl;
   verificationImage.src=asset.imageUrl;
   const addButton=document.createElement('button');addButton.type='button';addButton.className='secondary';
+  addButton.disabled=!isCurrentAsset||initialTransparency!=='verified';
   const alreadyAttached=(Array.isArray(sceneMetadata[sceneIndex]?.characterLayers)?sceneMetadata[sceneIndex].characterLayers:[]).some(layer=>String(layer?.characterId||'').toLocaleLowerCase()===String(asset.characterId||'').toLocaleLowerCase());
   addButton.textContent=alreadyAttached?(uiLang==='ru'?'Обновить на сцене':'Update on scene'):(uiLang==='ru'?'Добавить на сцену':'Add to scene');
   addButton.addEventListener('click',()=>{
    const resolvedSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===sceneId);
    if(resolvedSceneIndex<0)return;
-   const result=attachCharacterSpriteToSceneLayers(sceneMetadata[resolvedSceneIndex],asset);
+   const currentAssets=Array.isArray(sceneMetadata[resolvedSceneIndex]?.characterSpriteAssets)?sceneMetadata[resolvedSceneIndex].characterSpriteAssets:[];
+   const verifiedAsset=currentAssets.find(item=>item&&String(item.assetId||'')===assetId)||asset;
+   if(!isCurrentCharacterSpriteAsset(sceneMetadata[resolvedSceneIndex],characterBible,verifiedAsset)){
+    $('status').textContent=staleAssetNote;
+    addButton.disabled=true;
+    return;
+   }
+   const result=attachVerifiedCharacterSpriteToSceneLayers(sceneMetadata[resolvedSceneIndex],verifiedAsset);
+   if(result.status==='verification-required'){
+    $('status').textContent=uiLang==='ru'?'Сначала проверь прозрачность спрайта; непроверенное изображение не добавляется на сцену.':'Verify sprite transparency before adding it to the scene.';
+    return;
+   }
    if(result.status==='invalid'){
     $('status').textContent=uiLang==='ru'?'Не удалось добавить спрайт: проверь имя персонажа и HTTPS-ссылку.':'Could not attach sprite: check character ID and HTTPS image URL.';
     return;
@@ -2271,9 +2294,7 @@ function prepareAutomaticCharacterMotion(){
 function getMissingCharacterVisualCount(protagonistId = currentStoryboardPlan?.sourceCharacter || $('character').value.trim()) {
  return countScenesMissingCharacterVisuals(sceneMetadata,{
   protagonistId,
-  proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true,
-  hasSceneVideo:(scene,index)=>Boolean(sceneVideoCache.get(sceneVideoKey(index,scene))?.video)
- });
+  proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true });
 }
 
 $('makeFilm').addEventListener('click',async()=>{
@@ -2387,8 +2408,8 @@ $('makeFilm').addEventListener('click',async()=>{
    ?'Для '+gate.missingImageCount+' сцен ещё нет изображений. Отдельно подтверди отправку только текстовых промптов в AI Horde либо добавь изображения вручную.'
    :' '+gate.missingImageCount+' scene image(s) are missing. Separately allow sending text prompts to AI Horde, or add scene images manually.');
   if(gate.blockers.includes('character-visual-assets-required'))messages.push(ru
-   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах нет изображений или видеоклипов персонажей. Добавь изображения/спрайты героев через инструменты генерации сцен и персонажей либо выбери Hugging Face или локальный ComfyUI. Фоновое видео вместо мультфильма создавать не будем.'
-   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes have no character images or video clips. Add character images/sprites with the scene and character tools, or choose Hugging Face or local ComfyUI. A background-only video will not be exported.');
+   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах нет видимого спрайта или проверенного рига нужного персонажа. Добавь спрайт/риг через инструменты генерации персонажей либо выбери Hugging Face или локальный ComfyUI для генерации видеосцены. Кэшированный фон не заменяет персонажа.'
+   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes have no visible sprite or validated rig for the required cast. Add character sprites/rigs, or switch to Hugging Face or local ComfyUI to generate full-scene video. A cached background clip is not character evidence.');
   $('status').textContent=messages.join(' ');
   if(mode==='huggingface')$('hfVideoPanel').open=true;
   if(mode==='comfyui')$('comfyPanel').open=true;
@@ -2810,35 +2831,73 @@ $('generateCharacterSprites').addEventListener('click',async()=>{
  const button=$('generateCharacterSprites'),status=$('characterSpriteStatus');
  if(!$('spriteHordeConsent').checked){status.textContent=uiLang==='ru'?'Сначала подтверди отдельное согласие на отправку промптов персонажей.':'First confirm separate consent to send character prompts.';return}
  if(button.disabled)return;
- const targetIndex=sceneIndex,meta=sceneMetadata[targetIndex]||{};
- const targetId=String(meta.id||('scene_'+(targetIndex+1)));
- const scene={...meta,id:targetId,title:$('sceneTitle').value.trim()||titles[targetIndex],description:$('sceneDescription').value.trim(),imagePrompt:$('sceneImagePrompt').value.trim(),motionPrompt:$('sceneMotionPrompt').value.trim(),visibleAction:$('sceneMotionPrompt').value.trim(),camera:$('sceneCamera').value.trim(),characters:normalizeSceneCast($('sceneCharacters').value,meta.characters),startState:$('sceneStartState').value.trim(),endState:$('sceneEndState').value.trim(),continuityLock:$('sceneContinuityLock').value.trim(),negativePrompt:$('sceneNegativePrompt').value.trim()};
- const plans=buildCharacterSpriteAssetPlan(scene,characterBible);
- const ready=plans.filter(plan=>plan.status==='ready');
- if(!ready.length){status.textContent=uiLang==='ru'?'Нет готовых планов. Проверь состав сцены, справочник внешности и действия персонажей.':'No ready sprite plans. Check the scene cast, character appearance references, and character actions.';return}
+ const currentMeta=sceneMetadata[sceneIndex]||{};
+ const currentSceneOverrides={
+  title:$('sceneTitle').value.trim()||titles[sceneIndex],
+  description:$('sceneDescription').value.trim(),
+  imagePrompt:$('sceneImagePrompt').value.trim()||$('sceneDescription').value.trim(),
+  motionPrompt:$('sceneMotionPrompt').value.trim()||$('sceneDescription').value.trim(),
+  visibleAction:$('sceneMotionPrompt').value.trim()||$('sceneDescription').value.trim(),
+  camera:$('sceneCamera').value.trim(),
+  characters:normalizeSceneCast($('sceneCharacters').value,currentMeta.characters),
+  startState:$('sceneStartState').value.trim(),
+  endState:$('sceneEndState').value.trim(),
+  continuityLock:$('sceneContinuityLock').value.trim(),
+  negativePrompt:$('sceneNegativePrompt').value.trim()
+ };
+ const batch=buildCharacterSpriteBatchPlan(sceneMetadata,characterBible,{currentSceneIndex:sceneIndex,currentSceneOverrides});
+ const readyGroups=batch.map(group=>({...group,plans:group.plans.filter(plan=>plan.planningStatus==='ready'||plan.status==='ready')})).filter(group=>group.plans.length);
+ const blockedCount=batch.reduce((total,group)=>total+group.plans.filter(plan=>plan.planningStatus!=='ready'&&plan.status!=='ready').length,0);
+ const taskCount=readyGroups.reduce((total,group)=>total+group.plans.length,0);
+ if(!taskCount){status.textContent=uiLang==='ru'?'Нет готовых планов для всех сцен. Проверь состав сцен, справочник внешности и индивидуальные действия персонажей.':'No ready plans across the storyboard. Check scene casts, character appearance references, and actor-specific actions.';return}
+ // The planner intentionally reads unsaved editor values. Persist those same values
+ // into the scene metadata before attaching generated assets, so the saved cast/action
+ // cannot disagree with the sprite that was just requested.
+ const updatedCurrentScene=mergeCharacterSpriteSceneOverrides(currentMeta,currentSceneOverrides);
+ if(updatedCurrentScene){
+  sceneMetadata[sceneIndex]=updatedCurrentScene;
+  titles[sceneIndex]=updatedCurrentScene.title||titles[sceneIndex];
+  descriptions[sceneIndex]=updatedCurrentScene.description||descriptions[sceneIndex];
+  if(currentStoryboardPlan)currentStoryboardPlan={...currentStoryboardPlan,scenes:sceneMetadata,titles:[...titles],descriptions:[...descriptions],eventChain:buildStoryEventChain(sceneMetadata)};
+  $('sceneLabel').textContent=(storyLabels[storyLanguage()]||'Scene')+' '+(sceneIndex+1)+' · '+titles[sceneIndex];
+  renderScenes();
+  updateStoryQA();
+ }
  button.disabled=true;
- const existing=Array.isArray(meta.characterSpriteAssets)?[...meta.characterSpriteAssets]:[];
- let completed=0,failed=0;
+ let completed=0,failed=0,reused=0;
  try{
-  for(const plan of ready){
-   status.textContent=uiLang==='ru'?'Генерация '+(completed+failed+1)+' из '+ready.length+': '+plan.characterId+'…':'Generating '+(completed+failed+1)+' of '+ready.length+': '+plan.characterId+'…';
-   try{
-    const asset=await generateCharacterSpriteAsset({plan,consentAccepted:$('spriteHordeConsent').checked===true,onProgress:progress=>{
-     const pos=progress.queuePosition===null?'?':progress.queuePosition;
-     status.textContent=(uiLang==='ru'?'AI Horde · ':'AI Horde · ')+plan.characterId+' · очередь: '+pos;
-    }});
-    const oldIndex=existing.findIndex(item=>item&&item.assetId===asset.assetId);
-    if(oldIndex>=0)existing[oldIndex]=asset;else existing.push(asset);
-    completed++;
-   }catch(error){
-    failed++;
-    console.error('Character sprite generation failed:',plan.characterId,error);
+  for(const group of readyGroups){
+   for(const plan of group.plans){
+    const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===group.sceneId);
+    const targetIndex=resolvedIndex>=0?resolvedIndex:group.sceneIndex;
+    const targetMeta=sceneMetadata[targetIndex]||{};
+    const existing=Array.isArray(targetMeta.characterSpriteAssets)?[...targetMeta.characterSpriteAssets]:[];
+    const existingIndex=existing.findIndex(item=>item&&item.assetId===plan.assetId&&/^https:\/\//i.test(String(item.imageUrl||'')));
+    if(existingIndex>=0){reused++;continue}
+    status.textContent=uiLang==='ru'
+     ?'Сцена '+(group.sceneIndex+1)+' · спрайт '+(completed+failed+reused+1)+' из '+taskCount+': '+plan.characterId+'…'
+     :'Scene '+(group.sceneIndex+1)+' · sprite '+(completed+failed+reused+1)+' of '+taskCount+': '+plan.characterId+'…';
+    try{
+     const asset=await generateCharacterSpriteAsset({plan,consentAccepted:$('spriteHordeConsent').checked===true,onProgress:progress=>{
+      const pos=progress.queuePosition===null?'?':progress.queuePosition;
+      status.textContent='AI Horde · '+plan.characterId+' · queue: '+pos;
+     }});
+     const oldIndex=existing.findIndex(item=>item&&item.assetId===asset.assetId);
+     if(oldIndex>=0)existing[oldIndex]=asset;else existing.push(asset);
+     completed++;
+    }catch(error){
+     failed++;
+     console.error('Character sprite generation failed:',plan.sceneId,plan.characterId,error);
+    }
+    const saveIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===group.sceneId);
+    const resolvedSaveIndex=saveIndex>=0?saveIndex:group.sceneIndex;
+    if(sceneMetadata[resolvedSaveIndex])sceneMetadata[resolvedSaveIndex]={...sceneMetadata[resolvedSaveIndex],characterSpriteAssets:[...existing]};
+    if(sceneIndex===resolvedSaveIndex)renderCharacterSpriteAssets();
    }
-   const resolvedIndex=sceneMetadata.findIndex(item=>item&&String(item.id)===targetId);
-   if(resolvedIndex>=0)sceneMetadata[resolvedIndex]={...sceneMetadata[resolvedIndex],characterSpriteAssets:[...existing]};
-   if(sceneIndex===resolvedIndex)renderCharacterSpriteAssets();
   }
-  status.textContent=uiLang==='ru'?'Готово: '+completed+' · ошибок: '+failed+'. Сохрани черновик, чтобы сохранить ссылки.':'Finished: '+completed+' generated · '+failed+' failed. Save the draft to keep the links.';
+  status.textContent=uiLang==='ru'
+   ?'Пакет завершён: создано '+completed+' · повторно использовано '+reused+' · ошибок '+failed+' · заблокировано '+blockedCount+'. Сохрани черновик.'
+   :'Batch finished: '+completed+' generated · '+reused+' reused · '+failed+' failed · '+blockedCount+' blocked. Save the draft.';
  }finally{
   button.disabled=!$('spriteHordeConsent').checked;
  }
@@ -3807,11 +3866,11 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     return {status:'failed',reason:'There are no storyboard scenes to export.'};
   }
   const exportProtagonistId=String(currentStoryboardPlan?.sourceCharacter||$('character').value||'').trim();
-  const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId);
+  const missingCharacterAssetCount=requireAllVideos?0:getMissingCharacterVisualCount(exportProtagonistId);
   if(missingCharacterAssetCount>0){
     const message=uiLang==='ru'
-      ?'Экспорт остановлен: в '+missingCharacterAssetCount+' сценах нет изображения персонажа, рига или видеоклипа сцены. Добавь спрайты/риги либо сначала создай видеосцены; экспорт одного фона заблокирован.'
-      :'Export stopped: '+missingCharacterAssetCount+' scenes have no character image, rig or scene video. Add character sprites/rigs or generate scene videos first; background-only export is blocked.';
+      ?'Экспорт остановлен: в '+missingCharacterAssetCount+' сценах нет видимого спрайта или проверенного рига для локального Canvas-экспорта. Добавь спрайты/риги либо сначала создай полноценные видеосцены.'
+      :'Export stopped: '+missingCharacterAssetCount+' scenes have no visible sprite or validated rig for local Canvas export. Add character sprites/rigs or generate full-scene videos first.';
     $('status').textContent=message;
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Экспорт остановлен','Export stopped'),message);filmProgressTracking=false;}
     return {status:'failed',reason:message,missingCharacterAssetCount};
@@ -3952,7 +4011,7 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     exportMouthTracks=[];
     let lipSyncEligibleTrackCount=0;
     if(voiceTracks.length){
-      const mainCharacterKey=String($("character").value||"").trim();
+      const mainCharacterKey=String(currentStoryboardPlan?.sourceCharacter||$("character").value||"").trim();
       const storyUsesFallback=currentStoryboardPlan
         ?currentStoryboardPlan.proceduralDemoCharacter===true
         :!mainCharacterKey;
