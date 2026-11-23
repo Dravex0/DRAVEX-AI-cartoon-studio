@@ -288,7 +288,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   // viewport anchor exists. A story verb alone does not reveal where an object
   // should appear in the frame.
   const statefulChanges = changes.filter(change => change?.entityType === 'prop'
-    && ['openState', 'visible'].includes(change.property)
+    && ['openState', 'visible', 'rotation', 'scale'].includes(change.property)
     && normalizedPoint(change.position));
   const statefulByProp = new Map();
   for (const change of statefulChanges) {
@@ -301,6 +301,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   for (const [propKey, history] of statefulByProp) {
     let state = null;
     let opacity = 1;
+    let rotation = 0;
+    let scale = 1;
     let position = normalizedPoint(history[0].position);
     let evidence = '';
     let transitionProgress = 1;
@@ -327,6 +329,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       if (p < start) {
         if (change.property === 'openState') state = fromState === 'open' ? 1 : 0;
         else if (change.property === 'visible' && typeof fromState === 'boolean') opacity = fromState ? 1 : 0;
+        else if (change.property === 'rotation' && Number.isFinite(fromState)) rotation = fromState;
+        else if (change.property === 'scale' && Number.isFinite(fromState)) scale = clamp(fromState, 0.05, 4);
         break;
       }
       const progress = clamp((p - start) / Math.max(0.000001, end - start), 0, 1);
@@ -340,10 +344,18 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       } else if (change.property === 'visible'
           && typeof fromState === 'boolean' && typeof toState === 'boolean') {
         opacity = (fromState ? 1 : 0) + ((toState ? 1 : 0) - (fromState ? 1 : 0)) * progress;
+      } else if (change.property === 'rotation'
+          && Number.isFinite(fromState) && Number.isFinite(toState)) {
+        rotation = fromState + (toState - fromState) * progress;
+      } else if (change.property === 'scale'
+          && Number.isFinite(fromState) && Number.isFinite(toState)) {
+        scale = clamp(fromState + (toState - fromState) * progress, 0.05, 4);
       }
       if (p <= end) break;
       state = change.property === 'openState' ? (toState === 'open' ? 1 : 0) : state;
       opacity = change.property === 'visible' ? (toState ? 1 : 0) : opacity;
+      rotation = change.property === 'rotation' && Number.isFinite(toState) ? toState : rotation;
+      scale = change.property === 'scale' && Number.isFinite(toState) ? clamp(toState, 0.05, 4) : scale;
     }
     if (!position) continue;
     const existing = holderPlans.find(item => key(item.id) === propKey);
@@ -353,11 +365,11 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       kind: propKind(history[0].entityId),
       x: position.x,
       y: position.y,
-      rotation: existing?.rotation || 0,
+      rotation: rotation || existing?.rotation || 0,
       held: existing?.held === true,
       visible: opacity > 0.001,
       opacity,
-      scale: existing?.scale || 1,
+      scale: scale !== 1 ? scale : (existing?.scale || 1),
       ...(state === null ? {} : { openAmount: state }),
       evidence,
       transitionProgress
@@ -411,6 +423,7 @@ function drawProp(context, prop, x, y, time) {
   if (Number.isFinite(prop.opacity)) context.globalAlpha = (Number.isFinite(context.globalAlpha) ? context.globalAlpha : 1) * clamp(prop.opacity, 0, 1);
   context.translate(x, y + bob);
   context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
+  if (Number.isFinite(prop.scale)) context.scale(clamp(prop.scale, 0.05, 4), clamp(prop.scale, 0.05, 4));
   context.lineWidth = 2.5;
   context.lineJoin = 'round';
   if (prop.kind === 'star') {
