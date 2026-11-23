@@ -24,7 +24,7 @@ function propKind(name) {
  * Resolve an explicitly named hand/paw anchor from the same posed rig used by the renderer.
  * Returns null rather than guessing when the rig has no unambiguous contact part.
  */
-export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}) {
+export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}, gripHand = '') {
   const actorKey = key(characterId);
   if (!actorKey || !Array.isArray(rigs)) return null;
   const input = rigs.find(candidate => key(candidate?.characterId) === actorKey);
@@ -36,13 +36,31 @@ export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}
   const posedParts = applyCharacterRigPose(report.rig.parts, report.rig, pose);
   const handParts = posedParts.filter(part => /hand|paw|wrist| кист|лап/i.test(part.id)
     || /hand|paw|wrist|кисть|лап/i.test(part.boneId));
-  // Rigs with two hands need an explicit grip/contact anchor. Never choose
-  // left or right arbitrarily: that would make held props jump to the wrong hand.
+  // An explicitly authored side wins when the story specifies which hand
+  // grips the prop. Without that instruction, never guess between two hands.
+  const requested = key(gripHand).replace(/[^a-z]/g, '');
+  const requestedParts = requested
+    ? handParts.filter(part => {
+        const partId = key(part.id).replace(/[^a-z]/g, '');
+        const boneId = key(part.boneId).replace(/[^a-z]/g, '');
+        if (partId === requested || boneId === requested) return true;
+        const side = requested.startsWith('left') ? 'left'
+          : requested.startsWith('right') ? 'right' : '';
+        return Boolean(side && (partId.includes(side) || boneId.includes(side))
+          && /hand|paw|wrist/.test(partId + boneId));
+      })
+    : [];
   const semanticGripParts = handParts.filter(part => part.gripAnchor === true);
   const authoredGripParts = semanticGripParts.length
     ? semanticGripParts
     : handParts.filter(part => /grip|propanchor|contacthand|holdinghand/i.test(part.id));
-  const anchors = authoredGripParts.length ? authoredGripParts : handParts;
+  const anchors = requestedParts.length === 1
+    ? requestedParts
+    : requestedParts.length > 1
+      ? requestedParts.filter(part => part.gripAnchor === true).length === 1
+        ? requestedParts.filter(part => part.gripAnchor === true)
+        : []
+      : authoredGripParts.length ? authoredGripParts : handParts;
   if (anchors.length !== 1) return null;
   const anchor = anchors[0];
   if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)
@@ -134,7 +152,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     const actor = layers.find(layer => key(layer?.characterId) === key(actorId));
     const actorX = Number.isFinite(actor?.x) ? actor.x : 0.5;
     const actorY = Number.isFinite(actor?.y) ? actor.y : 0.68;
-    const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
+    const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses, gripHand);
     if (rigAnchor) return { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation };
     const proceduralEntry = Object.entries(runtime.proceduralPropAnchors || {})
       .find(([id]) => key(id) === key(actorId))?.[1];
