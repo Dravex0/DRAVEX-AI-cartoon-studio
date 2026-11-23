@@ -58,7 +58,7 @@ test('keeps a picked-up prop attached to the same animated hand through the next
             end: 0.9,
             actorId: 'Foxy',
             description: 'Foxy waves with the key in hand',
-            evidence: 'Foxy waves with the key in hand'
+            evidence: 'waves with the key in hand'
           }
         ]
       }]
