@@ -169,33 +169,50 @@ export function validateCharacterActionTimeline(scene = {}) {
   if (reaction && action && reaction.start < action.end) {
     issues.push(issue('reaction-before-action-complete', 'reaction', 'Reaction must begin after the central action finishes.'));
   }
-  if (action && action.steps !== undefined) {
-    if (!Array.isArray(action.steps) || action.steps.length === 0 || action.steps.length > 24) {
-      issues.push(issue('action-steps-shape-invalid', 'action', 'Action substeps must contain between one and 24 ordered steps.'));
-    } else {
-      let previousStepEnd = action.start;
-      action.steps.forEach((step, index) => {
-        if (!step) {
-          issues.push(issue('action-step-shape-invalid', 'action', `Action substep ${index + 1} must be an object.`));
-          return;
-        }
-        if (!step.intent || !step.motionCue || !step.description || !step.actorId || !step.evidence) {
-          issues.push(issue('action-step-fields-missing', 'action', `Action substep ${index + 1} needs intent, motion cue, actor, description, and source evidence.`));
-        }
-        if (step.start === null || step.end === null || step.start < action.start || step.end > action.end || step.start >= step.end || step.start < previousStepEnd) {
-          issues.push(issue('action-step-timing-invalid', 'action', `Action substep ${index + 1} must have ordered timing inside the central action phase.`));
-        } else {
-          previousStepEnd = step.end;
-        }
-        if (!evidenceSources.some(source => source.includes(step.evidence))) {
-          issues.push(issue('action-step-evidence-ungrounded', 'action', `Action substep ${index + 1} evidence must exactly match locked story evidence.`));
-        }
-        if (step.actorId && castWasExplicit && !cast.has(step.actorId.toLocaleLowerCase())) {
-          issues.push(issue('action-step-actor-not-in-cast', 'action', `Action substep ${index + 1} actor must belong to the scene cast.`));
-        }
-      });
+  // Validate nested steps for every phase, not only the central action.
+  // Otherwise a reaction/preparation step could escape its parent timing window
+  // and be played out of order even when the outer phase timeline is valid.
+  raw.phases.forEach((phase, phaseIndex) => {
+    if (!isRecord(phase) || phase.steps === undefined) return;
+    const normalized = timeline.phases[phaseIndex];
+    const phaseName = normalized?.phase || 'unknown';
+    const codePrefix = phaseName === 'action' ? 'action-step' : `${phaseName}-step`;
+    const label = phaseName === 'action' ? 'Action' : `${phaseName} phase`;
+    if (!Array.isArray(normalized?.steps) || normalized.steps.length === 0 || normalized.steps.length > 24) {
+      issues.push(issue(`${codePrefix}s-shape-invalid`, phaseName,
+        `${label} substeps must contain between one and 24 ordered steps.`));
+      return;
     }
-  }
+    let previousStepEnd = normalized.start;
+    normalized.steps.forEach((step, index) => {
+      if (!step) {
+        issues.push(issue(`${codePrefix}-shape-invalid`, phaseName,
+          `${label} substep ${index + 1} must be an object.`));
+        return;
+      }
+      if (!step.intent || !step.motionCue || !step.description || !step.actorId || !step.evidence) {
+        issues.push(issue(`${codePrefix}-fields-missing`, phaseName,
+          `${label} substep ${index + 1} needs intent, motion cue, actor, description, and source evidence.`));
+      }
+      if (normalized.start === null || normalized.end === null
+          || step.start === null || step.end === null
+          || step.start < normalized.start || step.end > normalized.end
+          || step.start >= step.end || step.start < previousStepEnd) {
+        issues.push(issue(`${codePrefix}-timing-invalid`, phaseName,
+          `${label} substep ${index + 1} must have ordered timing inside its parent phase.`));
+      } else {
+        previousStepEnd = step.end;
+      }
+      if (!evidenceSources.some(source => source.includes(step.evidence))) {
+        issues.push(issue(`${codePrefix}-evidence-ungrounded`, phaseName,
+          `${label} substep ${index + 1} evidence must exactly match locked story evidence.`));
+      }
+      if (step.actorId && castWasExplicit && !cast.has(step.actorId.toLocaleLowerCase())) {
+        issues.push(issue(`${codePrefix}-actor-not-in-cast`, phaseName,
+          `${label} substep ${index + 1} actor must belong to the scene cast.`));
+      }
+    });
+  });
   const resultFloor = Math.max(action?.end ?? 0, reaction?.end ?? 0);
   if (result && result.start < resultFloor) {
     issues.push(issue('result-before-reaction-complete', 'result', 'Result must begin after the action and any supplied reaction finish.'));
