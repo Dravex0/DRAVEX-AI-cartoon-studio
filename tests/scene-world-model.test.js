@@ -4,7 +4,7 @@ import { buildSceneWorldModel } from '../src/scene-world-model.js';
 
 test('builds the same directed interaction model for people, animals and robots', () => {
   const model = buildSceneWorldModel([
-    { id: 's1', characters: ['Maya', 'Noah'], storyDetail: 'Maya gives Noah a phone.',
+    { id: 's1', characters: ['Maya', 'Noah'], storyDetail: 'Maya picks up the phone and gives Noah the phone.',
       interaction: { type: 'give', actorId: 'Maya', targetId: 'Noah', evidence: 'Maya gives Noah a phone' },
       stateChanges: [{ entityType: 'prop', entityId: 'phone', property: 'holder', previousValue: null,
         value: 'Maya', actorId: 'Maya', evidence: 'Maya picks up the phone', actionIntent: 'pick_up' }] },
@@ -26,7 +26,7 @@ test('builds the same directed interaction model for people, animals and robots'
 
 test('represents object, vehicle and location state without species-specific assumptions', () => {
   const model = buildSceneWorldModel([
-    { id: 's1', characters: ['Driver'], location: 'Garage',
+    { id: 's1', characters: ['Driver'], location: 'Garage', storyDetail: 'Driver opens the car door. Driver drives the car onto the street.',
       stateChanges: [
         { entityType: 'prop', entityId: 'car door', property: 'openState', previousValue: 'closed', value: 'open', actorId: 'Driver', evidence: 'Driver opens the car door', actionIntent: 'open' },
         { entityType: 'vehicle', entityId: 'car', property: 'location', previousValue: 'Garage', value: 'Street', actorId: 'Driver', evidence: 'Driver drives the car onto the street' }
@@ -39,11 +39,11 @@ test('represents object, vehicle and location state without species-specific ass
 
 test('reports conflicting object-state handoffs instead of silently accepting them', () => {
   const model = buildSceneWorldModel([
-    { id: 's1', characters: ['Maya'], stateChanges: [
-      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: null, value: 'Maya', actorId: 'Maya' }
+    { id: 's1', characters: ['Maya'], storyDetail: 'Maya picks up the key.', stateChanges: [
+      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: null, value: 'Maya', actorId: 'Maya', evidence: 'Maya picks up the key.' }
     ] },
-    { id: 's2', characters: ['Noah'], stateChanges: [
-      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: 'Noah', value: null, actorId: 'Noah' }
+    { id: 's2', characters: ['Noah'], storyDetail: 'Noah drops the key.', stateChanges: [
+      { entityType: 'prop', entityId: 'key', property: 'holder', previousValue: 'Noah', value: null, actorId: 'Noah', evidence: 'Noah drops the key.' }
     ] }
   ]);
   assert.equal(model.validation.stateContinuityConflicts.length, 1);
@@ -160,4 +160,49 @@ test('retains persistent prop state snapshots in subsequent scene events', () =>
   assert.ok(model.events[1].actions.some(action => action.type === 'state_snapshot'
     && action.entityId === 'silver key' && action.value === 'Foxy'));
   assert.equal(model.validation.stateContinuityConflicts.length, 0);
+});
+
+test('ignores explicit interaction and state metadata without matching source evidence', () => {
+  const model = buildSceneWorldModel([{
+    id: 'untrusted',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira looks at the ball.',
+    interaction: { type: 'attack', actorId: 'Mira', targetId: 'Noah',
+      evidence: 'Mira attacks Noah.' },
+    stateChanges: [{ entityType: 'prop', entityId: 'secret key', property: 'holder',
+      previousValue: null, value: 'Mira', actorId: 'Mira', evidence: 'Mira picks up the secret key.' }]
+  }]);
+  assert.equal(model.relations.some(relation => relation.from === 'Mira' && relation.to === 'Noah'), false);
+  assert.equal(model.entities.some(entity => entity.id === 'secret key'), false);
+});
+
+test('ignores action timeline edges whose named target is absent from the evidence', () => {
+  const model = buildSceneWorldModel([{
+    id: 'bad-target',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira throws the ball to Noah.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira', targetId: 'wall',
+        description: 'Mira throws the ball to Noah.',
+        evidence: 'Mira throws the ball to Noah.'
+      }]
+    }
+  }]);
+  assert.equal(model.relations.some(relation => relation.type === 'acts_on'
+    && relation.from === 'Mira' && relation.to === 'wall'), false);
+});
+
+test('does not accept a persistent snapshot without a matching prior world state', () => {
+  const model = buildSceneWorldModel([{
+    id: 'unseeded-snapshot',
+    characters: ['Foxy'],
+    storyDetail: 'Foxy walks through the gate.',
+    stateSnapshot: [{ entityType: 'prop', entityId: 'magic key', property: 'holder',
+      previousValue: null, value: 'Foxy', actorId: 'Foxy', snapshot: true,
+      evidence: 'Foxy picked up the magic key.' }]
+  }]);
+  assert.equal(model.entities.some(entity => entity.id === 'magic key'), false);
+  assert.equal(model.events[0].actions.some(action => action.type === 'state_snapshot'), false);
 });
