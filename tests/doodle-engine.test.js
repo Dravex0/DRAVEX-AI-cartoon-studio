@@ -132,3 +132,27 @@ test('maps semantic interaction intents to explicit Doodle acting poses', () => 
   assert.equal(actionForStep({ intent: 'point', motionCue: 'turn' }), 'point');
   assert.equal(actionForStep({ intent: 'unrecognized', motionCue: 'wave' }), 'wave');
 });
+
+
+test('uses the offline actor while an authored sprite is not decoded, then yields to the real image', () => {
+  const scene = {
+    characters: ['Foxy'],
+    characterLayers: [{ characterId: 'Foxy', imageUrl: 'https://example.test/fox.png', visible: true }]
+  };
+  assert.deepEqual(createProceduralActorLayers(scene).map(layer => layer.characterId), []);
+  assert.deepEqual(createProceduralActorLayers(scene, 0, {
+    resolveImage: () => ({ naturalWidth: 0 })
+  }).map(layer => layer.characterId), ['Foxy']);
+  assert.deepEqual(createProceduralActorLayers(scene, 0, {
+    resolveImage: () => ({ naturalWidth: 256 })
+  }).map(layer => layer.characterId), []);
+});
+
+test('uses the resolved protagonist when a scene has no explicit cast list', () => {
+  const { context } = mockCanvas();
+  const result = drawProceduralSceneActors(context, {}, {
+    protagonistId: 'Foxy', width: 640, height: 360, progress: 0.5
+  });
+  assert.equal(result.drawn, 1);
+  assert.equal(result.layers[0].characterId, 'Foxy');
+});
