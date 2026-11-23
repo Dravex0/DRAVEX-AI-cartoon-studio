@@ -192,6 +192,7 @@ test('ignores action timeline edges whose named target is absent from the eviden
   }]);
   assert.equal(model.relations.some(relation => relation.type === 'acts_on'
     && relation.from === 'Mira' && relation.to === 'wall'), false);
+  assert.equal(model.entities.some(entity => entity.id === 'wall'), false);
 });
 
 test('does not accept a persistent snapshot without a matching prior world state', () => {
