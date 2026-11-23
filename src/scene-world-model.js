@@ -245,13 +245,27 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
         if (!record(step)) continue;
         const stepActor = clean(step.actorId || actor, 160);
         const stepTarget = clean(step.targetId, 160);
-        if (stepActor) addEntity(entities, stepActor, 'character', sceneId);
+        const stepEvidence = clean(step.evidence, 300);
+        // Timeline validation checks that evidence exists somewhere in the scene,
+        // but a valid phrase about a different actor must not authorize this edge.
+        // Ground each substep's participants against that substep's own evidence.
+        const stepGrounded = stepActor && stepEvidence
+          && sourceHasEvidence(scene, stepEvidence, sourceText)
+          && evidenceNamesEntity(stepEvidence, stepActor)
+          && (!stepTarget || evidenceNamesEntity(stepEvidence, stepTarget));
+        if (!stepGrounded) {
+          sceneEvents.push({ type: 'unresolved_action_step', actorId: stepActor || null,
+            targetId: stepTarget || null, start: step.start ?? null, end: step.end ?? null,
+            evidence: stepEvidence, reason: 'step-participants-not-grounded-in-step-evidence' });
+          continue;
+        }
+        addEntity(entities, stepActor, 'character', sceneId);
         if (stepTarget) addActionTarget(stepTarget);
-        sceneEvents.push({ type: clean(step.intent, 80) || 'action', actorId: stepActor || null,
+        sceneEvents.push({ type: clean(step.intent, 80) || 'action', actorId: stepActor,
           targetId: stepTarget || null, start: step.start ?? null, end: step.end ?? null,
-          description: clean(step.description, 500), evidence: clean(step.evidence, 300) });
-        if (stepActor && stepTarget) addRelation({ type: 'acts_on', from: stepActor, to: stepTarget,
-          action: clean(step.intent, 80), evidence: clean(step.evidence, 300) });
+          description: clean(step.description, 500), evidence: stepEvidence });
+        if (stepTarget) addRelation({ type: 'acts_on', from: stepActor, to: stepTarget,
+          action: clean(step.intent, 80), evidence: stepEvidence });
       }
     }
 
