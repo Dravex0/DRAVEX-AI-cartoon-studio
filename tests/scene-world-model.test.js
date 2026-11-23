@@ -122,3 +122,27 @@ test('classifies action targets as props when state metadata identifies an objec
   assert.ok(model.entities.some(entity => entity.id === 'Noah' && entity.kind === 'character'));
   assert.equal(model.entities.filter(entity => entity.id === 'silver key' && entity.kind === 'character').length, 0);
 });
+
+test('adds only evidence-grounded physical object and contact relations', () => {
+  const model = buildSceneWorldModel([{
+    id: 'throw-catch',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira throws the ball to Noah. Noah catches the ball.',
+    physicsEvents: [
+      { id: 'throw', type: 'throw', entityId: 'ball', actorId: 'Mira', targetId: 'Noah',
+        evidence: 'Mira throws the ball to Noah.' },
+      { id: 'catch', type: 'catch', entityId: 'ball', actorId: 'Noah', targetId: 'ball',
+        evidence: 'Noah catches the ball.' },
+      { id: 'invented', type: 'collision', entityId: 'ball', otherEntityId: 'wall',
+        evidence: 'The ball crashes through a wall.' }
+    ]
+  }]);
+  assert.ok(model.entities.some(entity => entity.id === 'ball' && entity.kind === 'prop'));
+  assert.ok(model.entities.some(entity => entity.id === 'Mira' && entity.kind === 'character'));
+  assert.ok(model.entities.some(entity => entity.id === 'Noah' && entity.kind === 'character'));
+  assert.ok(model.relations.some(relation => relation.type === 'physical_action'
+    && relation.from === 'Mira' && relation.to === 'ball' && relation.action === 'throw'));
+  assert.ok(model.relations.some(relation => relation.type === 'physical_action'
+    && relation.from === 'Noah' && relation.to === 'ball' && relation.action === 'catch'));
+  assert.equal(model.entities.some(entity => entity.id === 'wall'), false);
+});
