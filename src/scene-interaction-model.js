@@ -1,7 +1,7 @@
 import { buildScenePhysicsModel } from './scene-physics-model.js';
 import { validateCharacterActionTimeline } from './character-action-timeline.js';
 
-const clean = value => String(value ?? '').trim().slice(0, 180);
+const clean = (value, max = 180) => String(value ?? '').trim().slice(0, max);
 const key = value => clean(value).toLocaleLowerCase();
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
