@@ -190,8 +190,9 @@ export function validateCharacterActionTimeline(scene = {}) {
         if (!evidenceSources.some(source => source.includes(step.evidence))) {
           issues.push(issue('action-step-evidence-ungrounded', 'action', `Action substep ${index + 1} evidence must exactly match locked story evidence.`));
         }
-        if (step.evidence && step.targetId && !evidenceNamesEntity(step.evidence, step.targetId)) {
-          issues.push(issue('action-step-target-evidence-mismatch', 'action', `Action substep ${index + 1} evidence must name its target.`));
+        if (step.evidence && step.targetId
+            && !evidenceSources.some(source => evidenceNamesEntity(source, step.targetId))) {
+          issues.push(issue('action-step-target-evidence-mismatch', 'action', `Action substep ${index + 1} target must be named in locked scene evidence.`));
         }
         if (step.actorId && castWasExplicit && !cast.has(step.actorId.toLocaleLowerCase())) {
           issues.push(issue('action-step-actor-not-in-cast', 'action', `Action substep ${index + 1} actor must belong to the scene cast.`));
