@@ -142,6 +142,30 @@ test('transfers a prop between each character hand anchor without reverting to b
   assert.equal(after.rotation, 0.25);
 });
 
+
+test('honors an explicitly named left or right hand on a two-hand character rig', () => {
+  const rig = {
+    schemaVersion: 1, characterId: 'Fox',
+    bones: [{ id: 'root', parentId: null }, { id: 'leftHand', parentId: 'root' }, { id: 'rightHand', parentId: 'root' }],
+    parts: [
+      { id: 'leftHand', boneId: 'leftHand', imageUrl: 'https://assets.example/left.png', x: 0.29, y: 0.58, width: 0.08, height: 0.08 },
+      { id: 'rightHand', boneId: 'rightHand', imageUrl: 'https://assets.example/right.png', x: 0.71, y: 0.54, width: 0.08, height: 0.08 }
+    ]
+  };
+  const leftScene = {
+    stateChanges: scene.stateChanges.map(change => ({ ...change, gripHand: 'leftHand' }))
+  };
+  const rightScene = {
+    stateChanges: scene.stateChanges.map(change => ({ ...change, gripHand: 'rightHand' }))
+  };
+  const left = buildScenePropRenderPlan(leftScene, layers, 1, { characterRigs: [rig] })[0];
+  const right = buildScenePropRenderPlan(rightScene, layers, 1, { characterRigs: [rig] })[0];
+  assert.equal(left.x, 0.29);
+  assert.equal(left.y, 0.58);
+  assert.equal(right.x, 0.71);
+  assert.equal(right.y, 0.54);
+});
+
 test('uses the safe legacy hand estimate when the rig has no explicit hand or paw anchor', () => {
   const rig = {
     schemaVersion: 1, characterId: 'Fox',
