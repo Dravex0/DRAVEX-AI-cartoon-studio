@@ -1,6 +1,7 @@
 import { drawProceduralSceneEnvironment } from './procedural-scene-environment.js';
 import { convertWhatIfEpisode } from './what-if-episode-adapter.js';
 import { drawSceneProps } from './scene-prop-renderer.js';
+import { drawProceduralSceneActors } from './doodle-engine.js';
 import { validateStoryScenes } from "./story-qa.js";
 import { buildStoryboardFromText } from "./storyboard-generator.js";
 import { evaluatePromptToFilmStart } from "./prompt-to-film-gate.js";
@@ -878,8 +879,11 @@ if(showDemoFox){drawProceduralDemoFox(ctx,{x:foxBase[0],y:foxBase[1],time:t,acti
 const sampledRigPoses=currentSceneData.characterRigTimeline?.keyframes?.length
  ? sampleCharacterRigTimeline(currentSceneData.characterRigTimeline,rigAnimationProgress)
  : currentSceneData.characterRigPoses;
+const proceduralActors=$('videoGenerationMode').value==='local-canvas'&&!hasGeneratedVideo
+ ?drawProceduralSceneActors(ctx,currentSceneData,{progress:rigAnimationProgress,width:w,height:h,time:t,characterBible,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness})
+ :{drawn:0,layers:[]};
 drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});// Keep prop transitions on the same scrubbed clock as the sampled rig pose.
-drawSceneProps(ctx,currentSceneData,currentSceneData.characterLayers,rigAnimationProgress,w,h,t,{characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);ctx.restore();
+drawSceneProps(ctx,currentSceneData,[...(Array.isArray(currentSceneData.characterLayers)?currentSceneData.characterLayers:[]),...(proceduralActors.layers||[])],rigAnimationProgress,w,h,t,{characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);ctx.restore();
 updateFaceLandmarkPreviewOverlay({currentSceneData,generatedVideo,hasGeneratedVideo,motionTransform,viewportWidth:w,viewportHeight:h,cameraPlan:renderCameraPlan,focusX,focusY});
 try {
  captureCharacterMotionAuditFrame({
@@ -2272,6 +2276,7 @@ function getMissingCharacterVisualCount(protagonistId = currentStoryboardPlan?.s
  return countScenesMissingCharacterVisuals(sceneMetadata,{
   protagonistId,
   proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true,
+  proceduralActors:$('videoGenerationMode').value==='local-canvas',
   hasSceneVideo:(scene,index)=>Boolean(sceneVideoCache.get(sceneVideoKey(index,scene))?.video)
  });
 }
@@ -2620,8 +2625,12 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
   status.textContent=uiLang==='ru'?'Раскадровка создана локальным движком DRAVEX.':'Storyboard created by the local DRAVEX engine.';
   if(missingCharacterVisualCount>0){
    status.textContent+=uiLang==='ru'
-    ?' Локальный предпросмотр пока показывает только фон: в '+missingCharacterVisualCount+' сценах нет изображения или рига персонажа. Добавь спрайты/риги либо выбери AI-видеогенератор.'
-    :' The local preview currently shows only the scene background: '+missingCharacterVisualCount+' scene(s) have no character image or rig. Add character sprites/rigs or choose an AI video provider.';
+    ?' В '+missingCharacterVisualCount+' сценах нет персонажей или подтверждённых визуальных ресурсов. Добавь персонажей и спрайты либо создай видеоклипы.'
+    :' '+missingCharacterVisualCount+' scene(s) have no characters or verified visual resources. Add characters and sprites or generate scene clips.';
+  }else if($('videoGenerationMode').value==='local-canvas'&&sceneMetadata.some(scene=>Array.isArray(scene?.characters)&&scene.characters.length)){
+   status.textContent+=uiLang==='ru'
+    ?' Локальный режим показывает процедурную 2D-анимацию персонажей. Это офлайн-рендерер, а не нейросетевое AI-видео; существующие спрайты, риги и LipSync используются при наличии.'
+    :' Local mode uses procedural 2D character animation. This is an offline renderer, not neural AI video; authored sprites, rigs and LipSync remain active when available.';
   }
   status.scrollIntoView({behavior:'smooth',block:'nearest'});
   return currentStoryboardPlan;
