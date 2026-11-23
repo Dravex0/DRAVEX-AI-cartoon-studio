@@ -28,8 +28,8 @@ function propKind(name) {
   if (/table|стол|mesa/.test(value)) return 'table';
   if (/chair|стул|silla/.test(value)) return 'chair';
   if (/tree|дерев|деревц|árbol|arbol/.test(value)) return 'tree';
-  if (/rock|stone|камень|камін|piedra/.test(value)) return 'rock';
   if (/platform|ledge|платформ|уступ|plataforma/.test(value)) return 'platform';
+  if (/rock|stone|камень|камін|piedra/.test(value)) return 'rock';
   return 'generic';
 }
 
