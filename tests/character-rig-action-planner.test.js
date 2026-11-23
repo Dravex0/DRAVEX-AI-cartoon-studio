@@ -390,3 +390,30 @@ test('does not resolve an ambiguous prop target from multiple unmatched position
   assert.equal(result.status, 'generated');
   assert.equal(Object.hasOwn(result.mappedActions[0], 'targetedReach'), false);
 });
+
+
+test('holds the final authored pose after an action ends instead of snapping to rest', () => {
+  const scene = makeScene('sits on the bench');
+  scene.actionTimeline.phases[0].start = 0.2;
+  scene.actionTimeline.phases[0].end = 0.7;
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig()]);
+  assert.equal(result.status, 'generated');
+  const atEnd = sampleCharacterRigTimeline(result.timeline, 0.7).Foxy;
+  const afterEnd = sampleCharacterRigTimeline(result.timeline, 0.95).Foxy;
+  assert.ok(atEnd.root.y > 0.05);
+  assert.ok(afterEnd.root.y > 0.05);
+  assert.ok(Math.abs(afterEnd.root.y - atEnd.root.y) < 1e-6);
+});
+
+test('preserves the previous action pose through an idle gap before the next action', () => {
+  const scene = makeScene('sits on the bench, then waves hello');
+  scene.actionTimeline.phases = [
+    { phase: 'action', start: 0.1, end: 0.35, actorId: 'Foxy', targetId: null, intent: 'sit', description: 'Foxy sits on the bench', evidence: 'Foxy sits on the bench' },
+    { phase: 'action', start: 0.7, end: 0.95, actorId: 'Foxy', targetId: null, intent: 'wave', description: 'Foxy waves hello', evidence: 'Foxy waves hello' }
+  ];
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig()]);
+  assert.equal(result.status, 'generated');
+  const duringGap = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+  assert.ok(duringGap.root.y > 0.05);
+  assert.ok(Math.abs(duringGap.root.y - sampleCharacterRigTimeline(result.timeline, 0.35).Foxy.root.y) < 1e-6);
+});
