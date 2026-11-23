@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildGroundedPhysicsVisualPlan } from '../src/scene-physics-visual-bridge.js';
+import { normalizeScene } from '../src/scene-model.js';
+import { buildScenePhysicsModel } from '../src/scene-physics-model.js';
 const scene = { physicsEvents: [{ id: 'ball-flight', entityId: 'ball',
   visualStartPosition: { x: 0.1, y: 0.2 }, visualEndPosition: { x: 0.9, y: 0.8 },
   visualStartProgress: 0.2, visualEndProgress: 0.8 }] };
@@ -44,4 +46,25 @@ test('uses an authored quadratic viewport trajectory and interpolates object rot
   assert.ok(Math.abs(curved.x - 0.5) < 1e-9);
   assert.ok(curved.y < 0.5);
   assert.ok(Math.abs(curved.rotation - Math.PI / 2) < 1e-9);
+});
+
+test('keeps curved trajectory and rotation through the full scene normalization and physics path', () => {
+  const normalized = normalizeScene({
+    storyDetail: 'Mira throws the ball.',
+    physicsEvents: [{
+      id: 'flight', type: 'throw', entityId: 'ball', actorId: 'Mira',
+      evidence: 'Mira throws the ball.',
+      visualStartPosition: { x: 0.1, y: 0.8 },
+      visualControlPoint: { x: 0.5, y: 0.05 },
+      visualEndPosition: { x: 0.9, y: 0.8 },
+      visualStartProgress: 0, visualEndProgress: 1,
+      visualStartRotation: 0, visualEndRotation: Math.PI
+    }]
+  });
+  const physics = buildScenePhysicsModel([normalized]);
+  const sample = buildGroundedPhysicsVisualPlan(normalized, physics, 0.5)[0];
+  assert.equal(physics.events[0].grounded, true);
+  assert.ok(Math.abs(sample.x - 0.5) < 1e-9);
+  assert.ok(sample.y < 0.5);
+  assert.ok(Math.abs(sample.rotation - Math.PI / 2) < 1e-9);
 });
