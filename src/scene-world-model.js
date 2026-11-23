@@ -22,8 +22,13 @@ function sourceHasEvidence(scene, evidence, sourceText = '') {
 }
 
 function evidenceNamesEntity(evidence, entityId) {
+  const value = keyOf(evidence);
   const name = keyOf(entityId);
-  return Boolean(name && keyOf(evidence).includes(name));
+  if (!value || !name) return false;
+  if (value.includes(name)) return true;
+  const tokens = name.split(/[\s_-]+/u).filter(token =>
+    token.length >= 3 && !['the', 'and', 'for', 'with', 'una', 'uno', 'los', 'las'].includes(token));
+  return tokens.some(token => value.includes(token));
 }
 
 function addEntity(map, id, kind, sceneId, attributes = {}) {
