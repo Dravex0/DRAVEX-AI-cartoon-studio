@@ -84,10 +84,10 @@ const SEMANTIC_ACTIONS = [
     /esquiva\w*|evita el golpe/i
   ] },
   { intent: 'chase', motionCue: 'run', patterns: [
-    /\\b(?:chases?|pursues?|follows?|runs? after)\\b/i,
-    /преследу[\\p{L}]*|гонится\\s+за|догоня[\\p{L}]*/iu,
-    /пересліду[\\p{L}]*|женеться\\s+за|наздоганя[\\p{L}]*/iu,
-    /persigue|va\\s+tras|persigue a/i
+    /\b(?:chases?|pursues?|follows?|runs? after)\b/i,
+    /преследу[\p{L}]*|гонится\s+за|догоня[\p{L}]*/iu,
+    /пересліду[\p{L}]*|женеться\s+за|наздоганя[\p{L}]*/iu,
+    /persigue|va\s+tras|persigue a/i
   ] },
   { intent: 'attack', motionCue: 'run', patterns: [
     /\b(?:attacks?|strikes?|slashes?|swings? (?:a|the) (?:sword|blade)|fires? at)\b/i,
