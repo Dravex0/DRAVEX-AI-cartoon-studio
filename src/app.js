@@ -1602,7 +1602,7 @@ async function runSceneMotionAnalysis(){
   if(sceneMotionAnalysisRunning)return;
   const entries=sceneMetadata.map((meta,index)=>({meta,index,key:String(meta?.id||''),entry:sceneVideoCache.get(String(meta?.id||''))})).filter(item=>item.entry?.video);
   sceneMotionAnalysisRunning=true;
-  sceneMotionAnalysisSummary={checked:0,static:0,changed:0,skipped:0};
+  sceneMotionAnalysisSummary={checked:0,static:0,changed:0,skipped:0,motionTracks:0,persistentMotionTracks:0,motionRegionObservations:0};
   sceneMotionAnalysisResults=new Map();
   renderSceneMediaReport();
   try{
