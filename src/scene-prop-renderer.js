@@ -333,7 +333,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
         else if (change.property === 'visible' && typeof fromState === 'boolean') opacity = fromState ? 1 : 0;
         else if (change.property === 'rotation' && Number.isFinite(fromState)) rotation = fromState;
         else if (change.property === 'scale' && Number.isFinite(fromState)) scale = clamp(fromState, 0.05, 4);
-        break;
+        continue;
       }
       const progress = clamp((p - start) / Math.max(0.000001, end - start), 0, 1);
       transitionProgress = progress;
@@ -353,7 +353,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
           && Number.isFinite(fromState) && Number.isFinite(toState)) {
         scale = clamp(fromState + (toState - fromState) * progress, 0.05, 4);
       }
-      if (p <= end) break;
+      if (p <= end) continue;
       state = change.property === 'openState' ? (toState === 'open' ? 1 : 0) : state;
       opacity = change.property === 'visible' ? (toState ? 1 : 0) : opacity;
       rotation = change.property === 'rotation' && Number.isFinite(toState) ? toState : rotation;
