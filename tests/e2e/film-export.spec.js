@@ -161,7 +161,7 @@ test('assembles a storyboard into a non-empty WebM container', async ({ page }) 
 });
 
 
-test('blocks direct WebM export when a named protagonist has no character artwork', async ({ page }) => {
+test('exports an offline procedural protagonist when authored character artwork is unavailable', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -173,10 +173,18 @@ test('blocks direct WebM export when a named protagonist has no character artwor
   );
   await page.locator('#make').click();
   await expect(page.locator('#status')).toContainText(/storyboard created/i);
-  await expect(page.locator('#status')).toContainText(/local preview currently shows only the scene background/i);
+  await expect(page.locator('#status')).toContainText(/local mode uses procedural 2D character animation/i);
 
   await page.locator('#export').click();
-  await expect(page.locator('#status')).toContainText(/export stopped: .*no character image, rig or scene video/i);
-  await expect(page.locator('#finalFilmResult')).toBeHidden();
-  expect(pageErrors, 'a background-only direct export should be blocked without browser errors').toEqual([]);
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 45000 });
+  const film = await page.locator('#finalFilmPlayer').evaluate(async player => {
+    const response = await fetch(player.currentSrc);
+    const blob = await response.blob();
+    return { type: blob.type, size: blob.size, width: player.videoWidth, height: player.videoHeight };
+  });
+  expect(film.type).toMatch(/^video\\/webm/i);
+  expect(film.size).toBeGreaterThan(1024);
+  expect(film.width).toBeGreaterThan(0);
+  expect(film.height).toBeGreaterThan(0);
+  expect(pageErrors, 'offline procedural character export should not throw browser errors').toEqual([]);
 });
