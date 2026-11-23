@@ -53,7 +53,8 @@ test('walk, run, jump and wave create distinct motion curves', () => {
   assert.notEqual(walk.leftLeg, idle.leftLeg);
   assert.notEqual(run.leftLeg, walk.leftLeg);
   assert.ok(jump.bob < 0);
-  assert.ok(Math.abs(wave.rightArm) < 0.6);\n  assert.ok(wave.leftArm > 1.0);
+  assert.ok(Math.abs(wave.rightArm) < 0.6);
+  assert.ok(wave.leftArm > 1.0);
 });
 
 test('keeps the legacy mouth envelope bounded and outside-scene silence', () => {
