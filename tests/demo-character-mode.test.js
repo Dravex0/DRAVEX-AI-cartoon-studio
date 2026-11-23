@@ -128,3 +128,16 @@ test('procedural fallback consumes source-ordered action timeline progress', () 
   assert.match(appSource, /detectSceneActionAtProgress\(sceneMetadata\[index\]\|\|\{\},progress/);
   assert.match(appSource, /getSceneAction\(sceneIndex,sceneMotionProgress\)/);
 });
+
+
+test('does not treat a fully transparent sprite as renderable or suppress the procedural fallback', () => {
+  const scene = { characterLayers: [{
+    characterId: 'Foxy',
+    imageUrl: 'https://example.com/transparent-fox.png',
+    visible: true,
+    opacity: 0
+  }] };
+  const hasLayer = hasRenderableCharacterLayer(scene, 'Foxy');
+  assert.equal(hasLayer, false);
+  assert.equal(shouldShowProceduralDemoCharacter({ storyUsesFallback: true, hasCharacterLayers: hasLayer }), true);
+});

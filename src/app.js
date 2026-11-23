@@ -1090,6 +1090,7 @@ function renderCharacterSpriteAssets(){
     const updatedAssets=current.map(item=>item&&String(item.assetId||'')===assetId?{...item,transparencyStatus:status,transparencyCheck:check,verificationStatus:'not_verified',visualIdentityStatus:'not_verified'}:item);
     let updatedScene={...sceneMetadata[resolvedSceneIndex],characterSpriteAssets:updatedAssets};
     sceneMetadata[resolvedSceneIndex]=updatedScene;
+    if(typeof addButton!=='undefined')addButton.disabled=status!=='verified';
     if(status==='verified'){
      // Alpha-channel verification is the minimum safe gate before the sprite
      // becomes a visible character layer. Identity/anatomy remain unverified.
@@ -1145,18 +1146,24 @@ function renderCharacterSpriteAssets(){
   image.src=asset.imageUrl;
   verificationImage.src=asset.imageUrl;
   const addButton=document.createElement('button');addButton.type='button';addButton.className='secondary';
-  addButton.disabled=!isCurrentAsset;
+  addButton.disabled=!isCurrentAsset||initialTransparency!=='verified';
   const alreadyAttached=(Array.isArray(sceneMetadata[sceneIndex]?.characterLayers)?sceneMetadata[sceneIndex].characterLayers:[]).some(layer=>String(layer?.characterId||'').toLocaleLowerCase()===String(asset.characterId||'').toLocaleLowerCase());
   addButton.textContent=alreadyAttached?(uiLang==='ru'?'Обновить на сцене':'Update on scene'):(uiLang==='ru'?'Добавить на сцену':'Add to scene');
   addButton.addEventListener('click',()=>{
    const resolvedSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===sceneId);
    if(resolvedSceneIndex<0)return;
-   if(!isCurrentCharacterSpriteAsset(sceneMetadata[resolvedSceneIndex],characterBible,asset)){
+   const currentAssets=Array.isArray(sceneMetadata[resolvedSceneIndex]?.characterSpriteAssets)?sceneMetadata[resolvedSceneIndex].characterSpriteAssets:[];
+   const verifiedAsset=currentAssets.find(item=>item&&String(item.assetId||'')===assetId)||asset;
+   if(!isCurrentCharacterSpriteAsset(sceneMetadata[resolvedSceneIndex],characterBible,verifiedAsset)){
     $('status').textContent=staleAssetNote;
     addButton.disabled=true;
     return;
    }
-   const result=attachCharacterSpriteToSceneLayers(sceneMetadata[resolvedSceneIndex],asset);
+   const result=attachVerifiedCharacterSpriteToSceneLayers(sceneMetadata[resolvedSceneIndex],verifiedAsset);
+   if(result.status==='verification-required'){
+    $('status').textContent=uiLang==='ru'?'Сначала проверь прозрачность спрайта; непроверенное изображение не добавляется на сцену.':'Verify sprite transparency before adding it to the scene.';
+    return;
+   }
    if(result.status==='invalid'){
     $('status').textContent=uiLang==='ru'?'Не удалось добавить спрайт: проверь имя персонажа и HTTPS-ссылку.':'Could not attach sprite: check character ID and HTTPS image URL.';
     return;
@@ -2287,9 +2294,7 @@ function prepareAutomaticCharacterMotion(){
 function getMissingCharacterVisualCount(protagonistId = currentStoryboardPlan?.sourceCharacter || $('character').value.trim()) {
  return countScenesMissingCharacterVisuals(sceneMetadata,{
   protagonistId,
-  proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true,
-  hasSceneVideo:(scene,index)=>Boolean(sceneVideoCache.get(sceneVideoKey(index,scene))?.video)
- });
+  proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true });
 }
 
 $('makeFilm').addEventListener('click',async()=>{
@@ -2403,8 +2408,8 @@ $('makeFilm').addEventListener('click',async()=>{
    ?'Для '+gate.missingImageCount+' сцен ещё нет изображений. Отдельно подтверди отправку только текстовых промптов в AI Horde либо добавь изображения вручную.'
    :' '+gate.missingImageCount+' scene image(s) are missing. Separately allow sending text prompts to AI Horde, or add scene images manually.');
   if(gate.blockers.includes('character-visual-assets-required'))messages.push(ru
-   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах нет изображений или видеоклипов персонажей. Добавь изображения/спрайты героев через инструменты генерации сцен и персонажей либо выбери Hugging Face или локальный ComfyUI. Фоновое видео вместо мультфильма создавать не будем.'
-   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes have no character images or video clips. Add character images/sprites with the scene and character tools, or choose Hugging Face or local ComfyUI. A background-only video will not be exported.');
+   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах нет видимого спрайта или проверенного рига нужного персонажа. Добавь спрайт/риг через инструменты генерации персонажей либо выбери Hugging Face или локальный ComfyUI для генерации видеосцены. Кэшированный фон не заменяет персонажа.'
+   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes have no visible sprite or validated rig for the required cast. Add character sprites/rigs, or switch to Hugging Face or local ComfyUI to generate full-scene video. A cached background clip is not character evidence.');
   $('status').textContent=messages.join(' ');
   if(mode==='huggingface')$('hfVideoPanel').open=true;
   if(mode==='comfyui')$('comfyPanel').open=true;
@@ -3861,11 +3866,11 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     return {status:'failed',reason:'There are no storyboard scenes to export.'};
   }
   const exportProtagonistId=String(currentStoryboardPlan?.sourceCharacter||$('character').value||'').trim();
-  const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId);
+  const missingCharacterAssetCount=requireAllVideos?0:getMissingCharacterVisualCount(exportProtagonistId);
   if(missingCharacterAssetCount>0){
     const message=uiLang==='ru'
-      ?'Экспорт остановлен: в '+missingCharacterAssetCount+' сценах нет изображения персонажа, рига или видеоклипа сцены. Добавь спрайты/риги либо сначала создай видеосцены; экспорт одного фона заблокирован.'
-      :'Export stopped: '+missingCharacterAssetCount+' scenes have no character image, rig or scene video. Add character sprites/rigs or generate scene videos first; background-only export is blocked.';
+      ?'Экспорт остановлен: в '+missingCharacterAssetCount+' сценах нет видимого спрайта или проверенного рига для локального Canvas-экспорта. Добавь спрайты/риги либо сначала создай полноценные видеосцены.'
+      :'Export stopped: '+missingCharacterAssetCount+' scenes have no visible sprite or validated rig for local Canvas export. Add character sprites/rigs or generate full-scene videos first.';
     $('status').textContent=message;
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Экспорт остановлен','Export stopped'),message);filmProgressTracking=false;}
     return {status:'failed',reason:message,missingCharacterAssetCount};

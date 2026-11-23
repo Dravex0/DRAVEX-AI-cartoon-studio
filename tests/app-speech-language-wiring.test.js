@@ -69,9 +69,10 @@ test('blocks local-canvas export when a scene background is present but characte
   assert.ok(helperStart >= 0 && helperEnd > helperStart, 'shared character visual readiness helper must exist before the start handler');
   const helper = appSource.slice(helperStart, helperEnd);
   assert.match(helper, /countScenesMissingCharacterVisuals/);
-  assert.match(helper, /sceneVideoCache/);
   assert.match(helper, /proceduralFallback/);
+  assert.doesNotMatch(helper, /sceneVideoCache|hasSceneVideo/,
+    'a cached video may contain scenery only and must not bypass the character-asset gate');
   assert.doesNotMatch(helper, /generatedImageUrl/,
     'a generated scene background is not proof that a character is visible');
-  assert.match(appSource.slice(blocker, blocker + 900), /Фоновое видео вместо мультфильма создавать не будем/);
+  assert.match(appSource.slice(blocker, blocker + 1000), /Кэшированный фон не заменяет персонажа/);
 });
