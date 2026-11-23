@@ -568,3 +568,21 @@ test('keeps an explicitly positioned released prop visible in a later scene snap
   assert.equal(plan.snapshot, true);
   assert.deepEqual([plan.x, plan.y], [0.76, 0.82]);
 });
+
+test('classifies common interactive props into dedicated visual forms', () => {
+  const names = [
+    ['iron sword', 'weapon'], ['wooden shield', 'shield'], ['water bottle', 'bottle'],
+    ['smartphone', 'phone'], ['coffee cup', 'cup'], ['red car', 'vehicle'],
+    ['wooden table', 'furniture']
+  ];
+  const scene = {
+    stateChanges: names.map(([entityId], index) => ({
+      entityType: 'prop', entityId, property: 'holder',
+      previousValue: null, value: 'Foxy', actorId: 'Foxy',
+      evidence: `Foxy picks up the ${entityId}.`, index
+    }))
+  };
+  const layers = [{ characterId: 'Foxy', x: 0.5, y: 0.65 }];
+  const plan = buildScenePropRenderPlan(scene, layers, 1);
+  assert.deepEqual(plan.map(item => [item.id, item.kind]), names);
+});
