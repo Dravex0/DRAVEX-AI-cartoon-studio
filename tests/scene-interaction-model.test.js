@@ -97,3 +97,20 @@ test('injects grounded interaction rules into the final motion-generation prompt
   assert.match(prompt, /continuous handoff/i);
   assert.match(prompt, /never duplicate the object/i);
 });
+
+test('keeps raw physics event evidence aligned when malformed entries are skipped', () => {
+  const scene = {
+    id: 'indexed-events',
+    storyDetail: 'Mira throws the ball to Noah.',
+    physicsEvents: [
+      null,
+      { type: 'throw', entityId: 'ball', actorId: 'Mira', targetId: 'Noah',
+        evidence: 'Mira throws the ball to Noah.' }
+    ]
+  };
+  const model = buildSceneInteractionModel(scene);
+  assert.equal(model.eventCount, 1);
+  assert.equal(model.events[0].type, 'throw');
+  assert.equal(model.events[0].actorId, 'Mira');
+  assert.equal(model.events[0].targetId, 'Noah');
+});
