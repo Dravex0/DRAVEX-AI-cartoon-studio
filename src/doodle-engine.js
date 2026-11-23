@@ -3,7 +3,7 @@ import { detectSceneAction } from './scene-action.js';
 import { validateCharacterActionTimeline } from './character-action-timeline.js';
 import { validateCharacterRig } from './character-rig.js';
 
-export const ACTIONS = Object.freeze(['idle', 'walk', 'run', 'jump', 'wave', 'scared', 'talk', 'happy', 'sad', 'turn', 'dance', 'float']);
+export const ACTIONS = Object.freeze(['idle', 'walk', 'run', 'jump', 'wave', 'scared', 'talk', 'happy', 'sad', 'turn', 'dance', 'float', 'surprised', 'magic', 'attack', 'defend', 'dodge', 'throw', 'catch', 'give', 'take', 'put_down', 'point', 'sit', 'crawl', 'eat_drink', 'sleep_wake', 'vanish']);
 export const BACKGROUNDS = Object.freeze(['day', 'night', 'forest', 'city']);
 
 const clamp = (value, min, max, fallback = min) => {
@@ -20,6 +20,28 @@ const hash = value => {
 };
 const key = value => String(value ?? '').trim().toLocaleLowerCase();
 const record = value => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
+const INTENT_ACTIONS = Object.freeze({
+  attack: 'attack', defend: 'defend', dodge: 'dodge', throw: 'throw',
+  catch: 'catch', give: 'give', take: 'take', pickup: 'take',
+  put_down: 'put_down', point: 'point', sit: 'sit', crawl: 'crawl',
+  eat_drink: 'eat_drink', sleep_wake: 'sleep_wake', magic: 'magic',
+  vanish: 'vanish', warning: 'talk', shout_command: 'talk',
+  hands_up: 'scared', freeze: 'scared', discover_threat: 'surprised',
+  reveal: 'surprised', intervene: 'run', enter_location: 'walk',
+  advance: 'walk', stealth_advance: 'walk', listen_carefully: 'turn',
+  hear_sound: 'turn', power_up: 'magic', team_magic: 'magic', energy_clash: 'magic'
+});
+
+export function actionForStep(step = {}, fallbackDescription = '') {
+  const intent = String(step?.intent || '').trim().toLocaleLowerCase();
+  if (INTENT_ACTIONS[intent]) return INTENT_ACTIONS[intent];
+  const cue = String(step?.motionCue || '').trim().toLocaleLowerCase();
+  if (ACTIONS.includes(cue)) return cue;
+  const description = String(step?.description || fallbackDescription || '').trim();
+  const detected = detectSceneAction(description);
+  return ACTIONS.includes(detected) ? detected : 'idle';
+}
 
 /**
  * Deterministic pose curves for the optional offline Doodle renderer.
@@ -103,6 +125,38 @@ export function poseAt(action = 'idle', progress = 0, seed = 0) {
     pose.rightArm = 0.45;
     pose.leftLeg = -0.16;
     pose.rightLeg = 0.16;
+  } else if (cue === 'surprised') {
+    pose.leftArm = -0.7; pose.rightArm = 0.7; pose.mouth = 0.9; pose.headTilt = -0.08;
+  } else if (cue === 'magic') {
+    pose.leftArm = -0.65; pose.rightArm = 1.15; pose.tailSwing = small * 0.28;
+  } else if (cue === 'attack') {
+    pose.leftArm = -0.9 + swing * 0.25; pose.rightArm = 1.35 - swing * 0.25;
+    pose.lean = 0.24; pose.leftLeg = -0.25; pose.rightLeg = 0.35;
+  } else if (cue === 'defend') {
+    pose.leftArm = -0.5; pose.rightArm = 0.5; pose.lean = -0.12;
+  } else if (cue === 'dodge') {
+    pose.bob = 0.06; pose.lean = swing * 0.3; pose.leftArm = -0.9; pose.rightArm = 0.9;
+  } else if (cue === 'throw') {
+    pose.leftArm = -0.3; pose.rightArm = 1.5; pose.lean = 0.2;
+  } else if (cue === 'catch') {
+    pose.leftArm = -0.85; pose.rightArm = 0.85; pose.bob = Math.abs(swing) * 0.025;
+  } else if (cue === 'give' || cue === 'take') {
+    pose.leftArm = -0.25; pose.rightArm = 1.1; pose.lean = 0.08;
+  } else if (cue === 'put_down') {
+    pose.bob = 0.07; pose.rightArm = 1.35; pose.leftArm = -0.2;
+  } else if (cue === 'point') {
+    pose.rightArm = 1.55; pose.leftArm = -0.2; pose.headTilt = 0.06;
+  } else if (cue === 'sit') {
+    pose.bob = 0.1; pose.leftLeg = -0.6; pose.rightLeg = 0.6; pose.leftArm = -0.2; pose.rightArm = 0.2;
+  } else if (cue === 'crawl') {
+    pose.bob = 0.11; pose.lean = 0.45; pose.leftLeg = swing * 0.7; pose.rightLeg = -swing * 0.7;
+    pose.leftArm = -0.5 + swing * 0.3; pose.rightArm = 0.5 - swing * 0.3;
+  } else if (cue === 'eat_drink') {
+    pose.rightArm = 0.25; pose.leftArm = -0.2; pose.headTilt = 0.08;
+  } else if (cue === 'sleep_wake') {
+    pose.headTilt = 0.18; pose.bob = Math.sin(phase) * 0.008;
+  } else if (cue === 'vanish') {
+    pose.opacity = 1 - p; pose.bob = -p * 0.08;
   } else {
     pose.bob = Math.sin(phase) * 0.012;
     pose.leftArm += small * 0.035;
@@ -187,7 +241,8 @@ export function drawFigure(context, pose = {}, options = {}) {
   const p = pose || {};
   context.save();
   try {
-    context.translate(x, y + (Number(p.bob) || 0) * size);
+    context.globalAlpha = (Number.isFinite(context.globalAlpha) ? context.globalAlpha : 1) * clamp(options.opacity ?? p.opacity, 0, 1, 1);
+    context.translate(x + (Number(p.shiftX) || 0) * size, y + (Number(p.bob) || 0) * size);
     context.rotate(clamp(p.lean, -0.5, 0.5, 0));
     context.scale(unit, unit);
     // Tail is drawn first so the body naturally occludes its attachment.
@@ -251,8 +306,14 @@ export function drawFigure(context, pose = {}, options = {}) {
     context.ellipse(0, 11, colors.species === 'fox' ? 16 : 19, 13, 0, 0, Math.PI * 2);
     context.fill();
     context.fillStyle = colors.dark;
-    context.beginPath(); context.arc(-10, -3, 3.2, 0, Math.PI * 2); context.fill();
-    context.beginPath(); context.arc(10, -3, 3.2, 0, Math.PI * 2); context.fill();
+    if (p.action === 'sleep_wake') {
+      context.strokeStyle = colors.dark; context.lineWidth = 2.5;
+      context.beginPath(); context.moveTo(-15, -3); context.lineTo(-5, -3); context.stroke();
+      context.beginPath(); context.moveTo(5, -3); context.lineTo(15, -3); context.stroke();
+    } else {
+      context.beginPath(); context.arc(-10, -3, 3.2, 0, Math.PI * 2); context.fill();
+      context.beginPath(); context.arc(10, -3, 3.2, 0, Math.PI * 2); context.fill();
+    }
     context.fillStyle = colors.dark;
     if (mouth > 0.16) {
       context.beginPath(); context.ellipse(0, 14, 4 + mouth * 4, 2 + mouth * 8, 0, 0, Math.PI * 2); context.fill();
@@ -347,8 +408,10 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     const active = activeActorStep(actorScene, layer.characterId, progress, timelineValid);
     const step = active?.step;
     const actionText = String(step?.description || step?.intent || '');
-    const requestedCue = String(step?.motionCue || '').trim();
-    const action = ACTIONS.includes(requestedCue) ? requestedCue : detectSceneAction(actionText);
+    const fallbackAction = cast.length === 1
+      ? detectSceneAction(scene.visibleAction || scene.storyDetail || scene.description || '')
+      : 'idle';
+    const action = active ? actionForStep(step, actionText) : fallbackAction;
     const pose = poseAt(action, active?.localProgress ?? progress, layer.characterId);
     const mouthValue = mouthById[layer.characterId] ?? mouthById[key(layer.characterId)];
     const mouth = Number.isFinite(Number(mouthValue)) ? Number(mouthValue) : pose.mouth;
