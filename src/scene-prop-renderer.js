@@ -66,6 +66,7 @@ export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}
  */
 export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progress = 1, runtime = {}) {
   const changes = Array.isArray(scene?.stateChanges) ? scene.stateChanges : [];
+  const snapshots = Array.isArray(scene?.stateSnapshot) ? scene.stateSnapshot : [];
   const layers = Array.isArray(characterLayers) ? characterLayers : [];
   const p = clamp(Number.isFinite(progress) ? progress : 1, 0, 1);
   const actionPhase = Array.isArray(scene?.actionTimeline?.phases)
@@ -192,6 +193,23 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     };
   });
 
+  // A held prop remains present in the next shot even when that shot contains
+  // no new pickup event. Only attach it when its named holder is in the scene.
+  for (const snapshot of snapshots) {
+    if (snapshot?.entityType !== 'prop' || snapshot.property !== 'holder' || !snapshot.value) continue;
+    const entityId = clean(snapshot.entityId);
+    if (!entityId || holderPlans.some(item => key(item.id) === key(entityId))) continue;
+    const holderId = clean(snapshot.value);
+    if (!layers.some(layer => key(layer?.characterId) === key(holderId))) continue;
+    const point = holderPoint(holderId, snapshot.position);
+    holderPlans.push({
+      id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
+      rotation: Number.isFinite(point.rotation) ? point.rotation : 0,
+      held: true, visible: true, opacity: 1, scale: 1,
+      evidence: clean(snapshot.evidence), snapshot: true, transitionProgress: 1
+    });
+  }
+
   // Explicit position changes are rendered only when both endpoints are known.
   // A missing start position stays static rather than inventing a trajectory.
   const positionByProp = new Map();
@@ -287,7 +305,11 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   // Render open/closed and visibility transitions only when an authored
   // viewport anchor exists. A story verb alone does not reveal where an object
   // should appear in the frame.
-  const statefulChanges = changes.filter(change => change?.entityType === 'prop'
+  const changedStateKeys = new Set(changes.filter(change => change?.entityType === 'prop')
+    .map(change => [key(change.entityId), clean(change.property)].join(':')));
+  const snapshotOnly = snapshots.filter(change => change?.entityType === 'prop'
+    && !changedStateKeys.has([key(change.entityId), clean(change.property)].join(':')));
+  const statefulChanges = [...changes, ...snapshotOnly].filter(change => change?.entityType === 'prop'
     && ['openState', 'visible', 'rotation', 'scale'].includes(change.property)
     && normalizedPoint(change.position));
   const statefulByProp = new Map();
