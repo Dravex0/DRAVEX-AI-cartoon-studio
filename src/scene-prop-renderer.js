@@ -128,24 +128,37 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   }
 
   const ground = { x: 0.68, y: 0.79, rotation: 0 };
-  const holderPoint = (holderId, loosePosition = null) => {
+  const holderPoint = (holderId, loosePosition = null, gripHand = '') => {
     if (holderId == null || !clean(holderId)) return normalizedPoint(loosePosition) || ground;
     const actorId = clean(holderId);
     const actor = layers.find(layer => key(layer?.characterId) === key(actorId));
     const actorX = Number.isFinite(actor?.x) ? actor.x : 0.5;
     const actorY = Number.isFinite(actor?.y) ? actor.y : 0.68;
     const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
-    return rigAnchor
-      ? { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation }
-      : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96),
-          y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
+    if (rigAnchor) return { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation };
+    const proceduralEntry = Object.entries(runtime.proceduralPropAnchors || {})
+      .find(([id]) => key(id) === key(actorId))?.[1];
+    const requestedHand = key(gripHand);
+    const requestedSide = /left/.test(requestedHand) ? 'leftHand'
+      : /right/.test(requestedHand) ? 'rightHand' : null;
+    const proceduralAnchor = (requestedSide && proceduralEntry?.[requestedSide])
+      || proceduralEntry?.rightHand || proceduralEntry?.leftHand;
+    if (normalizedPoint(proceduralAnchor)) {
+      return {
+        x: proceduralAnchor.x,
+        y: proceduralAnchor.y,
+        rotation: Number.isFinite(proceduralAnchor.rotation) ? proceduralAnchor.rotation : 0
+      };
+    }
+    return { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96),
+      y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
   };
 
   const holderPlans = [...byProp.values()].map(history => {
     const entityId = clean(history[0].entityId);
     const interval = (phaseEnd - phaseStart) / Math.max(1, history.length);
     let holder = history[0].previousValue ?? null;
-    let from = holderPoint(holder, history[0].position);
+    let from = holderPoint(holder, history[0].position, history[0].fromGripHand || history[0].gripHand || history[0].hand);
     let to = from;
     let held = holder != null;
     let activeEvidence = clean(history[0].evidence);
@@ -159,8 +172,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       const end = matchedStep ? matchedStep.end : start + interval;
       const nextHolder = change.value ?? null;
       if (p < start) break;
-      from = holderPoint(holder, change.position);
-      to = holderPoint(nextHolder, change.position);
+      from = holderPoint(holder, change.position, change.fromGripHand || change.gripHand || change.hand);
+      to = holderPoint(nextHolder, change.position, change.toGripHand || change.gripHand || change.hand);
       activeEvidence = clean(change.evidence);
       activeIndex = index;
       if (p <= end) {
@@ -181,7 +194,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     }
 
     const finalPositionChange = history[activeIndex >= 0 ? activeIndex : 0];
-    const point = holderPoint(holder, finalPositionChange?.position);
+    const point = holderPoint(holder, finalPositionChange?.position, finalPositionChange?.gripHand || finalPositionChange?.hand);
     return {
       id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
       rotation: point.rotation || 0, held, visible: true, scale: 1,
@@ -226,7 +239,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
             || key(change.actorId) === key(item.actorId)))
         : null;
       const releasePoint = release
-        ? (normalizedPoint(release.position) || holderPoint(release.previousValue, release.position))
+        ? (normalizedPoint(release.position) || holderPoint(release.previousValue, release.position, release.fromGripHand || release.gripHand || release.hand))
         : null;
       if (releasePoint && index === 0) from = releasePoint;
       // The holder-release event and its paired position trajectory describe
