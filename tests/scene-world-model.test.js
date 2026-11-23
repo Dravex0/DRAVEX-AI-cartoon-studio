@@ -146,3 +146,18 @@ test('adds only evidence-grounded physical object and contact relations', () => 
     && relation.from === 'Noah' && relation.to === 'ball' && relation.action === 'catch'));
   assert.equal(model.entities.some(entity => entity.id === 'wall'), false);
 });
+
+test('retains persistent prop state snapshots in subsequent scene events', () => {
+  const model = buildSceneWorldModel([
+    { id: 's1', characters: ['Foxy'], storyDetail: 'Foxy picks up the silver key.',
+      stateChanges: [{ entityType: 'prop', entityId: 'silver key', property: 'holder',
+        previousValue: null, value: 'Foxy', actorId: 'Foxy', evidence: 'Foxy picks up the silver key.' }] },
+    { id: 's2', characters: ['Foxy'], storyDetail: 'Foxy walks through the gate.',
+      stateSnapshot: [{ entityType: 'prop', entityId: 'silver key', property: 'holder',
+        previousValue: 'Foxy', value: 'Foxy', actorId: 'Foxy', snapshot: true,
+        evidence: 'Foxy picks up the silver key.' }] }
+  ]);
+  assert.ok(model.events[1].actions.some(action => action.type === 'state_snapshot'
+    && action.entityId === 'silver key' && action.value === 'Foxy'));
+  assert.equal(model.validation.stateContinuityConflicts.length, 0);
+});
