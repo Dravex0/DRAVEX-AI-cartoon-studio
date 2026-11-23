@@ -153,6 +153,24 @@ function applyTargetedArmPose(timeline, actorId, targetPose) {
   };
 }
 
+function blendCharacterPose(from = {}, to = {}, progress = 0) {
+  const result = {};
+  const boneIds = new Set([...Object.keys(from), ...Object.keys(to)]);
+  for (const boneId of boneIds) {
+    const fromBone = from[boneId] || {};
+    const toBone = to[boneId] || {};
+    const pose = {};
+    for (const property of ['x', 'y', 'rotation']) {
+      const start = Number.isFinite(fromBone[property]) ? fromBone[property] : 0;
+      const end = Number.isFinite(toBone[property]) ? toBone[property] : 0;
+      const value = start + (end - start) * progress;
+      if (value !== 0) pose[property] = value;
+    }
+    if (Object.keys(pose).length) result[boneId] = pose;
+  }
+  return result;
+}
+
 /**
  * Converts grounded scene action phases into scene-time rig poses.
  * This is deterministic preset mapping, not semantic video understanding.
@@ -250,9 +268,8 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
       times.add(Number((segment.start + (segment.end - segment.start) * frame.time).toFixed(6)));
     }
   }
-  // Add a hold keyframe immediately before each later action so interpolation
-  // does not prematurely blend the previous pose toward the next action during
-  // an intentional idle gap.
+  // Preserve the prior pose through gaps, then blend into the next action
+  // over a short anticipation window instead of snapping at its first frame.
   for (const actorSegments of byActor.values()) {
     for (let index = 1; index < actorSegments.length; index++) {
       const previous = actorSegments[index - 1];
@@ -261,6 +278,10 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
       if (gap > 0.00001) {
         const holdTime = Number((next.start - Math.min(0.001, gap / 2)).toFixed(6));
         if (holdTime > previous.end && holdTime < next.start) times.add(holdTime);
+      }
+      const transitionDuration = Math.min((next.end - next.start) * 0.12, 0.08);
+      if (transitionDuration > 0.00001) {
+        times.add(Number((next.start + transitionDuration).toFixed(6)));
       }
     }
   }
@@ -272,9 +293,29 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
   const keyframes = orderedTimes.map(time => {
     const poses = {};
     for (const [actorKey, actorSegments] of byActor) {
-      const activeSegment = actorSegments.find(item => time >= item.start && time <= item.end);
-      const previousSegment = [...actorSegments].reverse().find(item => item.end < time);
+      const activeIndex = actorSegments.findIndex(item => time >= item.start && time <= item.end);
+      const activeSegment = activeIndex >= 0 ? actorSegments[activeIndex] : null;
+      const previousSegment = activeIndex > 0
+        ? actorSegments[activeIndex - 1]
+        : [...actorSegments].reverse().find(item => item.end < time);
       const nextSegment = actorSegments.find(item => item.start > time);
+
+      if (activeSegment && activeIndex > 0) {
+        const transitionDuration = Math.min((activeSegment.end - activeSegment.start) * 0.12, 0.08);
+        const transitionEnd = activeSegment.start + transitionDuration;
+        if (transitionDuration > 0.00001 && time >= activeSegment.start && time < transitionEnd) {
+          const previousSample = sampleCharacterRigTimeline(previousSegment.timeline, 1);
+          const nextLocalTime = (time - activeSegment.start) / (activeSegment.end - activeSegment.start);
+          const nextSample = sampleCharacterRigTimeline(activeSegment.timeline, nextLocalTime);
+          const previousPose = previousSample[previousSegment.actorId] || {};
+          const nextPose = nextSample[activeSegment.actorId] || {};
+          const rawProgress = (time - activeSegment.start) / transitionDuration;
+          const easedProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
+          poses[activeSegment.actorId] = blendCharacterPose(previousPose, nextPose, easedProgress);
+          continue;
+        }
+      }
+
       // Keep the last authored pose through idle gaps instead of snapping the
       // character back to the rig rest pose when no action segment is active.
       // Before the first action, sample its initial (normally neutral) pose.

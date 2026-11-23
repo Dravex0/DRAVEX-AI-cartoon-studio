@@ -422,6 +422,15 @@ test('preserves the previous action pose through an idle gap before the next act
   assert.equal(result.status, 'generated');
   const duringGap = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
   const atEndOfSit = sampleCharacterRigTimeline(result.timeline, 0.35).Foxy;
+  const atNextActionStart = sampleCharacterRigTimeline(result.timeline, 0.7).Foxy;
+  const duringTransition = sampleCharacterRigTimeline(result.timeline, 0.715).Foxy;
+  const afterTransition = sampleCharacterRigTimeline(result.timeline, 0.73).Foxy;
   assert.ok(duringGap.root.y > 0.05);
   assert.ok(Math.abs(duringGap.root.y - atEndOfSit.root.y) < 1e-6);
+  assert.ok(Math.abs(atNextActionStart.root.y - atEndOfSit.root.y) < 1e-6,
+    'the next action must begin from the previous authored pose');
+  assert.ok(Math.abs(duringTransition.rightArm.rotation - atNextActionStart.rightArm.rotation) > 0.05,
+    'the next action should visibly begin blending during its transition window');
+  assert.ok(Math.abs(afterTransition.rightArm.rotation) > Math.abs(duringTransition.rightArm.rotation),
+    'the transition should progress toward the next action pose');
 });
