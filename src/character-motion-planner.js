@@ -57,9 +57,13 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
   const phases = [];
   const skipped = [];
 
+  // Process every actor's action in scene-time order, not generator array order.
+  // Otherwise a pursuer can plan against a target's stale pre-movement position.
   const actionSteps = scene.actionTimeline.phases.flatMap(phase =>
     Array.isArray(phase.steps) ? phase.steps.map(step => ({ ...step, phase: 'action' })) : [phase]
-  );
+  ).map((source, index) => ({ source, index }))
+    .sort((a, b) => a.source.start - b.source.start || a.source.end - b.source.end || a.index - b.index)
+    .map(item => item.source);
   for (const source of actionSteps) {
     const actorId = clean(source.actorId);
     const actorKey = key(actorId);
