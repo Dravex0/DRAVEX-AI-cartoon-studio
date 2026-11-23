@@ -35,8 +35,13 @@ function issue(code, phase, message) {
 }
 
 function evidenceNamesEntity(evidence, entityId) {
+  const value = clean(evidence, 500).toLocaleLowerCase();
   const name = clean(entityId, 120).toLocaleLowerCase();
-  return Boolean(name && clean(evidence, 500).toLocaleLowerCase().includes(name));
+  if (!value || !name) return false;
+  if (value.includes(name)) return true;
+  const tokens = name.split(/[\s_-]+/u).filter(token =>
+    token.length >= 3 && !['the', 'and', 'for', 'with', 'una', 'uno', 'los', 'las'].includes(token));
+  return tokens.some(token => value.includes(token));
 }
 
 export function normalizeCharacterActionTimeline(rawTimeline) {
