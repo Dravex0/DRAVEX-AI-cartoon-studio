@@ -16,6 +16,11 @@ const normalizedScenePoint = value => value && typeof value === 'object' && !Arr
   && typeof value.x === 'number' && Number.isFinite(value.x) && value.x >= 0 && value.x <= 1
   && typeof value.y === 'number' && Number.isFinite(value.y) && value.y >= 0 && value.y <= 1
   ? { x: value.x, y: value.y } : null;
+const normalizeStateValue = value => value == null ? null
+  : typeof value === 'string' ? text(value, 160)
+  : typeof value === 'boolean' ? value
+  : typeof value === 'number' && Number.isFinite(value) ? value
+  : null;
 
 /** Normalize both current and legacy prototype scene shapes without dropping production prompts. */
 export function normalizeScene(input = {}, index = 0) {
@@ -113,8 +118,8 @@ export function normalizeScene(input = {}, index = 0) {
         entityType: text(change.entityType, 20),
         entityId: text(change.entityId, 120),
         property: text(change.property, 40),
-        previousValue: change.previousValue == null ? null : text(change.previousValue, 160),
-        value: change.value == null ? null : text(change.value, 160),
+        previousValue: normalizeStateValue(change.previousValue),
+        value: normalizeStateValue(change.value),
         actorId: text(change.actorId, 120),
         evidence: text(change.evidence, 1_200),
         ...(change.actionIntent == null || change.actionIntent === '' ? {} : { actionIntent: text(change.actionIntent, 40) }),
@@ -122,6 +127,22 @@ export function normalizeScene(input = {}, index = 0) {
         ...(previousPosition ? { previousPosition } : {})
       };
     }) : [],
+    stateSnapshot: Array.isArray(scene.stateSnapshot) ? scene.stateSnapshot
+      .filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 100).map(item => {
+        const position = normalizedScenePoint(item.position);
+        const previousPosition = normalizedScenePoint(item.previousPosition);
+        return {
+          entityType: text(item.entityType, 20), entityId: text(item.entityId, 120),
+          property: text(item.property, 40),
+          previousValue: normalizeStateValue(item.previousValue),
+          value: normalizeStateValue(item.value),
+          actorId: text(item.actorId, 120), evidence: text(item.evidence, 1_200),
+          snapshot: item.snapshot === true,
+          ...(item.actionIntent == null || item.actionIntent === '' ? {} : { actionIntent: text(item.actionIntent, 40) }),
+          ...(position ? { position } : {}),
+          ...(previousPosition ? { previousPosition } : {})
+        };
+      }) : [],
     interactions: Array.isArray(scene.interactions) ? scene.interactions.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(0, 30).map(item => ({
       type: text(item.type, 40), actorId: text(item.actorId, 120), targetId: text(item.targetId, 120),
       evidence: text(item.evidence, 500),
