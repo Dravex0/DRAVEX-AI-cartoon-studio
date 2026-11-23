@@ -390,3 +390,32 @@ test('does not resolve an ambiguous prop target from multiple unmatched position
   assert.equal(result.status, 'generated');
   assert.equal(Object.hasOwn(result.mappedActions[0], 'targetedReach'), false);
 });
+
+
+test('maps 17 additional semantic scene actions to dedicated articulated rig presets', () => {
+  const cases = [
+    ['chases Bird through the forest', 'run'],
+    ['rescues Bird from the river', 'run'],
+    ['climbs the ladder', 'climb'],
+    ['swims across the river', 'swim'],
+    ['crawls under the table', 'crawl'],
+    ['falls from the platform', 'fall'],
+    ['lands on the ground', 'land'],
+    ['opens the door', 'open'],
+    ['closes the door', 'close'],
+    ['drinks from the bottle', 'eat_drink'],
+    ['wakes up from sleep', 'sleep_wake'],
+    ['draws a map', 'write_draw'],
+    ['powers up as energy surges around the hands', 'power_up'],
+    ['combines powers with Bird', 'team_magic'],
+    ['their energy collides in a powerful clash', 'energy_clash'],
+    ['restrains Bird', 'restrain'],
+    ['appears from the shadows', 'reveal']
+  ];
+  for (const [description, expectedPreset] of cases) {
+    const result = createCharacterRigTimelineFromActionTimeline(makeScene(description), [rig()]);
+    assert.equal(result.status, 'generated', description);
+    assert.equal(result.mappedActions[0].preset, expectedPreset, description);
+    assert.ok(sampleCharacterRigTimeline(result.timeline, 0.5).Foxy, description);
+  }
+});
