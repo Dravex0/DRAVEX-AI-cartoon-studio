@@ -3,7 +3,7 @@ const ACTION_PATTERNS = [
   { action: 'wave', patterns: [/машет(?: рукой)?|помахива|приветственно машет/, /\bwave\w*|\bwaves? hello|\bgreet\w* with a wave/, /махає(?: рукою)?|привітально махає/, /saluda con la mano|\bagita\w* la mano/] },
   { action: 'jump', patterns: [/прыга|подпрыг|перепрыг|скачет/, /\bjump\w*|leap\w*|bounce\w*/, /стриба|підстрибу|перестрибу/, /salt\w*|brinca\w*/] },
   { action: 'run', patterns: [/беж|побеж|убега|мчится|гонится/, /\brun\w*|sprint\w*|chase\w*|runn?ing\b/, /біж|тіка|мчить|пересліду/, /corr\w*|persigue\w*|huye\w*/] },
-  { action: 'dance', patterns: [/танцу|пляш|ритмично двига|кружится в танце/, /\bdanc\w*|twirl\w*|groove\w*/, /танцю|ритмічно руха|крутиться в танці/, /bail\w*|gira bailando/] },
+  { action: 'dance', patterns: [/танцу|пляш(?!к)\w*|ритмично двига|кружится в танце/, /\bdanc\w*|twirl\w*|groove\w*/, /танцю|ритмічно руха|крутиться в танці/, /bail\w*|gira bailando/] },
   { action: 'walk', patterns: [/ид[её]т|шагает|прогулива|подходит|отходит/, /\bwalk\w*|stroll\w*|approach\w*|step\s+(?:forward|back)/, /йде|крокує|підходить|відходить/, /camin\w*|se acerc\w*|se aleja/] },
   { action: 'float', patterns: [/парит|взлет|летит|плыв[её]т по воздуху/, /\bfloat\w*|fly\w*|soar\w*|hover\w*/, /ширя|зліта|летить|пливе в повітрі/, /vuela|flot\w*|planea/] },
   { action: 'surprised', patterns: [/удивл|изумл|ошараш|вскрикива|широко раскрывает глаза/, /\bsurpris\w*|astonish\w*|gasp\w*|wide[- ]eyed/, /здив|враж|ошелеш|широко розплющує очі/, /sorprend\w*|asombr\w*|abre mucho los ojos/] },
@@ -223,7 +223,7 @@ const SEMANTIC_ACTIONS = [
   ] },
   { intent: 'throw', motionCue: 'run', patterns: [
     /\b(?:throws?|tosses?|hurls?|launches? .* into)\b/i,
-    /броса\w*|кида\w*|швыря\w*|мета\w*/i,
+    /броса\w*|(?<!про)кида\w*|швыря\w*|мета\w*/i,
     /(?<!про)кида\w*|жбурля\w*|мета\w*/i,
     /lanza\w*|arroja\w*/
   ] },
