@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ACTIONS, BACKGROUNDS, poseAt, mouthEnvelope, parseStory, sceneDuration, actionForStep,
-  drawFigure, drawScene, drawProceduralSceneActors, createProceduralActorLayers
+  drawFigure, drawScene, drawProceduralSceneActors, createProceduralActorLayers, resolveProceduralHandAnchors
 } from '../src/doodle-engine.js';
 
 function mockCanvas() {
@@ -123,6 +123,38 @@ test('creates and renders offline actors only when sprite and rig art are absent
   assert.equal(result.layers[0].procedural, true);
 });
 
+
+
+test('computes procedural hand anchors from the same pose and facing transform as the drawn actor', () => {
+  const layer = { characterId: 'Mira', x: 0.5, y: 0.7, flipX: false };
+  const pose = poseAt('give', 0.4, 'Mira');
+  const normal = resolveProceduralHandAnchors(layer, pose, 640, 360, 187.2);
+  const flipped = resolveProceduralHandAnchors({ ...layer, flipX: true }, pose, 640, 360, 187.2);
+  assert.ok(normal && flipped);
+  assert.ok(normal.rightHand.x > normal.leftHand.x);
+  assert.ok(flipped.rightHand.x < flipped.leftHand.x);
+  for (const anchor of Object.values(normal)) {
+    assert.ok(Number.isFinite(anchor.x) && Number.isFinite(anchor.y) && Number.isFinite(anchor.rotation));
+  }
+  assert.notEqual(normal.rightHand.x, flipped.rightHand.x);
+});
+
+test('returns procedural hand anchors alongside rendered actors for prop attachment', () => {
+  const scene = {
+    storyDetail: 'Mira picks up the key.',
+    characters: ['Mira'],
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0, end: 1, actorId: 'Mira',
+      steps: [{ intent: 'pick_up', start: 0, end: 1, actorId: 'Mira',
+        targetId: 'key', description: 'Mira picks up the key', evidence: 'Mira picks up the key.' }]
+    }] }
+  };
+  const { context } = mockCanvas();
+  const result = drawProceduralSceneActors(context, scene, { width: 640, height: 360, progress: 0.5 });
+  assert.equal(result.drawn, 1);
+  assert.ok(result.propAnchors.Mira.rightHand);
+  assert.ok(result.propAnchors.Mira.leftHand);
+});
 
 test('maps semantic interaction intents to explicit Doodle acting poses', () => {
   assert.equal(actionForStep({ intent: 'attack', motionCue: 'run' }), 'attack');
