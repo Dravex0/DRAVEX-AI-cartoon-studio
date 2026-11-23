@@ -227,8 +227,11 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
         targetId: target || null, start: phase.start ?? null, end: phase.end ?? null,
         description: clean(phase.description, 700), evidence: clean(phase.evidence, 500) };
       sceneEvents.push(event);
-      if (actor && target) addRelation({ type: 'acts_on', from: actor, to: target,
-        action: event.type, evidence: event.evidence });
+      if (actor && target && evidenceNamesEntity(event.evidence, actor)
+          && evidenceNamesEntity(event.evidence, target)) {
+        addRelation({ type: 'acts_on', from: actor, to: target,
+          action: event.type, evidence: event.evidence });
+      }
       for (const step of (Array.isArray(phase.steps) ? phase.steps : [])) {
         if (!record(step)) continue;
         const stepActor = clean(step.actorId || actor, 160);
