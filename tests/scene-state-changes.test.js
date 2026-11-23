@@ -72,7 +72,7 @@ test('keeps location evidence inside the sentence that names the moving characte
 
 test('carries object holder and door state into later scene snapshots', () => {
   const model = buildStoryboardStateSnapshots([
-    { storyDetail: 'Foxy picks up the silver key and opens the ancient door.', characters: ['Foxy'] },
+    { storyDetail: 'Foxy picks up the silver key. Foxy opens the ancient door.', characters: ['Foxy'] },
     { storyDetail: 'Foxy walks through the ancient door.', characters: ['Foxy'] }
   ], 'en');
   assert.equal(model.changesByScene[0].length, 2);
