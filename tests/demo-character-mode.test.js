@@ -48,3 +48,13 @@ test('local-AI storyboard rebuilds preserve the disabled fallback metadata path'
   assert.match(appSource, /hasCharacterRig:hasRenderableCharacterRig\(currentSceneData,currentStoryboardPlan\?\.sourceCharacter\|\|\$\('character'\)\.value\)/);
   assert.match(appSource, /countScenesMissingCharacterVisuals\(sceneMetadata/);
 });
+
+
+test('uses the shared offline Doodle renderer only in local-canvas mode and reuses production LipSync', () => {
+  assert.match(appSource, /drawProceduralSceneActors\(ctx,currentSceneData/);
+  assert.match(appSource, /proceduralActors\.layers/);
+  assert.match(appSource, /facialVisemes:facialLipSync\.facialVisemes/);
+  assert.match(appSource, /facialMouthOpenness:facialLipSync\.facialMouthOpenness/);
+  assert.match(appSource, /proceduralActors:\$\('videoGenerationMode'\)\.value==='local-canvas'/);
+  assert.match(appSource, /proceduralActors\.layers\)\],rigAnimationProgress/);
+});
