@@ -528,3 +528,29 @@ test('animates authored prop rotation and scale changes without guessing their a
   }, [], 1);
   assert.deepEqual(unanchored, []);
 });
+
+test('keeps a held prop attached to its named character in a later scene snapshot', () => {
+  const laterScene = {
+    stateSnapshot: [{
+      entityType: 'prop', entityId: 'silver key', property: 'holder',
+      previousValue: 'Fox', value: 'Fox', actorId: 'Fox',
+      evidence: 'Fox picks up the silver key.', snapshot: true
+    }]
+  };
+  const plan = buildScenePropRenderPlan(laterScene, layers, 0)[0];
+  assert.equal(plan.id, 'silver key');
+  assert.equal(plan.held, true);
+  assert.equal(plan.snapshot, true);
+  assert.ok(plan.x > 0.4 && plan.x < 0.6);
+  assert.ok(plan.y < 0.7);
+});
+
+test('does not show a snapshot prop when its named holder is absent from the scene', () => {
+  const laterScene = {
+    stateSnapshot: [{
+      entityType: 'prop', entityId: 'silver key', property: 'holder',
+      previousValue: 'Fox', value: 'Fox', snapshot: true
+    }]
+  };
+  assert.deepEqual(buildScenePropRenderPlan(laterScene, [], 0), []);
+});
