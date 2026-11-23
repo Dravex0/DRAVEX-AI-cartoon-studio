@@ -76,7 +76,28 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
     let to = { ...from };
     let plan = null;
 
-    if (intent.intent === 'dodge' && (direction === 'left' || direction === 'right')) {
+    if (intent.intent === 'attack' && source.targetId && layerById.has(key(source.targetId))) {
+      // A named target gives us a grounded direction. Animate a short lunge and
+      // recovery, but do not claim contact or invent a hit reaction.
+      const target = poses.get(key(source.targetId)) || basePose(layerById.get(key(source.targetId)));
+      const dx = target.x - from.x, dy = target.y - from.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > 0.08) {
+        const travel = Math.min(0.1, distance * 0.35);
+        const midpoint = source.start + (source.end - source.start) * 0.62;
+        const lunge = {
+          ...from,
+          x: clamp(from.x + dx / distance * travel, 0.05, 0.95),
+          y: clamp(from.y + dy / distance * travel, 0.05, 0.95),
+          scale: clamp(from.scale * 1.025, 0.05, 4)
+        };
+        plan = [
+          phase(actorId, source.start, midpoint, from, lunge, source, ' (lunge toward the explicitly named target; contact is not asserted)', 'ease-out'),
+          phase(actorId, midpoint, source.end, lunge, from, source, ' (recover after the lunge)', 'ease-in')
+        ];
+        to = from;
+      }
+    } else if (intent.intent === 'dodge' && (direction === 'left' || direction === 'right')) {
       const midpoint = (source.start + source.end) / 2;
       const offset = direction === 'left' ? -0.16 : 0.16;
       const evade = {
