@@ -6,6 +6,19 @@ const clean = value => String(value ?? '').trim();
 const key = value => clean(value).toLocaleLowerCase();
 const isRecord = value => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
+// Only explicitly named, character-directed interactions may trigger a contact approach.
+// Props and unknown targets never become character movement destinations.
+const INTERACTION_APPROACH_INTENTS = new Set([
+  'attack', 'push', 'pull', 'hug', 'give', 'handoff', 'hand_off', 'pass',
+  'take', 'pick_up', 'pickup', 'grasp', 'catch', 'receive', 'accept'
+]);
+
+function interactionGap(actorLayer, targetLayer) {
+  const actorWidth = Number.isFinite(actorLayer?.width) ? actorLayer.width : 0.32;
+  const targetWidth = Number.isFinite(targetLayer?.width) ? targetLayer.width : 0.32;
+  return clamp((actorWidth + targetWidth) * 0.275, 0.08, 0.22);
+}
+
 function directionOf(description) {
   const text = String(description ?? '').normalize('NFKC').toLocaleLowerCase();
   if (/\b(right|east)\b|вправо|праворуч|направо|\bderecha\b/.test(text)) return 'right';
@@ -96,16 +109,27 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
         phase(actorId, midpoint, source.end, evade, from, source, ' (recover to the starting position)', 'ease-in')
       ];
       to = from;
-    } else if ((action === 'walk' || action === 'run') && source.targetId && layerById.has(key(source.targetId))) {
-      const target = poses.get(key(source.targetId)) || basePose(layerById.get(key(source.targetId)));
+    } else if (source.targetId && layerById.has(key(source.targetId))
+      && ((action === 'walk' || action === 'run')
+        || INTERACTION_APPROACH_INTENTS.has(key(source.intent || intent.intent))
+        || action === 'attack')) {
+      const targetLayer = layerById.get(key(source.targetId));
+      const target = poses.get(key(source.targetId)) || basePose(targetLayer);
       const dx = target.x - from.x, dy = target.y - from.y;
       const distance = Math.hypot(dx, dy);
-      if (distance > 0.08) {
-        const travel = Math.min(action === 'run' ? 0.3 : 0.18, distance - 0.06);
+      const isInteraction = INTERACTION_APPROACH_INTENTS.has(key(source.intent || intent.intent))
+        || action === 'attack';
+      const safeGap = interactionGap(actorLayer, targetLayer);
+      if (distance > safeGap + 0.005) {
+        const maxTravel = isInteraction ? 0.4 : action === 'run' ? 0.3 : 0.18;
+        const travel = Math.min(maxTravel, distance - safeGap);
         const ratio = travel / distance;
         to.x = clamp(from.x + dx * ratio, 0.05, 0.95);
         to.y = clamp(from.y + dy * ratio, 0.05, 0.95);
-        plan = [phase(actorId, source.start, source.end, from, to, source, ' (move toward the named character target)')];
+        const suffix = isInteraction
+          ? ' (approach the explicitly named character to safe interaction range)'
+          : ' (move toward the named character target)';
+        plan = [phase(actorId, source.start, source.end, from, to, source, suffix)];
       }
     } else if ((action === 'walk' || action === 'run') && direction) {
       const distance = action === 'run' ? 0.24 : 0.14;
