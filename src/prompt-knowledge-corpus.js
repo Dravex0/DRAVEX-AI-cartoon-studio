@@ -96,9 +96,15 @@ export function generatePromptKnowledgeCorpus(count = 10000) {
       .replaceAll('{target}', TARGETS[(actorIndex + variation) % TARGETS.length])
       .replaceAll('{object}', OBJECTS[(actorIndex + variation) % OBJECTS.length]);
     const setting = SETTINGS[(actorIndex + variation + intentIndex) % SETTINGS.length];
+    const sceneLead = {
+      en: ACTORS[actorIndex] + ' is present in the scene.',
+      ru: ACTORS[actorIndex] + ' присутствует в сцене.',
+      uk: ACTORS[actorIndex] + ' присутній у сцені.',
+      es: ACTORS[actorIndex] + ' está presente en la escena.'
+    }[locale];
     examples.push({
       id: 'dxk-' + String(index + 1).padStart(5, '0'),
-      locale, prompt: prompt + ' ' + setting + '.',
+      locale, prompt: sceneLead + ' ' + prompt + ' ' + setting + '.',
       expectedIntent: intent, actor: ACTORS[actorIndex],
       target: TARGETS[(actorIndex + variation) % TARGETS.length],
       object: OBJECTS[(actorIndex + variation) % OBJECTS.length]
