@@ -287,11 +287,16 @@ test('rejects overlapping steps assigned to the same character', () => {
   assert.ok(report.issues.some(item => item.code === 'action-step-timing-invalid'));
 });
 
-test('rejects action targets that are not named in their locked source evidence', () => {
+test('rejects action substep targets that are not named in their locked source evidence', () => {
   const candidate = structuredClone(scene);
-  candidate.actionTimeline.phases[1].targetId = 'secret portal';
+  candidate.actionTimeline.phases[1].targetId = null;
+  candidate.actionTimeline.phases[1].steps = [{
+    intent: 'open', motionCue: 'reach', start: 0.2, end: 0.6,
+    actorId: 'Foxy', targetId: 'secret portal', description: 'Foxy opens a secret portal.',
+    evidence: 'Foxy picks up the silver key.'
+  }];
   const report = validateCharacterActionTimeline(candidate);
-  assert.ok(report.issues.some(item => item.code === 'phase-target-evidence-mismatch'));
+  assert.ok(report.issues.some(item => item.code === 'action-step-target-evidence-mismatch'));
 });
 
 test('rejects action substeps that assign a real sentence to an unmentioned target', () => {
