@@ -20,7 +20,7 @@ const scene = {
       { phase: 'preparation', start: 0, end: 0.2, actorId: 'Foxy', description: 'Foxy notices the key and leans forward.', evidence: 'Foxy notices the silver key' },
       { phase: 'action', start: 0.2, end: 0.65, actorId: 'Foxy', targetId: 'silver key', description: 'Foxy reaches down and lifts the key.', evidence: 'Foxy notices the silver key, reaches down, and picks it up.' },
       { phase: 'reaction', start: 0.65, end: 0.82, actorId: 'Foxy', description: 'Foxy looks at the key with surprise.', evidence: 'Foxy notices the silver key' },
-      { phase: 'result', start: 0.82, end: 1, actorId: 'Foxy', description: 'Foxy holds the key securely.', evidence: 'Foxy picks up the silver key.' }
+      { phase: 'result', start: 0.82, end: 1, actorId: 'Foxy', description: 'Foxy holds the key securely.', evidence: 'Foxy notices the silver key, reaches down, and picks it up.' }
     ]
   }
 };
@@ -31,7 +31,7 @@ test('scene normalization preserves action timeline metadata for evaluation', ()
 
 test('accepts ordered, source-grounded action phases in normalized scene time', () => {
   const report = validateCharacterActionTimeline(scene);
-  assert.equal(report.status, 'valid');
+  assert.equal(report.status, 'valid', JSON.stringify(report.issues));
   assert.equal(report.passed, true);
   assert.equal(report.phaseCount, 4);
 });
