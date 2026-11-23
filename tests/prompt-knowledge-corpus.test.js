@@ -53,3 +53,25 @@ test('keeps a missing interaction target unresolved instead of guessing', () => 
   assert.ok(understanding.unresolved.some(item => item.intent === 'attack'));
   assert.equal(understanding.interactions.length, 0);
 });
+
+
+test('retrieves locale- and intent-matched examples from the 10k corpus for downstream generation', async () => {
+  const { retrievePromptKnowledgeExamples } = await import('../src/prompt-knowledge-corpus.js');
+  const examples = retrievePromptKnowledgeExamples('Foxy chases Bird through the forest.', {
+    intent: 'chase', locale: 'en', limit: 2
+  });
+  assert.equal(examples.length, 2);
+  assert.ok(examples.every(item => item.intent === 'chase' && item.locale === 'en'));
+  assert.ok(examples.every(item => item.prompt.includes('chases')));
+  assert.ok(examples.every(item => Number.isFinite(item.similarity)));
+});
+
+test('attaches retrieved prompt examples to scene understanding without treating them as story facts', () => {
+  const understanding = understandScenePrompt('Foxy chases Bird through the forest.', {
+    characters: ['Foxy', 'Bird'], locale: 'en'
+  });
+  assert.ok(understanding.referenceExamples.length > 0);
+  assert.ok(understanding.referenceExamples.every(item => item.intent === 'chase'));
+  assert.match(formatSceneUnderstandingForMotion(understanding), /Related knowledge examples/);
+  assert.match(formatSceneUnderstandingForMotion(understanding), /guidance only, not scene facts/);
+});
