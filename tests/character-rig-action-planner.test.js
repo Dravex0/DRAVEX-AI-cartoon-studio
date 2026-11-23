@@ -419,3 +419,34 @@ test('maps 17 additional semantic scene actions to dedicated articulated rig pre
     assert.ok(sampleCharacterRigTimeline(result.timeline, 0.5).Foxy, description);
   }
 });
+
+test('plays synchronized team magic on both named character rigs at the same scene time', () => {
+  const evidence = 'Mira and Noah combine their powers.';
+  const scene = {
+    characters: ['Mira', 'Noah'],
+    characterCastProvided: true,
+    storyDetail: evidence,
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira', targetId: 'Noah',
+        description: evidence, evidence,
+        steps: [
+          { intent: 'team_magic', motionCue: 'magic', start: 0.2, end: 0.8,
+            actorId: 'Mira', targetId: 'Noah', description: 'Mira channels energy with Noah.', evidence },
+          { intent: 'team_magic', motionCue: 'magic', start: 0.2, end: 0.8,
+            actorId: 'Noah', targetId: 'Mira', description: 'Noah channels energy with Mira.', evidence }
+        ]
+      }]
+    }
+  };
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig('Mira'), rig('Noah')]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 2);
+  assert.deepEqual(result.mappedActions.map(item => item.actorId).sort(), ['Mira', 'Noah']);
+  const synchronized = sampleCharacterRigTimeline(result.timeline, 0.5);
+  assert.ok(synchronized.Mira);
+  assert.ok(synchronized.Noah);
+  assert.ok(Math.abs(synchronized.Mira.leftArm.rotation) > 0.1);
+  assert.ok(Math.abs(synchronized.Noah.leftArm.rotation) > 0.1);
+});
