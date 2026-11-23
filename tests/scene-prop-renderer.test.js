@@ -458,3 +458,49 @@ test('starts a thrown prop trajectory at the holder release contact, not a stale
   assert.ok(Math.abs(end.x - 0.9) < 1e-9);
   assert.ok(Math.abs(end.y - 0.3) < 1e-9);
 });
+
+test('animates a grounded door from closed to open only at its authored viewport anchor', () => {
+  const door = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0, end: 1, actorId: 'Fox',
+      steps: [{ intent: 'open', start: 0.2, end: 0.8, actorId: 'Fox',
+        targetId: 'old door', evidence: 'Fox opens the old door.' }]
+    }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'old door', property: 'openState',
+      previousValue: null, value: 'open', actorId: 'Fox', actionIntent: 'open',
+      position: { x: 0.72, y: 0.64 }, evidence: 'Fox opens the old door.'
+    }]
+  };
+  const before = buildScenePropRenderPlan(door, layers, 0.1)[0];
+  const middle = buildScenePropRenderPlan(door, layers, 0.5)[0];
+  const after = buildScenePropRenderPlan(door, layers, 0.9)[0];
+  assert.equal(before.kind, 'door');
+  assert.equal(before.openAmount, 0);
+  assert.ok(middle.openAmount > 0 && middle.openAmount < 1);
+  assert.equal(after.openAmount, 1);
+  assert.deepEqual([after.x, after.y], [0.72, 0.64]);
+});
+
+test('does not invent a screen position for an openable object without an authored anchor', () => {
+  const door = { stateChanges: [{
+    entityType: 'prop', entityId: 'old door', property: 'openState',
+    previousValue: null, value: 'open', actionIntent: 'open',
+    evidence: 'The old door opens.'
+  }] };
+  assert.deepEqual(buildScenePropRenderPlan(door, [], 1), []);
+});
+
+test('fades object visibility only from explicitly authored boolean state and position', () => {
+  const object = { stateChanges: [{
+    entityType: 'prop', entityId: 'lantern', property: 'visible',
+    previousValue: false, value: true, position: { x: 0.4, y: 0.5 },
+    evidence: 'The lantern becomes visible.'
+  }] };
+  const before = buildScenePropRenderPlan(object, [], 0.1)[0];
+  const middle = buildScenePropRenderPlan(object, [], 0.5)[0];
+  const after = buildScenePropRenderPlan(object, [], 1)[0];
+  assert.equal(before.opacity, 0);
+  assert.ok(middle.opacity > 0 && middle.opacity < 1);
+  assert.equal(after.opacity, 1);
+});
