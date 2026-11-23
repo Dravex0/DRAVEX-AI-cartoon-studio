@@ -69,8 +69,11 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
       continue;
     }
     const description = clean(source.description);
-    const action = detectSceneAction(description);
+    const detectedAction = detectSceneAction(description);
     const intent = inferSceneActionIntent(description);
+    // Semantic events such as "attacks" or "intervenes" can carry a useful
+    // movement cue even when the simpler preview-action lexicon has no match.
+    const action = detectedAction !== 'idle' ? detectedAction : intent.motionCue;
     const direction = directionOf(description);
     const from = { ...(poses.get(actorKey) || basePose(actorLayer)) };
     let to = { ...from };
