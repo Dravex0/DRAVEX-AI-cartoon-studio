@@ -202,3 +202,39 @@ test('combines authored layer opacity with pose opacity instead of overriding a 
   }), true);
   assert.equal(context.globalAlpha, 0.1);
 });
+
+
+test('mirrors the procedural figure toward a named target on its left', () => {
+  const { context, calls } = mockCanvas();
+  assert.equal(drawFigure(context, poseAt('attack', 0.5, 'Noah'), {
+    x: 460, y: 250, size: 220, characterId: 'Noah', flipX: true
+  }), true);
+  assert.ok(calls.some(([name, x, y]) => name === 'scale' && x === -1 && y === 1));
+});
+
+test('turns an acting procedural character toward its named target', () => {
+  const scene = {
+    characters: ['Mira', 'Noah'],
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Noah',
+        description: 'Noah attacks Mira.',
+        evidence: 'Noah attacks Mira.',
+        steps: [{
+          intent: 'attack', motionCue: 'run', start: 0, end: 1,
+          actorId: 'Noah', targetId: 'Mira',
+          description: 'Noah attacks Mira.',
+          evidence: 'Noah attacks Mira.'
+        }]
+      }]
+    }
+  };
+  const { context } = mockCanvas();
+  const result = drawProceduralSceneActors(context, scene, {
+    width: 640, height: 360, progress: 0.5
+  });
+  const noah = result.layers.find(layer => layer.characterId === 'Noah');
+  assert.ok(noah);
+  assert.equal(noah.flipX, true);
+});
