@@ -293,7 +293,7 @@ test('rejects action substep targets that are not named in their locked source e
   candidate.actionTimeline.phases[1].steps = [{
     intent: 'open', motionCue: 'reach', start: 0.2, end: 0.6,
     actorId: 'Foxy', targetId: 'secret portal', description: 'Foxy opens a secret portal.',
-    evidence: 'Foxy picks up the silver key.'
+    evidence: 'Foxy notices the silver key, reaches down, and picks it up.'
   }];
   const report = validateCharacterActionTimeline(candidate);
   assert.ok(report.issues.some(item => item.code === 'action-step-target-evidence-mismatch'));
