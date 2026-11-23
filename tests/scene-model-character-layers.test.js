@@ -184,3 +184,28 @@ test('scene normalization preserves explicit normalized prop positions and rejec
   assert.deepEqual(scene.stateChanges[0].position, { x: 0.72, y: 0.55 });
   assert.equal(Object.hasOwn(scene.stateChanges[1], 'position'), false);
 });
+
+test('scene normalization preserves boolean and numeric object states and snapshots', () => {
+  const scene = normalizeScene({
+    stateChanges: [
+      { entityType: 'prop', entityId: 'door', property: 'visible',
+        previousValue: false, value: true, evidence: 'The door appears.' },
+      { entityType: 'prop', entityId: 'crate', property: 'rotation',
+        previousValue: 0, value: Math.PI / 2, evidence: 'The crate rotates.' },
+      { entityType: 'prop', entityId: 'crate', property: 'scale',
+        previousValue: 1, value: 2, evidence: 'The crate grows.' }
+    ],
+    stateSnapshot: [{
+      entityType: 'prop', entityId: 'door', property: 'visible',
+      previousValue: true, value: true, snapshot: true,
+      position: { x: 0.4, y: 0.6 }, evidence: 'The door appears.'
+    }]
+  });
+  assert.equal(scene.stateChanges[0].previousValue, false);
+  assert.equal(scene.stateChanges[0].value, true);
+  assert.equal(scene.stateChanges[1].previousValue, 0);
+  assert.equal(scene.stateChanges[1].value, Math.PI / 2);
+  assert.equal(scene.stateChanges[2].value, 2);
+  assert.equal(scene.stateSnapshot[0].value, true);
+  assert.deepEqual(scene.stateSnapshot[0].position, { x: 0.4, y: 0.6 });
+});
