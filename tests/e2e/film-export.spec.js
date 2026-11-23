@@ -182,7 +182,7 @@ test('exports an offline procedural protagonist when authored character artwork 
     const blob = await response.blob();
     return { type: blob.type, size: blob.size, width: player.videoWidth, height: player.videoHeight };
   });
-  expect(film.type).toMatch(/^video\\/webm/i);
+  expect(film.type).toMatch(/^video\/webm/i);
   expect(film.size).toBeGreaterThan(1024);
   expect(film.width).toBeGreaterThan(0);
   expect(film.height).toBeGreaterThan(0);
