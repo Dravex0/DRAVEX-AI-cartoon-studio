@@ -165,7 +165,7 @@ test('creates a minimal source-grounded action timeline for an explicit directed
       evidence: 'Bird guides Foxy home.'
     }]
   });
-  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false, JSON.stringify(scene.productionReadiness.issues));
   assert.match(scene.motionGenerationPrompt, /Character action timeline/);
   assert.match(scene.motionGenerationPrompt, /actor: Bird/);
 });
@@ -282,6 +282,7 @@ test('assigns a shouted command to the speaker and its target, not the speaker',
   const scene = result.scenes[0];
   const command = scene.actionSequence.find(event => event.intent === 'shout_command');
   const step = scene.actionTimeline.phases[0].steps.find(item => item.intent === 'shout_command');
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false, JSON.stringify(scene.productionReadiness.issues));
   assert.equal(command.actorId, 'Officer');
   assert.equal(command.targetId, 'Robber');
   assert.equal(command.interactionType, 'command');
