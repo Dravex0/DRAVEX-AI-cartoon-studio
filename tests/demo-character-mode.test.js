@@ -56,5 +56,5 @@ test('uses the shared offline Doodle renderer only in local-canvas mode and reus
   assert.match(appSource, /facialVisemes:facialLipSync\.facialVisemes/);
   assert.match(appSource, /facialMouthOpenness:facialLipSync\.facialMouthOpenness/);
   assert.match(appSource, /proceduralActors:\$\('videoGenerationMode'\)\.value==='local-canvas'/);
-  assert.match(appSource, /proceduralActors\.layers\)\],rigAnimationProgress/);
+  assert.ok(appSource.includes('...(proceduralActors.layers||[])],rigAnimationProgress'));
 });
