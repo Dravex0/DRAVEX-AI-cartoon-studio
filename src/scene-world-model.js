@@ -199,6 +199,14 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
       const supportEntityId = clean(physical.supportEntityId, 160);
       const fromEntityId = clean(physical.fromEntityId, 160);
       const toEntityId = clean(physical.toEntityId, 160);
+      const namedParticipants = [entityId, actorId, targetId, otherEntityId,
+        supportEntityId, fromEntityId, toEntityId].filter(Boolean);
+      if (!namedParticipants.every(participant => evidenceNamesEntity(evidence, participant))) {
+        sceneEvents.push({ type: 'unresolved_physics_event', actorId: actorId || null,
+          entityId: entityId || null, targetId: targetId || null,
+          evidence, reason: 'physics-participants-not-grounded-in-event-evidence' });
+        continue;
+      }
       const entityKind = entityId && participantKeys.has(keyOf(entityId)) ? 'character' : 'prop';
       if (entityId) addEntity(entities, entityId, entityKind, sceneId);
       if (actorId) addEntity(entities, actorId, 'character', sceneId);
