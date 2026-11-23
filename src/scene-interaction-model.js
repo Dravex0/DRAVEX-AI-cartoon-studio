@@ -1,4 +1,5 @@
 import { buildScenePhysicsModel } from './scene-physics-model.js';
+import { validateCharacterActionTimeline } from './character-action-timeline.js';
 
 const clean = value => String(value ?? '').trim().slice(0, 180);
 const key = value => clean(value).toLocaleLowerCase();
@@ -98,6 +99,45 @@ export function buildSceneInteractionModel(scene = {}) {
     });
   }
 
+  // Validated action substeps already carry actor, target, timing and exact
+  // source evidence. Convert them into directed graph edges so character-to-
+  // character and character-to-prop actions are not lost when no physics event
+  // has been authored yet.
+  const timelineReport = validateCharacterActionTimeline(scene);
+  if (timelineReport.passed) {
+    const phases = Array.isArray(scene.actionTimeline?.phases) ? scene.actionTimeline.phases : [];
+    for (const phase of phases) {
+      for (const step of Array.isArray(phase?.steps) ? phase.steps : []) {
+        const actorId = clean(step?.actorId || phase.actorId);
+        const targetId = clean(step?.targetId || phase.targetId);
+        const evidence = clean(step?.evidence || phase.evidence, 500);
+        const intent = clean(step?.intent, 80);
+        if (!actorId || !targetId || !intent || !sourceHasEvidence(scene, evidence)) continue;
+        const start = Number(step.start), end = Number(step.end);
+        addEntity(actorId, 'actor');
+        addEntity(targetId, 'target');
+        const alreadyRepresented = events.some(event => event.actorId
+          && key(event.actorId) === key(actorId) && event.targetId
+          && key(event.targetId) === key(targetId) && key(event.evidence) === key(evidence));
+        if (alreadyRepresented) continue;
+        events.push({
+          id: clean(step.id) || `timeline_${events.length + 1}`,
+          type: 'directed_action',
+          intent,
+          actorId,
+          targetId,
+          participants: [...new Set([actorId, targetId])],
+          contact: null,
+          grounded: true,
+          evidence,
+          ...(Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end <= 1 && start < end
+            ? { start, end } : {}),
+          rule: `The named actor performs only the authored "${intent}" action toward the named target. Preserve the target's identity and position; contact is not implied unless separately established.`
+        });
+      }
+    }
+  }
+
   const rawStateChanges = Array.isArray(scene.stateChanges) ? scene.stateChanges : [];
   for (const [index, change] of rawStateChanges.entries()) {
     if (!isRecord(change)) continue;
@@ -151,7 +191,8 @@ export function formatSceneInteractionInstructions(model) {
     const participants = event.participants.join(' ↔ ');
     const contact = event.contact === true ? ' Contact is explicitly required.'
       : event.contact === false ? ' No physical contact is specified.' : ' Contact state is unknown; do not assume it.';
-    return `${index + 1}. ${event.type}${interval}: ${participants}. ${event.rule}${contact} Evidence: ${event.evidence}`;
+    const intent = event.intent ? ` (intent: ${event.intent})` : '';
+    return `${index + 1}. ${event.type}${intent}${interval}: ${participants}. ${event.rule}${contact} Evidence: ${event.evidence}`;
   });
   const stateLines = model.stateTransitions.map((change, index) =>
     `State ${index + 1}. ${change.entityId}.${change.property}: ${JSON.stringify(change.previousValue)} → ${JSON.stringify(change.value)}${change.actionIntent ? `; action: ${change.actionIntent}` : ''}${change.position ? `; position: (${change.position.x}, ${change.position.y})` : ''}. Evidence: ${change.evidence}`
