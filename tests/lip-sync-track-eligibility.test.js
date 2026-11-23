@@ -33,7 +33,7 @@ test("does not mark a generated main character lip-syncable without a facial mou
   assert.deepEqual(result, []);
 });
 
-test("keeps the built-in procedural demo character eligible for its Canvas mouth renderer", () => {
+test("does not mark the removed procedural demo character as lip-syncable", () => {
   const candidate = track("Foxy");
   const result = selectRenderableLipSyncTracks({
     voiceTracks: [candidate],
@@ -41,7 +41,7 @@ test("keeps the built-in procedural demo character eligible for its Canvas mouth
     storyUsesFallback: true,
     sceneMetadata: [{ characterLayers: [], characterFacialRigs: [] }]
   });
-  assert.deepEqual(result, [candidate]);
+  assert.deepEqual(result, []);
 });
 
 test("requires a valid matching facial rig with a mouth part for generated speakers", () => {
@@ -115,7 +115,7 @@ test("does not assign the procedural fox mouth to a character already rendered f
 });
 
 
-test("keeps the procedural fox lip-sync when only a secondary character layer is present", () => {
+test("does not assign procedural fox lip-sync when only a secondary character layer is present", () => {
   const candidate = track("Foxy");
   const result = selectRenderableLipSyncTracks({
     voiceTracks: [candidate],
@@ -127,10 +127,10 @@ test("keeps the procedural fox lip-sync when only a secondary character layer is
       characterFacialRigs: []
     }]
   });
-  assert.deepEqual(result, [candidate]);
+  assert.deepEqual(result, []);
 });
 
-test("keeps the procedural fallback eligible when a character layer has no image asset", () => {
+test("does not enable procedural fallback when a character layer has no image asset", () => {
   const candidate = track("Foxy");
   const result = selectRenderableLipSyncTracks({
     voiceTracks: [candidate],
@@ -138,5 +138,5 @@ test("keeps the procedural fallback eligible when a character layer has no image
     storyUsesFallback: true,
     sceneMetadata: [{ characterLayers: [{ characterId: "Foxy" }], characterFacialRigs: [] }]
   });
-  assert.deepEqual(result, [candidate]);
+  assert.deepEqual(result, []);
 });
