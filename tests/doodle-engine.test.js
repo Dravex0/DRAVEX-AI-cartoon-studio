@@ -139,6 +139,27 @@ test('computes procedural hand anchors from the same pose and facing transform a
   assert.notEqual(normal.rightHand.x, flipped.rightHand.x);
 });
 
+
+test('moves procedural hand contacts with the authored walk pose over the action clock', () => {
+  const scene = {
+    storyDetail: 'Mira walks forward.',
+    characters: ['Mira'],
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0, end: 1, actorId: 'Mira',
+      steps: [{ intent: 'advance', start: 0, end: 1, actorId: 'Mira',
+        description: 'Mira walks forward', evidence: 'Mira walks forward.' }]
+    }] }
+  };
+  const early = drawProceduralSceneActors(mockCanvas().context, scene, {
+    width: 640, height: 360, progress: 0.1
+  }).propAnchors.Mira;
+  const late = drawProceduralSceneActors(mockCanvas().context, scene, {
+    width: 640, height: 360, progress: 0.7
+  }).propAnchors.Mira;
+  assert.notEqual(early.rightHand.x, late.rightHand.x);
+  assert.notEqual(early.rightHand.y, late.rightHand.y);
+});
+
 test('returns procedural hand anchors alongside rendered actors for prop attachment', () => {
   const scene = {
     storyDetail: 'Mira picks up the key.',
