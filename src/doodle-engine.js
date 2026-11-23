@@ -28,10 +28,15 @@ const INTENT_ACTIONS = Object.freeze({
   put_down: 'put_down', point: 'point', sit: 'sit', crawl: 'crawl',
   eat_drink: 'eat_drink', sleep_wake: 'sleep_wake', magic: 'magic',
   vanish: 'vanish', warning: 'talk', shout_command: 'talk',
-  hands_up: 'scared', freeze: 'scared', discover_threat: 'surprised',
-  reveal: 'surprised', intervene: 'run', enter_location: 'walk',
-  advance: 'walk', stealth_advance: 'walk', listen_carefully: 'turn',
-  hear_sound: 'turn', power_up: 'magic', team_magic: 'magic', energy_clash: 'magic'
+  call_for_backup: 'talk', hands_up: 'scared', freeze: 'scared',
+  discover_threat: 'surprised', reveal: 'surprised', intervene: 'run',
+  enter_location: 'walk', advance: 'walk', stealth_advance: 'walk',
+  listen_carefully: 'turn', hear_sound: 'turn', draw_weapon: 'take',
+  pick_up: 'take', take: 'take', drop_weapon: 'put_down',
+  take_cover: 'defend', aim_weapon: 'point', point: 'point',
+  climb: 'jump', swim: 'float', fall: 'jump', land: 'jump',
+  hug: 'happy', open: 'give', close: 'take', write_draw: 'point',
+  power_up: 'magic', team_magic: 'magic', energy_clash: 'magic'
 });
 
 export function actionForStep(step = {}, fallbackDescription = '') {
@@ -242,7 +247,9 @@ export function drawFigure(context, pose = {}, options = {}) {
   const p = pose || {};
   context.save();
   try {
-    context.globalAlpha = (Number.isFinite(context.globalAlpha) ? context.globalAlpha : 1) * clamp(options.opacity ?? p.opacity, 0, 1, 1);
+    context.globalAlpha = (Number.isFinite(context.globalAlpha) ? context.globalAlpha : 1)
+      * clamp(options.opacity, 0, 1, 1)
+      * clamp(p.opacity, 0, 1, 1);
     context.translate(x + (Number(p.shiftX) || 0) * size, y + (Number(p.bob) || 0) * size);
     context.rotate(clamp(p.lean, -0.5, 0.5, 0));
     context.scale(unit, unit);
