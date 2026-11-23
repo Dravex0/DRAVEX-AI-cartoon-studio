@@ -258,9 +258,17 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
   const keyframes = orderedTimes.map(time => {
     const poses = {};
     for (const [actorKey, actorSegments] of byActor) {
-      const segment = actorSegments.find(item => time >= item.start && time <= item.end);
+      const activeSegment = actorSegments.find(item => time >= item.start && time <= item.end);
+      const previousSegment = [...actorSegments].reverse().find(item => item.end < time);
+      const nextSegment = actorSegments.find(item => item.start > time);
+      // Keep the last authored pose through idle gaps instead of snapping the
+      // character back to the rig rest pose when no action segment is active.
+      // Before the first action, sample its initial (normally neutral) pose.
+      const segment = activeSegment || previousSegment || nextSegment;
       if (!segment) continue;
-      const localTime = (time - segment.start) / (segment.end - segment.start);
+      const localTime = activeSegment
+        ? (time - segment.start) / (segment.end - segment.start)
+        : previousSegment ? 1 : 0;
       const sampled = sampleCharacterRigTimeline(segment.timeline, localTime);
       const actorId = segment.actorId;
       if (sampled[actorId]) poses[actorId] = sampled[actorId];
