@@ -322,8 +322,10 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
           || key(change.evidence).includes(key(step.evidence)))
       );
       const matched = candidates.length === 1 ? candidates[0] : null;
-      const start = matched ? matched.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
-      const end = matched ? matched.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
+      const propertyHistory = history.filter(item => item.property === change.property);
+      const propertyIndex = propertyHistory.indexOf(change);
+      const start = matched ? matched.start : phaseStart + (phaseEnd - phaseStart) * propertyIndex / propertyHistory.length;
+      const end = matched ? matched.end : phaseStart + (phaseEnd - phaseStart) * (propertyIndex + 1) / propertyHistory.length;
       const fromState = change.property === 'openState'
         ? (change.previousValue ?? (change.value === 'open' ? 'closed' : 'open'))
         : change.previousValue;
