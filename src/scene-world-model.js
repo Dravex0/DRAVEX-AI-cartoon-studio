@@ -221,11 +221,13 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
       if (!record(phase)) continue;
       const actor = clean(phase.actorId, 160);
       const target = clean(phase.targetId, 160);
+      const evidence = clean(phase.evidence, 500);
+      const groundedTarget = target && evidenceNamesEntity(evidence, target) ? target : '';
       if (actor) addEntity(entities, actor, 'character', sceneId);
-      if (target) addActionTarget(target);
+      if (groundedTarget) addActionTarget(groundedTarget);
       const event = { type: clean(phase.phase, 40) || 'action', actorId: actor || null,
-        targetId: target || null, start: phase.start ?? null, end: phase.end ?? null,
-        description: clean(phase.description, 700), evidence: clean(phase.evidence, 500) };
+        targetId: groundedTarget || null, start: phase.start ?? null, end: phase.end ?? null,
+        description: clean(phase.description, 700), evidence };
       sceneEvents.push(event);
       if (actor && target && evidenceNamesEntity(event.evidence, actor)
           && evidenceNamesEntity(event.evidence, target)) {
