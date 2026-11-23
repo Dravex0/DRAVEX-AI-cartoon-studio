@@ -573,7 +573,7 @@ test('classifies common interactive props into dedicated visual forms', () => {
   const names = [
     ['iron sword', 'weapon'], ['wooden shield', 'shield'], ['water bottle', 'bottle'],
     ['smartphone', 'phone'], ['coffee cup', 'cup'], ['red car', 'vehicle'],
-    ['wooden table', 'furniture']
+    ['wooden table', 'table']
   ];
   const scene = {
     stateChanges: names.map(([entityId], index) => ({
