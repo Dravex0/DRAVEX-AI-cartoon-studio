@@ -290,7 +290,7 @@ const SEMANTIC_ACTIONS = [
   { intent: 'eat_drink', motionCue: 'talk', patterns: [
     /\b(?:eats?|bites?|chews?|drinks?|sips?)\b/i,
     /ест|кусает|ж[уё]в[её]т|пь[её]т|отпивает/iu,
-    /їсть|кусає|жує|п'є|відпиває/iu,
+    /їсть|кусає|жує|п['’ʼ]є|відпиває/iu,
     /come\w*|bebe\w*|mastica\w*/
   ] },
   { intent: 'sleep_wake', motionCue: 'idle', patterns: [
