@@ -4,6 +4,8 @@ const clean = value => String(value ?? '').trim().slice(0, 180);
 const key = value => clean(value).toLocaleLowerCase();
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
+const STATE_PROPERTIES = new Set(['holder', 'position', 'rotation', 'visibility', 'visible', 'open', 'doorState', 'location', 'status', 'condition', 'support']);
+
 const INTERACTION_RULES = Object.freeze({
   collision: 'Both bodies must meet at the same contact point; preserve the reaction and separate or rebound only when the source describes it.',
   contact: 'Keep the named bodies in continuous contact for the authored interval; do not create contact when contact is unknown.',
@@ -39,6 +41,7 @@ export function buildSceneInteractionModel(scene = {}) {
   const physics = buildScenePhysicsModel([scene]);
   const rawEvents = Array.isArray(scene.physicsEvents) ? scene.physicsEvents : [];
   const events = [];
+  const stateTransitions = [];
   const entities = new Map();
 
   const addEntity = (id, role) => {
@@ -52,8 +55,11 @@ export function buildSceneInteractionModel(scene = {}) {
 
   for (const event of physics.events) {
     if (!event.grounded || !INTERACTION_RULES[event.type]) continue;
-    const raw = rawEvents.find(item => isRecord(item)
-      && (clean(item.id) === event.id || (!item.id && rawEvents.indexOf(item) === physics.events.indexOf(event))));
+    const raw = rawEvents.find(item => isRecord(item) && (
+      (item.id && clean(item.id) === event.id)
+      || (!item.id && clean(item.type).toLocaleLowerCase() === event.type
+        && clean(item.evidence) === event.evidence && clean(item.entityId) === event.entityId)
+    ));
     if (!raw || !sourceHasEvidence(scene, event.evidence)) continue;
 
     addEntity(event.entityId, 'entity');
@@ -90,16 +96,41 @@ export function buildSceneInteractionModel(scene = {}) {
     });
   }
 
+  const rawStateChanges = Array.isArray(scene.stateChanges) ? scene.stateChanges : [];
+  for (const [index, change] of rawStateChanges.entries()) {
+    if (!isRecord(change)) continue;
+    const property = clean(change.property, 60);
+    const evidence = clean(change.evidence, 500);
+    const entityId = clean(change.entityId);
+    if (!entityId || !STATE_PROPERTIES.has(property) || !sourceHasEvidence(scene, evidence)) continue;
+    addEntity(entityId, change.entityType === 'character' ? 'actor' : 'prop-or-world-entity');
+    if (change.value && typeof change.value === 'string') addEntity(change.value, property === 'holder' ? 'holder' : 'related-entity');
+    stateTransitions.push({
+      id: clean(change.id) || `state_${index + 1}`,
+      entityId,
+      entityType: clean(change.entityType, 40) || 'unknown',
+      property,
+      previousValue: change.previousValue ?? null,
+      value: change.value ?? null,
+      actionIntent: clean(change.actionIntent, 80) || null,
+      position: isRecord(change.position) && Number.isFinite(change.position.x) && Number.isFinite(change.position.y)
+        ? { x: change.position.x, y: change.position.y } : null,
+      evidence
+    });
+  }
+
   const holderTimeline = physics.holderTimeline
     .filter(item => events.some(event => event.id === item.eventId));
 
   return {
     schemaVersion: 1,
-    status: events.length ? 'grounded-interactions' : 'no-grounded-interactions',
+    status: events.length || stateTransitions.length ? 'grounded-interactions' : 'no-grounded-interactions',
     entityCount: entities.size,
     eventCount: events.length,
+    stateTransitionCount: stateTransitions.length,
     entities: [...entities.values()],
     events,
+    stateTransitions,
     holderTimeline,
     validationIssues: physics.validation.issues.filter(issue =>
       issue.severity !== 'info' && (issue.code.includes('holder') || issue.code.includes('participant')
@@ -110,7 +141,8 @@ export function buildSceneInteractionModel(scene = {}) {
 
 /** Convert the grounded interaction graph into concise provider-neutral motion rules. */
 export function formatSceneInteractionInstructions(model) {
-  if (!isRecord(model) || !Array.isArray(model.events) || !model.events.length) return '';
+  if (!isRecord(model) || !Array.isArray(model.events) || !Array.isArray(model.stateTransitions)
+      || (!model.events.length && !model.stateTransitions.length)) return '';
   const lines = model.events.map((event, index) => {
     const interval = Number.isFinite(event.start) && Number.isFinite(event.end)
       ? ` [${Math.round(event.start * 100)}%-${Math.round(event.end * 100)}%]` : '';
@@ -119,9 +151,13 @@ export function formatSceneInteractionInstructions(model) {
       : event.contact === false ? ' No physical contact is specified.' : ' Contact state is unknown; do not assume it.';
     return `${index + 1}. ${event.type}${interval}: ${participants}. ${event.rule}${contact} Evidence: ${event.evidence}`;
   });
+  const stateLines = model.stateTransitions.map((change, index) =>
+    `State ${index + 1}. ${change.entityId}.${change.property}: ${JSON.stringify(change.previousValue)} → ${JSON.stringify(change.value)}${change.actionIntent ? `; action: ${change.actionIntent}` : ''}${change.position ? `; position: (${change.position.x}, ${change.position.y})` : ''}. Evidence: ${change.evidence}`
+  );
   return [
-    'Grounded entity-interaction graph (only these interactions are established by source evidence):',
+    'Grounded entity-interaction graph (only these interactions and state changes are established by source evidence):',
     ...lines,
+    ...stateLines,
     'Interaction continuity: one physical object has one location and at most one holder at a time. Preserve identity, ownership, contact and momentum across frames. A handoff must not duplicate the object. Collisions require both named bodies. Unsupported or ambiguous interactions must remain unresolved rather than be invented.'
   ].join('\n');
 }
