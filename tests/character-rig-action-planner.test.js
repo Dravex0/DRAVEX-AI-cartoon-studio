@@ -60,7 +60,7 @@ test('maps jump action and preserves neutral poses outside its scene-time interv
 });
 
 test('does not guess a rig preset for unsupported semantic actions', () => {
-  const result = createCharacterRigTimelineFromActionTimeline(makeScene('opens a mysterious chest'), [rig()]);
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('contemplates a mysterious chest'), [rig()]);
   assert.equal(result.status, 'no-supported-actions');
   assert.equal(result.timeline, null);
   assert.equal(result.skipped[0].reason, 'unsupported-or-ambiguous-action');
