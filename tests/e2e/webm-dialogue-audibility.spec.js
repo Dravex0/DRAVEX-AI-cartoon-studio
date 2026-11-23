@@ -282,7 +282,8 @@ test('records all three synthetic dialogue tones in the exported WebM', async ({
     // Allow a small encoder/window-boundary tolerance around the 0.4s fixture.
     expect(check.activeDuration, JSON.stringify(inspection)).toBeLessThan(0.55);
     expect(check.activeStartOffset, JSON.stringify(inspection)).not.toBeNull();
-    expect(Math.abs(check.activeStartOffset), JSON.stringify(inspection)).toBeLessThan(0.10);
+    // Include one floating-point epsilon so an exact 100ms boundary is not rejected by binary rounding.
+    expect(Math.abs(check.activeStartOffset), JSON.stringify(inspection)).toBeLessThanOrEqual(0.10 + Number.EPSILON);
   }
 
   expect(inspection.silenceChecks).toHaveLength(2);
