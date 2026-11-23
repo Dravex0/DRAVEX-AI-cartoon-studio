@@ -76,6 +76,13 @@ const PATTERNS = Object.freeze({
   fantasy: /\b(magic|magical|spell|wizard|witch|dragon|fairy|portal|superpower|мгновенн|магия|волшеб|заклинани|волшебник|ведьма|дракон|фея|портал|сверхспособност|магія|заклят|чарівник|відьма|надздібност)\b/iu
 });
 
+function matchesUnicodeWordPattern(pattern, source) {
+  const unicodeBoundaries = pattern.source
+    .replace(/^\\\\b/u, '(?<![\\\\p{L}\\\\p{N}])')
+    .replace(/\\\\b$/u, '(?![\\\\p{L}\\\\p{N}])');
+  return new RegExp(unicodeBoundaries, pattern.flags).test(source);
+}
+
 const FALLBACK = Object.freeze({
   label: 'source-faithful general direction',
   priorities: ['preserve the exact events and characters from the prompt', 'make the described action visually readable', 'do not invent dialogue, props, interactions or plot events'],
@@ -89,7 +96,7 @@ const FALLBACK = Object.freeze({
 export function classifyPromptApproach(input = '') {
   const source = String(input ?? '').slice(0, 12000);
   const matches = Object.entries(PATTERNS)
-    .filter(([, pattern]) => pattern.test(source))
+    .filter(([, pattern]) => matchesUnicodeWordPattern(pattern, source))
     .map(([key]) => key);
   const primary = matches[0] || 'general';
   const selected = matches.length ? matches : ['general'];
