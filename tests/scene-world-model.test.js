@@ -92,3 +92,33 @@ test('auto-detects Spanish source text when the scene language is unspecified', 
     && relation.to === 'Noah' && relation.action === 'help'
   ));
 });
+
+test('classifies action targets as props when state metadata identifies an object', () => {
+  const model = buildSceneWorldModel([{
+    id: 'object-action',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira picks up the silver key and gives it to Noah.',
+    stateChanges: [{
+      entityType: 'prop', entityId: 'silver key', property: 'holder',
+      previousValue: null, value: 'Mira', actorId: 'Mira',
+      evidence: 'Mira picks up the silver key', actionIntent: 'pick_up'
+    }],
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira', targetId: 'Noah',
+        description: 'Mira gives the key to Noah.',
+        evidence: 'Mira picks up the silver key',
+        steps: [{
+          intent: 'pick_up', motionCue: 'grasp', start: 0, end: 0.5,
+          actorId: 'Mira', targetId: 'silver key',
+          description: 'Mira picks up the silver key.',
+          evidence: 'Mira picks up the silver key'
+        }]
+      }]
+    }
+  }]);
+  assert.ok(model.entities.some(entity => entity.id === 'silver key' && entity.kind === 'prop'));
+  assert.ok(model.entities.some(entity => entity.id === 'Noah' && entity.kind === 'character'));
+  assert.equal(model.entities.filter(entity => entity.id === 'silver key' && entity.kind === 'character').length, 0);
+});
