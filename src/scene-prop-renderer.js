@@ -19,6 +19,13 @@ function propKind(name) {
   if (/book|книг|книж|libro/.test(value)) return 'book';
   if (/ball|мяч|куля|pelota/.test(value)) return 'ball';
   if (/apple|яблок|яблук|manzana/.test(value)) return 'apple';
+  if (/sword|blade|меч|шпага|espada|hoja/.test(value)) return 'weapon';
+  if (/shield|щит|escudo/.test(value)) return 'shield';
+  if (/bottle|бутыл|пляш|botella/.test(value)) return 'bottle';
+  if (/phone|smartphone|телефон|смартфон|m[oó]vil|celular/.test(value)) return 'phone';
+  if (/cup|mug|чашк|кружк|taza|vaso/.test(value)) return 'cup';
+  if (/car|vehicle|машин|автомоб|авто|coche|veh[ií]culo/.test(value)) return 'vehicle';
+  if (/table|chair|стол|стул|mesa|silla/.test(value)) return 'furniture';
   return 'generic';
 }
 
@@ -493,6 +500,47 @@ function drawProp(context, prop, x, y, time) {
     context.fillStyle = '#df5b50'; context.strokeStyle = '#783a37';
     context.beginPath(); context.ellipse(0, 0.003, 0.019, 0.022, 0, 0, Math.PI * 2); context.fill(); context.stroke();
     context.strokeStyle = '#6e8b4d'; context.beginPath(); context.moveTo(0, -0.018); context.lineTo(0.004, -0.029); context.stroke();
+  } else if (prop.kind === 'weapon') {
+    context.strokeStyle = '#d9e3ec'; context.lineWidth = 0.006;
+    context.beginPath(); context.moveTo(-0.002, -0.035); context.lineTo(0.006, 0.02); context.stroke();
+    context.strokeStyle = '#9b6b42'; context.lineWidth = 0.008;
+    context.beginPath(); context.moveTo(-0.012, 0.022); context.lineTo(0.015, 0.022); context.stroke();
+    context.strokeStyle = '#d9e3ec'; context.lineWidth = 0.004;
+    context.beginPath(); context.moveTo(0.002, -0.018); context.lineTo(0.018, -0.006); context.stroke();
+  } else if (prop.kind === 'shield') {
+    context.fillStyle = '#6c91ad'; context.strokeStyle = '#31495d';
+    context.beginPath(); context.moveTo(0, -0.034); context.lineTo(0.027, -0.022);
+    context.lineTo(0.022, 0.012); context.lineTo(0, 0.036); context.lineTo(-0.022, 0.012);
+    context.lineTo(-0.027, -0.022); context.closePath(); context.fill(); context.stroke();
+    context.strokeStyle = '#e6c36f'; context.beginPath(); context.moveTo(0, -0.025); context.lineTo(0, 0.025); context.stroke();
+  } else if (prop.kind === 'bottle') {
+    context.fillStyle = '#75b9a5'; context.strokeStyle = '#315f58';
+    context.fillRect(-0.014, -0.022, 0.028, 0.044); context.strokeRect(-0.014, -0.022, 0.028, 0.044);
+    context.fillRect(-0.006, -0.033, 0.012, 0.012); context.strokeRect(-0.006, -0.033, 0.012, 0.012);
+    context.fillStyle = '#e7e1c4'; context.fillRect(-0.006, -0.035, 0.012, 0.004);
+  } else if (prop.kind === 'phone') {
+    context.fillStyle = '#303a4a'; context.strokeStyle = '#141a24';
+    context.beginPath(); context.roundRect(-0.018, -0.033, 0.036, 0.066, 0.006); context.fill(); context.stroke();
+    context.fillStyle = '#9ed8e6'; context.fillRect(-0.014, -0.025, 0.028, 0.047);
+    context.fillStyle = '#e7edf2'; context.beginPath(); context.arc(0, 0.028, 0.0025, 0, Math.PI * 2); context.fill();
+  } else if (prop.kind === 'cup') {
+    context.fillStyle = '#e4d6b8'; context.strokeStyle = '#75624c';
+    context.beginPath(); context.roundRect(-0.018, -0.02, 0.032, 0.034, 0.004); context.fill(); context.stroke();
+    context.beginPath(); context.arc(0.015, -0.003, 0.009, -Math.PI / 2, Math.PI / 2); context.stroke();
+  } else if (prop.kind === 'vehicle') {
+    context.fillStyle = '#d36d55'; context.strokeStyle = '#623d37';
+    context.beginPath(); context.roundRect(-0.04, -0.014, 0.08, 0.03, 0.008); context.fill(); context.stroke();
+    context.beginPath(); context.moveTo(-0.022, -0.014); context.lineTo(-0.01, -0.03);
+    context.lineTo(0.018, -0.03); context.lineTo(0.03, -0.014); context.stroke();
+    context.fillStyle = '#30343a';
+    for (const wheelX of [-0.023, 0.024]) {
+      context.beginPath(); context.arc(wheelX, 0.018, 0.009, 0, Math.PI * 2); context.fill();
+    }
+  } else if (prop.kind === 'furniture') {
+    context.fillStyle = '#9b704a'; context.strokeStyle = '#5d4432';
+    context.fillRect(-0.034, -0.012, 0.068, 0.012); context.strokeRect(-0.034, -0.012, 0.068, 0.012);
+    context.fillRect(-0.028, 0, 0.006, 0.032); context.fillRect(0.022, 0, 0.006, 0.032);
+    context.strokeRect(-0.028, 0, 0.006, 0.032); context.strokeRect(0.022, 0, 0.006, 0.032);
   } else {
     context.fillStyle = '#e7b66b'; context.strokeStyle = '#775735';
     context.beginPath(); context.roundRect(-0.021, -0.018, 0.042, 0.036, 0.008); context.fill(); context.stroke();
