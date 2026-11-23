@@ -304,3 +304,20 @@ test('wires an explicitly named chase into the action timeline and ordered motio
   assert.equal(scene.actionTimeline.phases[0].steps[0].targetId, 'Bird');
   assert.match(scene.motionGenerationPrompt, /chase/i);
 });
+
+
+test('attaches source-grounded scene understanding to each production scene', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\\nFoxy — an orange fox.\\nBird — a yellow bird.\\n\\nScene 1: Discovery\\nFoxy sees a key, hears a sound, and picks up the key.',
+    'en',
+    'Foxy'
+  );
+  const scene = result.scenes[0];
+  assert.equal(scene.sceneUnderstanding.schemaVersion, 1);
+  assert.ok(scene.sceneUnderstanding.entities.some(item => item.id === 'Foxy'));
+  assert.ok(scene.sceneUnderstanding.entities.some(item => item.id === 'key'));
+  assert.ok(scene.sceneUnderstanding.perception.some(item => item.type === 'visual_attention'));
+  assert.ok(scene.sceneUnderstanding.perception.some(item => item.type === 'auditory_attention'));
+  assert.match(scene.motionGenerationPrompt, /Source-grounded scene understanding/);
+  assert.match(scene.motionGenerationPrompt, /Do not invent visual observations/);
+});
