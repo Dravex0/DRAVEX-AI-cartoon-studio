@@ -250,6 +250,20 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
       times.add(Number((segment.start + (segment.end - segment.start) * frame.time).toFixed(6)));
     }
   }
+  // Add a hold keyframe immediately before each later action so interpolation
+  // does not prematurely blend the previous pose toward the next action during
+  // an intentional idle gap.
+  for (const actorSegments of byActor.values()) {
+    for (let index = 1; index < actorSegments.length; index++) {
+      const previous = actorSegments[index - 1];
+      const next = actorSegments[index];
+      const gap = next.start - previous.end;
+      if (gap > 0.00001) {
+        const holdTime = Number((next.start - Math.min(0.001, gap / 2)).toFixed(6));
+        if (holdTime > previous.end && holdTime < next.start) times.add(holdTime);
+      }
+    }
+  }
   const orderedTimes = [...times].sort((a, b) => a - b);
   if (orderedTimes.length > 60) {
     return { status: 'blocked', reason: 'The generated rig timeline would exceed the 60-keyframe safety limit.', timeline: null, generatedCount: 0, skipped };
