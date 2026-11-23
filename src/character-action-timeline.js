@@ -34,6 +34,11 @@ function issue(code, phase, message) {
   return { code, phase: phase || null, severity: 'error', message };
 }
 
+function evidenceNamesEntity(evidence, entityId) {
+  const name = clean(entityId, 120).toLocaleLowerCase();
+  return Boolean(name && clean(evidence, 500).toLocaleLowerCase().includes(name));
+}
+
 export function normalizeCharacterActionTimeline(rawTimeline) {
   if (rawTimeline == null) return null;
   if (!isRecord(rawTimeline) || !Array.isArray(rawTimeline.phases)) {
@@ -144,6 +149,12 @@ export function validateCharacterActionTimeline(scene = {}) {
     if (!normalized.evidence || !evidenceSources.some(source => source.includes(normalized.evidence))) {
       issues.push(issue('phase-evidence-ungrounded', name, 'Phase evidence must exactly match locked source-story evidence.'));
     }
+    if (normalized.evidence && normalized.actorId && !evidenceNamesEntity(normalized.evidence, normalized.actorId)) {
+      issues.push(issue('phase-actor-evidence-mismatch', name, 'Phase evidence must identify the character performing the action.'));
+    }
+    if (normalized.evidence && normalized.targetId && !evidenceNamesEntity(normalized.evidence, normalized.targetId)) {
+      issues.push(issue('phase-target-evidence-mismatch', name, 'Phase evidence must identify the named action target.'));
+    }
   });
 
   const action = byPhase.get('action');
@@ -179,6 +190,12 @@ export function validateCharacterActionTimeline(scene = {}) {
         }
         if (!evidenceSources.some(source => source.includes(step.evidence))) {
           issues.push(issue('action-step-evidence-ungrounded', 'action', `Action substep ${index + 1} evidence must exactly match locked story evidence.`));
+        }
+        if (step.evidence && step.actorId && !evidenceNamesEntity(step.evidence, step.actorId)) {
+          issues.push(issue('action-step-actor-evidence-mismatch', 'action', `Action substep ${index + 1} evidence must name its acting character.`));
+        }
+        if (step.evidence && step.targetId && !evidenceNamesEntity(step.evidence, step.targetId)) {
+          issues.push(issue('action-step-target-evidence-mismatch', 'action', `Action substep ${index + 1} evidence must name its target.`));
         }
         if (step.actorId && castWasExplicit && !cast.has(step.actorId.toLocaleLowerCase())) {
           issues.push(issue('action-step-actor-not-in-cast', 'action', `Action substep ${index + 1} actor must belong to the scene cast.`));
