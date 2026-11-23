@@ -80,6 +80,32 @@ const TEMPLATES = {
 
 export const PROMPT_KNOWLEDGE_INTENTS = Object.freeze(TEMPLATES.en.map(([intent]) => intent));
 
+const STOP_WORDS = new Set(['the','and','for','from','with','into','near','beside','inside','their','this','that','scene','present','en','la','el','los','las','de','del','y','и','та','в','у','на','за','из','от','по','для','свої','свои','сцене','сцені']);
+let cachedCorpus = null;
+function terms(value) {
+  return String(value ?? '').normalize('NFKC').toLocaleLowerCase().match(/[\\p{L}\\p{N}]+/gu) || [];
+}
+
+/** Retrieve few-shot examples from the 10k corpus for the same detected action. */
+export function retrievePromptKnowledgeExamples(input, { intent = '', locale = 'en', limit = 2 } = {}) {
+  if (!PROMPT_KNOWLEDGE_INTENTS.includes(intent)) return [];
+  if (!cachedCorpus) cachedCorpus = generatePromptKnowledgeCorpus(10000);
+  const query = new Set(terms(input).filter(term => term.length > 2 && !STOP_WORDS.has(term)));
+  const selectedLocale = Object.hasOwn(TEMPLATES, locale) ? locale : 'en';
+  const candidates = cachedCorpus.filter(item => item.expectedIntent === intent && item.locale === selectedLocale);
+  const ranked = candidates.map(item => {
+    const exampleTerms = new Set(terms(item.prompt).filter(term => term.length > 2 && !STOP_WORDS.has(term)));
+    let overlap = 0;
+    for (const term of query) if (exampleTerms.has(term)) overlap += 1;
+    return { item, score: overlap / Math.max(1, Math.sqrt(query.size * exampleTerms.size)) };
+  }).sort((a, b) => b.score - a.score || a.item.id.localeCompare(b.item.id));
+  return ranked.slice(0, Math.max(1, Math.min(3, Number(limit) || 2))).map(({ item, score }) => ({
+    id: item.id, locale: item.locale, intent: item.expectedIntent,
+    prompt: item.prompt, similarity: Number(score.toFixed(3))
+  }));
+}
+
+
 /** Build a reproducible corpus of exactly 10,000 unique multilingual prompt examples. */
 export function generatePromptKnowledgeCorpus(count = 10000) {
   const total = Math.max(1, Math.min(10000, Math.floor(Number(count) || 10000)));
