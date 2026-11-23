@@ -6,7 +6,7 @@ import { parseStoryBrief, formatProductionDirectives } from './story-brief.js';
 import { directStoryEvent } from './story-event-director.js';
 import { inferCharacterInteractions } from './character-interaction.js';
 import { inferSceneCausalLinks } from './scene-causality.js';
-import { inferStoryboardStateChanges } from './scene-state-changes.js';
+import { buildStoryboardStateSnapshots } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
 import { classifyPromptApproach, applyPromptApproach } from './prompt-approach.js';
@@ -144,7 +144,8 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   });
 
   const causalLinks = inferSceneCausalLinks(scenes, locale);
-  const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
+  const stateModel = buildStoryboardStateSnapshots(scenes, locale, subject);
+  const stateChanges = stateModel.changesByScene;
   const explicitSubject = !explicitScenes.length && String(character ?? '').trim() ? subject : '';
   const knownCharacters = [...new Set([explicitSubject, ...brief.characters].filter(Boolean))];
   const characterMention = (name, sourceText) => {
