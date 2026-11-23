@@ -157,3 +157,31 @@ test('uses the resolved protagonist when a scene has no explicit cast list', () 
   assert.equal(result.drawn, 1);
   assert.equal(result.layers[0].characterId, 'Foxy');
 });
+
+
+test('moves a procedural actor toward a named character using the validated motion planner', () => {
+  const scene = {
+    id: 'doodle-approach',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira walks toward Noah.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira',
+        description: 'Mira walks toward Noah.',
+        evidence: 'Mira walks toward Noah.',
+        steps: [{
+          intent: 'walk', motionCue: 'walk', start: 0, end: 1,
+          actorId: 'Mira', targetId: 'Noah',
+          description: 'Mira walks toward Noah.',
+          evidence: 'Mira walks toward Noah.'
+        }]
+      }]
+    }
+  };
+  const start = createProceduralActorLayers(scene, 0);
+  const middle = createProceduralActorLayers(scene, 0.5);
+  assert.equal(start[0].x, 0.28);
+  assert.ok(middle[0].x > start[0].x);
+  assert.equal(middle[1].x, 0.72);
+});
