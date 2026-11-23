@@ -94,7 +94,7 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
     };
 
     const explicitInteractions = (Array.isArray(scene.interactions) ? scene.interactions : [scene.interaction]).filter(record);
-    const sourceText = clean(scene.storyDetail || scene.visibleAction, 1200);
+    const sourceText = [scene.storyDetail, scene.visibleAction].filter(value => typeof value === 'string').map(value => clean(value, 1200)).filter(Boolean).join('\n');
     const language = resolveSceneLanguage(scene, fallbackLanguage);
     const inferredInteractions = sourceText
       ? inferCharacterInteractions(sourceText, participants, language)
