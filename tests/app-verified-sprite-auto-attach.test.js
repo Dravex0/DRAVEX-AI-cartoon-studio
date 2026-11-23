@@ -29,11 +29,11 @@ test('manual sprite attachment requires alpha verification and rechecks the curr
   const buttonEnd = app.indexOf("const link=document.createElement('a')", buttonStart);
   assert.ok(renderer >= 0 && buttonStart > renderer && buttonEnd > buttonStart);
   const buttonBlock = app.slice(buttonStart, buttonEnd);
-  assert.match(buttonBlock, /addButton\\.disabled=!isCurrentAsset\\|\\|initialTransparency!=='verified'/);
+  assert.match(buttonBlock, /addButton\.disabled=!isCurrentAsset\\|\\|initialTransparency!=='verified'/);
   assert.match(buttonBlock, /attachVerifiedCharacterSpriteToSceneLayers\\(sceneMetadata\\[resolvedSceneIndex\\],verifiedAsset\\)/);
-  assert.match(buttonBlock, /result\\.status==='verification-required'/);
+  assert.match(buttonBlock, /result\.status==='verification-required'/);
   assert.doesNotMatch(buttonBlock, /attachCharacterSpriteToSceneLayers\\(sceneMetadata\\[resolvedSceneIndex\\],asset\\)/);
   const updateStart = app.indexOf('const updateTransparency=');
   const updateEnd = app.indexOf('const verificationImage=', updateStart);
-  assert.match(app.slice(updateStart, updateEnd), /addButton\\.disabled=status!=='verified'/);
+  assert.match(app.slice(updateStart, updateEnd), /addButton\.disabled=status!=='verified'/);
 });
