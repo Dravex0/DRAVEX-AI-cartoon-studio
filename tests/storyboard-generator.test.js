@@ -285,3 +285,22 @@ test('assigns a shouted command to the speaker and its target, not the speaker',
   assert.match(scene.motionGenerationPrompt, /actor: Officer; target: Robber/);
   assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
 });
+
+
+test('wires an explicitly named chase into the action timeline and ordered motion steps', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\\nFoxy — a small orange fox.\\nBird — a small yellow bird.\\n\\nScene 1: Pursuit\\nFoxy chases Bird through the forest.',
+    'en',
+    'Foxy'
+  );
+  const scene = result.scenes[0];
+  assert.deepEqual(scene.characters, ['Foxy', 'Bird']);
+  assert.equal(scene.interaction.type, 'chase');
+  assert.equal(scene.interaction.actorId, 'Foxy');
+  assert.equal(scene.interaction.targetId, 'Bird');
+  assert.equal(scene.semanticActionIntent.intent, 'chase');
+  assert.equal(scene.actionTimeline.phases[0].actorId, 'Foxy');
+  assert.equal(scene.actionTimeline.phases[0].targetId, 'Bird');
+  assert.equal(scene.actionTimeline.phases[0].steps[0].targetId, 'Bird');
+  assert.match(scene.motionGenerationPrompt, /chase/i);
+});
