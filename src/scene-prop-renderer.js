@@ -303,6 +303,8 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     let opacity = 1;
     let rotation = 0;
     let scale = 1;
+    const hasRotationState = history.some(change => change.property === 'rotation');
+    const hasScaleState = history.some(change => change.property === 'scale');
     let position = normalizedPoint(history[0].position);
     let evidence = '';
     let transitionProgress = 1;
@@ -365,11 +367,11 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       kind: propKind(history[0].entityId),
       x: position.x,
       y: position.y,
-      rotation: rotation || existing?.rotation || 0,
+      rotation: hasRotationState ? rotation : (existing?.rotation || 0),
       held: existing?.held === true,
       visible: opacity > 0.001,
       opacity,
-      scale: scale !== 1 ? scale : (existing?.scale || 1),
+      scale: hasScaleState ? scale : (existing?.scale || 1),
       ...(state === null ? {} : { openAmount: state }),
       evidence,
       transitionProgress
