@@ -254,3 +254,33 @@ test('rejects unordered or ungrounded action substeps', () => {
   assert.ok(report.issues.some(item => item.code === 'action-step-timing-invalid'));
   assert.ok(report.issues.some(item => item.code === 'action-step-evidence-ungrounded'));
 });
+
+
+test('keeps reaction substeps inside the authored reaction window', () => {
+  const candidate = structuredClone(scene);
+  candidate.characters = ['Foxy', 'Bird'];
+  candidate.storyDetail = 'Foxy notices the silver key and picks it up. Bird raises both hands.';
+  candidate.actionTimeline.phases[2].steps = [{
+    intent: 'hands_up', motionCue: 'surprised',
+    start: 0.6, end: 0.75, actorId: 'Bird',
+    description: 'Bird raises both hands in response',
+    evidence: 'Bird raises both hands'
+  }];
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item =>
+    item.code === 'reaction-step-timing-invalid' && item.phase === 'reaction'
+  ));
+});
+
+test('validates reaction substep actors and evidence like central action substeps', () => {
+  const candidate = structuredClone(scene);
+  candidate.actionTimeline.phases[2].steps = [{
+    intent: 'hands_up', motionCue: 'surprised',
+    start: 0.66, end: 0.78, actorId: 'Wolf',
+    description: 'Wolf raises both hands',
+    evidence: 'Wolf raises both hands'
+  }];
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'reaction-step-actor-not-in-cast'));
+  assert.ok(report.issues.some(item => item.code === 'reaction-step-evidence-ungrounded'));
+});
