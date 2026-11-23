@@ -96,6 +96,27 @@ test('anchors held props to the explicitly named hand after applying the sampled
   assert.ok(Math.abs(plan.rotation - 0.35) < 1e-9);
 });
 
+
+test('attaches procedural actors props to the computed right or explicitly requested left hand', () => {
+  const anchors = {
+    Fox: {
+      leftHand: { x: 0.31, y: 0.44, rotation: -0.2 },
+      rightHand: { x: 0.67, y: 0.48, rotation: 0.35 }
+    }
+  };
+  const right = buildScenePropRenderPlan(scene, layers, 1, { proceduralPropAnchors: anchors })[0];
+  assert.equal(right.x, 0.67);
+  assert.equal(right.y, 0.48);
+  assert.equal(right.rotation, 0.35);
+  const leftScene = {
+    stateChanges: scene.stateChanges.map(change => ({ ...change, gripHand: 'leftHand' }))
+  };
+  const left = buildScenePropRenderPlan(leftScene, layers, 1, { proceduralPropAnchors: anchors })[0];
+  assert.equal(left.x, 0.31);
+  assert.equal(left.y, 0.44);
+  assert.equal(left.rotation, -0.2);
+});
+
 test('uses the safe legacy hand estimate when the rig has no explicit hand or paw anchor', () => {
   const rig = {
     schemaVersion: 1, characterId: 'Fox',
