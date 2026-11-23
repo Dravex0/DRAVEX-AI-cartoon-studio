@@ -209,3 +209,22 @@ test('scene normalization preserves boolean and numeric object states and snapsh
   assert.equal(scene.stateSnapshot[0].value, true);
   assert.deepEqual(scene.stateSnapshot[0].position, { x: 0.4, y: 0.6 });
 });
+
+test('scene normalization preserves curved prop trajectories and visual rotation', () => {
+  const scene = normalizeScene({
+    physicsEvents: [{
+      id: 'ball-flight', type: 'throw', entityId: 'ball',
+      visualStartPosition: { x: 0.1, y: 0.8 },
+      visualControlPoint: { x: 0.5, y: 0.05 },
+      visualEndPosition: { x: 0.9, y: 0.8 },
+      visualStartProgress: 0.1, visualEndProgress: 0.9,
+      visualStartRotation: 0, visualEndRotation: Math.PI * 2
+    }]
+  });
+  const event = scene.physicsEvents[0];
+  assert.deepEqual(event.visualControlPoint, { x: 0.5, y: 0.05 });
+  assert.equal(event.visualStartRotation, 0);
+  assert.equal(event.visualEndRotation, Math.PI * 2);
+  assert.equal(event.visualStartProgress, 0.1);
+  assert.equal(event.visualEndProgress, 0.9);
+});
