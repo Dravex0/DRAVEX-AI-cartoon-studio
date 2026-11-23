@@ -13,6 +13,8 @@ const normalizedPoint = value => value && typeof value === 'object' && !Array.is
 function propKind(name) {
   const value = key(name);
   if (/star|звезд|зірк|estrella/.test(value)) return 'star';
+  if (/door|gate|ворот|двер|puerta/.test(value)) return 'door';
+  if (/chest|сундук|скрин|cofre/.test(value)) return 'chest';
   if (/key|ключ|ключик|llave/.test(value)) return 'key';
   if (/book|книг|книж|libro/.test(value)) return 'book';
   if (/ball|мяч|куля|pelota/.test(value)) return 'ball';
@@ -282,6 +284,84 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     if (existing) Object.assign(existing, plan);
     else holderPlans.push(plan);
   }
+  // Render open/closed and visibility transitions only when an authored
+  // viewport anchor exists. A story verb alone does not reveal where an object
+  // should appear in the frame.
+  const statefulChanges = changes.filter(change => change?.entityType === 'prop'
+    && ['openState', 'visible'].includes(change.property)
+    && normalizedPoint(change.position));
+  const statefulByProp = new Map();
+  for (const change of statefulChanges) {
+    const id = clean(change.entityId);
+    if (!id) continue;
+    const propKey = key(id);
+    if (!statefulByProp.has(propKey)) statefulByProp.set(propKey, []);
+    statefulByProp.get(propKey).push(change);
+  }
+  for (const [propKey, history] of statefulByProp) {
+    let state = null;
+    let opacity = 1;
+    let position = normalizedPoint(history[0].position);
+    let evidence = '';
+    let transitionProgress = 1;
+    for (let index = 0; index < history.length; index += 1) {
+      const change = history[index];
+      const intent = clean(change.actionIntent);
+      const actorId = key(change.actorId);
+      const targetId = propKey;
+      const candidates = timelineSteps.filter(step =>
+        clean(step.intent) === intent
+        && (!actorId || key(step.actorId) === actorId)
+        && (!clean(step.targetId) || key(step.targetId) === targetId)
+        && (!clean(step.evidence) || !clean(change.evidence)
+          || key(step.evidence).includes(key(change.evidence))
+          || key(change.evidence).includes(key(step.evidence)))
+      );
+      const matched = candidates.length === 1 ? candidates[0] : null;
+      const start = matched ? matched.start : phaseStart + (phaseEnd - phaseStart) * index / history.length;
+      const end = matched ? matched.end : phaseStart + (phaseEnd - phaseStart) * (index + 1) / history.length;
+      const fromState = change.property === 'openState'
+        ? (change.previousValue ?? (change.value === 'open' ? 'closed' : 'open'))
+        : change.previousValue;
+      const toState = change.value;
+      if (p < start) break;
+      const progress = clamp((p - start) / Math.max(0.000001, end - start), 0, 1);
+      transitionProgress = progress;
+      evidence = clean(change.evidence);
+      position = normalizedPoint(change.position) || position;
+      if (change.property === 'openState') {
+        const fromOpen = fromState === 'open' ? 1 : 0;
+        const toOpen = toState === 'open' ? 1 : 0;
+        state = fromOpen + (toOpen - fromOpen) * progress;
+      } else if (change.property === 'visible'
+          && typeof fromState === 'boolean' && typeof toState === 'boolean') {
+        opacity = (fromState ? 1 : 0) + ((toState ? 1 : 0) - (fromState ? 1 : 0)) * progress;
+      }
+      if (p <= end) break;
+      state = change.property === 'openState' ? (toState === 'open' ? 1 : 0) : state;
+      opacity = change.property === 'visible' ? (toState ? 1 : 0) : opacity;
+    }
+    if (!position) continue;
+    const existing = holderPlans.find(item => key(item.id) === propKey);
+    const plan = {
+      ...(existing || {}),
+      id: clean(history[0].entityId),
+      kind: propKind(history[0].entityId),
+      x: position.x,
+      y: position.y,
+      rotation: existing?.rotation || 0,
+      held: existing?.held === true,
+      visible: opacity > 0.001,
+      opacity,
+      scale: existing?.scale || 1,
+      ...(state === null ? {} : { openAmount: state }),
+      evidence,
+      transitionProgress
+    };
+    if (existing) Object.assign(existing, plan);
+    else holderPlans.push(plan);
+  }
+
   const physicsModel = buildScenePhysicsModel([scene]);
   const physicsVisuals = buildGroundedPhysicsVisualPlan(scene, physicsModel, p);
   for (const visual of physicsVisuals) {
@@ -322,7 +402,9 @@ function drawStar(context, size) {
 
 function drawProp(context, prop, x, y, time) {
   const bob = prop.held ? Math.sin(time * 4) * 0.008 : 0;
+  if (prop.visible === false || (Number.isFinite(prop.opacity) && prop.opacity <= 0.001)) return;
   context.save();
+  if (Number.isFinite(prop.opacity)) context.globalAlpha *= clamp(prop.opacity, 0, 1);
   context.translate(x, y + bob);
   context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
   context.lineWidth = 2.5;
@@ -344,6 +426,19 @@ function drawProp(context, prop, x, y, time) {
     context.fillStyle = '#72c6df'; context.strokeStyle = '#24566c';
     context.beginPath(); context.arc(0, 0, 0.022, 0, Math.PI * 2); context.fill(); context.stroke();
     context.beginPath(); context.arc(0, 0, 0.011, 0, Math.PI * 2); context.stroke();
+  } else if (prop.kind === 'door') {
+    const open = clamp(Number.isFinite(prop.openAmount) ? prop.openAmount : 0, 0, 1);
+    context.translate(-0.018, 0);
+    context.rotate(-Math.PI * 0.42 * open);
+    context.fillStyle = '#98633f'; context.strokeStyle = '#50372b';
+    context.fillRect(0, -0.038, 0.036, 0.076); context.strokeRect(0, -0.038, 0.036, 0.076);
+    context.fillStyle = '#f3d17a'; context.beginPath(); context.arc(0.029, 0, 0.003, 0, Math.PI * 2); context.fill();
+  } else if (prop.kind === 'chest') {
+    const open = clamp(Number.isFinite(prop.openAmount) ? prop.openAmount : 0, 0, 1);
+    context.fillStyle = '#9b653e'; context.strokeStyle = '#51382a';
+    context.fillRect(-0.026, -0.012, 0.052, 0.03); context.strokeRect(-0.026, -0.012, 0.052, 0.03);
+    context.save(); context.translate(0, -0.012); context.rotate(-0.72 * open);
+    context.fillStyle = '#c18a50'; context.fillRect(-0.026, -0.024, 0.052, 0.024); context.strokeRect(-0.026, -0.024, 0.052, 0.024); context.restore();
   } else if (prop.kind === 'apple') {
     context.fillStyle = '#df5b50'; context.strokeStyle = '#783a37';
     context.beginPath(); context.ellipse(0, 0.003, 0.019, 0.022, 0, 0, Math.PI * 2); context.fill(); context.stroke();
