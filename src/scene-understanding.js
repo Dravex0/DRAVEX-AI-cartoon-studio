@@ -1,4 +1,5 @@
 import { extractSceneActionSequence, inferSceneActionIntent } from './scene-action.js';
+import { retrievePromptKnowledgeExamples } from './prompt-knowledge-corpus.js';
 
 const OBJECTS = Object.freeze({
   en: ['door','key','sword','shield','ball','apple','box','book','rope','ladder','stone','star','map','cup','bottle','phone','radio','bag','flower','car'],
@@ -54,13 +55,16 @@ export function understandScenePrompt(input = '', { characters = [], interaction
     targetId: String(item?.targetId ?? ''), evidence: String(item?.evidence ?? ''), confidence: 0.9
   })).filter(item => item.actorId && item.targetId && item.evidence);
   const primaryIntent = inferSceneActionIntent(source);
+  const referenceExamples = [...new Map(actions.flatMap(action =>
+    retrievePromptKnowledgeExamples(source, { intent: action.intent, locale, limit: 1 })
+  ).map(item => [item.intent + ':' + item.id, item])).values()].slice(0, 3);
   const unresolved = actions.filter(action => ['attack','chase','hug','rescue','restrain','catch','throw'].includes(action.intent))
     .filter(action => !directedInteractions.some(item => item.evidence && source.includes(item.evidence)))
     .map(action => ({ type: 'unresolved-interaction-target', intent: action.intent, evidence: action.evidence }));
   return {
     schemaVersion: 1, source: source.slice(0, 1200), primaryIntent,
     entities: [...characterEntities, ...objectEntities], perception, actions,
-    interactions: directedInteractions, unresolved,
+    interactions: directedInteractions, unresolved, referenceExamples,
     constraints: [
       'Only source-mentioned entities and events are considered known.',
       'Textual perception cues do not prove visual detection in an image or video.',
@@ -75,12 +79,14 @@ export function formatSceneUnderstandingForMotion(understanding = {}) {
   const interactions = (understanding.interactions || []).map(item => item.actorId + ' -> ' + item.targetId + ' (' + item.type + ')');
   const actions = (understanding.actions || []).map(item => item.intent + ': ' + item.evidence);
   const perception = (understanding.perception || []).map(item => item.type + ': ' + item.evidence);
+  const examples = (understanding.referenceExamples || []).map(item => item.intent + ' example: ' + item.prompt);
   return [
     'Source-grounded scene understanding:',
     entities.length ? 'Known entities: ' + entities.join(', ') : 'Known entities: none explicitly resolved.',
     actions.length ? 'Ordered events: ' + actions.join(' | ') : 'Ordered events: none confidently detected.',
     interactions.length ? 'Directed interactions: ' + interactions.join(' | ') : 'Directed interactions: none explicitly resolved.',
     perception.length ? 'Perception cues: ' + perception.join(' | ') : 'Perception cues: none explicitly stated.',
+    examples.length ? 'Related knowledge examples (guidance only, not scene facts): ' + examples.join(' | ') : '',
     (understanding.unresolved || []).length ? 'Unresolved details (do not guess): ' + understanding.unresolved.map(item => item.intent + ' target unresolved').join('; ') : '',
     'Do not invent visual observations, participants, object ownership, physical contact, or consequences.'
   ].filter(Boolean).join('\n');
