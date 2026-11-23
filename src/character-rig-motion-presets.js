@@ -29,7 +29,22 @@ const PRESETS = Object.freeze({
   pull: { label: 'Pull / Тянуть предмет', frames: 7 },
   hug: { label: 'Hug / Обнять', frames: 7 },
   point: { label: 'Point / Указать', frames: 5 },
-  sit: { label: 'Sit / Сесть', frames: 7 }
+  sit: { label: 'Sit / Сесть', frames: 7 },
+  climb: { label: 'Climb / Лазание', frames: 9 },
+  swim: { label: 'Swim / Плавание', frames: 9 },
+  crawl: { label: 'Crawl / Ползание', frames: 9 },
+  fall: { label: 'Fall / Падение', frames: 6 },
+  land: { label: 'Land / Приземление', frames: 6 },
+  open: { label: 'Open / Открыть', frames: 6 },
+  close: { label: 'Close / Закрыть', frames: 6 },
+  eat_drink: { label: 'Eat or drink / Есть или пить', frames: 7 },
+  sleep_wake: { label: 'Sleep and wake / Сон и пробуждение', frames: 9 },
+  write_draw: { label: 'Write or draw / Писать или рисовать', frames: 8 },
+  power_up: { label: 'Power up / Накопление силы', frames: 9 },
+  team_magic: { label: 'Team magic / Совместная магия', frames: 9 },
+  energy_clash: { label: 'Energy clash / Столкновение энергии', frames: 7 },
+  restrain: { label: 'Restrain / Удержание', frames: 7 },
+  reveal: { label: 'Reveal / Появление', frames: 6 }
 });
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const normalizeId = value => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -394,6 +409,130 @@ function poseFor(rig, preset, phase) {
       if (role === 'leftArm' || role === 'arm') rotation = -0.12 * lower;
       if (role === 'rightArm') rotation = 0.12 * lower;
       if (role === 'head') rotation = -0.035 * lower;
+    } else if (preset === 'climb') {
+      const rhythm = Math.sin(phase * Math.PI * 4);
+      if (role === 'root') { y = -0.11 * phase + 0.018 * Math.abs(rhythm); rotation = -0.025 * rhythm; }
+      if (role === 'leftArm' || role === 'arm') rotation = -0.9 + 0.22 * rhythm;
+      if (role === 'rightArm') rotation = -0.9 - 0.22 * rhythm;
+      if (role === 'leftLowerArm') rotation = 0.28 + 0.12 * rhythm;
+      if (role === 'rightLowerArm') rotation = 0.28 - 0.12 * rhythm;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.42 * rhythm;
+      if (role === 'rightLeg') rotation = 0.42 * rhythm;
+      if (role === 'head') rotation = -0.06;
+    } else if (preset === 'swim') {
+      const stroke = Math.sin(phase * Math.PI * 4);
+      if (role === 'root') y = 0.025 * Math.sin(phase * Math.PI * 4);
+      if (role === 'leftArm' || role === 'arm') rotation = -0.7 * stroke;
+      if (role === 'rightArm') rotation = 0.7 * stroke;
+      if (role === 'leftLowerArm') rotation = 0.28 * (1 - stroke);
+      if (role === 'rightLowerArm') rotation = -0.28 * (1 - stroke);
+      if (role === 'leftLeg' || role === 'leg') rotation = 0.38 * stroke;
+      if (role === 'rightLeg') rotation = -0.38 * stroke;
+      if (role === 'head') rotation = -0.025;
+    } else if (preset === 'crawl') {
+      const crawlBeat = Math.sin(phase * Math.PI * 4);
+      if (role === 'root') { y = 0.075; rotation = 0.025 * crawlBeat; }
+      if (role === 'head') { y = -0.025; rotation = -0.12; }
+      if (role === 'leftArm' || role === 'arm') rotation = -0.48 * crawlBeat;
+      if (role === 'rightArm') rotation = 0.48 * crawlBeat;
+      if (role === 'leftLowerArm') rotation = 0.18 * crawlBeat;
+      if (role === 'rightLowerArm') rotation = -0.18 * crawlBeat;
+      if (role === 'leftLeg' || role === 'leg') rotation = 0.35 * crawlBeat;
+      if (role === 'rightLeg') rotation = -0.35 * crawlBeat;
+    } else if (preset === 'fall') {
+      const drop = phase;
+      if (role === 'root') { y = 0.18 * drop; rotation = 0.28 * drop; }
+      if (role === 'head') rotation = 0.12 * drop;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.72 * drop;
+      if (role === 'rightArm') rotation = 0.72 * drop;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.25 * drop;
+      if (role === 'rightLeg') rotation = 0.25 * drop;
+    } else if (preset === 'land') {
+      const impact = Math.sin(Math.PI * phase);
+      const settle = clamp(phase * 2.4, 0, 1);
+      if (role === 'root') { y = 0.09 * impact - 0.025 * settle; rotation = -0.07 * impact; }
+      if (role === 'head') rotation = -0.12 * impact;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.5 * impact;
+      if (role === 'rightArm') rotation = 0.5 * impact;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.32 * impact;
+      if (role === 'rightLeg') rotation = 0.32 * impact;
+    } else if (preset === 'open') {
+      const reach = Math.sin(Math.PI * phase);
+      if (role === 'root') rotation = -0.035 * reach;
+      if (role === 'head') rotation = -0.06 * reach;
+      if (role === 'rightArm' || role === 'arm') rotation = -0.78 * reach;
+      if (role === 'rightLowerArm') rotation = 0.48 * reach;
+      if (role === 'leftArm') rotation = -0.12 * reach;
+    } else if (preset === 'close') {
+      const push = Math.sin(Math.PI * phase);
+      if (role === 'root') { x = 0.018 * push; rotation = -0.035 * push; }
+      if (role === 'rightArm' || role === 'arm') rotation = -0.72 * push;
+      if (role === 'leftArm') rotation = -0.58 * push;
+      if (role === 'rightLowerArm') rotation = 0.18 * push;
+      if (role === 'leftLowerArm') rotation = -0.18 * push;
+    } else if (preset === 'eat_drink') {
+      const lift = Math.sin(Math.PI * phase);
+      if (role === 'root') rotation = -0.025 * lift;
+      if (role === 'head') rotation = 0.12 * lift;
+      if (role === 'rightArm' || role === 'arm') rotation = -0.88 * lift;
+      if (role === 'rightLowerArm') rotation = 0.92 * lift;
+      if (role === 'leftArm') rotation = -0.08 * lift;
+    } else if (preset === 'sleep_wake') {
+      const waking = clamp((phase - 0.42) * 1.9, 0, 1);
+      const sleeping = 1 - waking;
+      if (role === 'root') y = 0.035 * sleeping - 0.015 * waking;
+      if (role === 'head') rotation = 0.18 * sleeping - 0.06 * waking;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.12 * sleeping - 0.35 * waking;
+      if (role === 'rightArm') rotation = 0.12 * sleeping + 0.35 * waking;
+      if (role === 'leftLowerArm') rotation = 0.08 * waking;
+      if (role === 'rightLowerArm') rotation = -0.08 * waking;
+    } else if (preset === 'write_draw') {
+      const stroke = Math.sin(phase * Math.PI * 8);
+      if (role === 'root') rotation = -0.025;
+      if (role === 'head') rotation = 0.1;
+      if (role === 'rightArm' || role === 'arm') rotation = -0.7 + 0.08 * stroke;
+      if (role === 'rightLowerArm') rotation = 0.75 + 0.12 * stroke;
+      if (role === 'leftArm') rotation = -0.12;
+    } else if (preset === 'power_up') {
+      const rise = Math.sin(Math.PI * phase);
+      if (role === 'root') y = -0.025 * rise;
+      if (role === 'head') rotation = -0.12 * rise;
+      if (role === 'leftArm' || role === 'arm') rotation = -1.05 * rise;
+      if (role === 'rightArm') rotation = 1.05 * rise;
+      if (role === 'leftLowerArm') rotation = 0.28 * rise;
+      if (role === 'rightLowerArm') rotation = -0.28 * rise;
+    } else if (preset === 'team_magic') {
+      const channel = Math.sin(Math.PI * phase);
+      if (role === 'root') rotation = -0.025 * channel;
+      if (role === 'head') rotation = -0.08 * channel;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.78 * channel;
+      if (role === 'rightArm') rotation = 0.78 * channel;
+      if (role === 'leftLowerArm') rotation = 0.22 * channel;
+      if (role === 'rightLowerArm') rotation = -0.22 * channel;
+    } else if (preset === 'energy_clash') {
+      const brace = Math.sin(Math.PI * phase);
+      if (role === 'root') { y = 0.035 * brace; rotation = -0.06 * brace; }
+      if (role === 'head') rotation = -0.1 * brace;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.86 * brace;
+      if (role === 'rightArm') rotation = 0.86 * brace;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.16 * brace;
+      if (role === 'rightLeg') rotation = 0.16 * brace;
+    } else if (preset === 'restrain') {
+      const hold = Math.sin(Math.PI * phase);
+      if (role === 'root') { x = 0.025 * hold; rotation = -0.06 * hold; }
+      if (role === 'head') rotation = -0.08 * hold;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.8 * hold;
+      if (role === 'rightArm') rotation = 0.8 * hold;
+      if (role === 'leftLowerArm') rotation = 0.35 * hold;
+      if (role === 'rightLowerArm') rotation = -0.35 * hold;
+      if (role === 'leftLeg' || role === 'leg') rotation = -0.12 * hold;
+      if (role === 'rightLeg') rotation = 0.12 * hold;
+    } else if (preset === 'reveal') {
+      const appear = Math.sin(Math.PI * phase);
+      if (role === 'root') { y = -0.035 * appear; rotation = -0.025 * appear; }
+      if (role === 'head') rotation = -0.14 * appear;
+      if (role === 'leftArm' || role === 'arm') rotation = -0.32 * appear;
+      if (role === 'rightArm') rotation = 0.32 * appear;
     } else if (preset === 'idle') {
       if (role === 'root') y = 0.008 * Math.sin(phase * Math.PI * 2);
       if (role === 'head') rotation = 0.025 * Math.sin(phase * Math.PI * 2);
