@@ -2,6 +2,7 @@ import { applyCharacterActionTimelineToLayers } from './character-action-runtime
 import { detectSceneAction } from './scene-action.js';
 import { validateCharacterActionTimeline } from './character-action-timeline.js';
 import { validateCharacterRig } from './character-rig.js';
+import { planCharacterMotionFromActionTimeline } from './character-motion-planner.js';
 
 export const ACTIONS = Object.freeze(['idle', 'walk', 'run', 'jump', 'wave', 'scared', 'talk', 'happy', 'sad', 'turn', 'dance', 'float', 'surprised', 'magic', 'attack', 'defend', 'dodge', 'throw', 'catch', 'give', 'take', 'put_down', 'point', 'sit', 'crawl', 'eat_drink', 'sleep_wake', 'vanish']);
 export const BACKGROUNDS = Object.freeze(['day', 'night', 'forest', 'city']);
@@ -393,7 +394,11 @@ export function createProceduralActorLayers(scene = {}, progress = 0, runtime = 
     visible: true,
     procedural: true
   }));
-  const motion = scene?.characterMotionTimeline;
+  const authoredMotion = scene?.characterMotionTimeline;
+  const generatedMotion = !authoredMotion && anchors.length
+    ? planCharacterMotionFromActionTimeline(scene, anchors).timeline
+    : null;
+  const motion = authoredMotion || generatedMotion;
   return motion ? applyCharacterActionTimelineToLayers(anchors, motion, progress) : anchors;
 }
 
