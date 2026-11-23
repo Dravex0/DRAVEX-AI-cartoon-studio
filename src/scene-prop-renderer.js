@@ -196,18 +196,25 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   // A held prop remains present in the next shot even when that shot contains
   // no new pickup event. Only attach it when its named holder is in the scene.
   for (const snapshot of snapshots) {
-    if (snapshot?.entityType !== 'prop' || snapshot.property !== 'holder' || !snapshot.value) continue;
+    if (snapshot?.entityType !== 'prop' || snapshot.property !== 'holder') continue;
     const entityId = clean(snapshot.entityId);
     if (!entityId || holderPlans.some(item => key(item.id) === key(entityId))) continue;
     const holderId = clean(snapshot.value);
-    if (!layers.some(layer => key(layer?.characterId) === key(holderId))) continue;
-    const point = holderPoint(holderId, snapshot.position);
-    holderPlans.push({
-      id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
-      rotation: Number.isFinite(point.rotation) ? point.rotation : 0,
-      held: true, visible: true, opacity: 1, scale: 1,
-      evidence: clean(snapshot.evidence), snapshot: true, transitionProgress: 1
-    });
+    if (holderId && layers.some(layer => key(layer?.characterId) === key(holderId))) {
+      const point = holderPoint(holderId, snapshot.position);
+      holderPlans.push({
+        id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
+        rotation: Number.isFinite(point.rotation) ? point.rotation : 0,
+        held: true, visible: true, opacity: 1, scale: 1,
+        evidence: clean(snapshot.evidence), snapshot: true, transitionProgress: 1
+      });
+    } else if (!holderId && normalizedPoint(snapshot.position)) {
+      holderPlans.push({
+        id: entityId, kind: propKind(entityId), x: snapshot.position.x, y: snapshot.position.y,
+        rotation: 0, held: false, visible: true, opacity: 1, scale: 1,
+        evidence: clean(snapshot.evidence), snapshot: true, transitionProgress: 1
+      });
+    }
   }
 
   // Explicit position changes are rendered only when both endpoints are known.
