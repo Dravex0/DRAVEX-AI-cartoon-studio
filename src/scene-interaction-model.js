@@ -4,7 +4,7 @@ const clean = value => String(value ?? '').trim().slice(0, 180);
 const key = value => clean(value).toLocaleLowerCase();
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const STATE_PROPERTIES = new Set(['holder', 'position', 'rotation', 'visibility', 'visible', 'open', 'doorState', 'location', 'status', 'condition', 'support']);
+const STATE_PROPERTIES = new Set(['holder', 'position', 'rotation', 'scale', 'visibility', 'visible', 'open', 'doorState', 'location', 'status', 'condition', 'support']);
 
 const INTERACTION_RULES = Object.freeze({
   collision: 'Both bodies must meet at the same contact point; preserve the reaction and separate or rebound only when the source describes it.',
