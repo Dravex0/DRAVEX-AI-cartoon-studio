@@ -324,7 +324,11 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
         ? (change.previousValue ?? (change.value === 'open' ? 'closed' : 'open'))
         : change.previousValue;
       const toState = change.value;
-      if (p < start) break;
+      if (p < start) {
+        if (change.property === 'openState') state = fromState === 'open' ? 1 : 0;
+        else if (change.property === 'visible' && typeof fromState === 'boolean') opacity = fromState ? 1 : 0;
+        break;
+      }
       const progress = clamp((p - start) / Math.max(0.000001, end - start), 0, 1);
       transitionProgress = progress;
       evidence = clean(change.evidence);
@@ -404,7 +408,7 @@ function drawProp(context, prop, x, y, time) {
   const bob = prop.held ? Math.sin(time * 4) * 0.008 : 0;
   if (prop.visible === false || (Number.isFinite(prop.opacity) && prop.opacity <= 0.001)) return;
   context.save();
-  if (Number.isFinite(prop.opacity)) context.globalAlpha *= clamp(prop.opacity, 0, 1);
+  if (Number.isFinite(prop.opacity)) context.globalAlpha = (Number.isFinite(context.globalAlpha) ? context.globalAlpha : 1) * clamp(prop.opacity, 0, 1);
   context.translate(x, y + bob);
   context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
   context.lineWidth = 2.5;
