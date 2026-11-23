@@ -25,7 +25,11 @@ function propKind(name) {
   if (/phone|smartphone|телефон|смартфон|m[oó]vil|celular/.test(value)) return 'phone';
   if (/cup|mug|чашк|кружк|taza|vaso/.test(value)) return 'cup';
   if (/car|vehicle|машин|автомоб|авто|coche|veh[ií]culo/.test(value)) return 'vehicle';
-  if (/table|chair|стол|стул|mesa|silla/.test(value)) return 'furniture';
+  if (/table|стол|mesa/.test(value)) return 'table';
+  if (/chair|стул|silla/.test(value)) return 'chair';
+  if (/tree|дерев|деревц|árbol|arbol/.test(value)) return 'tree';
+  if (/rock|stone|камень|камін|piedra/.test(value)) return 'rock';
+  if (/platform|ledge|платформ|уступ|plataforma/.test(value)) return 'platform';
   return 'generic';
 }
 
@@ -536,11 +540,31 @@ function drawProp(context, prop, x, y, time) {
     for (const wheelX of [-0.023, 0.024]) {
       context.beginPath(); context.arc(wheelX, 0.018, 0.009, 0, Math.PI * 2); context.fill();
     }
-  } else if (prop.kind === 'furniture') {
+  } else if (prop.kind === 'table') {
     context.fillStyle = '#9b704a'; context.strokeStyle = '#5d4432';
     context.fillRect(-0.034, -0.012, 0.068, 0.012); context.strokeRect(-0.034, -0.012, 0.068, 0.012);
     context.fillRect(-0.028, 0, 0.006, 0.032); context.fillRect(0.022, 0, 0.006, 0.032);
     context.strokeRect(-0.028, 0, 0.006, 0.032); context.strokeRect(0.022, 0, 0.006, 0.032);
+  } else if (prop.kind === 'chair') {
+    context.fillStyle = '#a97950'; context.strokeStyle = '#5d4432';
+    context.fillRect(-0.022, -0.002, 0.044, 0.012); context.strokeRect(-0.022, -0.002, 0.044, 0.012);
+    context.fillRect(-0.022, -0.03, 0.044, 0.01); context.strokeRect(-0.022, -0.03, 0.044, 0.01);
+    context.fillRect(-0.018, 0.01, 0.005, 0.025); context.fillRect(0.013, 0.01, 0.005, 0.025);
+    context.strokeRect(-0.018, 0.01, 0.005, 0.025); context.strokeRect(0.013, 0.01, 0.005, 0.025);
+  } else if (prop.kind === 'tree') {
+    context.fillStyle = '#76503a'; context.strokeStyle = '#4c392b';
+    context.fillRect(-0.006, 0.005, 0.012, 0.04); context.strokeRect(-0.006, 0.005, 0.012, 0.04);
+    context.fillStyle = '#65966b'; context.strokeStyle = '#355b42';
+    context.beginPath(); context.arc(0, -0.014, 0.03, 0, Math.PI * 2); context.fill(); context.stroke();
+  } else if (prop.kind === 'rock') {
+    context.fillStyle = '#92979c'; context.strokeStyle = '#555d65';
+    context.beginPath(); context.moveTo(-0.032, 0.018); context.lineTo(-0.024, -0.008);
+    context.lineTo(-0.004, -0.03); context.lineTo(0.022, -0.018);
+    context.lineTo(0.034, 0.018); context.closePath(); context.fill(); context.stroke();
+  } else if (prop.kind === 'platform') {
+    context.fillStyle = '#8b9299'; context.strokeStyle = '#4e5962';
+    context.fillRect(-0.045, -0.01, 0.09, 0.02); context.strokeRect(-0.045, -0.01, 0.09, 0.02);
+    context.fillRect(-0.035, 0.01, 0.07, 0.022); context.strokeRect(-0.035, 0.01, 0.07, 0.022);
   } else {
     context.fillStyle = '#e7b66b'; context.strokeStyle = '#775735';
     context.beginPath(); context.roundRect(-0.021, -0.018, 0.042, 0.036, 0.008); context.fill(); context.stroke();
