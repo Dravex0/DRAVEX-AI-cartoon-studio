@@ -9,6 +9,7 @@ import { inferSceneCausalLinks } from './scene-causality.js';
 import { inferStoryboardStateChanges } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
+import { classifyPromptApproach, applyPromptApproach } from './prompt-approach.js';
 import { detectSceneAction, inferSceneActionIntent, extractSceneActionSequence } from './scene-action.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
@@ -109,6 +110,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     : distributeStoryDetails(sentences.length ? sentences : [FALLBACK[locale]], beatCount);
   const beats = selectBeats(locale, beatCount);
   const directiveText = formatProductionDirectives(brief.directives);
+  const overallPromptApproach = classifyPromptApproach(source);
 
   const scenes = beats.map((beat, index) => {
     const explicitScene = explicitScenes[index] || null;
@@ -189,6 +191,10 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
       ? `Follow this exact source-grounded action order without skipping or rearranging steps: ${actionSequence.map((event, eventIndex) => `${eventIndex + 1}. ${event.actorId || 'unresolved actor'}${event.targetId ? ` → ${event.targetId}` : ''}: ${event.intent} (${event.evidence})`).join('; ')}. Preserve each explicitly identified actor and target; do not transfer a command or action to another character.`
       : '';
     scene.motionPrompt = [scene.visibleAction, semanticMotionInstruction, orderedActionInstruction].filter(Boolean).join('. ');
+    // Route each scene independently: a mixed story may need dialogue in one beat
+    // and chase/combat choreography in another. The classifier never changes source events.
+    scene.promptApproach = classifyPromptApproach(scene.storyDetail || source);
+    Object.assign(scene, applyPromptApproach({ motionPrompt: scene.motionPrompt }, scene.promptApproach));
     // Add one action phase only when source text supports a movement, semantic event,
     // or directed interaction. Never fabricate setup/reaction/aftermath phases.
     const sourceAction = detectSceneAction(scene.storyDetail);
@@ -259,6 +265,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     scenes: productionScenes,
     eventChain,
     brief,
+    promptApproach: overallPromptApproach,
     requestedSceneCount: beatCount
   };
 }
