@@ -64,6 +64,28 @@ test('plans a directional dodge as a sidestep and recovery for a flat sprite', (
   assert.equal(recover.easing, 'ease-in');
 });
 
+test('plans a source-grounded attack lunge toward an explicitly named character and recovers', () => {
+  const scene = makeScene('attacks Bird');
+  scene.actionTimeline.phases[0].targetId = 'Bird';
+  const result = planCharacterMotionFromActionTimeline(scene, layers);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 2);
+  const [lunge, recover] = result.timeline.phases;
+  assert.equal(lunge.start, 0.2);
+  assert.ok(lunge.end > lunge.start && lunge.end < 0.8);
+  assert.ok(lunge.motion.to.x > lunge.motion.from.x);
+  assert.equal(recover.start, lunge.end);
+  assert.equal(recover.end, 0.8);
+  assert.deepEqual(recover.motion.to, lunge.motion.from);
+  assert.match(lunge.description, /contact is not asserted/);
+});
+
+test('does not invent an attack direction when no named target sprite is available', () => {
+  const result = planCharacterMotionFromActionTimeline(makeScene('attacks the monster'), layers);
+  assert.equal(result.status, 'no-unambiguous-motion');
+  assert.equal(result.timeline, null);
+});
+
 test('does not guess a direction for an ambiguous dodge', () => {
   const result = planCharacterMotionFromActionTimeline(makeScene('dodges the incoming strike'), layers);
   assert.equal(result.status, 'no-unambiguous-motion');
