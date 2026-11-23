@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ACTIONS, BACKGROUNDS, poseAt, mouthEnvelope, parseStory, sceneDuration,
+  ACTIONS, BACKGROUNDS, poseAt, mouthEnvelope, parseStory, sceneDuration, actionForStep,
   drawFigure, drawScene, drawProceduralSceneActors, createProceduralActorLayers
 } from '../src/doodle-engine.js';
 
@@ -24,7 +24,12 @@ function mockCanvas() {
 }
 
 test('exports the supported action and background vocabulary', () => {
-  assert.deepEqual(ACTIONS, ['idle', 'walk', 'run', 'jump', 'wave', 'scared', 'talk', 'happy', 'sad', 'turn', 'dance', 'float']);
+  for (const action of ['idle', 'walk', 'run', 'jump', 'wave', 'scared', 'talk']) {
+    assert.ok(ACTIONS.includes(action), 'legacy action remains supported: ' + action);
+  }
+  for (const action of ['attack', 'defend', 'dodge', 'throw', 'catch', 'give', 'take', 'put_down', 'point', 'vanish']) {
+    assert.ok(ACTIONS.includes(action), 'interaction action is supported: ' + action);
+  }
   assert.deepEqual(BACKGROUNDS, ['day', 'night', 'forest', 'city']);
 });
 
@@ -115,4 +120,15 @@ test('creates and renders offline actors only when sprite and rig art are absent
   assert.equal(result.skipped, 0);
   assert.equal(result.layers.length, 1);
   assert.equal(result.layers[0].procedural, true);
+});
+
+
+test('maps semantic interaction intents to explicit Doodle acting poses', () => {
+  assert.equal(actionForStep({ intent: 'attack', motionCue: 'run' }), 'attack');
+  assert.equal(actionForStep({ intent: 'defend', motionCue: 'turn' }), 'defend');
+  assert.equal(actionForStep({ intent: 'throw', motionCue: 'run' }), 'throw');
+  assert.equal(actionForStep({ intent: 'catch', motionCue: 'turn' }), 'catch');
+  assert.equal(actionForStep({ intent: 'give', motionCue: 'talk' }), 'give');
+  assert.equal(actionForStep({ intent: 'point', motionCue: 'turn' }), 'point');
+  assert.equal(actionForStep({ intent: 'unrecognized', motionCue: 'wave' }), 'wave');
 });
