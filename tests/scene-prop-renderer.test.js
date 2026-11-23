@@ -498,7 +498,7 @@ test('fades object visibility only from explicitly authored boolean state and po
     evidence: 'The lantern becomes visible.'
   }] };
   const before = buildScenePropRenderPlan(object, [], 0.1)[0];
-  const middle = buildScenePropRenderPlan(object, [], 0.5)[0];
+  const middle = buildScenePropRenderPlan(object, [], 0.66)[0];
   const after = buildScenePropRenderPlan(object, [], 1)[0];
   assert.equal(before.opacity, 0);
   assert.ok(middle.opacity > 0 && middle.opacity < 1);
