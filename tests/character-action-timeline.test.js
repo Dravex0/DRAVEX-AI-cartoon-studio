@@ -18,9 +18,9 @@ const scene = {
     schemaVersion: 1,
     phases: [
       { phase: 'preparation', start: 0, end: 0.2, actorId: 'Foxy', description: 'Foxy notices the key and leans forward.', evidence: 'Foxy notices the silver key' },
-      { phase: 'action', start: 0.2, end: 0.65, actorId: 'Foxy', targetId: 'Foxy', description: 'Foxy reaches down and lifts the key.', evidence: 'picks it up' },
+      { phase: 'action', start: 0.2, end: 0.65, actorId: 'Foxy', targetId: 'silver key', description: 'Foxy reaches down and lifts the key.', evidence: 'Foxy picks up the silver key.' },
       { phase: 'reaction', start: 0.65, end: 0.82, actorId: 'Foxy', description: 'Foxy looks at the key with surprise.', evidence: 'Foxy notices the silver key' },
-      { phase: 'result', start: 0.82, end: 1, actorId: 'Foxy', description: 'Foxy holds the key securely.', evidence: 'picks it up' }
+      { phase: 'result', start: 0.82, end: 1, actorId: 'Foxy', description: 'Foxy holds the key securely.', evidence: 'Foxy picks up the silver key.' }
     ]
   }
 };
@@ -285,4 +285,35 @@ test('rejects overlapping steps assigned to the same character', () => {
   };
   const report = validateCharacterActionTimeline(candidate);
   assert.ok(report.issues.some(item => item.code === 'action-step-timing-invalid'));
+});
+
+test('rejects action targets that are not named in their locked source evidence', () => {
+  const candidate = structuredClone(scene);
+  candidate.actionTimeline.phases[1].targetId = 'secret portal';
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'phase-target-evidence-mismatch'));
+});
+
+test('rejects action substeps that assign a real sentence to an unmentioned actor or target', () => {
+  const candidate = {
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira throws the ball to Noah.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira',
+        description: 'Mira throws the ball to Noah.',
+        evidence: 'Mira throws the ball to Noah.',
+        steps: [{
+          intent: 'throw', motionCue: 'throw', start: 0.2, end: 0.8,
+          actorId: 'Noah', targetId: 'wall',
+          description: 'Noah throws the ball at a wall.',
+          evidence: 'Mira throws the ball to Noah.'
+        }]
+      }]
+    }
+  };
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'action-step-actor-evidence-mismatch'));
+  assert.ok(report.issues.some(item => item.code === 'action-step-target-evidence-mismatch'));
 });
