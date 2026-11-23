@@ -78,8 +78,8 @@ const PATTERNS = Object.freeze({
 
 function matchesUnicodeWordPattern(pattern, source) {
   const unicodeBoundaries = pattern.source
-    .replace(/^\\\\b/u, '(?<![\\\\p{L}\\\\p{N}])')
-    .replace(/\\\\b$/u, '(?![\\\\p{L}\\\\p{N}])');
+    .replace(/^\b/u, '(?<![\p{L}\p{N}])')
+    .replace(/\b$/u, '(?![\p{L}\p{N}])');
   return new RegExp(unicodeBoundaries, pattern.flags).test(source);
 }
 
