@@ -72,7 +72,7 @@ const SEMANTIC_ACTIONS = [
     /choque.{0,35}(?:energ|poder|magia)|energ\w*.{0,35}choque/i
   ] },
   { intent: 'defend', motionCue: 'turn', patterns: [
-    /\b(?:blocks?|parries|deflects?|raises? a shield|protects?)\b|\bshield\b/i,
+    /\b(?:blocks?|parries|deflects?|raises? a shield|protects?)\b/i,
     /блокиру\w*|отража\w* удар|поднима\w* щит|защища\w*/i,
     /блоку\w*|відбива\w* удар|підніма\w* щит|захища\w*/i,
     /bloque\w*|protege\w*|escudo/i
@@ -99,7 +99,7 @@ const SEMANTIC_ACTIONS = [
     /\b(?:awakens?|powers? up|energy surges?|aura ignites?|eyes? (?:begin to )?glow)\b/i,
     /пробужда\w*|энергия вспыхива\w*|сила пробужда\w*|глаза загора\w*/i,
     /пробуджу\w*|енергія спалаху\w*|сила пробуджу\w*|очі спалахую\w*/i,
-    /despierta\w*|energía despierta|aura se enciende/i
+    /despierta\w*.{0,30}(?:poder|energ|aura)|energía despierta|aura se enciende/i
   ] },
   { intent: 'reveal', motionCue: 'surprised', patterns: [
     /\b(?:appears?|emerges?|materializes?|steps out of the shadows|is revealed)\b/i,
@@ -224,7 +224,7 @@ const SEMANTIC_ACTIONS = [
   { intent: 'throw', motionCue: 'run', patterns: [
     /\b(?:throws?|tosses?|hurls?|launches? .* into)\b/i,
     /броса\w*|кида\w*|швыря\w*|мета\w*/i,
-    /кида\w*|жбурля\w*|мета\w*/i,
+    /(?<!про)кида\w*|жбурля\w*|мета\w*/i,
     /lanza\w*|arroja\w*/
   ] },
   { intent: 'catch', motionCue: 'jump', patterns: [
