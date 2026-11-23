@@ -158,7 +158,7 @@ test('localizes style and quality options and restores the saved creative setup'
   await expect(page.locator('#imageQuality')).toHaveValue('ultra');
 });
 
-test('renders the built-in procedural Foxy when a named fox has no scene artwork', async ({ page }) => {
+test('renders an offline procedural actor when a named character has no scene artwork', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -218,7 +218,7 @@ test('local canvas mode exports a playable WebM without contacting cloud video o
   );
   await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
   const savedDemoFlag = await page.evaluate(() => JSON.parse(localStorage.getItem('dravex-cartoon-draft') || '{}').proceduralDemoCharacter);
-  expect(savedDemoFlag).toBe(true);
+  expect(savedDemoFlag).toBeFalsy();
   await expect(page.locator('#videoGenerationMode')).toHaveValue('local-canvas');
   await expect(page.locator('#generateFullFilmComfy')).toBeHidden();
   await page.locator('#idea').fill(
@@ -870,7 +870,9 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   const observedColorBuckets = [...new Set(observedSceneColors.colors)].sort();
   expect(observedColorBuckets, 'Final WebM should contain exactly the five generated scene color buckets; expected: '+JSON.stringify(expectedColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedColorBuckets);
   expect(observedSceneColors.sceneColorSequence, 'Final WebM scene colors should follow storyboard order; expected: '+JSON.stringify(expectedSceneColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.sceneColorSequence)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedSceneColorBuckets);
-  expect(observedSceneColors.characterOverlayFrames).toBeGreaterThan(0);
+  // This ComfyUI fixture supplies background videos but no character artwork or rig.
+  // The removed hard-coded demo mascot must not be composited over generated footage.
+  expect(observedSceneColors.characterOverlayFrames).toBe(0);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
