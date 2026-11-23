@@ -206,6 +206,11 @@ test('semantic scene intent reaches motion prompt and action timeline for team m
   assert.equal(scene.actionTimeline.phases[0].actorId, 'Arin');
   assert.equal(scene.actionTimeline.phases[0].targetId, 'Elira');
   assert.match(scene.actionTimeline.phases[0].description, /combine their powers/);
+  const synchronizedSteps = scene.actionTimeline.phases[0].steps.filter(step => step.intent === 'team_magic');
+  assert.deepEqual(synchronizedSteps.map(step => step.actorId), ['Arin', 'Elira']);
+  assert.deepEqual(synchronizedSteps.map(step => step.targetId), ['Elira', 'Arin']);
+  assert.equal(synchronizedSteps[0].start, synchronizedSteps[1].start);
+  assert.equal(synchronizedSteps[0].end, synchronizedSteps[1].end);
   assert.match(scene.motionGenerationPrompt, /team_magic/);
   assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
 });
