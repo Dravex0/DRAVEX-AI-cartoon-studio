@@ -234,3 +234,21 @@ test('does not let a different sentence authorize an action substep interaction'
   assert.ok(model.events[0].actions.some(action => action.type === 'unresolved_action_step'
     && action.reason === 'step-participants-not-grounded-in-step-evidence'));
 });
+
+
+test('does not build physical relations from evidence naming different participants', () => {
+  const model = buildSceneWorldModel([{
+    id: 'unrelated-physics-evidence',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira throws the ball to Noah. Noah waves.',
+    physicsEvents: [{
+      id: 'false-throw', type: 'throw', actorId: 'Mira', entityId: 'ball',
+      targetId: 'Noah', evidence: 'Noah waves.'
+    }]
+  }]);
+  assert.equal(model.relations.some(relation => relation.type === 'physical_action'
+    && relation.from === 'Mira' && relation.to === 'ball'), false);
+  assert.equal(model.entities.some(entity => entity.id === 'ball'), false);
+  assert.ok(model.events[0].actions.some(action => action.type === 'unresolved_physics_event'
+    && action.reason === 'physics-participants-not-grounded-in-event-evidence'));
+});
