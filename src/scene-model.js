@@ -122,6 +122,9 @@ export function normalizeScene(input = {}, index = 0) {
         physicsEventId: text(change.physicsEventId, 160),
         fromEntityId: text(change.fromEntityId, 120),
         toEntityId: text(change.toEntityId, 120),
+        gripHand: text(change.gripHand, 40),
+        fromGripHand: text(change.fromGripHand, 40),
+        toGripHand: text(change.toGripHand, 40),
         ...(change.actionIntent == null || change.actionIntent === '' ? {} : { actionIntent: text(change.actionIntent, 40) }),
         ...(position ? { position } : {}),
         ...(previousPosition ? { previousPosition } : {})
