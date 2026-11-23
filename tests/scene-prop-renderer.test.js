@@ -23,6 +23,36 @@ test('plans a grounded pickup and moves the prop from the ground to the named ac
   assert.equal(late.evidence, 'Fox picks up the glowing star.');
 });
 
+test('uses the grip hand declared by the matched action timeline step', () => {
+  const evidence = 'Fox picks up the glowing star.';
+  const authored = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.2, end: 0.8, actorId: 'Fox',
+      steps: [{
+        intent: 'take', start: 0.2, end: 0.8, actorId: 'Fox',
+        targetId: 'glowing star', evidence, description: 'Fox picks up the star.',
+        gripHand: 'left'
+      }]
+    }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'glowing star', property: 'holder',
+      previousValue: null, value: 'Fox', actorId: 'Fox',
+      actionIntent: 'take', evidence
+    }]
+  };
+  const plan = buildScenePropRenderPlan(authored, layers, 1, {
+    proceduralPropAnchors: {
+      Fox: {
+        leftHand: { x: 0.23, y: 0.34, rotation: 0 },
+        rightHand: { x: 0.76, y: 0.31, rotation: 0 }
+      }
+    }
+  })[0];
+  assert.equal(plan.held, true);
+  assert.ok(Math.abs(plan.x - 0.23) < 1e-9);
+  assert.ok(Math.abs(plan.y - 0.34) < 1e-9);
+});
+
 test('does not invent props when a scene has no explicit holder state change', () => {
   assert.deepEqual(buildScenePropRenderPlan({ storyDetail: 'Fox looks around.' }, layers, 1), []);
 });
