@@ -195,6 +195,24 @@ test('maps semantic interaction intents to explicit Doodle acting poses', () => 
 });
 
 
+test('maps common object interaction synonyms and rejects inherited object keys', () => {
+  for (const intent of ['pickup', 'grab', 'grasp', 'hold']) {
+    assert.equal(actionForStep({ intent }), 'take', intent);
+  }
+  for (const intent of ['drop', 'release', 'place', 'set_down']) {
+    assert.equal(actionForStep({ intent }), 'put_down', intent);
+  }
+  for (const intent of ['handoff', 'hand_off', 'pass']) {
+    assert.equal(actionForStep({ intent }), 'give', intent);
+  }
+  for (const intent of ['receive', 'accept']) {
+    assert.equal(actionForStep({ intent }), 'catch', intent);
+  }
+  assert.equal(actionForStep({ intent: 'carry' }), 'walk');
+  assert.notEqual(typeof actionForStep({ intent: 'constructor' }), 'function');
+  assert.notEqual(typeof actionForStep({ intent: 'toString' }), 'function');
+});
+
 test('uses the offline actor while an authored sprite is not decoded, then yields to the real image', () => {
   const scene = {
     characters: ['Foxy'],
