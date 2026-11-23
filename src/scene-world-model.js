@@ -123,7 +123,9 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
 
     const changes = Array.isArray(scene.stateChanges) ? scene.stateChanges : [];
     const participantKeys = new Set(participants.map(keyOf));
-    const propKeys = new Set(changes.filter(record).filter(change => clean(change.entityType, 40) === 'prop')
+    const propKeys = new Set(changes.filter(record).filter(change =>
+      clean(change.entityType, 40) === 'prop'
+      && sourceHasEvidence(scene, clean(change.evidence, 500), sourceText))
       .map(change => keyOf(change.entityId)).filter(Boolean));
     const addActionTarget = targetId => {
       const target = clean(targetId, 160);
