@@ -48,6 +48,49 @@ test('moves toward an explicitly named character target without inventing a dire
   assert.ok(result.timeline.phases[0].motion.to.x > 0.25);
 });
 
+test('moves an explicitly targeted attacker into safe character interaction range without moving the target', () => {
+  const scene = makeScene('attacks Bird');
+  scene.actionTimeline.phases[0].targetId = 'Bird';
+  const result = planCharacterMotionFromActionTimeline(scene, layers);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 1);
+  const movement = result.timeline.phases[0].motion;
+  assert.equal(movement.from.x, 0.25);
+  assert.ok(movement.to.x > movement.from.x);
+  assert.ok(movement.to.x < 0.75);
+  const remainingGap = Math.hypot(0.75 - movement.to.x, 0.5 - movement.to.y);
+  assert.ok(Math.abs(remainingGap - 0.176) < 1e-9,
+    'the actor should stop at the width-derived safe interaction gap');
+  assert.equal(result.timeline.phases[0].actorId, 'Foxy');
+  assert.ok(!result.timeline.phases.some(item => item.actorId === 'Bird'),
+    'the target must not be moved without its own authored action');
+});
+
+test('moves a handoff actor toward an explicitly named character target', () => {
+  const scene = makeScene('gives the key to Bird');
+  scene.actionTimeline.phases[0].targetId = null;
+  scene.actionTimeline.phases[0].steps = [{
+    intent: 'give', motionCue: 'give', start: 0.2, end: 0.8,
+    actorId: 'Foxy', targetId: 'Bird',
+    description: 'Foxy gives the key to Bird',
+    evidence: 'gives the key to Bird'
+  }];
+  const result = planCharacterMotionFromActionTimeline(scene, layers);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 1);
+  assert.ok(result.timeline.phases[0].motion.to.x > 0.25);
+  assert.ok(result.timeline.phases[0].motion.to.x < 0.75);
+});
+
+test('does not invent a contact destination for an unknown character target', () => {
+  const scene = makeScene('attacks Ghost');
+  scene.actionTimeline.phases[0].targetId = 'Ghost';
+  const result = planCharacterMotionFromActionTimeline(scene, layers);
+  assert.equal(result.status, 'no-unambiguous-motion');
+  assert.equal(result.timeline, null);
+  assert.ok(result.skipped.some(item => item.reason === 'motion-not-unambiguous'));
+});
+
 test('plans a directional dodge as a sidestep and recovery for a flat sprite', () => {
   const result = planCharacterMotionFromActionTimeline(makeScene('dodges left from the incoming strike'), layers);
   assert.equal(result.status, 'generated');

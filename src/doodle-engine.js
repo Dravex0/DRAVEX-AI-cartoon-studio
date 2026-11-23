@@ -20,6 +20,7 @@ const hash = value => {
   return result >>> 0;
 };
 const key = value => String(value ?? '').trim().toLocaleLowerCase();
+const cleanLayerId = value => String(value ?? '').trim();
 const record = value => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 const INTENT_ACTIONS = Object.freeze({
@@ -449,8 +450,19 @@ export function createProceduralActorLayers(scene = {}, progress = 0, runtime = 
     procedural: true
   }));
   const authoredMotion = scene?.characterMotionTimeline;
+  // Include positioned authored sprite layers as target anchors. The returned
+  // procedural layers still contain only fallback actors, but their motion
+  // planner must know where non-procedural cast members are standing.
+  const proceduralIds = new Set(anchors.map(layer => key(layer.characterId)));
+  const positionedAuthoredLayers = layers.filter(layer =>
+    record(layer) && cleanLayerId(layer.characterId)
+    && layer.visible !== false
+    && !proceduralIds.has(key(layer.characterId))
+    && Number.isFinite(layer.x) && Number.isFinite(layer.y)
+  );
+  const planningLayers = [...positionedAuthoredLayers, ...anchors];
   const generatedMotion = !authoredMotion && anchors.length
-    ? planCharacterMotionFromActionTimeline(scene, anchors).timeline
+    ? planCharacterMotionFromActionTimeline(scene, planningLayers).timeline
     : null;
   const motion = authoredMotion || generatedMotion;
   return motion ? applyCharacterActionTimelineToLayers(anchors, motion, progress) : anchors;

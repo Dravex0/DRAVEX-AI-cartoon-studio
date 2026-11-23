@@ -237,6 +237,41 @@ test('uses the resolved protagonist when a scene has no explicit cast list', () 
 });
 
 
+test('moves a procedural fallback actor toward a positioned authored sprite target', () => {
+  const scene = {
+    id: 'doodle-mixed-render-approach',
+    characters: ['Mira', 'Noah'],
+    characterLayers: [{
+      characterId: 'Noah', imageUrl: 'https://example.test/noah.png',
+      x: 0.72, y: 0.7, width: 0.32, height: 0.52,
+      scale: 1, rotation: 0, opacity: 1
+    }],
+    storyDetail: 'Mira walks toward Noah.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira',
+        description: 'Mira walks toward Noah.',
+        evidence: 'Mira walks toward Noah.',
+        steps: [{
+          intent: 'walk', motionCue: 'walk', start: 0, end: 1,
+          actorId: 'Mira', targetId: 'Noah',
+          description: 'Mira walks toward Noah.',
+          evidence: 'Mira walks toward Noah.'
+        }]
+      }]
+    }
+  };
+  const start = createProceduralActorLayers(scene, 0);
+  const middle = createProceduralActorLayers(scene, 0.5);
+  assert.deepEqual(start.map(layer => layer.characterId), ['Mira']);
+  assert.equal(middle.length, 1);
+  assert.ok(middle[0].x > start[0].x,
+    'the fallback actor should use the authored sprite target position');
+  assert.ok(middle[0].x < 0.72,
+    'the fallback actor should stop before overlapping the sprite target');
+});
+
 test('moves a procedural actor toward a named character using the validated motion planner', () => {
   const scene = {
     id: 'doodle-approach',
