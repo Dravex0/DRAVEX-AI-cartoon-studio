@@ -164,3 +164,18 @@ test('ignores invalid or ungrounded action timelines when building interaction e
   });
   assert.equal(model.eventCount, 0);
 });
+
+test('retains inferred openState transitions in the interaction model', () => {
+  const model = buildSceneInteractionModel({
+    storyDetail: 'Foxy opens the ancient door.',
+    stateChanges: [{
+      entityType: 'prop', entityId: 'ancient door', property: 'openState',
+      previousValue: 'closed', value: 'open', actorId: 'Foxy',
+      actionIntent: 'open', evidence: 'Foxy opens the ancient door.'
+    }]
+  });
+  assert.equal(model.stateTransitionCount, 1);
+  assert.equal(model.stateTransitions[0].property, 'openState');
+  assert.equal(model.stateTransitions[0].previousValue, 'closed');
+  assert.equal(model.stateTransitions[0].value, 'open');
+});
