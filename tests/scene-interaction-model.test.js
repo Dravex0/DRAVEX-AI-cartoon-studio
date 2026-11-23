@@ -114,3 +114,53 @@ test('keeps raw physics event evidence aligned when malformed entries are skippe
   assert.equal(model.events[0].actorId, 'Mira');
   assert.equal(model.events[0].targetId, 'Noah');
 });
+
+test('creates directed character-to-character interaction edges from validated action substeps', () => {
+  const scene = {
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira hugs Noah, then Noah waves to Mira.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [
+        { phase: 'preparation', start: 0, end: 0.1, actorId: 'Mira',
+          description: 'Mira approaches Noah.', evidence: 'Mira hugs Noah,' },
+        { phase: 'action', start: 0.1, end: 0.75, actorId: 'Mira',
+          description: 'They interact.', evidence: 'Mira hugs Noah, then Noah waves to Mira.',
+          steps: [
+            { intent: 'hug', motionCue: 'contact', start: 0.1, end: 0.4,
+              actorId: 'Mira', targetId: 'Noah', description: 'Mira hugs Noah.',
+              evidence: 'Mira hugs Noah,' },
+            { intent: 'wave', motionCue: 'gesture', start: 0.45, end: 0.7,
+              actorId: 'Noah', targetId: 'Mira', description: 'Noah waves to Mira.',
+              evidence: 'Noah waves to Mira.' }
+          ] }
+      ]
+    }
+  };
+  const model = buildSceneInteractionModel(scene);
+  assert.equal(model.eventCount, 2);
+  assert.deepEqual(model.events.map(event => [event.actorId, event.targetId, event.intent]), [
+    ['Mira', 'Noah', 'hug'], ['Noah', 'Mira', 'wave']
+  ]);
+  assert.equal(model.events[0].contact, null);
+  assert.match(formatSceneInteractionInstructions(model), /Mira.*Noah/);
+  assert.match(formatSceneInteractionInstructions(model), /Noah.*Mira/);
+});
+
+test('ignores invalid or ungrounded action timelines when building interaction edges', () => {
+  const model = buildSceneInteractionModel({
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira looks at Noah.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0.1, end: 0.8, actorId: 'Mira',
+        description: 'Mira secretly pushes Noah.', evidence: 'Mira secretly pushes Noah.',
+        steps: [{ intent: 'push', motionCue: 'push', start: 0.2, end: 0.6,
+          actorId: 'Mira', targetId: 'Noah', description: 'Mira pushes Noah.',
+          evidence: 'Mira secretly pushes Noah.' }]
+      }]
+    }
+  });
+  assert.equal(model.eventCount, 0);
+});
