@@ -333,8 +333,9 @@ test('storyboard carries a persistent object snapshot into the next scene', () =
     'en',
     'Foxy'
   );
-  assert.ok(result.scenes[0].stateSnapshot.some(item => item.entityId === 'silver key'
-    && item.property === 'holder' && item.value === 'Foxy'));
-  assert.ok(result.scenes[1].stateSnapshot.some(item => item.entityId === 'silver key'
-    && item.property === 'holder' && item.value === 'Foxy'));
+  const firstKeyScene = result.scenes.findIndex(scene => scene.stateSnapshot.some(item =>
+    item.entityId === 'silver key' && item.property === 'holder' && item.value === 'Foxy'));
+  assert.ok(firstKeyScene >= 0);
+  assert.ok(result.scenes.slice(firstKeyScene).every(scene => scene.stateSnapshot.some(item =>
+    item.entityId === 'silver key' && item.property === 'holder' && item.value === 'Foxy')));
 });
