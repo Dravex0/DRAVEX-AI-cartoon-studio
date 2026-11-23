@@ -30,6 +30,16 @@ function normalizePhaseMotion(rawMotion) {
   return { ...(from ? { from } : {}), to };
 }
 
+function normalizeGripHandFields(source) {
+  if (!isRecord(source)) return {};
+  const fields = {};
+  for (const field of ['gripHand', 'fromGripHand', 'toGripHand']) {
+    const value = clean(source[field], 24);
+    if (value) fields[field] = value;
+  }
+  return fields;
+}
+
 function issue(code, phase, message) {
   return { code, phase: phase || null, severity: 'error', message };
 }
@@ -54,6 +64,7 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
         targetId: clean(phase.targetId, 120) || null,
         description: clean(phase.description, 700),
         evidence: clean(phase.evidence, 500),
+        ...normalizeGripHandFields(phase),
         ...(phase.easing == null ? {} : { easing: clean(phase.easing, 24) }),
         ...(phase.motion == null ? {} : { motion }),
         ...(phase.steps == null ? {} : {
@@ -69,7 +80,8 @@ export function normalizeCharacterActionTimeline(rawTimeline) {
               actorId: clean(step.actorId, 120),
               targetId: clean(step.targetId, 120) || null,
               description: clean(step.description, 500),
-              evidence: clean(step.evidence, 300)
+              evidence: clean(step.evidence, 300),
+              ...normalizeGripHandFields(step)
             };
           }) : null
         })
