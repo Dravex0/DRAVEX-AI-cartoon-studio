@@ -3,6 +3,7 @@ import { validateCharacterActionTimeline } from './character-action-timeline.js'
 import { buildCharacterSpriteAssetPlan } from './character-sprite-asset-plan.js';
 import { buildSceneBackgroundPrompt } from './scene-background-prompt.js';
 import { formatSceneUnderstandingForMotion } from './scene-understanding.js';
+import { buildSceneInteractionModel, formatSceneInteractionInstructions } from './scene-interaction-model.js';
 
 const safe = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const list = values => Array.isArray(values) ? values.map(value => safe(value, 500)).filter(Boolean) : [];
@@ -130,6 +131,7 @@ export function buildMotionGenerationPrompt(scene = {}, characterBible = []) {
   return [
     safe(scene.motionPrompt) || safe(scene.visibleAction),
     formatSceneUnderstandingForMotion(scene.sceneUnderstanding),
+    formatSceneInteractionInstructions(buildSceneInteractionModel(scene)),
     safe(scene.startState) && `Start state: ${safe(scene.startState, 1000)}`,
     safe(scene.endState) && `End state: ${safe(scene.endState, 1000)}`,
     actionTimelineInstructions(scene),
