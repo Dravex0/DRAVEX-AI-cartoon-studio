@@ -23,7 +23,7 @@ const TEMPLATES = {
     ['point','{actor} points at the {object}.'], ['write_draw','{actor} draws a map.']
   ],
   ru: [
-    ['team_magic','{actor} и {target} объединяют свои силы и магию.'], ['energy_clash','Их энергия сталкивается в мощном столкновении.'],
+    ['team_magic','{actor} и {target} объединяют свои силы и магию.'], ['energy_clash','Столкновение энергии и магии вызывает яркую вспышку.'],
     ['defend','{actor} блокирует удар {target}.'], ['dodge','{actor} уклоняется влево от удара.'],
     ['chase','{actor} гонится за {target}.'], ['attack','{actor} атакует {target}.'],
     ['power_up','{actor} пробуждает силу, энергия вспыхивает вокруг рук.'], ['reveal','{target} появляется из-за двери.'],
@@ -41,14 +41,14 @@ const TEMPLATES = {
     ['point','{actor} указывает на {object}.'], ['write_draw','{actor} рисует карту.']
   ],
   uk: [
-    ['team_magic','{actor} та {target} об’єднують свої сили й магію.'], ['energy_clash','Їхня енергія стикається в потужному зіткненні.'],
+    ['team_magic','{actor} та {target} поєднують свої сили й магію.'], ['energy_clash','Зіткнення енергії та магії викликає яскравий спалах.'],
     ['defend','{actor} блокує удар {target}.'], ['dodge','{actor} ухиляється ліворуч від удару.'],
     ['chase','{actor} переслідує {target}.'], ['attack','{actor} атакує {target}.'],
     ['power_up','{actor} пробуджує силу, енергія спалахує навколо рук.'], ['reveal','{target} з’являється з-за дверей.'],
     ['warning','{actor} попереджає {target} про небезпеку.'], ['restrain','{actor} затримує {target}.'],
     ['rescue','{actor} рятує {target}.'], ['freeze','{actor} завмирає на місці.'],
     ['take_cover','{actor} ховається за стіною.'], ['call_for_backup','{actor} викликає підкріплення по рації.'],
-    ['drop_weapon','{actor} кидає зброю.'], ['hands_up','{actor} піднімає обидві руки.'],
+    ['drop_weapon','{actor} кидає зброю.'], ['hands_up','{actor} піднімає руки.'],
     ['pick_up','{actor} підбирає {object}.'], ['throw','{actor} кидає {object}.'],
     ['catch','{actor} ловить {object}.'], ['open','{actor} відчиняє двері.'],
     ['close','{actor} зачиняє двері.'], ['climb','{actor} дереться по драбині.'],
@@ -59,7 +59,7 @@ const TEMPLATES = {
     ['point','{actor} вказує на {object}.'], ['write_draw','{actor} малює карту.']
   ],
   es: [
-    ['team_magic','{actor} y {target} combinan sus poderes y energía.'], ['energy_clash','Su energía choca en un poderoso impacto.'],
+    ['team_magic','{actor} y {target} combinan sus poderes y energía.'], ['energy_clash','Choque de energía y magia en un impacto poderoso.'],
     ['defend','{actor} bloquea el golpe de {target}.'], ['dodge','{actor} esquiva hacia la izquierda el golpe.'],
     ['chase','{actor} persigue a {target}.'], ['attack','{actor} ataca a {target}.'],
     ['power_up','{actor} despierta su poder y la energía surge alrededor de sus manos.'], ['reveal','{target} aparece detrás de la puerta.'],
