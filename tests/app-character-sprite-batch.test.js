@@ -32,6 +32,7 @@ test('prevents historical action/appearance sprites from overwriting the current
   const block = app.slice(renderer, end);
   assert.match(block, /isCurrentCharacterSpriteAsset\(sceneMetadata\[sceneIndex\]\|\|\{\},characterBible,asset\)/);
   assert.match(block, /if\(!isCurrentCharacterSpriteAsset\(updatedScene,characterBible,verifiedAsset\)\)/);
-  assert.match(block, /if\(!isCurrentCharacterSpriteAsset\(sceneMetadata\[resolvedSceneIndex\],characterBible,asset\)\)/);
+  assert.match(block, /if\(!isCurrentCharacterSpriteAsset\(sceneMetadata\[resolvedSceneIndex\],characterBible,verifiedAsset\)\)/);
+  assert.match(block, /const verifiedAsset=currentAssets\.find/);
   assert.match(block, /addButton\.disabled=!isCurrentAsset/);
 });
