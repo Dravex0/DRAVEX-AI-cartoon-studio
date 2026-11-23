@@ -215,6 +215,7 @@ test('mirrors the procedural figure toward a named target on its left', () => {
 test('turns an acting procedural character toward its named target', () => {
   const scene = {
     characters: ['Mira', 'Noah'],
+    storyDetail: 'Noah attacks Mira.',
     actionTimeline: {
       schemaVersion: 1,
       phases: [{
