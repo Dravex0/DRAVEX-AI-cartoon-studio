@@ -307,8 +307,8 @@ export function createProceduralActorLayers(scene = {}, progress = 0) {
     characterId,
     x: cast.length === 1 ? 0.5 : 0.28 + castIndex * (0.44 / Math.max(1, cast.length - 1)),
     y: 0.7,
-    width: 0.25,
-    height: 0.42,
+    width: 0.32,
+    height: 0.52,
     scale: 1,
     rotation: 0,
     opacity: 1,
@@ -330,9 +330,12 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
   if (!context || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return { drawn: 0, layers: [], skipped: 0 };
   }
-  const cast = castOf(scene);
-  const timelineValid = validateCharacterActionTimeline(scene).passed;
-  const layers = createProceduralActorLayers(scene, progress);
+  const actorScene = castOf(scene).length || !String(runtime.protagonistId || '').trim()
+    ? scene
+    : { ...scene, characters: [String(runtime.protagonistId).trim()] };
+  const cast = castOf(actorScene);
+  const timelineValid = validateCharacterActionTimeline(actorScene).passed;
+  const layers = createProceduralActorLayers(actorScene, progress);
   const profileById = new Map((Array.isArray(runtime.characterBible) ? runtime.characterBible : [])
     .filter(record).map(profile => [key(profile.characterId), profile]));
   const mouthById = runtime.facialMouthOpenness && typeof runtime.facialMouthOpenness === 'object'
@@ -341,7 +344,7 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     ? runtime.facialVisemes : {};
   let drawn = 0, skipped = 0;
   for (const layer of layers) {
-    const active = activeActorStep(scene, layer.characterId, progress, timelineValid);
+    const active = activeActorStep(actorScene, layer.characterId, progress, timelineValid);
     const step = active?.step;
     const actionText = String(step?.description || step?.intent || '');
     const requestedCue = String(step?.motionCue || '').trim();
