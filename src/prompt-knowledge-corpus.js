@@ -83,7 +83,7 @@ export const PROMPT_KNOWLEDGE_INTENTS = Object.freeze(TEMPLATES.en.map(([intent]
 const STOP_WORDS = new Set(['the','and','for','from','with','into','near','beside','inside','their','this','that','scene','present','en','la','el','los','las','de','del','y','и','та','в','у','на','за','из','от','по','для','свої','свои','сцене','сцені']);
 let cachedCorpus = null;
 function terms(value) {
-  return String(value ?? '').normalize('NFKC').toLocaleLowerCase().match(/[\\p{L}\\p{N}]+/gu) || [];
+  return String(value ?? '').normalize('NFKC').toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
 }
 
 /** Retrieve few-shot examples from the 10k corpus for the same detected action. */
