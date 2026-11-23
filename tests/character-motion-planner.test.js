@@ -127,3 +127,23 @@ test('does not animate an ambiguous duck when no dodge direction is stated', () 
   assert.equal(result.status, 'no-unambiguous-motion');
   assert.equal(result.timeline, null);
 });
+
+
+test('uses semantic motion cues when the basic action lexicon misses an authored attack', () => {
+  const scene = makeScene('attacks Bird');
+  scene.actionTimeline.phases[0].targetId = 'Bird';
+  const result = planCharacterMotionFromActionTimeline(scene, layers);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 1);
+  assert.ok(result.timeline.phases[0].motion.to.x > layers[0].x);
+  assert.ok(result.timeline.phases[0].motion.to.x < layers[1].x);
+});
+
+test('uses an inferred semantic movement cue for intervention toward a named target', () => {
+  const scene = makeScene('intervenes near Bird');
+  scene.actionTimeline.phases[0].targetId = 'Bird';
+  const result = planCharacterMotionFromActionTimeline(scene, layers);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 1);
+  assert.ok(result.timeline.phases[0].motion.to.x > layers[0].x);
+});
