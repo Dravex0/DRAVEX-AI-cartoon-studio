@@ -236,20 +236,35 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
               const weights = actionSequence.map(event => Math.max(0.25, Math.min(3, Number(event.durationWeight) || 1)));
               const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
               let elapsedWeight = 0;
-              return actionSequence.map((event, eventIndex) => {
+              return actionSequence.flatMap((event, eventIndex) => {
                 const start = elapsedWeight / totalWeight;
                 elapsedWeight += weights[eventIndex];
                 const end = elapsedWeight / totalWeight;
-                return {
+                const actorId = event.actorId || actionActor;
+                const primary = {
                   intent: event.intent,
                   motionCue: event.motionCue,
                   start,
                   end,
-                  actorId: event.actorId || actionActor,
+                  actorId,
                   targetId: event.targetId || null,
                   description: `Perform the ${event.intent} action: ${event.evidence}`,
                   evidence: event.evidence
                 };
+                // Team actions are synchronized: both explicitly named participants
+                // receive their own action track over the same interval.
+                if (semanticNeedsPair && actionTarget
+                    && ![actorId, actionTarget].some((id, index) => index === 0
+                      ? id.toLocaleLowerCase() === actionTarget.toLocaleLowerCase()
+                      : id.toLocaleLowerCase() === actorId.toLocaleLowerCase())) {
+                  return [primary, {
+                    ...primary,
+                    actorId: actionTarget,
+                    targetId: actorId,
+                    description: `Perform the synchronized ${event.intent} action with ${actorId}: ${event.evidence}`
+                  }];
+                }
+                return [primary];
               });
             })()
           } : {})
