@@ -101,6 +101,7 @@ test('preserves causal and physics references when normalizing prop state change
     previousValue: 'Maya', value: 'Noah', actorId: 'Maya', targetId: 'Noah',
     causedByEventId: 'handoff-1', physicsEventId: 'contact-1',
     fromEntityId: 'Maya', toEntityId: 'Noah',
+    gripHand: 'leftHand', fromGripHand: 'rightHand', toGripHand: 'leftHand',
     evidence: 'Maya hands the ball to Noah.', actionIntent: 'give'
   }] });
   assert.deepEqual(scene.stateChanges[0], {
@@ -108,6 +109,7 @@ test('preserves causal and physics references when normalizing prop state change
     previousValue: 'Maya', value: 'Noah', actorId: 'Maya', targetId: 'Noah',
     causedByEventId: 'handoff-1', physicsEventId: 'contact-1',
     fromEntityId: 'Maya', toEntityId: 'Noah',
+    gripHand: 'leftHand', fromGripHand: 'rightHand', toGripHand: 'leftHand',
     evidence: 'Maya hands the ball to Noah.', actionIntent: 'give'
   });
 });
