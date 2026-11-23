@@ -554,3 +554,17 @@ test('does not show a snapshot prop when its named holder is absent from the sce
   };
   assert.deepEqual(buildScenePropRenderPlan(laterScene, [], 0), []);
 });
+
+test('keeps an explicitly positioned released prop visible in a later scene snapshot', () => {
+  const laterScene = {
+    stateSnapshot: [{
+      entityType: 'prop', entityId: 'silver key', property: 'holder',
+      previousValue: 'Fox', value: null, position: { x: 0.76, y: 0.82 },
+      evidence: 'Fox drops the silver key.', snapshot: true
+    }]
+  };
+  const plan = buildScenePropRenderPlan(laterScene, [], 0)[0];
+  assert.equal(plan.held, false);
+  assert.equal(plan.snapshot, true);
+  assert.deepEqual([plan.x, plan.y], [0.76, 0.82]);
+});
