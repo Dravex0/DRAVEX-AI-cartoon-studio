@@ -1656,7 +1656,7 @@ function renderSceneMediaReport(){
     const value=sceneMotionAnalysisSummary;
     const motion=document.createElement('div');
     motion.style.marginTop='6px';
-    motion.textContent=(russian?'Проверка движения: ':'Motion check: ')+value.checked+' '+(russian?'проверено':'checked')+' · '+value.static+' '+(russian?'почти без изменений':'likely static')+' · '+value.changed+' '+(russian?'есть изменения пикселей':'pixel changes')+' · '+value.skipped+' '+(russian?'пропущено':'skipped')+'. '+(russian?'Это приблизительная проверка пикселей, не оценка качества анимации персонажа.':'Pixel heuristic only; it does not rate character animation quality.');
+    motion.textContent=(russian?'Проверка движения: ':'Motion check: ')+value.checked+' '+(russian?'проверено':'checked')+' · '+value.static+' '+(russian?'почти без изменений':'likely static')+' · '+value.changed+' '+(russian?'есть изменения пикселей':'pixel changes')+' · '+value.skipped+' '+(russian?'пропущено':'skipped')+' · '+value.motionTracks+' '+(russian?'областей движения':'motion-region tracks')+' ('+value.persistentMotionTracks+' '+(russian?'устойчивых':'persistent')+'). '+(russian?'Это отслеживание изменений пикселей, а не распознавание персонажей и предметов.':'Anonymous pixel-region tracking, not character or object recognition.');
     target.appendChild(motion);
     const details=document.createElement('div');
     details.style.marginTop='8px';
@@ -1676,7 +1676,7 @@ function renderSceneMediaReport(){
       if(result.status==='likely-static'){
         detail.textContent=(russian?'Почти нет изменений пикселей':'Very little pixel change')+' · '+(russian?'среднее изменение: ':'mean change: ')+Number(result.meanPixelChange||0).toFixed(5);
       }else if(result.status==='visible-change'){
-        detail.textContent=(russian?'Обнаружены изменения пикселей':'Pixel changes detected')+' · '+(russian?'доля изменившихся пикселей: ':'changed-pixel ratio: ')+(Number(result.changedPixelRatio||0)*100).toFixed(1)+'%';
+        detail.textContent=(russian?'Обнаружены изменения пикселей':'Pixel changes detected')+' · '+(russian?'доля изменившихся пикселей: ':'changed-pixel ratio: ')+(Number(result.changedPixelRatio||0)*100).toFixed(1)+'% · '+(result.motionTrackCount||0)+' '+(russian?'областей движения':'motion-region tracks');
       }else{
         detail.textContent=(russian?'Проверка пропущена: ':'Analysis skipped: ')+String(result.message||'');
       }
