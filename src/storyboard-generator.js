@@ -254,9 +254,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
                 // Team actions are synchronized: both explicitly named participants
                 // receive their own action track over the same interval.
                 if (semanticNeedsPair && actionTarget
-                    && ![actorId, actionTarget].some((id, index) => index === 0
-                      ? id.toLocaleLowerCase() === actionTarget.toLocaleLowerCase()
-                      : id.toLocaleLowerCase() === actorId.toLocaleLowerCase())) {
+                    && actorId.toLocaleLowerCase() !== actionTarget.toLocaleLowerCase()) {
                   return [primary, {
                     ...primary,
                     actorId: actionTarget,
