@@ -58,7 +58,8 @@ test('moves an explicitly targeted attacker into safe character interaction rang
   assert.equal(movement.from.x, 0.25);
   assert.ok(movement.to.x > movement.from.x);
   assert.ok(movement.to.x < 0.75);
-  assert.ok(Math.abs(0.75 - movement.to.x - 0.176) < 1e-9,
+  const remainingGap = Math.hypot(0.75 - movement.to.x, 0.5 - movement.to.y);
+  assert.ok(Math.abs(remainingGap - 0.176) < 1e-9,
     'the actor should stop at the width-derived safe interaction gap');
   assert.equal(result.timeline.phases[0].actorId, 'Foxy');
   assert.ok(!result.timeline.phases.some(item => item.actorId === 'Bird'),
