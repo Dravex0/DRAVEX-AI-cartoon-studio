@@ -378,7 +378,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       kind: propKind(visual.id),
       x: visual.x,
       y: visual.y,
-      rotation: existing?.rotation || 0,
+      rotation: Number.isFinite(visual.rotation) ? visual.rotation : (existing?.rotation || 0),
       held: false,
       visible: true,
       scale: existing?.scale || 1,
