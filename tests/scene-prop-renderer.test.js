@@ -23,6 +23,36 @@ test('plans a grounded pickup and moves the prop from the ground to the named ac
   assert.equal(late.evidence, 'Fox picks up the glowing star.');
 });
 
+test('uses the grip hand declared by the matched action timeline step', () => {
+  const evidence = 'Fox picks up the glowing star.';
+  const authored = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0.2, end: 0.8, actorId: 'Fox',
+      steps: [{
+        intent: 'take', start: 0.2, end: 0.8, actorId: 'Fox',
+        targetId: 'glowing star', evidence, description: 'Fox picks up the star.',
+        gripHand: 'left'
+      }]
+    }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'glowing star', property: 'holder',
+      previousValue: null, value: 'Fox', actorId: 'Fox',
+      actionIntent: 'take', evidence
+    }]
+  };
+  const plan = buildScenePropRenderPlan(authored, layers, 1, {
+    proceduralPropAnchors: {
+      Fox: {
+        leftHand: { x: 0.23, y: 0.34, rotation: 0 },
+        rightHand: { x: 0.76, y: 0.31, rotation: 0 }
+      }
+    }
+  })[0];
+  assert.equal(plan.held, true);
+  assert.ok(Math.abs(plan.x - 0.23) < 1e-9);
+  assert.ok(Math.abs(plan.y - 0.34) < 1e-9);
+});
+
 test('does not invent props when a scene has no explicit holder state change', () => {
   assert.deepEqual(buildScenePropRenderPlan({ storyDetail: 'Fox looks around.' }, layers, 1), []);
 });
@@ -42,12 +72,14 @@ test('draws planned props through the canvas API', () => {
   const calls = [];
   const context = new Proxy({}, { get(target, property) {
     if (property === 'save' || property === 'restore' || property === 'beginPath' || property === 'closePath' || property === 'stroke' || property === 'fill') return () => calls.push(property);
-    if (property === 'translate' || property === 'rotate' || property === 'moveTo' || property === 'lineTo' || property === 'fillRect' || property === 'strokeRect' || property === 'arc' || property === 'ellipse' || property === 'roundRect') return (...args) => calls.push([property, ...args]);
+    if (property === 'translate' || property === 'scale' || property === 'rotate' || property === 'moveTo' || property === 'lineTo' || property === 'fillRect' || property === 'strokeRect' || property === 'arc' || property === 'ellipse' || property === 'roundRect') return (...args) => calls.push([property, ...args]);
     return undefined;
   }, set(target, property, value) { target[property] = value; return true; } });
   const result = drawSceneProps(context, scene, layers, 1, 640, 360, 0.5);
   assert.equal(result.drawn, 1);
   assert.ok(calls.some(call => Array.isArray(call) && call[0] === 'translate'));
+  assert.ok(calls.some(call => Array.isArray(call) && call[0] === 'scale' && call[1] === 360 && call[2] === 360),
+    'normalized prop geometry must be scaled to the 640×360 canvas instead of rendering at sub-pixel size');
 });
 
 test('uses the authored action phase instead of the fallback timing', () => {
@@ -92,6 +124,76 @@ test('anchors held props to the explicitly named hand after applying the sampled
   assert.ok(Math.abs(plan.x - 0.47) < 1e-9);
   assert.ok(Math.abs(plan.y - 0.61) < 1e-9);
   assert.ok(Math.abs(plan.rotation - 0.35) < 1e-9);
+});
+
+
+test('attaches procedural actors props to the computed right or explicitly requested left hand', () => {
+  const anchors = {
+    Fox: {
+      leftHand: { x: 0.31, y: 0.44, rotation: -0.2 },
+      rightHand: { x: 0.67, y: 0.48, rotation: 0.35 }
+    }
+  };
+  const right = buildScenePropRenderPlan(scene, layers, 1, { proceduralPropAnchors: anchors })[0];
+  assert.equal(right.x, 0.67);
+  assert.equal(right.y, 0.48);
+  assert.equal(right.rotation, 0.35);
+  const leftScene = {
+    stateChanges: scene.stateChanges.map(change => ({ ...change, gripHand: 'leftHand' }))
+  };
+  const left = buildScenePropRenderPlan(leftScene, layers, 1, { proceduralPropAnchors: anchors })[0];
+  assert.equal(left.x, 0.31);
+  assert.equal(left.y, 0.44);
+  assert.equal(left.rotation, -0.2);
+});
+
+
+test('transfers a prop between each character hand anchor without reverting to body offsets', () => {
+  const handoff = {
+    actionTimeline: { schemaVersion: 1, phases: [{ phase: 'action', start: 0.2, end: 0.8 }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'key', property: 'holder',
+      previousValue: 'Fox', value: 'Bird', actorId: 'Fox',
+      fromGripHand: 'leftHand', toGripHand: 'rightHand',
+      evidence: 'Fox hands the key to Bird.'
+    }]
+  };
+  const cast = [...layers, { characterId: 'Bird', x: 0.8, y: 0.65 }];
+  const anchors = {
+    Fox: { leftHand: { x: 0.28, y: 0.52, rotation: -0.1 }, rightHand: { x: 0.44, y: 0.5, rotation: 0.1 } },
+    Bird: { leftHand: { x: 0.72, y: 0.51, rotation: -0.2 }, rightHand: { x: 0.84, y: 0.49, rotation: 0.25 } }
+  };
+  const before = buildScenePropRenderPlan(handoff, cast, 0.2, { proceduralPropAnchors: anchors })[0];
+  const after = buildScenePropRenderPlan(handoff, cast, 0.8, { proceduralPropAnchors: anchors })[0];
+  assert.equal(before.x, 0.28);
+  assert.equal(before.y, 0.52);
+  assert.equal(after.x, 0.84);
+  assert.equal(after.y, 0.49);
+  assert.ok(Math.abs(after.rotation - 0.25) < 1e-9);
+});
+
+
+test('honors an explicitly named left or right hand on a two-hand character rig', () => {
+  const rig = {
+    schemaVersion: 1, characterId: 'Fox',
+    bones: [{ id: 'root', parentId: null }, { id: 'leftHand', parentId: 'root' }, { id: 'rightHand', parentId: 'root' }],
+    parts: [
+      { id: 'leftHand', boneId: 'leftHand', imageUrl: 'https://assets.example/left.png', x: 0.29, y: 0.58, width: 0.08, height: 0.08 },
+      { id: 'rightHand', boneId: 'rightHand', imageUrl: 'https://assets.example/right.png', x: 0.71, y: 0.54, width: 0.08, height: 0.08 }
+    ]
+  };
+  const leftScene = {
+    stateChanges: scene.stateChanges.map(change => ({ ...change, gripHand: 'leftHand' }))
+  };
+  const rightScene = {
+    stateChanges: scene.stateChanges.map(change => ({ ...change, gripHand: 'rightHand' }))
+  };
+  const left = buildScenePropRenderPlan(leftScene, layers, 1, { characterRigs: [rig] })[0];
+  const right = buildScenePropRenderPlan(rightScene, layers, 1, { characterRigs: [rig] })[0];
+  assert.equal(left.x, 0.29);
+  assert.equal(left.y, 0.58);
+  assert.equal(right.x, 0.71);
+  assert.equal(right.y, 0.54);
 });
 
 test('uses the safe legacy hand estimate when the rig has no explicit hand or paw anchor', () => {

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSceneWorldModel } from '../src/scene-world-model.js';
+import { normalizeScene } from '../src/scene-model.js';
 
 test('builds the same directed interaction model for people, animals and robots', () => {
   const model = buildSceneWorldModel([
@@ -91,4 +92,24 @@ test('auto-detects Spanish source text when the scene language is unspecified', 
     relation.type === 'acts_on' && relation.from === 'Maya'
     && relation.to === 'Noah' && relation.action === 'help'
   ));
+});
+
+
+test('preserves causal and physics references when normalizing prop state changes', () => {
+  const scene = normalizeScene({ stateChanges: [{
+    entityType: 'prop', entityId: 'ball', property: 'holder',
+    previousValue: 'Maya', value: 'Noah', actorId: 'Maya', targetId: 'Noah',
+    causedByEventId: 'handoff-1', physicsEventId: 'contact-1',
+    fromEntityId: 'Maya', toEntityId: 'Noah',
+    gripHand: 'leftHand', fromGripHand: 'rightHand', toGripHand: 'leftHand',
+    evidence: 'Maya hands the ball to Noah.', actionIntent: 'give'
+  }] });
+  assert.deepEqual(scene.stateChanges[0], {
+    entityType: 'prop', entityId: 'ball', property: 'holder',
+    previousValue: 'Maya', value: 'Noah', actorId: 'Maya', targetId: 'Noah',
+    causedByEventId: 'handoff-1', physicsEventId: 'contact-1',
+    fromEntityId: 'Maya', toEntityId: 'Noah',
+    gripHand: 'leftHand', fromGripHand: 'rightHand', toGripHand: 'leftHand',
+    evidence: 'Maya hands the ball to Noah.', actionIntent: 'give'
+  });
 });

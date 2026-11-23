@@ -174,6 +174,25 @@ test('rejects a supplied motion block without a valid numeric target pose', () =
   assert.ok(report.issues.some(item => item.code === 'phase-motion-invalid'));
 });
 
+test('preserves explicit grip-hand metadata on phases and action substeps', () => {
+  const candidate = structuredClone(scene);
+  candidate.actionTimeline.phases[1].gripHand = 'left';
+  candidate.actionTimeline.phases[1].fromGripHand = 'right';
+  candidate.actionTimeline.phases[1].toGripHand = 'left';
+  candidate.actionTimeline.phases[1].steps = [{
+    intent: 'pick_up', motionCue: 'reach', start: 0.2, end: 0.65,
+    actorId: 'Foxy', targetId: 'silver-key', description: 'Foxy picks up the key.',
+    evidence: 'picks it up', gripHand: 'right', fromGripHand: 'left', toGripHand: 'right'
+  }];
+  const normalized = normalizeCharacterActionTimeline(candidate.actionTimeline).phases[1];
+  assert.equal(normalized.gripHand, 'left');
+  assert.equal(normalized.fromGripHand, 'right');
+  assert.equal(normalized.toGripHand, 'left');
+  assert.equal(normalized.steps[0].gripHand, 'right');
+  assert.equal(normalized.steps[0].fromGripHand, 'left');
+  assert.equal(normalized.steps[0].toGripHand, 'right');
+});
+
 test('normalizes and validates supported motion easing profiles', () => {
   const candidate = structuredClone(scene);
   candidate.actionTimeline.phases[1].easing = 'ease-in-out';

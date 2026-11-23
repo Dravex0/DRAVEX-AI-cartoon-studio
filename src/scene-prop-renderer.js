@@ -24,7 +24,7 @@ function propKind(name) {
  * Resolve an explicitly named hand/paw anchor from the same posed rig used by the renderer.
  * Returns null rather than guessing when the rig has no unambiguous contact part.
  */
-export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}) {
+export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}, gripHand = '') {
   const actorKey = key(characterId);
   if (!actorKey || !Array.isArray(rigs)) return null;
   const input = rigs.find(candidate => key(candidate?.characterId) === actorKey);
@@ -36,13 +36,31 @@ export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}
   const posedParts = applyCharacterRigPose(report.rig.parts, report.rig, pose);
   const handParts = posedParts.filter(part => /hand|paw|wrist| кист|лап/i.test(part.id)
     || /hand|paw|wrist|кисть|лап/i.test(part.boneId));
-  // Rigs with two hands need an explicit grip/contact anchor. Never choose
-  // left or right arbitrarily: that would make held props jump to the wrong hand.
+  // An explicitly authored side wins when the story specifies which hand
+  // grips the prop. Without that instruction, never guess between two hands.
+  const requested = key(gripHand).replace(/[^a-z]/g, '');
+  const requestedParts = requested
+    ? handParts.filter(part => {
+        const partId = key(part.id).replace(/[^a-z]/g, '');
+        const boneId = key(part.boneId).replace(/[^a-z]/g, '');
+        if (partId === requested || boneId === requested) return true;
+        const side = requested.startsWith('left') ? 'left'
+          : requested.startsWith('right') ? 'right' : '';
+        return Boolean(side && (partId.includes(side) || boneId.includes(side))
+          && /hand|paw|wrist/.test(partId + boneId));
+      })
+    : [];
   const semanticGripParts = handParts.filter(part => part.gripAnchor === true);
   const authoredGripParts = semanticGripParts.length
     ? semanticGripParts
     : handParts.filter(part => /grip|propanchor|contacthand|holdinghand/i.test(part.id));
-  const anchors = authoredGripParts.length ? authoredGripParts : handParts;
+  const anchors = requestedParts.length === 1
+    ? requestedParts
+    : requestedParts.length > 1
+      ? requestedParts.filter(part => part.gripAnchor === true).length === 1
+        ? requestedParts.filter(part => part.gripAnchor === true)
+        : []
+      : authoredGripParts.length ? authoredGripParts : handParts;
   if (anchors.length !== 1) return null;
   const anchor = anchors[0];
   if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)
@@ -78,7 +96,10 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       ...step,
       actorId: clean(step.actorId) || clean(phase.actorId),
       targetId: clean(step.targetId) || clean(phase.targetId),
-      evidence: clean(step.evidence) || clean(phase.evidence)
+      evidence: clean(step.evidence) || clean(phase.evidence),
+      gripHand: clean(step.gripHand) || clean(phase.gripHand),
+      fromGripHand: clean(step.fromGripHand) || clean(phase.fromGripHand),
+      toGripHand: clean(step.toGripHand) || clean(phase.toGripHand)
     })) : [])
     .filter(step => Number.isFinite(step?.start) && Number.isFinite(step?.end)
       && step.start >= 0 && step.start < step.end && step.end <= 1);
@@ -128,24 +149,40 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
   }
 
   const ground = { x: 0.68, y: 0.79, rotation: 0 };
-  const holderPoint = (holderId, loosePosition = null) => {
+  const holderPoint = (holderId, loosePosition = null, gripHand = '') => {
     if (holderId == null || !clean(holderId)) return normalizedPoint(loosePosition) || ground;
     const actorId = clean(holderId);
     const actor = layers.find(layer => key(layer?.characterId) === key(actorId));
     const actorX = Number.isFinite(actor?.x) ? actor.x : 0.5;
     const actorY = Number.isFinite(actor?.y) ? actor.y : 0.68;
-    const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses);
-    return rigAnchor
-      ? { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation }
-      : { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96),
-          y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
+    const rigAnchor = resolveCharacterPropAnchor(actorId, runtime.characterRigs, runtime.rigPoses, gripHand);
+    if (rigAnchor) return { x: rigAnchor.x, y: rigAnchor.y, rotation: rigAnchor.rotation };
+    const proceduralEntry = Object.entries(runtime.proceduralPropAnchors || {})
+      .find(([id]) => key(id) === key(actorId))?.[1];
+    const requestedHand = key(gripHand);
+    const requestedSide = /left/.test(requestedHand) ? 'leftHand'
+      : /right/.test(requestedHand) ? 'rightHand' : null;
+    const proceduralAnchor = (requestedSide && proceduralEntry?.[requestedSide])
+      || proceduralEntry?.rightHand || proceduralEntry?.leftHand;
+    if (normalizedPoint(proceduralAnchor)) {
+      return {
+        x: proceduralAnchor.x,
+        y: proceduralAnchor.y,
+        rotation: Number.isFinite(proceduralAnchor.rotation) ? proceduralAnchor.rotation : 0
+      };
+    }
+    return { x: clamp(actorX + (actor?.flipX ? -0.12 : 0.12), 0.04, 0.96),
+      y: clamp(actorY - 0.08, 0.08, 0.9), rotation: 0 };
   };
 
   const holderPlans = [...byProp.values()].map(history => {
     const entityId = clean(history[0].entityId);
     const interval = (phaseEnd - phaseStart) / Math.max(1, history.length);
     let holder = history[0].previousValue ?? null;
-    let from = holderPoint(holder, history[0].position);
+    const firstMatchedStep = matchedStepByChange.get(history[0]);
+    let from = holderPoint(holder, history[0].position,
+      history[0].fromGripHand || history[0].gripHand
+        || firstMatchedStep?.fromGripHand || firstMatchedStep?.gripHand || history[0].hand);
     let to = from;
     let held = holder != null;
     let activeEvidence = clean(history[0].evidence);
@@ -159,8 +196,12 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       const end = matchedStep ? matchedStep.end : start + interval;
       const nextHolder = change.value ?? null;
       if (p < start) break;
-      from = holderPoint(holder, change.position);
-      to = holderPoint(nextHolder, change.position);
+      const fromGripHand = change.fromGripHand || change.gripHand
+        || matchedStep?.fromGripHand || matchedStep?.gripHand || change.hand;
+      const toGripHand = change.toGripHand || change.gripHand
+        || matchedStep?.toGripHand || matchedStep?.gripHand || change.hand;
+      from = holderPoint(holder, change.position, fromGripHand);
+      to = holderPoint(nextHolder, change.position, toGripHand);
       activeEvidence = clean(change.evidence);
       activeIndex = index;
       if (p <= end) {
@@ -181,7 +222,10 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     }
 
     const finalPositionChange = history[activeIndex >= 0 ? activeIndex : 0];
-    const point = holderPoint(holder, finalPositionChange?.position);
+    const finalMatchedStep = matchedStepByChange.get(finalPositionChange);
+    const point = holderPoint(holder, finalPositionChange?.position,
+      finalPositionChange?.toGripHand || finalPositionChange?.gripHand
+        || finalMatchedStep?.toGripHand || finalMatchedStep?.gripHand || finalPositionChange?.hand);
     return {
       id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
       rotation: point.rotation || 0, held, visible: true, scale: 1,
@@ -226,7 +270,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
             || key(change.actorId) === key(item.actorId)))
         : null;
       const releasePoint = release
-        ? (normalizedPoint(release.position) || holderPoint(release.previousValue, release.position))
+        ? (normalizedPoint(release.position) || holderPoint(release.previousValue, release.position, release.fromGripHand || release.gripHand || release.hand))
         : null;
       if (releasePoint && index === 0) from = releasePoint;
       // The holder-release event and its paired position trajectory describe
@@ -320,12 +364,17 @@ function drawStar(context, size) {
   context.fill();
 }
 
-function drawProp(context, prop, x, y, time) {
+function drawProp(context, prop, x, y, time, unit = 1) {
   const bob = prop.held ? Math.sin(time * 4) * 0.008 : 0;
+  const safeUnit = Number.isFinite(unit) && unit > 0 ? unit : 1;
   context.save();
-  context.translate(x, y + bob);
+  context.translate(x, y);
+  // Prop geometry is authored in normalized scene coordinates. Scale it to
+  // the canvas while keeping outlines a readable, device-independent pixel width.
+  context.scale(safeUnit, safeUnit);
+  context.translate(0, bob);
   context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
-  context.lineWidth = 2.5;
+  context.lineWidth = 2.5 / safeUnit;
   context.lineJoin = 'round';
   if (prop.kind === 'star') {
     context.fillStyle = '#ffe58a'; context.strokeStyle = '#9b6b24';
@@ -361,6 +410,7 @@ export function drawSceneProps(context, scene, characterLayers, progress, width,
     return { drawn: 0, skipped: 0 };
   }
   const plan = buildScenePropRenderPlan(scene, characterLayers, progress, runtime);
-  for (const prop of plan) drawProp(context, prop, prop.x * width, prop.y * height, Number.isFinite(time) ? time : 0);
+  const unit = Math.min(width, height);
+  for (const prop of plan) drawProp(context, prop, prop.x * width, prop.y * height, Number.isFinite(time) ? time : 0, unit);
   return { drawn: plan.length, skipped: 0, props: plan };
 }
