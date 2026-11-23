@@ -5,10 +5,26 @@
  * can all participate through the same IDs and relation model.
  */
 import { inferCharacterInteractions } from './character-interaction.js';
+import { validateCharacterActionTimeline } from './character-action-timeline.js';
 
 const clean = (value, max = 1200) => String(value ?? '').trim().slice(0, max);
 const record = value => value && typeof value === 'object' && !Array.isArray(value);
 const keyOf = value => clean(value, 160).toLocaleLowerCase();
+
+function sourceHasEvidence(scene, evidence, sourceText = '') {
+  if (!evidence) return false;
+  if (sourceText.includes(evidence)) return true;
+  return (Array.isArray(scene.sourceEvents) ? scene.sourceEvents : []).some(item =>
+    typeof item === 'string' ? item.includes(evidence)
+      : record(item) && ['evidence', 'text', 'description'].some(field =>
+        typeof item[field] === 'string' && item[field].includes(evidence))
+  );
+}
+
+function evidenceNamesEntity(evidence, entityId) {
+  const name = keyOf(entityId);
+  return Boolean(name && keyOf(evidence).includes(name));
+}
 
 function addEntity(map, id, kind, sceneId, attributes = {}) {
   const name = clean(id, 160);
@@ -90,10 +106,11 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
       interactionKeys.add(interactionKey);
       const actor = clean(interaction.actorId, 160);
       const target = clean(interaction.targetId, 160);
-      if (!actor || !target) continue;
+      const evidence = clean(interaction.evidence, 500);
+      if (!actor || !target || !sourceHasEvidence(scene, evidence, sourceText)
+          || !evidenceNamesEntity(evidence, actor) || !evidenceNamesEntity(evidence, target)) continue;
       addEntity(entities, actor, 'character', sceneId);
       addEntity(entities, target, 'character', sceneId);
-      const evidence = clean(interaction.evidence, 500);
       const event = { type: clean(interaction.type, 80) || 'interact', actorId: actor, targetId: target, evidence };
       sceneEvents.push(event);
       addRelation({ type: 'acts_on', from: actor, to: target, action: event.type, evidence });
@@ -114,14 +131,15 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
       const entityId = clean(change.entityId, 160);
       const entityKind = clean(change.entityType, 40) || 'object';
       const actorId = clean(change.actorId, 160);
-      if (!entityId) continue;
+      const evidence = clean(change.evidence, 500);
+      if (!entityId || !sourceHasEvidence(scene, evidence, sourceText)) continue;
       addEntity(entities, entityId, entityKind, sceneId);
       if (actorId) {
         addEntity(entities, actorId, 'character', sceneId);
         addRelation({ type: 'changes_state_of', from: actorId, to: entityId,
           property: clean(change.property, 60), previousValue: change.previousValue ?? null,
           value: change.value ?? null, actionIntent: clean(change.actionIntent, 60),
-          evidence: clean(change.evidence, 500) });
+          evidence });
       }
       const propertyKey = entityKind + ':' + keyOf(entityId) + ':' + clean(change.property, 60);
       const previous = state.has(propertyKey) ? state.get(propertyKey) : null;
@@ -139,15 +157,16 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
       const entityId = clean(snapshot.entityId, 160);
       const entityKind = clean(snapshot.entityType, 40) || 'entity';
       const property = clean(snapshot.property, 60);
-      if (!entityId || !property) continue;
-      addEntity(entities, entityId, entityKind, sceneId);
+      if (!entityId || !property || snapshot.snapshot !== true) continue;
       const stateKey = entityKind + ':' + keyOf(entityId) + ':' + property;
       const value = snapshot.value ?? null;
-      if (state.has(stateKey) && state.get(stateKey) !== value) {
+      if (!state.has(stateKey)) continue;
+      if (state.get(stateKey) !== value) {
         sceneEvents.push({ type: 'state_snapshot_conflict', entityId, property,
           currentValue: state.get(stateKey), snapshotValue: value });
+        continue;
       }
-      state.set(stateKey, value);
+      addEntity(entities, entityId, entityKind, sceneId);
       sceneEvents.push({ type: 'state_snapshot', entityId, property, value,
         evidence: clean(snapshot.evidence, 500) });
     }
@@ -197,7 +216,8 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
     }
 
     const timeline = scene.actionTimeline;
-    for (const phase of (Array.isArray(timeline?.phases) ? timeline.phases : [])) {
+    const timelineReport = validateCharacterActionTimeline(scene);
+    for (const phase of (timelineReport.passed && Array.isArray(timeline?.phases) ? timeline.phases : [])) {
       if (!record(phase)) continue;
       const actor = clean(phase.actorId, 160);
       const target = clean(phase.targetId, 160);
