@@ -173,3 +173,39 @@ test('does not invent a chase target or pursuit direction when no named target s
   assert.equal(result.status, 'no-unambiguous-motion');
   assert.equal(result.timeline, null);
 });
+
+test('plans actions in scene-time order when actors are listed out of order', () => {
+  const scene = {
+    characters: ['Foxy', 'Bird'],
+    characterCastProvided: true,
+    storyDetail: 'Bird walks to the right. Foxy chases Bird.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0.1, end: 0.9, actorId: 'Foxy',
+        description: 'Bird walks to the right. Foxy chases Bird.',
+        evidence: 'Bird walks to the right. Foxy chases Bird.',
+        steps: [
+          { intent: 'chase', motionCue: 'pursuit', start: 0.5, end: 0.9,
+            actorId: 'Foxy', targetId: 'Bird', description: 'Foxy chases Bird.',
+            evidence: 'Foxy chases Bird.' },
+          { intent: 'walk', motionCue: 'travel', start: 0.1, end: 0.3,
+            actorId: 'Bird', description: 'Bird walks to the right.',
+            evidence: 'Bird walks to the right.' }
+        ]
+      }]
+    }
+  };
+  const closeLayers = [
+    { characterId: 'Foxy', x: 0.25, y: 0.7, scale: 1, rotation: 0, opacity: 1 },
+    { characterId: 'Bird', x: 0.4, y: 0.5, scale: 1, rotation: 0, opacity: 1 }
+  ];
+  const result = planCharacterMotionFromActionTimeline(scene, closeLayers);
+  assert.equal(result.status, 'generated');
+  const birdMove = result.timeline.phases.find(item => item.actorId === 'Bird');
+  const foxPursuit = result.timeline.phases.find(item =>
+    item.actorId === 'Foxy' && item.description.includes('continue pursuit'));
+  assert.ok(birdMove.motion.to.x > 0.4);
+  assert.ok(foxPursuit.motion.to.x > 0.48,
+    'Foxy should plan toward Bird after Bird has moved, not toward Bird\'s stale start pose');
+});
