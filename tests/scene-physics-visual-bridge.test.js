@@ -30,3 +30,18 @@ test('clamps samples outside the authored event interval', () => {
   assert.equal(before.x, 0.1); assert.equal(after.x, 0.9);
   assert.equal(before.active, false); assert.equal(after.active, false);
 });
+
+test('uses an authored quadratic viewport trajectory and interpolates object rotation', () => {
+  const curvedScene = { physicsEvents: [{
+    id: 'arc', entityId: 'ball', visualStartPosition: { x: 0.1, y: 0.8 },
+    visualControlPoint: { x: 0.5, y: 0.05 }, visualEndPosition: { x: 0.9, y: 0.8 },
+    visualStartProgress: 0, visualEndProgress: 1,
+    visualStartRotation: 0, visualEndRotation: Math.PI
+  }] };
+  const curved = buildGroundedPhysicsVisualPlan(curvedScene, {
+    events: [{ id: 'arc', entityId: 'ball', type: 'throw', grounded: true, evidence: 'Mira throws the ball.' }]
+  }, 0.5)[0];
+  assert.ok(Math.abs(curved.x - 0.5) < 1e-9);
+  assert.ok(curved.y < 0.5);
+  assert.ok(Math.abs(curved.rotation - Math.PI / 2) < 1e-9);
+});
