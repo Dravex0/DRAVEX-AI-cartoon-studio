@@ -235,3 +235,54 @@ test('rejects unordered or ungrounded action substeps', () => {
   assert.ok(report.issues.some(item => item.code === 'action-step-timing-invalid'));
   assert.ok(report.issues.some(item => item.code === 'action-step-evidence-ungrounded'));
 });
+
+test('allows synchronized overlapping steps for different characters', () => {
+  const candidate = {
+    id: 'paired-action',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira and Noah combine their powers.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira',
+        description: 'Mira and Noah combine their powers.',
+        evidence: 'Mira and Noah combine their powers.',
+        steps: [
+          { intent: 'team_magic', motionCue: 'magic', start: 0.2, end: 0.8,
+            actorId: 'Mira', targetId: 'Noah', description: 'Mira channels energy.',
+            evidence: 'Mira and Noah combine their powers.' },
+          { intent: 'team_magic', motionCue: 'magic', start: 0.2, end: 0.8,
+            actorId: 'Noah', targetId: 'Mira', description: 'Noah channels energy.',
+            evidence: 'Mira and Noah combine their powers.' }
+        ]
+      }]
+    }
+  };
+  assert.equal(validateCharacterActionTimeline(candidate).passed, true);
+});
+
+test('rejects overlapping steps assigned to the same character', () => {
+  const candidate = {
+    id: 'same-actor-overlap',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira combines her powers.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira',
+        description: 'Mira combines her powers.',
+        evidence: 'Mira combines her powers.',
+        steps: [
+          { intent: 'power_up', motionCue: 'magic', start: 0.1, end: 0.7,
+            actorId: 'Mira', description: 'Mira channels energy.',
+            evidence: 'Mira combines her powers.' },
+          { intent: 'power_up', motionCue: 'magic', start: 0.5, end: 0.9,
+            actorId: 'Mira', description: 'Mira sustains energy.',
+            evidence: 'Mira combines her powers.' }
+        ]
+      }]
+    }
+  };
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'action-step-timing-invalid'));
+});
