@@ -139,7 +139,7 @@ test('transfers a prop between each character hand anchor without reverting to b
   assert.equal(before.y, 0.52);
   assert.equal(after.x, 0.84);
   assert.equal(after.y, 0.49);
-  assert.equal(after.rotation, 0.25);
+  assert.ok(Math.abs(after.rotation - 0.25) < 1e-9);
 });
 
 
