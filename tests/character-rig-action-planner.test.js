@@ -394,8 +394,10 @@ test('does not resolve an ambiguous prop target from multiple unmatched position
 
 test('holds the final authored pose after an action ends instead of snapping to rest', () => {
   const scene = makeScene('sits on the bench');
-  scene.actionTimeline.phases[0].start = 0.2;
-  scene.actionTimeline.phases[0].end = 0.7;
+  scene.actionTimeline.phases[0].steps = [{
+    intent: 'sit', motionCue: 'turn', start: 0.2, end: 0.7, actorId: 'Foxy',
+    description: 'Foxy sits on the bench', evidence: 'sits on the bench'
+  }];
   const result = createCharacterRigTimelineFromActionTimeline(scene, [rig()]);
   assert.equal(result.status, 'generated');
   const atEnd = sampleCharacterRigTimeline(result.timeline, 0.7).Foxy;
@@ -407,13 +409,19 @@ test('holds the final authored pose after an action ends instead of snapping to 
 
 test('preserves the previous action pose through an idle gap before the next action', () => {
   const scene = makeScene('sits on the bench, then waves hello');
-  scene.actionTimeline.phases = [
-    { phase: 'action', start: 0.1, end: 0.35, actorId: 'Foxy', targetId: null, intent: 'sit', description: 'Foxy sits on the bench', evidence: 'Foxy sits on the bench' },
-    { phase: 'action', start: 0.7, end: 0.95, actorId: 'Foxy', targetId: null, intent: 'wave', description: 'Foxy waves hello', evidence: 'Foxy waves hello' }
-  ];
+  scene.actionTimeline.phases[0] = {
+    phase: 'action', start: 0.1, end: 0.95, actorId: 'Foxy', targetId: null,
+    description: 'Foxy sits on the bench, then waves hello',
+    evidence: 'Foxy sits on the bench, then waves hello',
+    steps: [
+      { intent: 'sit', motionCue: 'turn', start: 0.1, end: 0.35, actorId: 'Foxy', description: 'Foxy sits on the bench', evidence: 'sits on the bench' },
+      { intent: 'wave', motionCue: 'wave', start: 0.7, end: 0.95, actorId: 'Foxy', description: 'Foxy waves hello', evidence: 'waves hello' }
+    ]
+  };
   const result = createCharacterRigTimelineFromActionTimeline(scene, [rig()]);
   assert.equal(result.status, 'generated');
   const duringGap = sampleCharacterRigTimeline(result.timeline, 0.5).Foxy;
+  const atEndOfSit = sampleCharacterRigTimeline(result.timeline, 0.35).Foxy;
   assert.ok(duringGap.root.y > 0.05);
-  assert.ok(Math.abs(duringGap.root.y - sampleCharacterRigTimeline(result.timeline, 0.35).Foxy.root.y) < 1e-6);
+  assert.ok(Math.abs(duringGap.root.y - atEndOfSit.root.y) < 1e-6);
 });
