@@ -58,3 +58,17 @@ test('accepts a cached full-scene video as the visual scene resource', () => {
     hasSceneVideo: () => true
   }), 0);
 });
+
+
+test('counts the explicit offline Doodle renderer as a visual resource for every named actor', () => {
+  const scene = { characters: ['Foxy', 'Owl', 'Robot'] };
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy', proceduralActors: true
+  }), 0);
+});
+
+test('still blocks a scene with no cast even when procedural actors are enabled', () => {
+  assert.equal(countScenesMissingCharacterVisuals([{}], {
+    protagonistId: '', proceduralActors: true
+  }), 1);
+});
