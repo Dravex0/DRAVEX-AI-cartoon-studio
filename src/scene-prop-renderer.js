@@ -425,7 +425,7 @@ function drawProp(context, prop, x, y, time) {
   if (Number.isFinite(prop.opacity)) context.globalAlpha = (Number.isFinite(context.globalAlpha) ? context.globalAlpha : 1) * clamp(prop.opacity, 0, 1);
   context.translate(x, y + bob);
   context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
-  if (Number.isFinite(prop.scale)) context.scale(clamp(prop.scale, 0.05, 4), clamp(prop.scale, 0.05, 4));
+  if (Number.isFinite(prop.scale) && typeof context.scale === 'function') context.scale(clamp(prop.scale, 0.05, 4), clamp(prop.scale, 0.05, 4));
   context.lineWidth = 2.5;
   context.lineJoin = 'round';
   if (prop.kind === 'star') {
