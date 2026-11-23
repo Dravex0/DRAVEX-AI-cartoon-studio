@@ -161,7 +161,7 @@ export function validateCharacterActionTimeline(scene = {}) {
     if (!Array.isArray(action.steps) || action.steps.length === 0 || action.steps.length > 24) {
       issues.push(issue('action-steps-shape-invalid', 'action', 'Action substeps must contain between one and 24 ordered steps.'));
     } else {
-      let previousStepEnd = action.start;
+      const previousStepEndByActor = new Map();
       action.steps.forEach((step, index) => {
         if (!step) {
           issues.push(issue('action-step-shape-invalid', 'action', `Action substep ${index + 1} must be an object.`));
@@ -170,10 +170,12 @@ export function validateCharacterActionTimeline(scene = {}) {
         if (!step.intent || !step.motionCue || !step.description || !step.actorId || !step.evidence) {
           issues.push(issue('action-step-fields-missing', 'action', `Action substep ${index + 1} needs intent, motion cue, actor, description, and source evidence.`));
         }
-        if (step.start === null || step.end === null || step.start < action.start || step.end > action.end || step.start >= step.end || step.start < previousStepEnd) {
-          issues.push(issue('action-step-timing-invalid', 'action', `Action substep ${index + 1} must have ordered timing inside the central action phase.`));
+        const actorKey = clean(step.actorId, 120).toLocaleLowerCase();
+        const previousActorEnd = previousStepEndByActor.get(actorKey) ?? action.start;
+        if (step.start === null || step.end === null || step.start < action.start || step.end > action.end || step.start >= step.end || step.start < previousActorEnd) {
+          issues.push(issue('action-step-timing-invalid', 'action', `Action substep ${index + 1} must have ordered timing for its actor inside the central action phase.`));
         } else {
-          previousStepEnd = step.end;
+          previousStepEndByActor.set(actorKey, Math.max(previousActorEnd, step.end));
         }
         if (!evidenceSources.some(source => source.includes(step.evidence))) {
           issues.push(issue('action-step-evidence-ungrounded', 'action', `Action substep ${index + 1} evidence must exactly match locked story evidence.`));
