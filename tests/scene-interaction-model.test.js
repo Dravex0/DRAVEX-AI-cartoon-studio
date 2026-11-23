@@ -179,3 +179,17 @@ test('retains inferred openState transitions in the interaction model', () => {
   assert.equal(model.stateTransitions[0].previousValue, 'closed');
   assert.equal(model.stateTransitions[0].value, 'open');
 });
+
+test('does not accept truncated evidence whose unsupported suffix is absent from the source', () => {
+  const groundedPrefix = 'Mira picks up the key. ' + 'x'.repeat(170);
+  const unsupportedEvidence = groundedPrefix + ' Noah secretly steals the crown.';
+  const model = buildSceneInteractionModel({
+    storyDetail: groundedPrefix,
+    stateChanges: [{
+      entityType: 'prop', entityId: 'key', property: 'holder',
+      previousValue: null, value: 'Mira', evidence: unsupportedEvidence
+    }]
+  });
+  assert.equal(model.stateTransitionCount, 0);
+  assert.equal(model.status, 'no-grounded-interactions');
+});
