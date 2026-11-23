@@ -68,3 +68,19 @@ test('keeps curved trajectory and rotation through the full scene normalization 
   assert.ok(sample.y < 0.5);
   assert.ok(Math.abs(sample.rotation - Math.PI / 2) < 1e-9);
 });
+
+test('rejects ambiguous duplicate authored event IDs instead of selecting the last trajectory', () => {
+  const duplicate = { physicsEvents: [
+    { ...scene.physicsEvents[0], visualEndPosition: { x: 0.9, y: 0.8 } },
+    { ...scene.physicsEvents[0], visualEndPosition: { x: 0.2, y: 0.3 } }
+  ] };
+  assert.deepEqual(buildGroundedPhysicsVisualPlan(duplicate, model, 0.5), []);
+});
+
+test('rejects duplicate grounded physics event IDs instead of rendering ambiguous samples', () => {
+  const duplicateModel = { events: [
+    model.events[0],
+    { ...model.events[0], type: 'motion' }
+  ] };
+  assert.deepEqual(buildGroundedPhysicsVisualPlan(scene, duplicateModel, 0.5), []);
+});
