@@ -247,7 +247,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
                   start,
                   end,
                   actorId,
-                  targetId: event.targetId || null,
+                  targetId: event.targetId || (semanticNeedsPair ? actionTarget : null),
                   description: `Perform the ${event.intent} action: ${event.evidence}`,
                   evidence: event.evidence
                 };
