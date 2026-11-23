@@ -320,12 +320,17 @@ function drawStar(context, size) {
   context.fill();
 }
 
-function drawProp(context, prop, x, y, time) {
+function drawProp(context, prop, x, y, time, unit = 1) {
   const bob = prop.held ? Math.sin(time * 4) * 0.008 : 0;
+  const safeUnit = Number.isFinite(unit) && unit > 0 ? unit : 1;
   context.save();
-  context.translate(x, y + bob);
+  context.translate(x, y);
+  // Prop geometry is authored in normalized scene coordinates. Scale it to
+  // the canvas while keeping outlines a readable, device-independent pixel width.
+  context.scale(safeUnit, safeUnit);
+  context.translate(0, bob);
   context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
-  context.lineWidth = 2.5;
+  context.lineWidth = 2.5 / safeUnit;
   context.lineJoin = 'round';
   if (prop.kind === 'star') {
     context.fillStyle = '#ffe58a'; context.strokeStyle = '#9b6b24';
@@ -361,6 +366,7 @@ export function drawSceneProps(context, scene, characterLayers, progress, width,
     return { drawn: 0, skipped: 0 };
   }
   const plan = buildScenePropRenderPlan(scene, characterLayers, progress, runtime);
-  for (const prop of plan) drawProp(context, prop, prop.x * width, prop.y * height, Number.isFinite(time) ? time : 0);
+  const unit = Math.min(width, height);
+  for (const prop of plan) drawProp(context, prop, prop.x * width, prop.y * height, Number.isFinite(time) ? time : 0, unit);
   return { drawn: plan.length, skipped: 0, props: plan };
 }
