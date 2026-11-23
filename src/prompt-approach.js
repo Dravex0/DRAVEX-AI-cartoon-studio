@@ -62,7 +62,7 @@ const STRATEGIES = Object.freeze({
 });
 
 const PATTERNS = Object.freeze({
-  combat: /\b(fight|fighting|battle|attack|attacks|punch|punches|kick|kicks|duel|clash| удар|дер[её]тся|драка|бой|сражени|атакует|бь[её]т|ударяет|уклоняется|бій|б'ється|атакує|сутичк)\b/iu,
+  combat: /\b(fight|fighting|battle|attack|attacks|punch|punches|kick|kicks|duel|clash| удар|дер[её]тся|дерется|дерётся|драка|бой|сражени|сражается|сражаются|атакует|бь[её]т|бьется|бьётся|ударяет|уклоняется|бій|б'ється|атакує|сутичк)\b/iu,
   chase: /\b(chase|chases|chasing|pursue|pursuit|escape|escapes|run away|runs away|runs after|гонк|погон|убегает|преследует|догоняет|втікає|переслідує|наздоганяє)\b/iu,
   dialogue: /\b(says|said|asks|replies|answers|whispers|shouts|conversation|talks|speaks|говорит|сказал|спрашивает|отвечает|шепчет|кричит|разговор|диалог|каже|запитує|відповідає|розмов)\b/iu,
   dance: /\b(dance|dances|dancing|dancer|choreography|танцует|танцуют|танец|танцев|хореограф|танцює|танцюють|танець)\b/iu,
