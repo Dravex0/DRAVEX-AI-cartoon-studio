@@ -144,23 +144,27 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   });
 
   const causalLinks = inferSceneCausalLinks(scenes, locale);
-  const stateModel = buildStoryboardStateSnapshots(scenes, locale, subject);
-  const stateChanges = stateModel.changesByScene;
   const explicitSubject = !explicitScenes.length && String(character ?? '').trim() ? subject : '';
   const knownCharacters = [...new Set([explicitSubject, ...brief.characters].filter(Boolean))];
   const characterMention = (name, sourceText) => {
     const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
     return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
   };
-  scenes.forEach((scene, index) => {
-    scene.causalLink = causalLinks[index];
-    scene.stateChanges = stateChanges[index];
-    scene.characters = [...new Set([
+  const sceneCast = scene => [...new Set([
       ...(explicitSubject ? [explicitSubject] : []),
       ...knownCharacters.filter(name => name !== explicitSubject && (scene.storyDetail
         ? characterMention(name, scene.storyDetail)
         : name.toLocaleLowerCase() === subject.toLocaleLowerCase()))
     ])];
+  const stateModel = buildStoryboardStateSnapshots(
+    scenes.map(scene => ({ ...scene, characters: sceneCast(scene) })), locale, subject
+  );
+  const stateChanges = stateModel.changesByScene;
+  scenes.forEach((scene, index) => {
+    scene.causalLink = causalLinks[index];
+    scene.stateChanges = stateChanges[index];
+    scene.stateSnapshot = stateModel.snapshots[index] || [];
+    scene.characters = sceneCast(scene);
     // Keep interaction inference source-grounded and limited to characters assigned to this scene.
     scene.interactions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
