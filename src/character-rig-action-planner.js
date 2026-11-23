@@ -190,7 +190,7 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
   const segments = [];
   const skipped = [];
   const actionSteps = scene.actionTimeline.phases.flatMap(phase =>
-    Array.isArray(phase.steps) ? phase.steps.map(step => ({ ...step, phase: 'action' })) : [phase]
+    Array.isArray(phase.steps) ? phase.steps.map(step => ({ ...step, phase: phase.phase })) : [phase]
   );
   for (const phase of actionSteps) {
     const actorId = clean(phase.actorId);
@@ -343,8 +343,8 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     timeline: report.timeline,
     generatedCount: accepted.length,
     skipped,
-    mappedActions: accepted.map(({ actorId, preset, doodleAction, targetedReach, targetPositionSource, start, end }) => ({
-      actorId, preset, start, end,
+    mappedActions: accepted.map(({ actorId, preset, doodleAction, targetedReach, targetPositionSource, phase, start, end }) => ({
+      actorId, preset, phase, start, end,
       ...(doodleAction ? { doodleAction } : {}),
       ...(targetedReach ? { targetedReach, targetPositionSource } : {})
     }))
