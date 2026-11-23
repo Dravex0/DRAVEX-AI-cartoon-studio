@@ -100,6 +100,16 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
     }
 
     const changes = Array.isArray(scene.stateChanges) ? scene.stateChanges : [];
+    const participantKeys = new Set(participants.map(keyOf));
+    const propKeys = new Set(changes.filter(record).filter(change => clean(change.entityType, 40) === 'prop')
+      .map(change => keyOf(change.entityId)).filter(Boolean));
+    const addActionTarget = targetId => {
+      const target = clean(targetId, 160);
+      if (!target) return;
+      const kind = propKeys.has(keyOf(target)) ? 'prop'
+        : participantKeys.has(keyOf(target)) ? 'character' : 'entity';
+      addEntity(entities, target, kind, sceneId);
+    };
     for (const change of changes.filter(record)) {
       const entityId = clean(change.entityId, 160);
       const entityKind = clean(change.entityType, 40) || 'object';
@@ -128,7 +138,7 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
       const actor = clean(phase.actorId, 160);
       const target = clean(phase.targetId, 160);
       if (actor) addEntity(entities, actor, 'character', sceneId);
-      if (target) addEntity(entities, target, 'character', sceneId);
+      if (target) addActionTarget(target);
       const event = { type: clean(phase.phase, 40) || 'action', actorId: actor || null,
         targetId: target || null, start: phase.start ?? null, end: phase.end ?? null,
         description: clean(phase.description, 700), evidence: clean(phase.evidence, 500) };
@@ -140,7 +150,7 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
         const stepActor = clean(step.actorId || actor, 160);
         const stepTarget = clean(step.targetId, 160);
         if (stepActor) addEntity(entities, stepActor, 'character', sceneId);
-        if (stepTarget) addEntity(entities, stepTarget, 'character', sceneId);
+        if (stepTarget) addActionTarget(stepTarget);
         sceneEvents.push({ type: clean(step.intent, 80) || 'action', actorId: stepActor || null,
           targetId: stepTarget || null, start: step.start ?? null, end: step.end ?? null,
           description: clean(step.description, 500), evidence: clean(step.evidence, 300) });
