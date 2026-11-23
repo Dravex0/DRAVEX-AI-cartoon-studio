@@ -117,6 +117,31 @@ test('attaches procedural actors props to the computed right or explicitly reque
   assert.equal(left.rotation, -0.2);
 });
 
+
+test('transfers a prop between each character hand anchor without reverting to body offsets', () => {
+  const handoff = {
+    actionTimeline: { schemaVersion: 1, phases: [{ phase: 'action', start: 0.2, end: 0.8 }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'key', property: 'holder',
+      previousValue: 'Fox', value: 'Bird', actorId: 'Fox',
+      fromGripHand: 'leftHand', toGripHand: 'rightHand',
+      evidence: 'Fox hands the key to Bird.'
+    }]
+  };
+  const cast = [...layers, { characterId: 'Bird', x: 0.8, y: 0.65 }];
+  const anchors = {
+    Fox: { leftHand: { x: 0.28, y: 0.52, rotation: -0.1 }, rightHand: { x: 0.44, y: 0.5, rotation: 0.1 } },
+    Bird: { leftHand: { x: 0.72, y: 0.51, rotation: -0.2 }, rightHand: { x: 0.84, y: 0.49, rotation: 0.25 } }
+  };
+  const before = buildScenePropRenderPlan(handoff, cast, 0.2, { proceduralPropAnchors: anchors })[0];
+  const after = buildScenePropRenderPlan(handoff, cast, 0.8, { proceduralPropAnchors: anchors })[0];
+  assert.equal(before.x, 0.28);
+  assert.equal(before.y, 0.52);
+  assert.equal(after.x, 0.84);
+  assert.equal(after.y, 0.49);
+  assert.equal(after.rotation, 0.25);
+});
+
 test('uses the safe legacy hand estimate when the rig has no explicit hand or paw anchor', () => {
   const rig = {
     schemaVersion: 1, characterId: 'Fox',
