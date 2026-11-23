@@ -10,7 +10,6 @@ const clamp = (value, min, max, fallback = min) => {
   const number = Number(value);
   return Math.max(min, Math.min(max, Number.isFinite(number) ? number : fallback));
 };
-const lerp = (a, b, p) => a + (b - a) * p;
 const hash = value => {
   let result = 2166136261;
   for (const character of String(value ?? '')) {
@@ -61,17 +60,17 @@ export function poseAt(action = 'idle', progress = 0, seed = 0) {
     pose.lean = 0.2;
   } else if (cue === 'jump') {
     pose.bob = -Math.sin(Math.PI * p) * 0.22;
-    pose.leftArm = -1.65;
-    pose.rightArm = 1.65;
+    pose.leftArm = -0.9;
+    pose.rightArm = 0.9;
     pose.leftLeg = -0.55;
     pose.rightLeg = 0.55;
   } else if (cue === 'wave') {
-    pose.rightArm = -1.9 + Math.sin(phase * 4) * 0.28;
-    pose.leftArm = 0.2;
+    pose.rightArm = 0.22 + Math.sin(phase * 4) * 0.24;
+    pose.leftArm = 1.1;
     pose.bob = Math.abs(small) * 0.012;
   } else if (cue === 'scared') {
-    pose.leftArm = -1.15 + small * 0.12;
-    pose.rightArm = 1.15 - small * 0.12;
+    pose.leftArm = -0.85 + small * 0.12;
+    pose.rightArm = 0.85 - small * 0.12;
     pose.headTilt = small * 0.1;
     pose.bob = Math.sin(phase * 8) * 0.018;
   } else if (cue === 'talk') {
@@ -79,8 +78,8 @@ export function poseAt(action = 'idle', progress = 0, seed = 0) {
     pose.rightArm = 0.25 - small * 0.12;
     pose.mouth = 0.12 + Math.max(0, Math.sin(phase * 5)) * 0.28;
   } else if (cue === 'happy') {
-    pose.leftArm = -1.1;
-    pose.rightArm = 1.1;
+    pose.leftArm = -0.9;
+    pose.rightArm = 0.9;
     pose.bob = Math.abs(swing) * 0.045;
     pose.headTilt = small * 0.06;
   } else if (cue === 'sad') {
@@ -92,16 +91,16 @@ export function poseAt(action = 'idle', progress = 0, seed = 0) {
     pose.headTilt = Math.sin(Math.PI * p) * 0.5;
     pose.lean = Math.sin(Math.PI * p) * 0.12;
   } else if (cue === 'dance') {
-    pose.leftArm = -1.0 + swing * 0.35;
-    pose.rightArm = 1.0 - swing * 0.35;
+    pose.leftArm = -0.75 + swing * 0.35;
+    pose.rightArm = 0.75 - swing * 0.35;
     pose.leftLeg = swing * 0.48;
     pose.rightLeg = -swing * 0.48;
     pose.bob = Math.abs(swing) * 0.06;
     pose.lean = Math.sin(phase * 2) * 0.1;
   } else if (cue === 'float') {
     pose.bob = -0.06 - Math.abs(small) * 0.08;
-    pose.leftArm = -0.55;
-    pose.rightArm = 0.55;
+    pose.leftArm = -0.45;
+    pose.rightArm = 0.45;
     pose.leftLeg = -0.16;
     pose.rightLeg = 0.16;
   } else {
@@ -153,16 +152,25 @@ function paletteFor(profile, characterId) {
   return { fur: color, light: '#f5e8d6', dark: '#344052', accent: '#e6b45b', species: 'generic' };
 }
 
-function drawLimb(context, x1, y1, x2, y2, x3, y3, width, color) {
+function drawLimb(context, x, y, upper, lower, angle, width, color, direction = 1) {
+  const elbowX = x + Math.sin(angle) * upper;
+  const elbowY = y + direction * Math.cos(angle) * upper;
+  const wristAngle = angle * 0.78;
+  const wristX = elbowX + Math.sin(wristAngle) * lower;
+  const wristY = elbowY + direction * Math.cos(wristAngle) * lower;
   context.strokeStyle = color;
   context.lineWidth = width;
   context.lineCap = 'round';
   context.lineJoin = 'round';
   context.beginPath();
-  context.moveTo(x1, y1);
-  context.lineTo(x2, y2);
-  if (Number.isFinite(x3) && Number.isFinite(y3)) context.lineTo(x3, y3);
+  context.moveTo(x, y);
+  context.lineTo(elbowX, elbowY);
+  context.lineTo(wristX, wristY);
   context.stroke();
+  context.fillStyle = '#f4c28f';
+  context.beginPath();
+  context.ellipse(wristX, wristY, width * 0.72, width * 0.48, 0, 0, Math.PI * 2);
+  context.fill();
 }
 
 /** Draw one expressive full-body vector actor; coordinates are its visual centre. */
@@ -198,11 +206,11 @@ export function drawFigure(context, pose = {}, options = {}) {
       context.restore();
     }
     // Legs and shoes.
-    drawLimb(context, -12, 49, -18 + Math.sin(p.leftLeg || 0) * 17, 82, -24 + Math.sin(p.leftLeg || 0) * 22, 91, 12, colors.dark);
-    drawLimb(context, 12, 49, 18 + Math.sin(p.rightLeg || 0) * 17, 82, 24 + Math.sin(p.rightLeg || 0) * 22, 91, 12, colors.dark);
-    // Arms use the same pose clock as the body and legs.
-    drawLimb(context, -25, -7, -48 + Math.sin(p.leftArm || 0) * 20, 12, -55 + Math.sin(p.leftArm || 0) * 27, 34, 10, colors.dark);
-    drawLimb(context, 25, -7, 48 + Math.sin(p.rightArm || 0) * 20, 12, 55 + Math.sin(p.rightArm || 0) * 27, 34, 10, colors.dark);
+    drawLimb(context, -12, 49, 30, 23, Number(p.leftLeg) || 0, 12, colors.dark, 1);
+    drawLimb(context, 12, 49, 30, 23, Number(p.rightLeg) || 0, 12, colors.dark, 1);
+    // Arms use the same pose clock as the body and legs; negative Y is upward.
+    drawLimb(context, -25, -7, 24, 19, Number(p.leftArm) || 0, 10, colors.dark, -1);
+    drawLimb(context, 25, -7, 24, 19, Number(p.rightArm) || 0, 10, colors.dark, -1);
     // Torso.
     context.fillStyle = colors.fur;
     context.beginPath();
@@ -259,8 +267,8 @@ export function drawFigure(context, pose = {}, options = {}) {
   return true;
 }
 
-function activeActorStep(scene, actorId, progress) {
-  if (!validateCharacterActionTimeline(scene).passed) return null;
+function activeActorStep(scene, actorId, progress, timelineValid) {
+  if (!timelineValid) return null;
   const phases = Array.isArray(scene?.actionTimeline?.phases) ? scene.actionTimeline.phases : [];
   for (const phase of phases) {
     const steps = Array.isArray(phase.steps) && phase.steps.length ? phase.steps : [phase];
@@ -293,10 +301,11 @@ export function createProceduralActorLayers(scene = {}, progress = 0) {
   const layerIds = new Set(layers.map(layer => key(layer?.characterId)));
   const rigIds = new Set((Array.isArray(scene?.characterRigs) ? scene.characterRigs : [])
     .filter(rig => validateCharacterRig(rig).passed).map(rig => key(rig.characterId)));
-  const fallback = cast.filter(id => !layerIds.has(key(id)) && !rigIds.has(key(id)));
-  const anchors = fallback.map((characterId, index) => ({
+  const fallback = cast.map((characterId, index) => ({ characterId, castIndex: index }))
+    .filter(item => !layerIds.has(key(item.characterId)) && !rigIds.has(key(item.characterId)));
+  const anchors = fallback.map(({ characterId, castIndex }) => ({
     characterId,
-    x: fallback.length === 1 ? 0.5 : 0.28 + index * (0.44 / Math.max(1, fallback.length - 1)),
+    x: cast.length === 1 ? 0.5 : 0.28 + castIndex * (0.44 / Math.max(1, cast.length - 1)),
     y: 0.7,
     width: 0.25,
     height: 0.42,
@@ -322,6 +331,7 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     return { drawn: 0, layers: [], skipped: 0 };
   }
   const cast = castOf(scene);
+  const timelineValid = validateCharacterActionTimeline(scene).passed;
   const layers = createProceduralActorLayers(scene, progress);
   const profileById = new Map((Array.isArray(runtime.characterBible) ? runtime.characterBible : [])
     .filter(record).map(profile => [key(profile.characterId), profile]));
@@ -331,7 +341,7 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     ? runtime.facialVisemes : {};
   let drawn = 0, skipped = 0;
   for (const layer of layers) {
-    const active = activeActorStep(scene, layer.characterId, progress);
+    const active = activeActorStep(scene, layer.characterId, progress, timelineValid);
     const step = active?.step;
     const actionText = String(step?.description || step?.intent || '');
     const requestedCue = String(step?.motionCue || '').trim();
