@@ -458,3 +458,147 @@ test('starts a thrown prop trajectory at the holder release contact, not a stale
   assert.ok(Math.abs(end.x - 0.9) < 1e-9);
   assert.ok(Math.abs(end.y - 0.3) < 1e-9);
 });
+
+test('animates a grounded door from closed to open only at its authored viewport anchor', () => {
+  const door = {
+    actionTimeline: { schemaVersion: 1, phases: [{
+      phase: 'action', start: 0, end: 1, actorId: 'Fox',
+      steps: [{ intent: 'open', start: 0.2, end: 0.8, actorId: 'Fox',
+        targetId: 'old door', evidence: 'Fox opens the old door.' }]
+    }] },
+    stateChanges: [{
+      entityType: 'prop', entityId: 'old door', property: 'openState',
+      previousValue: null, value: 'open', actorId: 'Fox', actionIntent: 'open',
+      position: { x: 0.72, y: 0.64 }, evidence: 'Fox opens the old door.'
+    }]
+  };
+  const before = buildScenePropRenderPlan(door, layers, 0.1)[0];
+  const middle = buildScenePropRenderPlan(door, layers, 0.5)[0];
+  const after = buildScenePropRenderPlan(door, layers, 0.9)[0];
+  assert.equal(before.kind, 'door');
+  assert.equal(before.openAmount, 0);
+  assert.ok(middle.openAmount > 0 && middle.openAmount < 1);
+  assert.equal(after.openAmount, 1);
+  assert.deepEqual([after.x, after.y], [0.72, 0.64]);
+});
+
+test('does not invent a screen position for an openable object without an authored anchor', () => {
+  const door = { stateChanges: [{
+    entityType: 'prop', entityId: 'old door', property: 'openState',
+    previousValue: null, value: 'open', actionIntent: 'open',
+    evidence: 'The old door opens.'
+  }] };
+  assert.deepEqual(buildScenePropRenderPlan(door, [], 1), []);
+});
+
+test('fades object visibility only from explicitly authored boolean state and position', () => {
+  const object = { stateChanges: [{
+    entityType: 'prop', entityId: 'lantern', property: 'visible',
+    previousValue: false, value: true, position: { x: 0.4, y: 0.5 },
+    evidence: 'The lantern becomes visible.'
+  }] };
+  const before = buildScenePropRenderPlan(object, [], 0.1)[0];
+  const middle = buildScenePropRenderPlan(object, [], 0.66)[0];
+  const after = buildScenePropRenderPlan(object, [], 1)[0];
+  assert.equal(before.opacity, 0);
+  assert.ok(middle.opacity > 0 && middle.opacity < 1);
+  assert.equal(after.opacity, 1);
+});
+
+test('animates authored prop rotation and scale changes without guessing their anchor', () => {
+  const rotating = {
+    stateChanges: [{
+      entityType: 'prop', entityId: 'wooden box', property: 'rotation',
+      previousValue: 0, value: Math.PI / 2, position: { x: 0.3, y: 0.4 },
+      evidence: 'The wooden box rotates.'
+    }, {
+      entityType: 'prop', entityId: 'wooden box', property: 'scale',
+      previousValue: 1, value: 2, position: { x: 0.3, y: 0.4 },
+      evidence: 'The wooden box grows.'
+    }]
+  };
+  const middle = buildScenePropRenderPlan(rotating, [], 0.66)[0];
+  const end = buildScenePropRenderPlan(rotating, [], 1)[0];
+  assert.ok(middle.rotation > 0 && middle.rotation < Math.PI / 2);
+  assert.ok(middle.scale > 1 && middle.scale < 2);
+  assert.equal(end.rotation, Math.PI / 2);
+  assert.equal(end.scale, 2);
+  const unanchored = buildScenePropRenderPlan({
+    stateChanges: [{ ...rotating.stateChanges[0], position: undefined }]
+  }, [], 1);
+  assert.deepEqual(unanchored, []);
+});
+
+test('keeps a held prop attached to its named character in a later scene snapshot', () => {
+  const laterScene = {
+    stateSnapshot: [{
+      entityType: 'prop', entityId: 'silver key', property: 'holder',
+      previousValue: 'Fox', value: 'Fox', actorId: 'Fox',
+      evidence: 'Fox picks up the silver key.', snapshot: true
+    }]
+  };
+  const plan = buildScenePropRenderPlan(laterScene, layers, 0)[0];
+  assert.equal(plan.id, 'silver key');
+  assert.equal(plan.held, true);
+  assert.equal(plan.snapshot, true);
+  assert.ok(plan.x > 0.4 && plan.x < 0.6);
+  assert.ok(plan.y < 0.7);
+});
+
+test('does not show a snapshot prop when its named holder is absent from the scene', () => {
+  const laterScene = {
+    stateSnapshot: [{
+      entityType: 'prop', entityId: 'silver key', property: 'holder',
+      previousValue: 'Fox', value: 'Fox', snapshot: true
+    }]
+  };
+  assert.deepEqual(buildScenePropRenderPlan(laterScene, [], 0), []);
+});
+
+test('keeps an explicitly positioned released prop visible in a later scene snapshot', () => {
+  const laterScene = {
+    stateSnapshot: [{
+      entityType: 'prop', entityId: 'silver key', property: 'holder',
+      previousValue: 'Fox', value: null, position: { x: 0.76, y: 0.82 },
+      evidence: 'Fox drops the silver key.', snapshot: true
+    }]
+  };
+  const plan = buildScenePropRenderPlan(laterScene, [], 0)[0];
+  assert.equal(plan.held, false);
+  assert.equal(plan.snapshot, true);
+  assert.deepEqual([plan.x, plan.y], [0.76, 0.82]);
+});
+
+test('classifies common interactive props into dedicated visual forms', () => {
+  const names = [
+    ['iron sword', 'weapon'], ['wooden shield', 'shield'], ['water bottle', 'bottle'],
+    ['smartphone', 'phone'], ['coffee cup', 'cup'], ['red car', 'vehicle'],
+    ['wooden table', 'table']
+  ];
+  const scene = {
+    stateChanges: names.map(([entityId], index) => ({
+      entityType: 'prop', entityId, property: 'holder',
+      previousValue: null, value: 'Foxy', actorId: 'Foxy',
+      evidence: `Foxy picks up the ${entityId}.`, index
+    }))
+  };
+  const layers = [{ characterId: 'Foxy', x: 0.5, y: 0.65 }];
+  const plan = buildScenePropRenderPlan(scene, layers, 1);
+  assert.deepEqual(plan.map(item => [item.id, item.kind]), names);
+});
+
+test('distinguishes furniture, natural objects and support surfaces', () => {
+  const names = [
+    ['wooden table', 'table'], ['wooden chair', 'chair'],
+    ['oak tree', 'tree'], ['large rock', 'rock'], ['stone platform', 'platform']
+  ];
+  const scene = {
+    stateChanges: names.map(([entityId]) => ({
+      entityType: 'prop', entityId, property: 'holder',
+      previousValue: null, value: 'Foxy', actorId: 'Foxy',
+      evidence: `Foxy moves beside the ${entityId}.`
+    }))
+  };
+  const plan = buildScenePropRenderPlan(scene, [{ characterId: 'Foxy', x: 0.5, y: 0.65 }], 1);
+  assert.deepEqual(plan.map(item => [item.id, item.kind]), names);
+});

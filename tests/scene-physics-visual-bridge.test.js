@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildGroundedPhysicsVisualPlan } from '../src/scene-physics-visual-bridge.js';
+import { normalizeScene } from '../src/scene-model.js';
+import { buildScenePhysicsModel } from '../src/scene-physics-model.js';
 const scene = { physicsEvents: [{ id: 'ball-flight', entityId: 'ball',
   visualStartPosition: { x: 0.1, y: 0.2 }, visualEndPosition: { x: 0.9, y: 0.8 },
   visualStartProgress: 0.2, visualEndProgress: 0.8 }] };
@@ -29,4 +31,56 @@ test('clamps samples outside the authored event interval', () => {
   const after = buildGroundedPhysicsVisualPlan(scene, model, 1)[0];
   assert.equal(before.x, 0.1); assert.equal(after.x, 0.9);
   assert.equal(before.active, false); assert.equal(after.active, false);
+});
+
+test('uses an authored quadratic viewport trajectory and interpolates object rotation', () => {
+  const curvedScene = { physicsEvents: [{
+    id: 'arc', entityId: 'ball', visualStartPosition: { x: 0.1, y: 0.8 },
+    visualControlPoint: { x: 0.5, y: 0.05 }, visualEndPosition: { x: 0.9, y: 0.8 },
+    visualStartProgress: 0, visualEndProgress: 1,
+    visualStartRotation: 0, visualEndRotation: Math.PI
+  }] };
+  const curved = buildGroundedPhysicsVisualPlan(curvedScene, {
+    events: [{ id: 'arc', entityId: 'ball', type: 'throw', grounded: true, evidence: 'Mira throws the ball.' }]
+  }, 0.5)[0];
+  assert.ok(Math.abs(curved.x - 0.5) < 1e-9);
+  assert.ok(curved.y < 0.5);
+  assert.ok(Math.abs(curved.rotation - Math.PI / 2) < 1e-9);
+});
+
+test('keeps curved trajectory and rotation through the full scene normalization and physics path', () => {
+  const normalized = normalizeScene({
+    storyDetail: 'Mira throws the ball.',
+    physicsEvents: [{
+      id: 'flight', type: 'throw', entityId: 'ball', actorId: 'Mira',
+      evidence: 'Mira throws the ball.',
+      visualStartPosition: { x: 0.1, y: 0.8 },
+      visualControlPoint: { x: 0.5, y: 0.05 },
+      visualEndPosition: { x: 0.9, y: 0.8 },
+      visualStartProgress: 0, visualEndProgress: 1,
+      visualStartRotation: 0, visualEndRotation: Math.PI
+    }]
+  });
+  const physics = buildScenePhysicsModel([normalized]);
+  const sample = buildGroundedPhysicsVisualPlan(normalized, physics, 0.5)[0];
+  assert.equal(physics.events[0].grounded, true);
+  assert.ok(Math.abs(sample.x - 0.5) < 1e-9);
+  assert.ok(sample.y < 0.5);
+  assert.ok(Math.abs(sample.rotation - Math.PI / 2) < 1e-9);
+});
+
+test('rejects ambiguous duplicate authored event IDs instead of selecting the last trajectory', () => {
+  const duplicate = { physicsEvents: [
+    { ...scene.physicsEvents[0], visualEndPosition: { x: 0.9, y: 0.8 } },
+    { ...scene.physicsEvents[0], visualEndPosition: { x: 0.2, y: 0.3 } }
+  ] };
+  assert.deepEqual(buildGroundedPhysicsVisualPlan(duplicate, model, 0.5), []);
+});
+
+test('rejects duplicate grounded physics event IDs instead of rendering ambiguous samples', () => {
+  const duplicateModel = { events: [
+    model.events[0],
+    { ...model.events[0], type: 'motion' }
+  ] };
+  assert.deepEqual(buildGroundedPhysicsVisualPlan(scene, duplicateModel, 0.5), []);
 });

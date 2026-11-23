@@ -18,9 +18,9 @@ const scene = {
     schemaVersion: 1,
     phases: [
       { phase: 'preparation', start: 0, end: 0.2, actorId: 'Foxy', description: 'Foxy notices the key and leans forward.', evidence: 'Foxy notices the silver key' },
-      { phase: 'action', start: 0.2, end: 0.65, actorId: 'Foxy', targetId: 'Foxy', description: 'Foxy reaches down and lifts the key.', evidence: 'picks it up' },
+      { phase: 'action', start: 0.2, end: 0.65, actorId: 'Foxy', targetId: 'silver key', description: 'Foxy reaches down and lifts the key.', evidence: 'Foxy notices the silver key, reaches down, and picks it up.' },
       { phase: 'reaction', start: 0.65, end: 0.82, actorId: 'Foxy', description: 'Foxy looks at the key with surprise.', evidence: 'Foxy notices the silver key' },
-      { phase: 'result', start: 0.82, end: 1, actorId: 'Foxy', description: 'Foxy holds the key securely.', evidence: 'picks it up' }
+      { phase: 'result', start: 0.82, end: 1, actorId: 'Foxy', description: 'Foxy holds the key securely.', evidence: 'Foxy notices the silver key, reaches down, and picks it up.' }
     ]
   }
 };
@@ -31,7 +31,7 @@ test('scene normalization preserves action timeline metadata for evaluation', ()
 
 test('accepts ordered, source-grounded action phases in normalized scene time', () => {
   const report = validateCharacterActionTimeline(scene);
-  assert.equal(report.status, 'valid');
+  assert.equal(report.status, 'valid', JSON.stringify(report.issues));
   assert.equal(report.passed, true);
   assert.equal(report.phaseCount, 4);
 });
@@ -234,4 +234,90 @@ test('rejects unordered or ungrounded action substeps', () => {
   const report = validateCharacterActionTimeline(candidate);
   assert.ok(report.issues.some(item => item.code === 'action-step-timing-invalid'));
   assert.ok(report.issues.some(item => item.code === 'action-step-evidence-ungrounded'));
+});
+
+test('allows synchronized overlapping steps for different characters', () => {
+  const candidate = {
+    id: 'paired-action',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira and Noah combine their powers.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira',
+        description: 'Mira and Noah combine their powers.',
+        evidence: 'Mira and Noah combine their powers.',
+        steps: [
+          { intent: 'team_magic', motionCue: 'magic', start: 0.2, end: 0.8,
+            actorId: 'Mira', targetId: 'Noah', description: 'Mira channels energy.',
+            evidence: 'Mira and Noah combine their powers.' },
+          { intent: 'team_magic', motionCue: 'magic', start: 0.2, end: 0.8,
+            actorId: 'Noah', targetId: 'Mira', description: 'Noah channels energy.',
+            evidence: 'Mira and Noah combine their powers.' }
+        ]
+      }]
+    }
+  };
+  assert.equal(validateCharacterActionTimeline(candidate).passed, true);
+});
+
+test('rejects overlapping steps assigned to the same character', () => {
+  const candidate = {
+    id: 'same-actor-overlap',
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira combines her powers.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira',
+        description: 'Mira combines her powers.',
+        evidence: 'Mira combines her powers.',
+        steps: [
+          { intent: 'power_up', motionCue: 'magic', start: 0.1, end: 0.7,
+            actorId: 'Mira', description: 'Mira channels energy.',
+            evidence: 'Mira combines her powers.' },
+          { intent: 'power_up', motionCue: 'magic', start: 0.5, end: 0.9,
+            actorId: 'Mira', description: 'Mira sustains energy.',
+            evidence: 'Mira combines her powers.' }
+        ]
+      }]
+    }
+  };
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'action-step-timing-invalid'));
+});
+
+test('rejects action substep targets that are not named in their locked source evidence', () => {
+  const candidate = structuredClone(scene);
+  candidate.actionTimeline.phases[1].targetId = null;
+  candidate.actionTimeline.phases[1].steps = [{
+    intent: 'open', motionCue: 'reach', start: 0.2, end: 0.6,
+    actorId: 'Foxy', targetId: 'secret portal', description: 'Foxy opens a secret portal.',
+    evidence: 'Foxy notices the silver key, reaches down, and picks it up.'
+  }];
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'action-step-target-evidence-mismatch'));
+});
+
+test('rejects action substeps that assign a real sentence to an unmentioned target', () => {
+  const candidate = {
+    characters: ['Mira', 'Noah'],
+    storyDetail: 'Mira throws the ball to Noah.',
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira',
+        description: 'Mira throws the ball to Noah.',
+        evidence: 'Mira throws the ball to Noah.',
+        steps: [{
+          intent: 'throw', motionCue: 'throw', start: 0.2, end: 0.8,
+          actorId: 'Noah', targetId: 'wall',
+          description: 'Noah throws the ball at a wall.',
+          evidence: 'Mira throws the ball to Noah.'
+        }]
+      }]
+    }
+  };
+  const report = validateCharacterActionTimeline(candidate);
+  assert.ok(report.issues.some(item => item.code === 'action-step-target-evidence-mismatch'));
 });

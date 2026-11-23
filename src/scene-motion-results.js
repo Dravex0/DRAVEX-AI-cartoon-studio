@@ -11,5 +11,8 @@ export function summarizeSceneMotionResults(results) {
     else if (result?.status === "skipped") counts.skipped += 1;
     return counts;
   }, { static: 0, changed: 0, skipped: 0 });
-  return { checked: summary.static + summary.changed, ...summary };
+  const motionTracks = values.reduce((sum, result) => sum + (Number.isFinite(result?.motionTrackCount) ? result.motionTrackCount : 0), 0);
+  const persistentMotionTracks = values.reduce((sum, result) => sum + (Number.isFinite(result?.persistentMotionTrackCount) ? result.persistentMotionTrackCount : 0), 0);
+  const motionRegionObservations = values.reduce((sum, result) => sum + (Number.isFinite(result?.motionRegionObservations) ? result.motionRegionObservations : 0), 0);
+  return { checked: summary.static + summary.changed, ...summary, motionTracks, persistentMotionTracks, motionRegionObservations };
 }

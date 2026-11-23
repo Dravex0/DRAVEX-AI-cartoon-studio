@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { inferStoryboardStateChanges } from '../src/scene-state-changes.js';
+import { inferStoryboardStateChanges, buildStoryboardStateSnapshots } from '../src/scene-state-changes.js';
 
 test('tracks an explicitly picked-up prop and carries its holder into later scenes', () => {
   const changes = inferStoryboardStateChanges([
@@ -68,4 +68,20 @@ test('keeps location evidence inside the sentence that names the moving characte
   assert.equal(changes[0][0].entityId, 'Mira');
   assert.equal(changes[0][0].value, 'inside:stone castle');
   assert.equal(changes[0][0].evidence, 'Mira enters the stone castle.');
+});
+
+test('carries object holder and door state into later scene snapshots', () => {
+  const model = buildStoryboardStateSnapshots([
+    { storyDetail: 'Foxy picks up the silver key.', characters: ['Foxy'] },
+    { storyDetail: 'Foxy opens the ancient door.', characters: ['Foxy'] },
+    { storyDetail: 'Foxy walks through the ancient door.', characters: ['Foxy'] }
+  ], 'en');
+  assert.equal(model.changesByScene[0].length, 1);
+  assert.equal(model.changesByScene[1].length, 1);
+  assert.equal(model.changesByScene[2].length, 0);
+  const second = model.snapshots[2];
+  assert.ok(second.some(item => item.entityId === 'silver key'
+    && item.property === 'holder' && item.value === 'Foxy'));
+  assert.ok(second.some(item => item.entityId === 'ancient door'
+    && item.property === 'openState' && item.value === 'open'));
 });

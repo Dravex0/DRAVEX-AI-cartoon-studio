@@ -184,3 +184,47 @@ test('scene normalization preserves explicit normalized prop positions and rejec
   assert.deepEqual(scene.stateChanges[0].position, { x: 0.72, y: 0.55 });
   assert.equal(Object.hasOwn(scene.stateChanges[1], 'position'), false);
 });
+
+test('scene normalization preserves boolean and numeric object states and snapshots', () => {
+  const scene = normalizeScene({
+    stateChanges: [
+      { entityType: 'prop', entityId: 'door', property: 'visible',
+        previousValue: false, value: true, evidence: 'The door appears.' },
+      { entityType: 'prop', entityId: 'crate', property: 'rotation',
+        previousValue: 0, value: Math.PI / 2, evidence: 'The crate rotates.' },
+      { entityType: 'prop', entityId: 'crate', property: 'scale',
+        previousValue: 1, value: 2, evidence: 'The crate grows.' }
+    ],
+    stateSnapshot: [{
+      entityType: 'prop', entityId: 'door', property: 'visible',
+      previousValue: true, value: true, snapshot: true,
+      position: { x: 0.4, y: 0.6 }, evidence: 'The door appears.'
+    }]
+  });
+  assert.equal(scene.stateChanges[0].previousValue, false);
+  assert.equal(scene.stateChanges[0].value, true);
+  assert.equal(scene.stateChanges[1].previousValue, 0);
+  assert.equal(scene.stateChanges[1].value, Math.PI / 2);
+  assert.equal(scene.stateChanges[2].value, 2);
+  assert.equal(scene.stateSnapshot[0].value, true);
+  assert.deepEqual(scene.stateSnapshot[0].position, { x: 0.4, y: 0.6 });
+});
+
+test('scene normalization preserves curved prop trajectories and visual rotation', () => {
+  const scene = normalizeScene({
+    physicsEvents: [{
+      id: 'ball-flight', type: 'throw', entityId: 'ball',
+      visualStartPosition: { x: 0.1, y: 0.8 },
+      visualControlPoint: { x: 0.5, y: 0.05 },
+      visualEndPosition: { x: 0.9, y: 0.8 },
+      visualStartProgress: 0.1, visualEndProgress: 0.9,
+      visualStartRotation: 0, visualEndRotation: Math.PI * 2
+    }]
+  });
+  const event = scene.physicsEvents[0];
+  assert.deepEqual(event.visualControlPoint, { x: 0.5, y: 0.05 });
+  assert.equal(event.visualStartRotation, 0);
+  assert.equal(event.visualEndRotation, Math.PI * 2);
+  assert.equal(event.visualStartProgress, 0.1);
+  assert.equal(event.visualEndProgress, 0.9);
+});

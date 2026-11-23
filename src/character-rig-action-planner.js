@@ -16,7 +16,13 @@ const PRESET_BY_INTENT = Object.freeze({
   drop_weapon: 'drop_weapon', freeze: 'freeze', discover_threat: 'freeze',
   pick_up: 'pick_up', grasp: 'grasp', release: 'release', carry: 'carry',
   throw: 'throw', catch: 'catch', push: 'push', pull: 'pull',
-  hug: 'hug', point: 'point', sit: 'sit'
+  hug: 'hug', point: 'point', sit: 'sit',
+  chase: 'run', rescue: 'run', intervene: 'run',
+  advance: 'walk', stealth_advance: 'walk', enter_location: 'walk',
+  climb: 'climb', swim: 'swim', crawl: 'crawl', fall: 'fall', land: 'land',
+  open: 'open', close: 'close', eat_drink: 'eat_drink', sleep_wake: 'sleep_wake',
+  write_draw: 'write_draw', power_up: 'power_up', team_magic: 'team_magic',
+  energy_clash: 'energy_clash', restrain: 'restrain', reveal: 'reveal'
 });
 
 function presetForDescription(description) {
@@ -24,6 +30,7 @@ function presetForDescription(description) {
   if (intent.intent === 'dodge') return 'dodge';
   if (intent.intent === 'attack') return 'attack';
   if (intent.intent === 'defend') return 'defend';
+  if (PRESET_BY_INTENT[intent.intent]) return PRESET_BY_INTENT[intent.intent];
   const action = detectSceneAction(description);
   return PRESET_BY_ACTION[action] || null;
 }

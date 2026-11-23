@@ -13,10 +13,23 @@ const normalizedPoint = value => value && typeof value === 'object' && !Array.is
 function propKind(name) {
   const value = key(name);
   if (/star|звезд|зірк|estrella/.test(value)) return 'star';
+  if (/door|gate|ворот|двер|puerta/.test(value)) return 'door';
+  if (/chest|сундук|скрин|cofre/.test(value)) return 'chest';
   if (/key|ключ|ключик|llave/.test(value)) return 'key';
   if (/book|книг|книж|libro/.test(value)) return 'book';
   if (/ball|мяч|куля|pelota/.test(value)) return 'ball';
   if (/apple|яблок|яблук|manzana/.test(value)) return 'apple';
+  if (/sword|blade|меч|шпага|espada|hoja/.test(value)) return 'weapon';
+  if (/shield|щит|escudo/.test(value)) return 'shield';
+  if (/bottle|бутыл|пляш|botella/.test(value)) return 'bottle';
+  if (/phone|smartphone|телефон|смартфон|m[oó]vil|celular/.test(value)) return 'phone';
+  if (/cup|mug|чашк|кружк|taza|vaso/.test(value)) return 'cup';
+  if (/car|vehicle|машин|автомоб|авто|coche|veh[ií]culo/.test(value)) return 'vehicle';
+  if (/table|стол|mesa/.test(value)) return 'table';
+  if (/chair|стул|silla/.test(value)) return 'chair';
+  if (/tree|дерев|деревц|árbol|arbol/.test(value)) return 'tree';
+  if (/platform|ledge|платформ|уступ|plataforma/.test(value)) return 'platform';
+  if (/rock|stone|камень|камін|piedra/.test(value)) return 'rock';
   return 'generic';
 }
 
@@ -64,6 +77,7 @@ export function resolveCharacterPropAnchor(characterId, rigs = [], rigPoses = {}
  */
 export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progress = 1, runtime = {}) {
   const changes = Array.isArray(scene?.stateChanges) ? scene.stateChanges : [];
+  const snapshots = Array.isArray(scene?.stateSnapshot) ? scene.stateSnapshot : [];
   const layers = Array.isArray(characterLayers) ? characterLayers : [];
   const p = clamp(Number.isFinite(progress) ? progress : 1, 0, 1);
   const actionPhase = Array.isArray(scene?.actionTimeline?.phases)
@@ -190,6 +204,30 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     };
   });
 
+  // A held prop remains present in the next shot even when that shot contains
+  // no new pickup event. Only attach it when its named holder is in the scene.
+  for (const snapshot of snapshots) {
+    if (snapshot?.entityType !== 'prop' || snapshot.property !== 'holder') continue;
+    const entityId = clean(snapshot.entityId);
+    if (!entityId || holderPlans.some(item => key(item.id) === key(entityId))) continue;
+    const holderId = clean(snapshot.value);
+    if (holderId && layers.some(layer => key(layer?.characterId) === key(holderId))) {
+      const point = holderPoint(holderId, snapshot.position);
+      holderPlans.push({
+        id: entityId, kind: propKind(entityId), x: point.x, y: point.y,
+        rotation: Number.isFinite(point.rotation) ? point.rotation : 0,
+        held: true, visible: true, opacity: 1, scale: 1,
+        evidence: clean(snapshot.evidence), snapshot: true, transitionProgress: 1
+      });
+    } else if (!holderId && normalizedPoint(snapshot.position)) {
+      holderPlans.push({
+        id: entityId, kind: propKind(entityId), x: snapshot.position.x, y: snapshot.position.y,
+        rotation: 0, held: false, visible: true, opacity: 1, scale: 1,
+        evidence: clean(snapshot.evidence), snapshot: true, transitionProgress: 1
+      });
+    }
+  }
+
   // Explicit position changes are rendered only when both endpoints are known.
   // A missing start position stays static rather than inventing a trajectory.
   const positionByProp = new Map();
@@ -282,6 +320,108 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
     if (existing) Object.assign(existing, plan);
     else holderPlans.push(plan);
   }
+  // Render open/closed and visibility transitions only when an authored
+  // viewport anchor exists. A story verb alone does not reveal where an object
+  // should appear in the frame.
+  const changedStateKeys = new Set(changes.filter(change => change?.entityType === 'prop')
+    .map(change => [key(change.entityId), clean(change.property)].join(':')));
+  const snapshotOnly = snapshots.filter(change => change?.entityType === 'prop'
+    && !changedStateKeys.has([key(change.entityId), clean(change.property)].join(':')));
+  const statefulChanges = [...changes, ...snapshotOnly].filter(change => change?.entityType === 'prop'
+    && ['openState', 'visible', 'rotation', 'scale'].includes(change.property)
+    && normalizedPoint(change.position));
+  const statefulByProp = new Map();
+  for (const change of statefulChanges) {
+    const id = clean(change.entityId);
+    if (!id) continue;
+    const propKey = key(id);
+    if (!statefulByProp.has(propKey)) statefulByProp.set(propKey, []);
+    statefulByProp.get(propKey).push(change);
+  }
+  for (const [propKey, history] of statefulByProp) {
+    let state = null;
+    let opacity = 1;
+    let rotation = 0;
+    let scale = 1;
+    const hasRotationState = history.some(change => change.property === 'rotation');
+    const hasScaleState = history.some(change => change.property === 'scale');
+    let position = normalizedPoint(history[0].position);
+    let evidence = '';
+    let transitionProgress = 1;
+    for (let index = 0; index < history.length; index += 1) {
+      const change = history[index];
+      const intent = clean(change.actionIntent);
+      const actorId = key(change.actorId);
+      const targetId = propKey;
+      const candidates = timelineSteps.filter(step =>
+        clean(step.intent) === intent
+        && (!actorId || key(step.actorId) === actorId)
+        && (!clean(step.targetId) || key(step.targetId) === targetId)
+        && (!clean(step.evidence) || !clean(change.evidence)
+          || key(step.evidence).includes(key(change.evidence))
+          || key(change.evidence).includes(key(step.evidence)))
+      );
+      const matched = candidates.length === 1 ? candidates[0] : null;
+      const propertyHistory = history.filter(item => item.property === change.property);
+      const propertyIndex = propertyHistory.indexOf(change);
+      const start = matched ? matched.start : phaseStart + (phaseEnd - phaseStart) * propertyIndex / propertyHistory.length;
+      const end = matched ? matched.end : phaseStart + (phaseEnd - phaseStart) * (propertyIndex + 1) / propertyHistory.length;
+      const fromState = change.property === 'openState'
+        ? (change.previousValue ?? (change.value === 'open' ? 'closed' : 'open'))
+        : change.previousValue;
+      const toState = change.value;
+      if (p < start) {
+        if (change.property === 'openState') state = fromState === 'open' ? 1 : 0;
+        else if (change.property === 'visible' && typeof fromState === 'boolean') opacity = fromState ? 1 : 0;
+        else if (change.property === 'rotation' && Number.isFinite(fromState)) rotation = fromState;
+        else if (change.property === 'scale' && Number.isFinite(fromState)) scale = clamp(fromState, 0.05, 4);
+        continue;
+      }
+      const progress = clamp((p - start) / Math.max(0.000001, end - start), 0, 1);
+      transitionProgress = progress;
+      evidence = clean(change.evidence);
+      position = normalizedPoint(change.position) || position;
+      if (change.property === 'openState') {
+        const fromOpen = fromState === 'open' ? 1 : 0;
+        const toOpen = toState === 'open' ? 1 : 0;
+        state = fromOpen + (toOpen - fromOpen) * progress;
+      } else if (change.property === 'visible'
+          && typeof fromState === 'boolean' && typeof toState === 'boolean') {
+        opacity = (fromState ? 1 : 0) + ((toState ? 1 : 0) - (fromState ? 1 : 0)) * progress;
+      } else if (change.property === 'rotation'
+          && Number.isFinite(fromState) && Number.isFinite(toState)) {
+        rotation = fromState + (toState - fromState) * progress;
+      } else if (change.property === 'scale'
+          && Number.isFinite(fromState) && Number.isFinite(toState)) {
+        scale = clamp(fromState + (toState - fromState) * progress, 0.05, 4);
+      }
+      if (p <= end) continue;
+      state = change.property === 'openState' ? (toState === 'open' ? 1 : 0) : state;
+      opacity = change.property === 'visible' ? (toState ? 1 : 0) : opacity;
+      rotation = change.property === 'rotation' && Number.isFinite(toState) ? toState : rotation;
+      scale = change.property === 'scale' && Number.isFinite(toState) ? clamp(toState, 0.05, 4) : scale;
+    }
+    if (!position) continue;
+    const existing = holderPlans.find(item => key(item.id) === propKey);
+    const plan = {
+      ...(existing || {}),
+      id: clean(history[0].entityId),
+      kind: propKind(history[0].entityId),
+      x: position.x,
+      y: position.y,
+      rotation: hasRotationState ? rotation : (existing?.rotation || 0),
+      held: existing?.held === true,
+      visible: opacity > 0.001,
+      opacity,
+      scale: hasScaleState ? scale : (existing?.scale || 1),
+      ...(state === null ? {} : { openAmount: state }),
+      evidence,
+      transitionProgress
+    };
+    if (existing) Object.assign(existing, plan);
+    else holderPlans.push(plan);
+  }
+
   const physicsModel = buildScenePhysicsModel([scene]);
   const physicsVisuals = buildGroundedPhysicsVisualPlan(scene, physicsModel, p);
   for (const visual of physicsVisuals) {
@@ -294,7 +434,7 @@ export function buildScenePropRenderPlan(scene = {}, characterLayers = [], progr
       kind: propKind(visual.id),
       x: visual.x,
       y: visual.y,
-      rotation: existing?.rotation || 0,
+      rotation: Number.isFinite(visual.rotation) ? visual.rotation : (existing?.rotation || 0),
       held: false,
       visible: true,
       scale: existing?.scale || 1,
@@ -322,9 +462,12 @@ function drawStar(context, size) {
 
 function drawProp(context, prop, x, y, time) {
   const bob = prop.held ? Math.sin(time * 4) * 0.008 : 0;
+  if (prop.visible === false || (Number.isFinite(prop.opacity) && prop.opacity <= 0.001)) return;
   context.save();
+  if (Number.isFinite(prop.opacity)) context.globalAlpha = (Number.isFinite(context.globalAlpha) ? context.globalAlpha : 1) * clamp(prop.opacity, 0, 1);
   context.translate(x, y + bob);
   context.rotate(Number.isFinite(prop.rotation) ? prop.rotation : 0);
+  if (Number.isFinite(prop.scale) && typeof context.scale === 'function') context.scale(clamp(prop.scale, 0.05, 4), clamp(prop.scale, 0.05, 4));
   context.lineWidth = 2.5;
   context.lineJoin = 'round';
   if (prop.kind === 'star') {
@@ -344,10 +487,84 @@ function drawProp(context, prop, x, y, time) {
     context.fillStyle = '#72c6df'; context.strokeStyle = '#24566c';
     context.beginPath(); context.arc(0, 0, 0.022, 0, Math.PI * 2); context.fill(); context.stroke();
     context.beginPath(); context.arc(0, 0, 0.011, 0, Math.PI * 2); context.stroke();
+  } else if (prop.kind === 'door') {
+    const open = clamp(Number.isFinite(prop.openAmount) ? prop.openAmount : 0, 0, 1);
+    context.translate(-0.018, 0);
+    context.rotate(-Math.PI * 0.42 * open);
+    context.fillStyle = '#98633f'; context.strokeStyle = '#50372b';
+    context.fillRect(0, -0.038, 0.036, 0.076); context.strokeRect(0, -0.038, 0.036, 0.076);
+    context.fillStyle = '#f3d17a'; context.beginPath(); context.arc(0.029, 0, 0.003, 0, Math.PI * 2); context.fill();
+  } else if (prop.kind === 'chest') {
+    const open = clamp(Number.isFinite(prop.openAmount) ? prop.openAmount : 0, 0, 1);
+    context.fillStyle = '#9b653e'; context.strokeStyle = '#51382a';
+    context.fillRect(-0.026, -0.012, 0.052, 0.03); context.strokeRect(-0.026, -0.012, 0.052, 0.03);
+    context.save(); context.translate(0, -0.012); context.rotate(-0.72 * open);
+    context.fillStyle = '#c18a50'; context.fillRect(-0.026, -0.024, 0.052, 0.024); context.strokeRect(-0.026, -0.024, 0.052, 0.024); context.restore();
   } else if (prop.kind === 'apple') {
     context.fillStyle = '#df5b50'; context.strokeStyle = '#783a37';
     context.beginPath(); context.ellipse(0, 0.003, 0.019, 0.022, 0, 0, Math.PI * 2); context.fill(); context.stroke();
     context.strokeStyle = '#6e8b4d'; context.beginPath(); context.moveTo(0, -0.018); context.lineTo(0.004, -0.029); context.stroke();
+  } else if (prop.kind === 'weapon') {
+    context.strokeStyle = '#d9e3ec'; context.lineWidth = 0.006;
+    context.beginPath(); context.moveTo(-0.002, -0.035); context.lineTo(0.006, 0.02); context.stroke();
+    context.strokeStyle = '#9b6b42'; context.lineWidth = 0.008;
+    context.beginPath(); context.moveTo(-0.012, 0.022); context.lineTo(0.015, 0.022); context.stroke();
+    context.strokeStyle = '#d9e3ec'; context.lineWidth = 0.004;
+    context.beginPath(); context.moveTo(0.002, -0.018); context.lineTo(0.018, -0.006); context.stroke();
+  } else if (prop.kind === 'shield') {
+    context.fillStyle = '#6c91ad'; context.strokeStyle = '#31495d';
+    context.beginPath(); context.moveTo(0, -0.034); context.lineTo(0.027, -0.022);
+    context.lineTo(0.022, 0.012); context.lineTo(0, 0.036); context.lineTo(-0.022, 0.012);
+    context.lineTo(-0.027, -0.022); context.closePath(); context.fill(); context.stroke();
+    context.strokeStyle = '#e6c36f'; context.beginPath(); context.moveTo(0, -0.025); context.lineTo(0, 0.025); context.stroke();
+  } else if (prop.kind === 'bottle') {
+    context.fillStyle = '#75b9a5'; context.strokeStyle = '#315f58';
+    context.fillRect(-0.014, -0.022, 0.028, 0.044); context.strokeRect(-0.014, -0.022, 0.028, 0.044);
+    context.fillRect(-0.006, -0.033, 0.012, 0.012); context.strokeRect(-0.006, -0.033, 0.012, 0.012);
+    context.fillStyle = '#e7e1c4'; context.fillRect(-0.006, -0.035, 0.012, 0.004);
+  } else if (prop.kind === 'phone') {
+    context.fillStyle = '#303a4a'; context.strokeStyle = '#141a24';
+    context.beginPath(); context.roundRect(-0.018, -0.033, 0.036, 0.066, 0.006); context.fill(); context.stroke();
+    context.fillStyle = '#9ed8e6'; context.fillRect(-0.014, -0.025, 0.028, 0.047);
+    context.fillStyle = '#e7edf2'; context.beginPath(); context.arc(0, 0.028, 0.0025, 0, Math.PI * 2); context.fill();
+  } else if (prop.kind === 'cup') {
+    context.fillStyle = '#e4d6b8'; context.strokeStyle = '#75624c';
+    context.beginPath(); context.roundRect(-0.018, -0.02, 0.032, 0.034, 0.004); context.fill(); context.stroke();
+    context.beginPath(); context.arc(0.015, -0.003, 0.009, -Math.PI / 2, Math.PI / 2); context.stroke();
+  } else if (prop.kind === 'vehicle') {
+    context.fillStyle = '#d36d55'; context.strokeStyle = '#623d37';
+    context.beginPath(); context.roundRect(-0.04, -0.014, 0.08, 0.03, 0.008); context.fill(); context.stroke();
+    context.beginPath(); context.moveTo(-0.022, -0.014); context.lineTo(-0.01, -0.03);
+    context.lineTo(0.018, -0.03); context.lineTo(0.03, -0.014); context.stroke();
+    context.fillStyle = '#30343a';
+    for (const wheelX of [-0.023, 0.024]) {
+      context.beginPath(); context.arc(wheelX, 0.018, 0.009, 0, Math.PI * 2); context.fill();
+    }
+  } else if (prop.kind === 'table') {
+    context.fillStyle = '#9b704a'; context.strokeStyle = '#5d4432';
+    context.fillRect(-0.034, -0.012, 0.068, 0.012); context.strokeRect(-0.034, -0.012, 0.068, 0.012);
+    context.fillRect(-0.028, 0, 0.006, 0.032); context.fillRect(0.022, 0, 0.006, 0.032);
+    context.strokeRect(-0.028, 0, 0.006, 0.032); context.strokeRect(0.022, 0, 0.006, 0.032);
+  } else if (prop.kind === 'chair') {
+    context.fillStyle = '#a97950'; context.strokeStyle = '#5d4432';
+    context.fillRect(-0.022, -0.002, 0.044, 0.012); context.strokeRect(-0.022, -0.002, 0.044, 0.012);
+    context.fillRect(-0.022, -0.03, 0.044, 0.01); context.strokeRect(-0.022, -0.03, 0.044, 0.01);
+    context.fillRect(-0.018, 0.01, 0.005, 0.025); context.fillRect(0.013, 0.01, 0.005, 0.025);
+    context.strokeRect(-0.018, 0.01, 0.005, 0.025); context.strokeRect(0.013, 0.01, 0.005, 0.025);
+  } else if (prop.kind === 'tree') {
+    context.fillStyle = '#76503a'; context.strokeStyle = '#4c392b';
+    context.fillRect(-0.006, 0.005, 0.012, 0.04); context.strokeRect(-0.006, 0.005, 0.012, 0.04);
+    context.fillStyle = '#65966b'; context.strokeStyle = '#355b42';
+    context.beginPath(); context.arc(0, -0.014, 0.03, 0, Math.PI * 2); context.fill(); context.stroke();
+  } else if (prop.kind === 'rock') {
+    context.fillStyle = '#92979c'; context.strokeStyle = '#555d65';
+    context.beginPath(); context.moveTo(-0.032, 0.018); context.lineTo(-0.024, -0.008);
+    context.lineTo(-0.004, -0.03); context.lineTo(0.022, -0.018);
+    context.lineTo(0.034, 0.018); context.closePath(); context.fill(); context.stroke();
+  } else if (prop.kind === 'platform') {
+    context.fillStyle = '#8b9299'; context.strokeStyle = '#4e5962';
+    context.fillRect(-0.045, -0.01, 0.09, 0.02); context.strokeRect(-0.045, -0.01, 0.09, 0.02);
+    context.fillRect(-0.035, 0.01, 0.07, 0.022); context.strokeRect(-0.035, 0.01, 0.07, 0.022);
   } else {
     context.fillStyle = '#e7b66b'; context.strokeStyle = '#775735';
     context.beginPath(); context.roundRect(-0.021, -0.018, 0.042, 0.036, 0.008); context.fill(); context.stroke();

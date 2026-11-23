@@ -5,10 +5,31 @@
  * can all participate through the same IDs and relation model.
  */
 import { inferCharacterInteractions } from './character-interaction.js';
+import { validateCharacterActionTimeline } from './character-action-timeline.js';
 
 const clean = (value, max = 1200) => String(value ?? '').trim().slice(0, max);
 const record = value => value && typeof value === 'object' && !Array.isArray(value);
 const keyOf = value => clean(value, 160).toLocaleLowerCase();
+
+function sourceHasEvidence(scene, evidence, sourceText = '') {
+  if (!evidence) return false;
+  if (sourceText.includes(evidence)) return true;
+  return (Array.isArray(scene.sourceEvents) ? scene.sourceEvents : []).some(item =>
+    typeof item === 'string' ? item.includes(evidence)
+      : record(item) && ['evidence', 'text', 'description'].some(field =>
+        typeof item[field] === 'string' && item[field].includes(evidence))
+  );
+}
+
+function evidenceNamesEntity(evidence, entityId) {
+  const value = keyOf(evidence);
+  const name = keyOf(entityId);
+  if (!value || !name) return false;
+  if (value.includes(name)) return true;
+  const tokens = name.split(/[\s_-]+/u).filter(token =>
+    token.length >= 3 && !['the', 'and', 'for', 'with', 'una', 'uno', 'los', 'las'].includes(token));
+  return tokens.some(token => value.includes(token));
+}
 
 function addEntity(map, id, kind, sceneId, attributes = {}) {
   const name = clean(id, 160);
@@ -78,7 +99,7 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
     };
 
     const explicitInteractions = (Array.isArray(scene.interactions) ? scene.interactions : [scene.interaction]).filter(record);
-    const sourceText = clean(scene.storyDetail || scene.visibleAction, 1200);
+    const sourceText = [scene.storyDetail, scene.visibleAction].filter(value => typeof value === 'string').map(value => clean(value, 1200)).filter(Boolean).join('\n');
     const language = resolveSceneLanguage(scene, fallbackLanguage);
     const inferredInteractions = sourceText
       ? inferCharacterInteractions(sourceText, participants, language)
@@ -90,28 +111,42 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
       interactionKeys.add(interactionKey);
       const actor = clean(interaction.actorId, 160);
       const target = clean(interaction.targetId, 160);
-      if (!actor || !target) continue;
+      const evidence = clean(interaction.evidence, 500);
+      if (!actor || !target || !sourceHasEvidence(scene, evidence, sourceText)
+          || !evidenceNamesEntity(evidence, actor) || !evidenceNamesEntity(evidence, target)) continue;
       addEntity(entities, actor, 'character', sceneId);
       addEntity(entities, target, 'character', sceneId);
-      const evidence = clean(interaction.evidence, 500);
       const event = { type: clean(interaction.type, 80) || 'interact', actorId: actor, targetId: target, evidence };
       sceneEvents.push(event);
       addRelation({ type: 'acts_on', from: actor, to: target, action: event.type, evidence });
     }
 
     const changes = Array.isArray(scene.stateChanges) ? scene.stateChanges : [];
+    const participantKeys = new Set(participants.map(keyOf));
+    const propKeys = new Set(changes.filter(record).filter(change =>
+      clean(change.entityType, 40) === 'prop'
+      && sourceHasEvidence(scene, clean(change.evidence, 500), sourceText))
+      .map(change => keyOf(change.entityId)).filter(Boolean));
+    const addActionTarget = targetId => {
+      const target = clean(targetId, 160);
+      if (!target) return;
+      const kind = propKeys.has(keyOf(target)) ? 'prop'
+        : participantKeys.has(keyOf(target)) ? 'character' : 'entity';
+      addEntity(entities, target, kind, sceneId);
+    };
     for (const change of changes.filter(record)) {
       const entityId = clean(change.entityId, 160);
       const entityKind = clean(change.entityType, 40) || 'object';
       const actorId = clean(change.actorId, 160);
-      if (!entityId) continue;
+      const evidence = clean(change.evidence, 500);
+      if (!entityId || !sourceHasEvidence(scene, evidence, sourceText)) continue;
       addEntity(entities, entityId, entityKind, sceneId);
       if (actorId) {
         addEntity(entities, actorId, 'character', sceneId);
         addRelation({ type: 'changes_state_of', from: actorId, to: entityId,
           property: clean(change.property, 60), previousValue: change.previousValue ?? null,
           value: change.value ?? null, actionIntent: clean(change.actionIntent, 60),
-          evidence: clean(change.evidence, 500) });
+          evidence });
       }
       const propertyKey = entityKind + ':' + keyOf(entityId) + ':' + clean(change.property, 60);
       const previous = state.has(propertyKey) ? state.get(propertyKey) : null;
@@ -122,30 +157,123 @@ export function buildSceneWorldModel(scenes = [], options = {}) {
         expectedPreviousValue: previous, declaredPreviousValue: declaredPrevious });
     }
 
+    // Persistent snapshots keep the same prop identity and known state alive
+    // across scene cuts, even when the next scene contains no new state delta.
+    const snapshots = Array.isArray(scene.stateSnapshot) ? scene.stateSnapshot : [];
+    for (const snapshot of snapshots.filter(record)) {
+      const entityId = clean(snapshot.entityId, 160);
+      const entityKind = clean(snapshot.entityType, 40) || 'entity';
+      const property = clean(snapshot.property, 60);
+      if (!entityId || !property || snapshot.snapshot !== true) continue;
+      const stateKey = entityKind + ':' + keyOf(entityId) + ':' + property;
+      const value = snapshot.value ?? null;
+      if (!state.has(stateKey)) continue;
+      if (state.get(stateKey) !== value) {
+        sceneEvents.push({ type: 'state_snapshot_conflict', entityId, property,
+          currentValue: state.get(stateKey), snapshotValue: value });
+        continue;
+      }
+      addEntity(entities, entityId, entityKind, sceneId);
+      sceneEvents.push({ type: 'state_snapshot', entityId, property, value,
+        evidence: clean(snapshot.evidence, 500) });
+    }
+
+    // Add physical relations only when the event's exact evidence is present
+    // in this scene. Unverified event metadata never enters the world graph.
+    const rawPhysicsEvents = Array.isArray(scene.physicsEvents) ? scene.physicsEvents : [];
+    for (const physical of rawPhysicsEvents.filter(record)) {
+      const evidence = clean(physical.evidence, 500);
+      const evidenceGrounded = Boolean(evidence && (
+        sourceText.includes(evidence)
+        || (Array.isArray(scene.sourceEvents) ? scene.sourceEvents : []).some(item =>
+          typeof item === 'string' ? item.includes(evidence)
+            : record(item) && ['evidence', 'text', 'description'].some(field =>
+              typeof item[field] === 'string' && item[field].includes(evidence)))
+      ));
+      if (!evidenceGrounded) continue;
+      const type = clean(physical.type, 40).toLocaleLowerCase();
+      const entityId = clean(physical.entityId, 160);
+      const actorId = clean(physical.actorId, 160);
+      const targetId = clean(physical.targetId, 160);
+      const otherEntityId = clean(physical.otherEntityId, 160);
+      const supportEntityId = clean(physical.supportEntityId, 160);
+      const fromEntityId = clean(physical.fromEntityId, 160);
+      const toEntityId = clean(physical.toEntityId, 160);
+      const namedParticipants = [entityId, actorId, targetId, otherEntityId,
+        supportEntityId, fromEntityId, toEntityId].filter(Boolean);
+      if (!namedParticipants.every(participant => evidenceNamesEntity(evidence, participant))) {
+        sceneEvents.push({ type: 'unresolved_physics_event', actorId: actorId || null,
+          entityId: entityId || null, targetId: targetId || null,
+          evidence, reason: 'physics-participants-not-grounded-in-event-evidence' });
+        continue;
+      }
+      const entityKind = entityId && participantKeys.has(keyOf(entityId)) ? 'character' : 'prop';
+      if (entityId) addEntity(entities, entityId, entityKind, sceneId);
+      if (actorId) addEntity(entities, actorId, 'character', sceneId);
+      if (targetId) addActionTarget(targetId);
+      if (otherEntityId) addEntity(entities, otherEntityId,
+        participantKeys.has(keyOf(otherEntityId)) ? 'character' : 'entity', sceneId);
+      if (supportEntityId) addEntity(entities, supportEntityId, 'surface', sceneId);
+      if (fromEntityId) addEntity(entities, fromEntityId, 'character', sceneId);
+      if (toEntityId) addEntity(entities, toEntityId, 'character', sceneId);
+      const event = { type: 'physics_' + (type || 'event'), actorId: actorId || null,
+        entityId: entityId || null, targetId: targetId || null,
+        otherEntityId: otherEntityId || null, supportEntityId: supportEntityId || null,
+        fromEntityId: fromEntityId || null, toEntityId: toEntityId || null, evidence };
+      sceneEvents.push(event);
+      if (actorId && entityId) addRelation({ type: 'physical_action', from: actorId, to: entityId, action: type, evidence });
+      if (entityId && otherEntityId) addRelation({ type: 'physical_contact', from: entityId, to: otherEntityId, action: type, evidence });
+      if (entityId && supportEntityId) addRelation({ type: 'supported_by', from: entityId, to: supportEntityId, action: type, evidence });
+      if (fromEntityId && toEntityId && entityId) {
+        addRelation({ type: 'transfers_ownership', from: fromEntityId, to: toEntityId,
+          action: type, property: 'holder', value: entityId, evidence });
+      }
+    }
+
     const timeline = scene.actionTimeline;
-    for (const phase of (Array.isArray(timeline?.phases) ? timeline.phases : [])) {
+    const timelineReport = validateCharacterActionTimeline(scene);
+    for (const phase of (timelineReport.passed && Array.isArray(timeline?.phases) ? timeline.phases : [])) {
       if (!record(phase)) continue;
       const actor = clean(phase.actorId, 160);
       const target = clean(phase.targetId, 160);
+      const evidence = clean(phase.evidence, 500);
+      const groundedTarget = target && evidenceNamesEntity(evidence, target) ? target : '';
       if (actor) addEntity(entities, actor, 'character', sceneId);
-      if (target) addEntity(entities, target, 'character', sceneId);
+      if (groundedTarget) addActionTarget(groundedTarget);
       const event = { type: clean(phase.phase, 40) || 'action', actorId: actor || null,
-        targetId: target || null, start: phase.start ?? null, end: phase.end ?? null,
-        description: clean(phase.description, 700), evidence: clean(phase.evidence, 500) };
+        targetId: groundedTarget || null, start: phase.start ?? null, end: phase.end ?? null,
+        description: clean(phase.description, 700), evidence };
       sceneEvents.push(event);
-      if (actor && target) addRelation({ type: 'acts_on', from: actor, to: target,
-        action: event.type, evidence: event.evidence });
+      if (actor && target && evidenceNamesEntity(event.evidence, actor)
+          && evidenceNamesEntity(event.evidence, target)) {
+        addRelation({ type: 'acts_on', from: actor, to: target,
+          action: event.type, evidence: event.evidence });
+      }
       for (const step of (Array.isArray(phase.steps) ? phase.steps : [])) {
         if (!record(step)) continue;
         const stepActor = clean(step.actorId || actor, 160);
         const stepTarget = clean(step.targetId, 160);
-        if (stepActor) addEntity(entities, stepActor, 'character', sceneId);
-        if (stepTarget) addEntity(entities, stepTarget, 'character', sceneId);
-        sceneEvents.push({ type: clean(step.intent, 80) || 'action', actorId: stepActor || null,
+        const stepEvidence = clean(step.evidence, 300);
+        // Timeline validation checks that evidence exists somewhere in the scene,
+        // but a valid phrase about a different actor must not authorize this edge.
+        // Ground each substep's participants against that substep's own evidence.
+        const stepGrounded = stepActor && stepEvidence
+          && sourceHasEvidence(scene, stepEvidence, sourceText)
+          && evidenceNamesEntity(stepEvidence, stepActor)
+          && (!stepTarget || evidenceNamesEntity(stepEvidence, stepTarget));
+        if (!stepGrounded) {
+          sceneEvents.push({ type: 'unresolved_action_step', actorId: stepActor || null,
+            targetId: stepTarget || null, start: step.start ?? null, end: step.end ?? null,
+            evidence: stepEvidence, reason: 'step-participants-not-grounded-in-step-evidence' });
+          continue;
+        }
+        addEntity(entities, stepActor, 'character', sceneId);
+        if (stepTarget) addActionTarget(stepTarget);
+        sceneEvents.push({ type: clean(step.intent, 80) || 'action', actorId: stepActor,
           targetId: stepTarget || null, start: step.start ?? null, end: step.end ?? null,
-          description: clean(step.description, 500), evidence: clean(step.evidence, 300) });
-        if (stepActor && stepTarget) addRelation({ type: 'acts_on', from: stepActor, to: stepTarget,
-          action: clean(step.intent, 80), evidence: clean(step.evidence, 300) });
+          description: clean(step.description, 500), evidence: stepEvidence });
+        if (stepTarget) addRelation({ type: 'acts_on', from: stepActor, to: stepTarget,
+          action: clean(step.intent, 80), evidence: stepEvidence });
       }
     }
 

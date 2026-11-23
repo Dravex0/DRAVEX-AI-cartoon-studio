@@ -3,7 +3,7 @@ const ACTION_PATTERNS = [
   { action: 'wave', patterns: [/машет(?: рукой)?|помахива|приветственно машет/, /\bwave\w*|\bwaves? hello|\bgreet\w* with a wave/, /махає(?: рукою)?|привітально махає/, /saluda con la mano|\bagita\w* la mano/] },
   { action: 'jump', patterns: [/прыга|подпрыг|перепрыг|скачет/, /\bjump\w*|leap\w*|bounce\w*/, /стриба|підстрибу|перестрибу/, /salt\w*|brinca\w*/] },
   { action: 'run', patterns: [/беж|побеж|убега|мчится|гонится/, /\brun\w*|sprint\w*|chase\w*|runn?ing\b/, /біж|тіка|мчить|пересліду/, /corr\w*|persigue\w*|huye\w*/] },
-  { action: 'dance', patterns: [/танцу|пляш|ритмично двига|кружится в танце/, /\bdanc\w*|twirl\w*|groove\w*/, /танцю|ритмічно руха|крутиться в танці/, /bail\w*|gira bailando/] },
+  { action: 'dance', patterns: [/танцу|пляш(?!к)\w*|ритмично двига|кружится в танце/, /\bdanc\w*|twirl\w*|groove\w*/, /танцю|ритмічно руха|крутиться в танці/, /bail\w*|gira bailando/] },
   { action: 'walk', patterns: [/ид[её]т|шагает|прогулива|подходит|отходит/, /\bwalk\w*|stroll\w*|approach\w*|step\s+(?:forward|back)/, /йде|крокує|підходить|відходить/, /camin\w*|se acerc\w*|se aleja/] },
   { action: 'float', patterns: [/парит|взлет|летит|плыв[её]т по воздуху/, /\bfloat\w*|fly\w*|soar\w*|hover\w*/, /ширя|зліта|летить|пливе в повітрі/, /vuela|flot\w*|planea/] },
   { action: 'surprised', patterns: [/удивл|изумл|ошараш|вскрикива|широко раскрывает глаза/, /\bsurpris\w*|astonish\w*|gasp\w*|wide[- ]eyed/, /здив|враж|ошелеш|широко розплющує очі/, /sorprend\w*|asombr\w*|abre mucho los ojos/] },
@@ -72,7 +72,7 @@ const SEMANTIC_ACTIONS = [
     /choque.{0,35}(?:energ|poder|magia)|energ\w*.{0,35}choque/i
   ] },
   { intent: 'defend', motionCue: 'turn', patterns: [
-    /\b(?:blocks?|parries|deflects?|raises? a shield|protects?)\b|\bshield\b/i,
+    /\b(?:blocks?|parries|deflects?|raises? a shield|protects?)\b/i,
     /блокиру\w*|отража\w* удар|поднима\w* щит|защища\w*/i,
     /блоку\w*|відбива\w* удар|підніма\w* щит|захища\w*/i,
     /bloque\w*|protege\w*|escudo/i
@@ -82,6 +82,12 @@ const SEMANTIC_ACTIONS = [
     /уклоня\w*|уворачива\w*|отскакива\w*/i,
     /ухиля\w*|відскаку\w*|пригина\w*/i,
     /esquiva\w*|evita el golpe/i
+  ] },
+  { intent: 'chase', motionCue: 'run', patterns: [
+    /\b(?:chases?|pursues?|follows?|runs? after)\b/i,
+    /преследу[\p{L}]*|гонится\s+за|догоня[\p{L}]*/iu,
+    /пересліду[\p{L}]*|женеться\s+за|наздоганя[\p{L}]*/iu,
+    /persigue|va\s+tras|persigue a/i
   ] },
   { intent: 'attack', motionCue: 'run', patterns: [
     /\b(?:attacks?|strikes?|slashes?|swings? (?:a|the) (?:sword|blade)|fires? at)\b/i,
@@ -93,7 +99,7 @@ const SEMANTIC_ACTIONS = [
     /\b(?:awakens?|powers? up|energy surges?|aura ignites?|eyes? (?:begin to )?glow)\b/i,
     /пробужда\w*|энергия вспыхива\w*|сила пробужда\w*|глаза загора\w*/i,
     /пробуджу\w*|енергія спалаху\w*|сила пробуджу\w*|очі спалахую\w*/i,
-    /despierta\w*|energía despierta|aura se enciende/i
+    /despierta\w*.{0,30}(?:poder|energ|aura)|energía despierta|aura se enciende/i
   ] },
   { intent: 'reveal', motionCue: 'surprised', patterns: [
     /\b(?:appears?|emerges?|materializes?|steps out of the shadows|is revealed)\b/i,
@@ -217,8 +223,8 @@ const SEMANTIC_ACTIONS = [
   ] },
   { intent: 'throw', motionCue: 'run', patterns: [
     /\b(?:throws?|tosses?|hurls?|launches? .* into)\b/i,
-    /броса\w*|кида\w*|швыря\w*|мета\w*/i,
-    /кида\w*|жбурля\w*|мета\w*/i,
+    /броса\w*|(?<!про)кида\w*|швыря\w*|мета\w*/i,
+    /(?<!про)кида\w*|жбурля\w*|мета\w*/i,
     /lanza\w*|arroja\w*/
   ] },
   { intent: 'catch', motionCue: 'jump', patterns: [
@@ -284,7 +290,7 @@ const SEMANTIC_ACTIONS = [
   { intent: 'eat_drink', motionCue: 'talk', patterns: [
     /\b(?:eats?|bites?|chews?|drinks?|sips?)\b/i,
     /ест|кусает|ж[уё]в[её]т|пь[её]т|отпивает/iu,
-    /їсть|кусає|жує|п'є|відпиває/iu,
+    /їсть|кусає|жує|п['’ʼ]є|відпиває/iu,
     /come\w*|bebe\w*|mastica\w*/
   ] },
   { intent: 'sleep_wake', motionCue: 'idle', patterns: [

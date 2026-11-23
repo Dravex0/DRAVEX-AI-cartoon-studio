@@ -438,3 +438,17 @@ test('does not let malformed or unsupported timeline cues override the scene act
       steps: [{ start: 0, end: 1, intent: 'unknown', motionCue: 'unregistered-motion' }] }] }
   }, 0.5), 'walk');
 });
+
+
+test('classifies explicit chases as a distinct semantic event in English, Russian and Ukrainian', async () => {
+  const { inferSceneActionIntent } = await import('../src/scene-action.js');
+  for (const story of [
+    'Foxy chases Bird through the forest.',
+    'Фокси гонится за Птицей по лесу.',
+    'Фоксі переслідує Птаха лісом.'
+  ]) {
+    const result = inferSceneActionIntent(story);
+    assert.equal(result.intent, 'chase', story);
+    assert.equal(result.motionCue, 'run', story);
+  }
+});

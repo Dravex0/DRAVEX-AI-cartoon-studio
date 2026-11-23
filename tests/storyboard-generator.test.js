@@ -165,7 +165,7 @@ test('creates a minimal source-grounded action timeline for an explicit directed
       evidence: 'Bird guides Foxy home.'
     }]
   });
-  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false, JSON.stringify(scene.productionReadiness.issues));
   assert.match(scene.motionGenerationPrompt, /Character action timeline/);
   assert.match(scene.motionGenerationPrompt, /actor: Bird/);
 });
@@ -206,6 +206,11 @@ test('semantic scene intent reaches motion prompt and action timeline for team m
   assert.equal(scene.actionTimeline.phases[0].actorId, 'Arin');
   assert.equal(scene.actionTimeline.phases[0].targetId, 'Elira');
   assert.match(scene.actionTimeline.phases[0].description, /combine their powers/);
+  const synchronizedSteps = scene.actionTimeline.phases[0].steps.filter(step => step.intent === 'team_magic');
+  assert.deepEqual(synchronizedSteps.map(step => step.actorId), ['Arin', 'Elira']);
+  assert.deepEqual(synchronizedSteps.map(step => step.targetId), ['Elira', 'Arin']);
+  assert.equal(synchronizedSteps[0].start, synchronizedSteps[1].start);
+  assert.equal(synchronizedSteps[0].end, synchronizedSteps[1].end);
   assert.match(scene.motionGenerationPrompt, /team_magic/);
   assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
 });
@@ -277,6 +282,7 @@ test('assigns a shouted command to the speaker and its target, not the speaker',
   const scene = result.scenes[0];
   const command = scene.actionSequence.find(event => event.intent === 'shout_command');
   const step = scene.actionTimeline.phases[0].steps.find(item => item.intent === 'shout_command');
+  assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false, JSON.stringify(scene.productionReadiness.issues));
   assert.equal(command.actorId, 'Officer');
   assert.equal(command.targetId, 'Robber');
   assert.equal(command.interactionType, 'command');
@@ -284,4 +290,53 @@ test('assigns a shouted command to the speaker and its target, not the speaker',
   assert.equal(step.targetId, 'Robber');
   assert.match(scene.motionGenerationPrompt, /actor: Officer; target: Robber/);
   assert.equal(scene.productionReadiness.issues.some(issue => issue.code === 'invalid-action-timeline'), false);
+});
+
+
+test('wires an explicitly named chase into the action timeline and ordered motion steps', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — a small orange fox.\nBird — a small yellow bird.\n\nScene 1: Pursuit\nFoxy chases Bird through the forest.',
+    'en',
+    'Foxy'
+  );
+  const scene = result.scenes[0];
+  assert.deepEqual(scene.characters, ['Foxy', 'Bird']);
+  assert.equal(scene.interaction.type, 'chase');
+  assert.equal(scene.interaction.actorId, 'Foxy');
+  assert.equal(scene.interaction.targetId, 'Bird');
+  assert.equal(scene.semanticActionIntent.intent, 'chase');
+  assert.equal(scene.actionTimeline.phases[0].actorId, 'Foxy');
+  assert.equal(scene.actionTimeline.phases[0].targetId, 'Bird');
+  assert.equal(scene.actionTimeline.phases[0].steps[0].targetId, 'Bird');
+  assert.match(scene.motionGenerationPrompt, /chase/i);
+});
+
+
+test('attaches source-grounded scene understanding to each production scene', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — an orange fox.\nBird — a yellow bird.\n\nScene 1: Discovery\nFoxy sees a key, hears a sound, and picks up the key.',
+    'en',
+    'Foxy'
+  );
+  const scene = result.scenes[0];
+  assert.equal(scene.sceneUnderstanding.schemaVersion, 1);
+  assert.ok(scene.sceneUnderstanding.entities.some(item => item.id === 'Foxy'));
+  assert.ok(scene.sceneUnderstanding.entities.some(item => item.id === 'key'));
+  assert.ok(scene.sceneUnderstanding.perception.some(item => item.type === 'visual_attention'));
+  assert.ok(scene.sceneUnderstanding.perception.some(item => item.type === 'auditory_attention'));
+  assert.match(scene.motionGenerationPrompt, /Source-grounded scene understanding/);
+  assert.match(scene.motionGenerationPrompt, /Do not invent visual observations/);
+});
+
+test('storyboard carries a persistent object snapshot into the next scene', () => {
+  const result = buildStoryboardFromText(
+    'Characters:\nFoxy — a small orange fox.\n\nScene 1: The key\nFoxy picks up the silver key.\n\nScene 2: The gate\nFoxy walks through the ancient gate.',
+    'en',
+    'Foxy'
+  );
+  const firstKeyScene = result.scenes.findIndex(scene => scene.stateSnapshot.some(item =>
+    item.entityId === 'silver key' && item.property === 'holder' && item.value === 'Foxy'));
+  assert.ok(firstKeyScene >= 0);
+  assert.ok(result.scenes.slice(firstKeyScene).every(scene => scene.stateSnapshot.some(item =>
+    item.entityId === 'silver key' && item.property === 'holder' && item.value === 'Foxy')));
 });

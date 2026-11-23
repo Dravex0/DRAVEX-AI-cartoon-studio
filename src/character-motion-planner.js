@@ -57,9 +57,13 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
   const phases = [];
   const skipped = [];
 
+  // Process every actor's action in scene-time order, not generator array order.
+  // Otherwise a pursuer can plan against a target's stale pre-movement position.
   const actionSteps = scene.actionTimeline.phases.flatMap(phase =>
     Array.isArray(phase.steps) ? phase.steps.map(step => ({ ...step, phase: 'action' })) : [phase]
-  );
+  ).map((source, index) => ({ source, index }))
+    .sort((a, b) => a.source.start - b.source.start || a.source.end - b.source.end || a.index - b.index)
+    .map(item => item.source);
   for (const source of actionSteps) {
     const actorId = clean(source.actorId);
     const actorKey = key(actorId);
@@ -76,7 +80,50 @@ export function planCharacterMotionFromActionTimeline(scene = {}, layers = []) {
     let to = { ...from };
     let plan = null;
 
-    if (intent.intent === 'dodge' && (direction === 'left' || direction === 'right')) {
+    if (intent.intent === 'chase' && source.targetId && layerById.has(key(source.targetId))) {
+      // A chase is an ongoing pursuit, not an assumed collision. Accelerate first,
+      // then move toward the explicitly named target while preserving a visible gap.
+      const target = poses.get(key(source.targetId)) || basePose(layerById.get(key(source.targetId)));
+      const dx = target.x - from.x, dy = target.y - from.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > 0.08) {
+        const travel = Math.min(0.3, distance - 0.06);
+        const ratio = travel / distance;
+        const midpoint = source.start + (source.end - source.start) * 0.22;
+        const accelerated = { ...from, scale: clamp(from.scale * 1.035, 0.05, 4) };
+        const pursuit = {
+          ...accelerated,
+          x: clamp(from.x + dx * ratio, 0.05, 0.95),
+          y: clamp(from.y + dy * ratio, 0.05, 0.95)
+        };
+        plan = [
+          phase(actorId, source.start, midpoint, from, accelerated, source, ' (accelerate into the explicitly described chase)', 'ease-out'),
+          phase(actorId, midpoint, source.end, accelerated, pursuit, source, ' (continue pursuit toward the named target; no contact is implied)', 'ease-in-out')
+        ];
+        to = pursuit;
+      }
+    } else if (intent.intent === 'attack' && source.targetId && layerById.has(key(source.targetId))) {
+      // A named target gives us a grounded direction. Animate a short lunge and
+      // recovery, but do not claim contact or invent a hit reaction.
+      const target = poses.get(key(source.targetId)) || basePose(layerById.get(key(source.targetId)));
+      const dx = target.x - from.x, dy = target.y - from.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > 0.08) {
+        const travel = Math.min(0.1, distance * 0.35);
+        const midpoint = source.start + (source.end - source.start) * 0.62;
+        const lunge = {
+          ...from,
+          x: clamp(from.x + dx / distance * travel, 0.05, 0.95),
+          y: clamp(from.y + dy / distance * travel, 0.05, 0.95),
+          scale: clamp(from.scale * 1.025, 0.05, 4)
+        };
+        plan = [
+          phase(actorId, source.start, midpoint, from, lunge, source, ' (lunge toward the explicitly named target; contact is not asserted)', 'ease-out'),
+          phase(actorId, midpoint, source.end, lunge, from, source, ' (recover after the lunge)', 'ease-in')
+        ];
+        to = from;
+      }
+    } else if (intent.intent === 'dodge' && (direction === 'left' || direction === 'right')) {
       const midpoint = (source.start + source.end) / 2;
       const offset = direction === 'left' ? -0.16 : 0.16;
       const evade = {

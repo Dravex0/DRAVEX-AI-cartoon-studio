@@ -131,3 +131,29 @@ export function inferStoryboardStateChanges(scenes = [], language = 'en', fallba
     return changes;
   });
 }
+
+
+/**
+ * Return both per-scene state deltas and the persistent world-state snapshot
+ * after each scene. Snapshots preserve object possession/open state across cuts.
+ */
+export function buildStoryboardStateSnapshots(scenes = [], language = 'en', fallbackCharacter = '') {
+  const list = Array.isArray(scenes) ? scenes : [];
+  const changesByScene = inferStoryboardStateChanges(list, language, fallbackCharacter);
+  const known = new Map();
+  const snapshots = changesByScene.map(changes => {
+    for (const change of Array.isArray(changes) ? changes : []) {
+      const key = [change.entityType, change.entityId, change.property]
+        .map(value => String(value ?? '').trim().toLocaleLowerCase()).join(':');
+      if (!key) continue;
+      known.set(key, {
+        ...change,
+        previousValue: change.value ?? null,
+        value: change.value ?? null,
+        snapshot: true
+      });
+    }
+    return [...known.values()].map(item => ({ ...item }));
+  });
+  return { changesByScene, snapshots };
+}

@@ -6,10 +6,12 @@ import { parseStoryBrief, formatProductionDirectives } from './story-brief.js';
 import { directStoryEvent } from './story-event-director.js';
 import { inferCharacterInteractions } from './character-interaction.js';
 import { inferSceneCausalLinks } from './scene-causality.js';
-import { inferStoryboardStateChanges } from './scene-state-changes.js';
+import { buildStoryboardStateSnapshots } from './scene-state-changes.js';
 import { buildStoryEventChain } from './story-event-chain.js';
 import { buildProductionScene } from './scene-production.js';
+import { classifyPromptApproach, applyPromptApproach } from './prompt-approach.js';
 import { detectSceneAction, inferSceneActionIntent, extractSceneActionSequence } from './scene-action.js';
+import { understandScenePrompt } from './scene-understanding.js';
 
 export const STORYBOARD_BEAT_COUNT = 5;
 
@@ -109,6 +111,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     : distributeStoryDetails(sentences.length ? sentences : [FALLBACK[locale]], beatCount);
   const beats = selectBeats(locale, beatCount);
   const directiveText = formatProductionDirectives(brief.directives);
+  const overallPromptApproach = classifyPromptApproach(source);
 
   const scenes = beats.map((beat, index) => {
     const explicitScene = explicitScenes[index] || null;
@@ -141,26 +144,37 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
   });
 
   const causalLinks = inferSceneCausalLinks(scenes, locale);
-  const stateChanges = inferStoryboardStateChanges(scenes, locale, subject);
   const explicitSubject = !explicitScenes.length && String(character ?? '').trim() ? subject : '';
   const knownCharacters = [...new Set([explicitSubject, ...brief.characters].filter(Boolean))];
   const characterMention = (name, sourceText) => {
     const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, character => `\\${character}`);
     return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(sourceText);
   };
-  scenes.forEach((scene, index) => {
-    scene.causalLink = causalLinks[index];
-    scene.stateChanges = stateChanges[index];
-    scene.characters = [...new Set([
+  const sceneCast = scene => [...new Set([
       ...(explicitSubject ? [explicitSubject] : []),
       ...knownCharacters.filter(name => name !== explicitSubject && (scene.storyDetail
         ? characterMention(name, scene.storyDetail)
         : name.toLocaleLowerCase() === subject.toLocaleLowerCase()))
     ])];
+  const stateModel = buildStoryboardStateSnapshots(
+    scenes.map(scene => ({ ...scene, characters: sceneCast(scene) })), locale, subject
+  );
+  const stateChanges = stateModel.changesByScene;
+  scenes.forEach((scene, index) => {
+    scene.causalLink = causalLinks[index];
+    scene.stateChanges = stateChanges[index];
+    scene.stateSnapshot = stateModel.snapshots[index] || [];
+    scene.characters = sceneCast(scene);
     // Keep interaction inference source-grounded and limited to characters assigned to this scene.
     scene.interactions = scene.storyDetail
       ? inferCharacterInteractions(scene.storyDetail, scene.characters, locale)
       : [];
+    // Interpret only entities, perception cues, and events grounded in this scene's own source text.
+    scene.sceneUnderstanding = understandScenePrompt(scene.storyDetail, {
+      characters: scene.characters,
+      interactions: scene.interactions,
+      locale
+    });
     // Semantic story intent is separate from renderer movement presets and is now
     // carried into the actual motion prompt and validated action timeline.
     const semanticIntent = inferSceneActionIntent(scene.storyDetail);
@@ -189,6 +203,10 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
       ? `Follow this exact source-grounded action order without skipping or rearranging steps: ${actionSequence.map((event, eventIndex) => `${eventIndex + 1}. ${event.actorId || 'unresolved actor'}${event.targetId ? ` → ${event.targetId}` : ''}: ${event.intent} (${event.evidence})`).join('; ')}. Preserve each explicitly identified actor and target; do not transfer a command or action to another character.`
       : '';
     scene.motionPrompt = [scene.visibleAction, semanticMotionInstruction, orderedActionInstruction].filter(Boolean).join('. ');
+    // Route each scene independently: a mixed story may need dialogue in one beat
+    // and chase/combat choreography in another. The classifier never changes source events.
+    scene.promptApproach = classifyPromptApproach(scene.storyDetail || source);
+    Object.assign(scene, applyPromptApproach(scene, scene.promptApproach));
     // Add one action phase only when source text supports a movement, semantic event,
     // or directed interaction. Never fabricate setup/reaction/aftermath phases.
     const sourceAction = detectSceneAction(scene.storyDetail);
@@ -223,20 +241,33 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
               const weights = actionSequence.map(event => Math.max(0.25, Math.min(3, Number(event.durationWeight) || 1)));
               const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
               let elapsedWeight = 0;
-              return actionSequence.map((event, eventIndex) => {
+              return actionSequence.flatMap((event, eventIndex) => {
                 const start = elapsedWeight / totalWeight;
                 elapsedWeight += weights[eventIndex];
                 const end = elapsedWeight / totalWeight;
-                return {
+                const actorId = event.actorId || actionActor;
+                const primary = {
                   intent: event.intent,
                   motionCue: event.motionCue,
                   start,
                   end,
-                  actorId: event.actorId || actionActor,
-                  targetId: event.targetId || null,
+                  actorId,
+                  targetId: event.targetId || (semanticNeedsPair ? actionTarget : null),
                   description: `Perform the ${event.intent} action: ${event.evidence}`,
                   evidence: event.evidence
                 };
+                // Team actions are synchronized: both explicitly named participants
+                // receive their own action track over the same interval.
+                if (semanticNeedsPair && actionTarget
+                    && actorId.toLocaleLowerCase() !== actionTarget.toLocaleLowerCase()) {
+                  return [primary, {
+                    ...primary,
+                    actorId: actionTarget,
+                    targetId: actorId,
+                    description: `Perform the synchronized ${event.intent} action with ${actorId}: ${event.evidence}`
+                  }];
+                }
+                return [primary];
               });
             })()
           } : {})
@@ -259,6 +290,7 @@ export function buildStoryboardFromText(idea, lang = 'ru', character = '') {
     scenes: productionScenes,
     eventChain,
     brief,
+    promptApproach: overallPromptApproach,
     requestedSceneCount: beatCount
   };
 }

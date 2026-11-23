@@ -60,7 +60,7 @@ test('maps jump action and preserves neutral poses outside its scene-time interv
 });
 
 test('does not guess a rig preset for unsupported semantic actions', () => {
-  const result = createCharacterRigTimelineFromActionTimeline(makeScene('opens a mysterious chest'), [rig()]);
+  const result = createCharacterRigTimelineFromActionTimeline(makeScene('contemplates a mysterious chest'), [rig()]);
   assert.equal(result.status, 'no-supported-actions');
   assert.equal(result.timeline, null);
   assert.equal(result.skipped[0].reason, 'unsupported-or-ambiguous-action');
@@ -389,4 +389,64 @@ test('does not resolve an ambiguous prop target from multiple unmatched position
   const result = createCharacterRigTimelineFromActionTimeline(candidate, [rig()]);
   assert.equal(result.status, 'generated');
   assert.equal(Object.hasOwn(result.mappedActions[0], 'targetedReach'), false);
+});
+
+
+test('maps 17 additional semantic scene actions to dedicated articulated rig presets', () => {
+  const cases = [
+    ['chases Bird through the forest', 'run'],
+    ['rescues Bird from the river', 'run'],
+    ['climbs the ladder', 'climb'],
+    ['swims across the river', 'swim'],
+    ['crawls under the table', 'crawl'],
+    ['falls from the platform', 'fall'],
+    ['lands on the ground', 'land'],
+    ['opens the door', 'open'],
+    ['closes the door', 'close'],
+    ['drinks from the bottle', 'eat_drink'],
+    ['wakes up from sleep', 'sleep_wake'],
+    ['draws a map', 'write_draw'],
+    ['powers up as energy surges around the hands', 'power_up'],
+    ['combines powers with Bird', 'team_magic'],
+    ['their energy collides in a powerful clash', 'energy_clash'],
+    ['restrains Bird', 'restrain'],
+    ['appears from the shadows', 'reveal']
+  ];
+  for (const [description, expectedPreset] of cases) {
+    const result = createCharacterRigTimelineFromActionTimeline(makeScene(description), [rig()]);
+    assert.equal(result.status, 'generated', description);
+    assert.equal(result.mappedActions[0].preset, expectedPreset, description);
+    assert.ok(sampleCharacterRigTimeline(result.timeline, 0.5).Foxy, description);
+  }
+});
+
+test('plays synchronized team magic on both named character rigs at the same scene time', () => {
+  const evidence = 'Mira and Noah combine their powers.';
+  const scene = {
+    characters: ['Mira', 'Noah'],
+    characterCastProvided: true,
+    storyDetail: evidence,
+    actionTimeline: {
+      schemaVersion: 1,
+      phases: [{
+        phase: 'action', start: 0, end: 1, actorId: 'Mira', targetId: 'Noah',
+        description: evidence, evidence,
+        steps: [
+          { intent: 'team_magic', motionCue: 'magic', start: 0.2, end: 0.8,
+            actorId: 'Mira', targetId: 'Noah', description: 'Mira channels energy with Noah.', evidence },
+          { intent: 'team_magic', motionCue: 'magic', start: 0.2, end: 0.8,
+            actorId: 'Noah', targetId: 'Mira', description: 'Noah channels energy with Mira.', evidence }
+        ]
+      }]
+    }
+  };
+  const result = createCharacterRigTimelineFromActionTimeline(scene, [rig('Mira'), rig('Noah')]);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 2);
+  assert.deepEqual(result.mappedActions.map(item => item.actorId).sort(), ['Mira', 'Noah']);
+  const synchronized = sampleCharacterRigTimeline(result.timeline, 0.5);
+  assert.ok(synchronized.Mira);
+  assert.ok(synchronized.Noah);
+  assert.ok(Math.abs(synchronized.Mira.leftArm.rotation) > 0.1);
+  assert.ok(Math.abs(synchronized.Noah.leftArm.rotation) > 0.1);
 });

@@ -34,6 +34,16 @@ function issue(code, phase, message) {
   return { code, phase: phase || null, severity: 'error', message };
 }
 
+function evidenceNamesEntity(evidence, entityId) {
+  const value = clean(evidence, 500).toLocaleLowerCase();
+  const name = clean(entityId, 120).toLocaleLowerCase();
+  if (!value || !name) return false;
+  if (value.includes(name)) return true;
+  const tokens = name.split(/[\s_-]+/u).filter(token =>
+    token.length >= 3 && !['the', 'and', 'for', 'with', 'una', 'uno', 'los', 'las'].includes(token));
+  return tokens.some(token => value.includes(token));
+}
+
 export function normalizeCharacterActionTimeline(rawTimeline) {
   if (rawTimeline == null) return null;
   if (!isRecord(rawTimeline) || !Array.isArray(rawTimeline.phases)) {
@@ -101,7 +111,7 @@ export function validateCharacterActionTimeline(scene = {}) {
   const castWasExplicit = typeof scene.characterCastProvided === 'boolean'
     ? scene.characterCastProvided
     : Array.isArray(scene.characters);
-  const evidenceSources = [scene.storyDetail, ...(Array.isArray(scene.sourceEvents) ? scene.sourceEvents : [])]
+  const evidenceSources = [scene.storyDetail, scene.visibleAction, ...(Array.isArray(scene.sourceEvents) ? scene.sourceEvents : [])]
     .map(value => clean(value, 2_000)).filter(Boolean);
   const seen = new Set();
   let previousRank = -1;
@@ -161,7 +171,7 @@ export function validateCharacterActionTimeline(scene = {}) {
     if (!Array.isArray(action.steps) || action.steps.length === 0 || action.steps.length > 24) {
       issues.push(issue('action-steps-shape-invalid', 'action', 'Action substeps must contain between one and 24 ordered steps.'));
     } else {
-      let previousStepEnd = action.start;
+      const previousStepEndByActor = new Map();
       action.steps.forEach((step, index) => {
         if (!step) {
           issues.push(issue('action-step-shape-invalid', 'action', `Action substep ${index + 1} must be an object.`));
@@ -170,13 +180,19 @@ export function validateCharacterActionTimeline(scene = {}) {
         if (!step.intent || !step.motionCue || !step.description || !step.actorId || !step.evidence) {
           issues.push(issue('action-step-fields-missing', 'action', `Action substep ${index + 1} needs intent, motion cue, actor, description, and source evidence.`));
         }
-        if (step.start === null || step.end === null || step.start < action.start || step.end > action.end || step.start >= step.end || step.start < previousStepEnd) {
-          issues.push(issue('action-step-timing-invalid', 'action', `Action substep ${index + 1} must have ordered timing inside the central action phase.`));
+        const actorKey = clean(step.actorId, 120).toLocaleLowerCase();
+        const previousActorEnd = previousStepEndByActor.get(actorKey) ?? action.start;
+        if (step.start === null || step.end === null || step.start < action.start || step.end > action.end || step.start >= step.end || step.start < previousActorEnd) {
+          issues.push(issue('action-step-timing-invalid', 'action', `Action substep ${index + 1} must have ordered timing for its actor inside the central action phase.`));
         } else {
-          previousStepEnd = step.end;
+          previousStepEndByActor.set(actorKey, Math.max(previousActorEnd, step.end));
         }
         if (!evidenceSources.some(source => source.includes(step.evidence))) {
           issues.push(issue('action-step-evidence-ungrounded', 'action', `Action substep ${index + 1} evidence must exactly match locked story evidence.`));
+        }
+        if (step.evidence && step.targetId
+            && !evidenceSources.some(source => evidenceNamesEntity(source, step.targetId))) {
+          issues.push(issue('action-step-target-evidence-mismatch', 'action', `Action substep ${index + 1} target must be named in locked scene evidence.`));
         }
         if (step.actorId && castWasExplicit && !cast.has(step.actorId.toLocaleLowerCase())) {
           issues.push(issue('action-step-actor-not-in-cast', 'action', `Action substep ${index + 1} actor must belong to the scene cast.`));
