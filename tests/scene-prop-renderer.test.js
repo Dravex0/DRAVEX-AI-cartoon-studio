@@ -504,3 +504,27 @@ test('fades object visibility only from explicitly authored boolean state and po
   assert.ok(middle.opacity > 0 && middle.opacity < 1);
   assert.equal(after.opacity, 1);
 });
+
+test('animates authored prop rotation and scale changes without guessing their anchor', () => {
+  const rotating = {
+    stateChanges: [{
+      entityType: 'prop', entityId: 'wooden box', property: 'rotation',
+      previousValue: 0, value: Math.PI / 2, position: { x: 0.3, y: 0.4 },
+      evidence: 'The wooden box rotates.'
+    }, {
+      entityType: 'prop', entityId: 'wooden box', property: 'scale',
+      previousValue: 1, value: 2, position: { x: 0.3, y: 0.4 },
+      evidence: 'The wooden box grows.'
+    }]
+  };
+  const middle = buildScenePropRenderPlan(rotating, [], 0.66)[0];
+  const end = buildScenePropRenderPlan(rotating, [], 1)[0];
+  assert.ok(middle.rotation > 0 && middle.rotation < Math.PI / 2);
+  assert.ok(middle.scale > 1 && middle.scale < 2);
+  assert.equal(end.rotation, Math.PI / 2);
+  assert.equal(end.scale, 2);
+  const unanchored = buildScenePropRenderPlan({
+    stateChanges: [{ ...rotating.stateChanges[0], position: undefined }]
+  }, [], 1);
+  assert.deepEqual(unanchored, []);
+});
