@@ -5,7 +5,7 @@ import { buildSceneWorldModel } from '../src/scene-world-model.js';
 test('builds the same directed interaction model for people, animals and robots', () => {
   const model = buildSceneWorldModel([
     { id: 's1', characters: ['Maya', 'Noah'], storyDetail: 'Maya picks up the phone and gives Noah the phone.',
-      interaction: { type: 'give', actorId: 'Maya', targetId: 'Noah', evidence: 'Maya gives Noah a phone' },
+      interaction: { type: 'give', actorId: 'Maya', targetId: 'Noah', evidence: 'Maya picks up the phone and gives Noah the phone.' },
       stateChanges: [{ entityType: 'prop', entityId: 'phone', property: 'holder', previousValue: null,
         value: 'Maya', actorId: 'Maya', evidence: 'Maya picks up the phone', actionIntent: 'pick_up' }] },
     { id: 's2', characters: ['Noah', 'Rex the dog'], storyDetail: 'Noah gives Rex the ball.',
