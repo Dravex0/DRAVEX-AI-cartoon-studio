@@ -63,7 +63,7 @@ const STRATEGIES = Object.freeze({
 
 const PATTERNS = Object.freeze({
   combat: /\b(fight|fighting|battle|attack|attacks|punch|punches|kick|kicks|duel|clash| удар|дер[её]тся|драка|бой|сражени|атакует|бь[её]т|ударяет|уклоняется|бій|б'ється|атакує|сутичк)\b/iu,
-  chase: /\b(chase|chases|chasing|pursue|pursuit|escape|escapes|run away|runs after|гонк|погон|убегает|преследует|догоняет|втікає|переслідує|наздоганяє)\b/iu,
+  chase: /\b(chase|chases|chasing|pursue|pursuit|escape|escapes|run away|runs away|runs after|гонк|погон|убегает|преследует|догоняет|втікає|переслідує|наздоганяє)\b/iu,
   dialogue: /\b(says|said|asks|replies|answers|whispers|shouts|conversation|talks|speaks|говорит|сказал|спрашивает|отвечает|шепчет|кричит|разговор|диалог|каже|запитує|відповідає|розмов)\b/iu,
   dance: /\b(dance|dances|dancing|dancer|choreography|танцует|танцуют|танец|танцев|хореограф|танцює|танцюють|танець)\b/iu,
   sports: /\b(football|soccer|basketball|tennis|volleyball|match|goal|scores|dribbles|играет в футбол|футбол|баскетбол|теннис|волейбол|матч|забивает гол|мяч|грає у футбол|забиває гол)\b/iu,
@@ -125,6 +125,7 @@ export function applyPromptApproach(scene = {}, approach = null) {
   return {
     ...scene,
     promptApproach: approach,
+    camera: [scene.camera, approach.cameraGuidance].filter(Boolean).join(' '),
     motionPrompt: [scene.motionPrompt || scene.visibleAction, strategyText].filter(Boolean).join('\n')
   };
 }
