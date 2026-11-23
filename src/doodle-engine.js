@@ -356,12 +356,28 @@ function castOf(scene) {
 }
 
 /** Create non-image actor anchors for characters that do not already have a sprite or rig. */
-export function createProceduralActorLayers(scene = {}, progress = 0) {
+export function createProceduralActorLayers(scene = {}, progress = 0, runtime = {}) {
   const cast = castOf(scene);
   const layers = Array.isArray(scene?.characterLayers) ? scene.characterLayers : [];
-  const layerIds = new Set(layers.map(layer => key(layer?.characterId)));
+  const resolveImage = typeof runtime.resolveImage === 'function' ? runtime.resolveImage : null;
+  const layerIds = new Set(layers.filter(layer => {
+    const characterId = key(layer?.characterId);
+    const imageUrl = String(layer?.imageUrl || '').trim();
+    if (!characterId || !imageUrl) return false;
+    if (layer?.visible === false || !resolveImage) return true;
+    const image = resolveImage(imageUrl, layer.characterId);
+    return Number(image?.naturalWidth || image?.videoWidth || image?.width) > 0;
+  }).map(layer => key(layer?.characterId)));
   const rigIds = new Set((Array.isArray(scene?.characterRigs) ? scene.characterRigs : [])
-    .filter(rig => validateCharacterRig(rig).passed).map(rig => key(rig.characterId)));
+    .filter(rig => {
+      const report = validateCharacterRig(rig);
+      if (!report.passed) return false;
+      if (!resolveImage) return true;
+      return report.rig.parts.every(part => {
+        const image = resolveImage(part.imageUrl, report.rig.characterId);
+        return Number(image?.naturalWidth || image?.videoWidth || image?.width) > 0;
+      });
+    }).map(rig => key(rig.characterId)));
   const fallback = cast.map((characterId, index) => ({ characterId, castIndex: index }))
     .filter(item => !layerIds.has(key(item.characterId)) && !rigIds.has(key(item.characterId)));
   const anchors = fallback.map(({ characterId, castIndex }) => ({
@@ -396,7 +412,7 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     : { ...scene, characters: [String(runtime.protagonistId).trim()] };
   const cast = castOf(actorScene);
   const timelineValid = validateCharacterActionTimeline(actorScene).passed;
-  const layers = createProceduralActorLayers(actorScene, progress);
+  const layers = createProceduralActorLayers(actorScene, progress, runtime);
   const profileById = new Map((Array.isArray(runtime.characterBible) ? runtime.characterBible : [])
     .filter(record).map(profile => [key(profile.characterId), profile]));
   const mouthById = runtime.facialMouthOpenness && typeof runtime.facialMouthOpenness === 'object'
