@@ -439,7 +439,7 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     const x = layer.x * width;
     const y = layer.y * height;
     if (drawFigure(context, pose, {
-      x, y, size, profile, characterId: layer.characterId, mouthOpenness
+      x, y, size, profile, characterId: layer.characterId, mouthOpenness, opacity: layer.opacity
     })) drawn++;
     else skipped++;
   }
