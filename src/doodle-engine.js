@@ -252,7 +252,7 @@ export function drawFigure(context, pose = {}, options = {}) {
       * clamp(p.opacity, 0, 1, 1);
     context.translate(x + (Number(p.shiftX) || 0) * size, y + (Number(p.bob) || 0) * size);
     context.rotate(clamp(p.lean, -0.5, 0.5, 0));
-    context.scale(unit, unit);
+    context.scale(options.flipX === true ? -unit : unit, unit);
     // Tail is drawn first so the body naturally occludes its attachment.
     if (colors.species === 'fox' || colors.species === 'rabbit') {
       context.save();
@@ -431,9 +431,22 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     ? runtime.facialMouthOpenness : {};
   const visemes = runtime.facialVisemes && typeof runtime.facialVisemes === 'object'
     ? runtime.facialVisemes : {};
+  const actorXById = new Map();
+  for (const layer of [
+    ...(Array.isArray(actorScene.characterLayers) ? actorScene.characterLayers : []),
+    ...layers
+  ]) {
+    const id = key(layer?.characterId);
+    if (id && Number.isFinite(layer?.x)) actorXById.set(id, layer.x);
+  }
   let drawn = 0, skipped = 0;
   for (const layer of layers) {
     const active = activeActorStep(actorScene, layer.characterId, progress, timelineValid);
+    const targetId = key(active?.step?.targetId || active?.phase?.targetId);
+    const targetX = targetId ? actorXById.get(targetId) : null;
+    if (Number.isFinite(targetX) && Math.abs(targetX - layer.x) > 0.005) {
+      layer.flipX = targetX < layer.x;
+    }
     const step = active?.step;
     const actionText = String(step?.description || step?.intent || '');
     const fallbackAction = cast.length === 1
@@ -451,7 +464,8 @@ export function drawProceduralSceneActors(context, scene = {}, runtime = {}) {
     const x = layer.x * width;
     const y = layer.y * height;
     if (drawFigure(context, pose, {
-      x, y, size, profile, characterId: layer.characterId, mouthOpenness, opacity: layer.opacity
+      x, y, size, profile, characterId: layer.characterId, mouthOpenness,
+      opacity: layer.opacity, flipX: layer.flipX
     })) drawn++;
     else skipped++;
   }
