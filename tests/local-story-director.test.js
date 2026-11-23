@@ -220,6 +220,7 @@ test('locks scene state changes against local model rewriting', async () => {
       stateChanges: [{
         entityType: 'prop', entityId: 'silver key', property: 'holder',
         previousValue: null, value: 'Foxy', actorId: 'Foxy',
+        causedByEventId: '', fromEntityId: '', toEntityId: '',
         evidence: 'Foxy picks up the silver key.'
       }]
     } : scene)
