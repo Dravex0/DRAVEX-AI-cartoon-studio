@@ -880,7 +880,7 @@ const sampledRigPoses=currentSceneData.characterRigTimeline?.keyframes?.length
  ? sampleCharacterRigTimeline(currentSceneData.characterRigTimeline,rigAnimationProgress)
  : currentSceneData.characterRigPoses;
 const proceduralActors=$('videoGenerationMode').value==='local-canvas'&&!hasGeneratedVideo
- ?drawProceduralSceneActors(ctx,currentSceneData,{progress:rigAnimationProgress,width:w,height:h,time:t,characterBible,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness})
+ ?drawProceduralSceneActors(ctx,currentSceneData,{progress:rigAnimationProgress,width:w,height:h,time:t,protagonistId:currentStoryboardPlan?.sourceCharacter||$('character').value,characterBible,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness})
  :{drawn:0,layers:[]};
 drawCharacterLayers(ctx,currentSceneData.characterLayers,getLoadedSceneImage,w,h,{motionTimeline:currentSceneData.characterMotionTimeline||currentSceneData.actionTimeline,progress:rigAnimationProgress,drawRigParts:true,preferRigParts:true,characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses,drawFacialRigs:true,characterFacialRigs:currentSceneData.characterFacialRigs,facialExpressions:currentSceneData.characterFacialExpressions,facialVisemes:facialLipSync.facialVisemes,facialMouthOpenness:facialLipSync.facialMouthOpenness});// Keep prop transitions on the same scrubbed clock as the sampled rig pose.
 drawSceneProps(ctx,currentSceneData,[...(Array.isArray(currentSceneData.characterLayers)?currentSceneData.characterLayers:[]),...(proceduralActors.layers||[])],rigAnimationProgress,w,h,t,{characterRigs:currentSceneData.characterRigs,rigPoses:sampledRigPoses});if(showDemoFox&&!hasGeneratedMedia&&playing&&frame%7===0&&(action==='magic'||sceneIndex===3))magicParticles.emit(sx,sy,4,sceneIndex===3?'#fff1a8':'#ffe58a');if(!showDemoFox||hasGeneratedMedia)magicParticles.particles.length=0;else magicParticles.updateAndDraw(ctx);ctx.restore();
@@ -2627,7 +2627,7 @@ function createStoryboard(ideaOverride, {throwOnError=false}={}){
    status.textContent+=uiLang==='ru'
     ?' В '+missingCharacterVisualCount+' сценах нет персонажей или подтверждённых визуальных ресурсов. Добавь персонажей и спрайты либо создай видеоклипы.'
     :' '+missingCharacterVisualCount+' scene(s) have no characters or verified visual resources. Add characters and sprites or generate scene clips.';
-  }else if($('videoGenerationMode').value==='local-canvas'&&sceneMetadata.some(scene=>Array.isArray(scene?.characters)&&scene.characters.length)){
+  }else if($('videoGenerationMode').value==='local-canvas'&&(sceneMetadata.some(scene=>Array.isArray(scene?.characters)&&scene.characters.length)||Boolean(currentStoryboardPlan?.sourceCharacter||$('character').value.trim()))){
    status.textContent+=uiLang==='ru'
     ?' Локальный режим показывает процедурную 2D-анимацию персонажей. Это офлайн-рендерер, а не нейросетевое AI-видео; существующие спрайты, риги и LipSync используются при наличии.'
     :' Local mode uses procedural 2D character animation. This is an offline renderer, not neural AI video; authored sprites, rigs and LipSync remain active when available.';
