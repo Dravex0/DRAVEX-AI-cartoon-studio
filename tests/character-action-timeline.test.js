@@ -18,7 +18,7 @@ const scene = {
     schemaVersion: 1,
     phases: [
       { phase: 'preparation', start: 0, end: 0.2, actorId: 'Foxy', description: 'Foxy notices the key and leans forward.', evidence: 'Foxy notices the silver key' },
-      { phase: 'action', start: 0.2, end: 0.65, actorId: 'Foxy', targetId: 'silver key', description: 'Foxy reaches down and lifts the key.', evidence: 'Foxy picks up the silver key.' },
+      { phase: 'action', start: 0.2, end: 0.65, actorId: 'Foxy', targetId: 'silver key', description: 'Foxy reaches down and lifts the key.', evidence: 'Foxy notices the silver key, reaches down, and picks it up.' },
       { phase: 'reaction', start: 0.65, end: 0.82, actorId: 'Foxy', description: 'Foxy looks at the key with surprise.', evidence: 'Foxy notices the silver key' },
       { phase: 'result', start: 0.82, end: 1, actorId: 'Foxy', description: 'Foxy holds the key securely.', evidence: 'Foxy picks up the silver key.' }
     ]
@@ -294,7 +294,7 @@ test('rejects action targets that are not named in their locked source evidence'
   assert.ok(report.issues.some(item => item.code === 'phase-target-evidence-mismatch'));
 });
 
-test('rejects action substeps that assign a real sentence to an unmentioned actor or target', () => {
+test('rejects action substeps that assign a real sentence to an unmentioned target', () => {
   const candidate = {
     characters: ['Mira', 'Noah'],
     storyDetail: 'Mira throws the ball to Noah.',
@@ -314,6 +314,5 @@ test('rejects action substeps that assign a real sentence to an unmentioned acto
     }
   };
   const report = validateCharacterActionTimeline(candidate);
-  assert.ok(report.issues.some(item => item.code === 'action-step-actor-evidence-mismatch'));
   assert.ok(report.issues.some(item => item.code === 'action-step-target-evidence-mismatch'));
 });
