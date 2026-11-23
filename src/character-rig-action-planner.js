@@ -236,6 +236,7 @@ export function createCharacterRigTimelineFromActionTimeline(scene = {}, rigs = 
     }
     segments.push({
       actorId: rig.characterId,
+      phase: phase.phase || 'action',
       start: phase.start,
       end: phase.end,
       preset: preset || result.actions?.[0]?.preset || 'idle',
