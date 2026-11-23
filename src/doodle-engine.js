@@ -24,8 +24,11 @@ const record = value => Boolean(value && typeof value === 'object' && !Array.isA
 
 const INTENT_ACTIONS = Object.freeze({
   attack: 'attack', defend: 'defend', dodge: 'dodge', throw: 'throw',
-  catch: 'catch', give: 'give', take: 'take', pickup: 'take',
-  put_down: 'put_down', point: 'point', sit: 'sit', crawl: 'crawl',
+  catch: 'catch', receive: 'catch', accept: 'catch',
+  give: 'give', handoff: 'give', hand_off: 'give', pass: 'give',
+  take: 'take', pickup: 'take', pick_up: 'take', grab: 'take', grasp: 'take', hold: 'take',
+  put_down: 'put_down', drop: 'put_down', release: 'put_down', place: 'put_down', set_down: 'put_down',
+  carry: 'walk', point: 'point', sit: 'sit', crawl: 'crawl',
   eat_drink: 'eat_drink', sleep_wake: 'sleep_wake', magic: 'magic',
   vanish: 'vanish', warning: 'talk', shout_command: 'talk',
   call_for_backup: 'talk', hands_up: 'scared', freeze: 'scared',
@@ -41,7 +44,7 @@ const INTENT_ACTIONS = Object.freeze({
 
 export function actionForStep(step = {}, fallbackDescription = '') {
   const intent = String(step?.intent || '').trim().toLocaleLowerCase();
-  if (INTENT_ACTIONS[intent]) return INTENT_ACTIONS[intent];
+  if (Object.prototype.hasOwnProperty.call(INTENT_ACTIONS, intent)) return INTENT_ACTIONS[intent];
   const cue = String(step?.motionCue || '').trim().toLocaleLowerCase();
   if (ACTIONS.includes(cue)) return cue;
   const description = String(step?.description || fallbackDescription || '').trim();
