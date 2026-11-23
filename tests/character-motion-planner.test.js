@@ -149,3 +149,27 @@ test('does not animate an ambiguous duck when no dodge direction is stated', () 
   assert.equal(result.status, 'no-unambiguous-motion');
   assert.equal(result.timeline, null);
 });
+
+
+test('plans an accelerating pursuit toward an explicitly named chase target', () => {
+  const scene = makeScene('chases Bird through the forest');
+  scene.actionTimeline.phases[0].targetId = 'Bird';
+  const result = planCharacterMotionFromActionTimeline(scene, layers);
+  assert.equal(result.status, 'generated');
+  assert.equal(result.generatedCount, 2);
+  const [accelerate, pursue] = result.timeline.phases;
+  assert.equal(accelerate.start, 0.2);
+  assert.ok(accelerate.end > accelerate.start);
+  assert.equal(pursue.start, accelerate.end);
+  assert.equal(pursue.end, 0.8);
+  assert.ok(accelerate.motion.to.scale > accelerate.motion.from.scale);
+  assert.ok(pursue.motion.to.x > pursue.motion.from.x);
+  assert.ok(pursue.motion.to.x < 0.75);
+  assert.match(pursue.description, /no contact is implied/);
+});
+
+test('does not invent a chase target or pursuit direction when no named target sprite exists', () => {
+  const result = planCharacterMotionFromActionTimeline(makeScene('chases a stranger through the forest'), layers);
+  assert.equal(result.status, 'no-unambiguous-motion');
+  assert.equal(result.timeline, null);
+});
