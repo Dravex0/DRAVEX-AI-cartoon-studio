@@ -13,9 +13,10 @@ const uniqueIds = values => {
 
 /**
  * Count scenes that cannot render every required cast member in local-canvas mode.
- * A scene background image is deliberately not character evidence: it may contain
- * only scenery. Full scene video, matching sprite layers, validated rigs, and the
- * explicitly enabled built-in protagonist fallback are accepted visual resources.
+ * A scene background image or decoded video is not character evidence by itself.
+ * A decoded clip suppresses the local procedural-actor renderer, so that scene still
+ * needs a matching sprite or validated rig. Procedural actors count only when the
+ * renderer will actually draw them (no decoded scene clip).
  */
 export function countScenesMissingCharacterVisuals(scenes, {
   protagonistId = '',
@@ -29,11 +30,15 @@ export function countScenesMissingCharacterVisuals(scenes, {
     const cast = uniqueIds(scene?.characters);
     const requiredIds = cast.length ? cast : (protagonist ? [protagonist] : []);
     if (!requiredIds.length) return true;
-    if (typeof hasSceneVideo === 'function' && hasSceneVideo(scene, index) === true) return false;
+    const sceneHasDecodedVideo = typeof hasSceneVideo === 'function'
+      && hasSceneVideo(scene, index) === true;
 
     return requiredIds.some(characterId => {
-      if (proceduralActors === true) return false;
-      const isProceduralProtagonist = proceduralFallback === true
+      // The app draws procedural actors only when no decoded scene video is
+      // available. Do not let a cached clip bypass this gate: it may be scenery.
+      if (proceduralActors === true && !sceneHasDecodedVideo) return false;
+      const isProceduralProtagonist = !sceneHasDecodedVideo
+        && proceduralFallback === true
         && protagonist
         && characterId.toLocaleLowerCase() === protagonist.toLocaleLowerCase();
       if (isProceduralProtagonist) return false;
