@@ -2276,7 +2276,7 @@ function getMissingCharacterVisualCount(protagonistId = currentStoryboardPlan?.s
  return countScenesMissingCharacterVisuals(sceneMetadata,{
   protagonistId,
   proceduralActors:$('videoGenerationMode').value==='local-canvas',
-  hasSceneVideo:(scene,index)=>isSceneVideoDecoded(sceneVideoCache.get(sceneVideoKey(index,scene))?.video)
+  hasSceneVideo:(scene,index)=>Boolean(sceneVideoCache.get(sceneVideoKey(index,scene))?.video)
  });
 }
 
