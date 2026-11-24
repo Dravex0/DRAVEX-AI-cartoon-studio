@@ -75,3 +75,13 @@ test('blocks local-canvas export when a scene background is present but characte
     'a generated scene background is not proof that a character is visible');
   assert.match(appSource.slice(blocker, blocker + 900), /фоновое изображение или видеоклип сами по себе не доказывают/);
 });
+
+
+test('one-click film waits for persisted scene videos before checking character readiness', () => {
+  const start = appSource.indexOf("$('makeFilm').addEventListener('click',async()=>{");
+  const restore = appSource.indexOf('await sceneVideoRestorePromise;', start);
+  const mode = appSource.indexOf("const mode=$('videoGenerationMode').value;", start);
+  const gate = appSource.indexOf('const missingCharacterAssetCount=', start);
+  assert.ok(start >= 0 && restore > start && mode > restore && gate > mode,
+    'persisted clips must be restored before the character-visual preflight');
+});
