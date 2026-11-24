@@ -70,7 +70,7 @@ test('blocks local-canvas export when a scene background is present but characte
   const helper = appSource.slice(helperStart, helperEnd);
   assert.match(helper, /countScenesMissingCharacterVisuals/);
   assert.match(helper, /sceneVideoCache/);
-  assert.match(helper, /proceduralFallback/);
+  assert.doesNotMatch(helper, /proceduralFallback/, 'the disabled legacy demo character must not satisfy readiness');
   assert.doesNotMatch(helper, /generatedImageUrl/,
     'a generated scene background is not proof that a character is visible');
   assert.match(appSource.slice(blocker, blocker + 900), /фоновое изображение или видеоклип сами по себе не доказывают/);
