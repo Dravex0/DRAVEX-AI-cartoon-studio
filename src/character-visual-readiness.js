@@ -20,7 +20,6 @@ const uniqueIds = values => {
  */
 export function countScenesMissingCharacterVisuals(scenes, {
   protagonistId = '',
-  proceduralFallback = false,
   proceduralActors = false,
   hasSceneVideo = () => false
 } = {}) {
@@ -37,11 +36,6 @@ export function countScenesMissingCharacterVisuals(scenes, {
       // The app draws procedural actors only when no decoded scene video is
       // available. Do not let a cached clip bypass this gate: it may be scenery.
       if (proceduralActors === true && !sceneHasDecodedVideo) return false;
-      const isProceduralProtagonist = !sceneHasDecodedVideo
-        && proceduralFallback === true
-        && protagonist
-        && characterId.toLocaleLowerCase() === protagonist.toLocaleLowerCase();
-      if (isProceduralProtagonist) return false;
       return !hasRenderableCharacterLayer(scene, characterId)
         && !hasRenderableCharacterRig(scene, characterId);
     });
