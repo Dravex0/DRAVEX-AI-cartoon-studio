@@ -13,10 +13,10 @@ const uniqueIds = values => {
 
 /**
  * Count scenes that cannot render every required cast member in local-canvas mode.
- * A scene background image or decoded video is not character evidence by itself.
- * A decoded clip suppresses the local procedural-actor renderer, so that scene still
- * needs a matching sprite or validated rig. Procedural actors count only when the
- * renderer will actually draw them (no decoded scene clip).
+ * A scene background image or cached video is not character evidence by itself.
+ * A cached clip may decode during export and suppress the local procedural-actor
+ * renderer, so require a matching sprite or validated rig whenever a clip is cached.
+ * Procedural actors count only when no cached scene clip can suppress their renderer.
  */
 export function countScenesMissingCharacterVisuals(scenes, {
   protagonistId = '',
@@ -29,13 +29,13 @@ export function countScenesMissingCharacterVisuals(scenes, {
     const cast = uniqueIds(scene?.characters);
     const requiredIds = cast.length ? cast : (protagonist ? [protagonist] : []);
     if (!requiredIds.length) return true;
-    const sceneHasDecodedVideo = typeof hasSceneVideo === 'function'
+    const sceneHasVideo = typeof hasSceneVideo === 'function'
       && hasSceneVideo(scene, index) === true;
 
     return requiredIds.some(characterId => {
-      // The app draws procedural actors only when no decoded scene video is
-      // available. Do not let a cached clip bypass this gate: it may be scenery.
-      if (proceduralActors === true && !sceneHasDecodedVideo) return false;
+      // A cached video can become decoded during export. Treat it as a possible
+      // renderer suppressor now, but never as proof that the required character exists.
+      if (proceduralActors === true && !sceneHasVideo) return false;
       return !hasRenderableCharacterLayer(scene, characterId)
         && !hasRenderableCharacterRig(scene, characterId);
     });
