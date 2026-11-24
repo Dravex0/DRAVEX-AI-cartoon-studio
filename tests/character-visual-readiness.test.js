@@ -51,20 +51,46 @@ test('the procedural fallback covers only the protagonist, not missing secondary
   }), 1);
 });
 
-test('accepts a cached full-scene video as the visual scene resource', () => {
+test('does not treat a cached scene video as proof that the required character is visible', () => {
   const scene = { characters: ['Foxy'], generatedImageUrl: 'blob:forest-background' };
   assert.equal(countScenesMissingCharacterVisuals([scene], {
     protagonistId: 'Foxy',
+    hasSceneVideo: () => true
+  }), 1);
+});
+
+test('does not count local procedural actors when a decoded scene video suppresses their renderer', () => {
+  const scene = { characters: ['Foxy', 'Owl'] };
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy',
+    proceduralActors: true,
+    hasSceneVideo: () => true
+  }), 1);
+});
+
+test('accepts matching authored character art even when a decoded scene video is present', () => {
+  const scene = {
+    characters: ['Foxy'],
+    characterLayers: [{ characterId: 'Foxy', imageUrl: 'blob:fox-sprite', visible: true }]
+  };
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy',
+    proceduralActors: true,
     hasSceneVideo: () => true
   }), 0);
 });
 
 
-test('counts the explicit offline Doodle renderer as a visual resource for every named actor', () => {
+test('counts the explicit offline Doodle renderer only when no decoded video suppresses it', () => {
   const scene = { characters: ['Foxy', 'Owl', 'Robot'] };
   assert.equal(countScenesMissingCharacterVisuals([scene], {
     protagonistId: 'Foxy', proceduralActors: true
   }), 0);
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy',
+    proceduralActors: true,
+    hasSceneVideo: () => true
+  }), 1);
 });
 
 test('still blocks a scene with no cast even when procedural actors are enabled', () => {
