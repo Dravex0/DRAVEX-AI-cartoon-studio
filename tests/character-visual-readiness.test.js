@@ -110,5 +110,6 @@ test('uses decoded scene-video readiness to match the renderer suppression condi
   const helper = appSource.slice(helperStart, helperEnd);
   assert.match(helper, /hasSceneVideo:\(scene,index\)=>isSceneVideoDecoded\(sceneVideoCache\.get\(sceneVideoKey\(index,scene\)\)\?\.video\)/);
   assert.doesNotMatch(helper, /hasSceneVideo:\(scene,index\)=>Boolean\(sceneVideoCache/);
+  assert.match(appSource, /const hasGeneratedVideo=isSceneVideoDecoded\(generatedVideo\)/);
   assert.match(appSource, /const proceduralActors=\$\('videoGenerationMode'\)\.value==='local-canvas'&&!hasGeneratedVideo/);
 });
