@@ -43,14 +43,11 @@ test('accepts a validated image-backed rig for the required character', () => {
   assert.equal(countScenesMissingCharacterVisuals([scene], { protagonistId: 'Foxy' }), 0);
 });
 
-test('the procedural fallback covers only the protagonist, not missing secondary cast members', () => {
-  const singleCharacterScene = { characters: ['Foxy'] };
-  const twoCharacterScene = { characters: ['Foxy', 'Owl'] };
-  assert.equal(countScenesMissingCharacterVisuals([singleCharacterScene], {
-    protagonistId: 'Foxy', proceduralFallback: true
-  }), 0);
-  assert.equal(countScenesMissingCharacterVisuals([twoCharacterScene], {
-    protagonistId: 'Foxy', proceduralFallback: true
+test('does not count the disabled legacy demo-protagonist fallback as visible character artwork', () => {
+  const scene = { characters: ['Foxy'] };
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy',
+    proceduralFallback: true
   }), 1);
 });
 
