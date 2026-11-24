@@ -71,6 +71,15 @@ test('does not count local procedural actors when a decoded scene video suppress
   }), 1);
 });
 
+test('does not accept a legacy demo-protagonist flag when a decoded clip suppresses that fallback', () => {
+  const scene = { characters: ['Foxy'] };
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy',
+    proceduralFallback: true,
+    hasSceneVideo: () => true
+  }), 1);
+});
+
 test('accepts matching authored character art even when a decoded scene video is present', () => {
   const scene = {
     characters: ['Foxy'],
