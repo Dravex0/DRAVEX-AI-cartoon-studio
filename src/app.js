@@ -2358,6 +2358,9 @@ $('makeFilm').addEventListener('click',async()=>{
  }else if(!localTextRuntime.status.loaded){
   $('status').textContent=uiLang==='ru'?'Локальная модель не загружена. Используем раскадровку DRAVEX; AI-режиссёр можно включить после загрузки модели.':'Local model is not loaded. Using the DRAVEX storyboard; load the model to enable AI direction.';
  }
+ // Restore IndexedDB scene clips before readiness checks: a late restore can suppress
+ // procedural actors in draw(), so the preflight must see the same cache as the renderer.
+ await sceneVideoRestorePromise;
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
   const source=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:index,localImage:comfySourceImageForScene(index),generatedImageUrl:scene?.generatedImageUrl});
