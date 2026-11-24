@@ -59,7 +59,7 @@ test('does not treat a cached scene video as proof that the required character i
   }), 1);
 });
 
-test('does not count local procedural actors when a decoded scene video suppresses their renderer', () => {
+test('does not count local procedural actors when a cached video may suppress their renderer during export', () => {
   const scene = { characters: ['Foxy', 'Owl'] };
   assert.equal(countScenesMissingCharacterVisuals([scene], {
     protagonistId: 'Foxy',
@@ -77,7 +77,7 @@ test('does not accept a legacy demo-protagonist flag when a decoded clip suppres
   }), 1);
 });
 
-test('accepts matching authored character art even when a decoded scene video is present', () => {
+test('accepts matching authored character art even when a cached scene video is present', () => {
   const scene = {
     characters: ['Foxy'],
     characterLayers: [{ characterId: 'Foxy', imageUrl: 'blob:fox-sprite', visible: true }]
@@ -114,7 +114,7 @@ test('uses decoded scene-video readiness to match the renderer suppression condi
   const helperEnd = appSource.indexOf("$('makeFilm').addEventListener", helperStart);
   assert.ok(helperStart >= 0 && helperEnd > helperStart);
   const helper = appSource.slice(helperStart, helperEnd);
-  assert.match(helper, /hasSceneVideo:\(scene,index\)=>isSceneVideoDecoded\(sceneVideoCache\.get\(sceneVideoKey\(index,scene\)\)\?\.video\)/);
+  assert.match(helper, /hasSceneVideo:\(scene,index\)=>Boolean\(sceneVideoCache\.get\(sceneVideoKey\(index,scene\)\)\?\.video\)/);
   assert.doesNotMatch(helper, /hasSceneVideo:\(scene,index\)=>Boolean\(sceneVideoCache/);
   assert.match(appSource, /const hasGeneratedVideo=isSceneVideoDecoded\(generatedVideo\)/);
   assert.match(appSource, /const proceduralActors=\$\('videoGenerationMode'\)\.value==='local-canvas'&&!hasGeneratedVideo/);
