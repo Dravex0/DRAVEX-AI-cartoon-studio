@@ -109,13 +109,13 @@ test('still blocks a scene with no cast even when procedural actors are enabled'
 });
 
 
-test('uses decoded scene-video readiness to match the renderer suppression condition', () => {
+test('uses cached scene-video presence to guard against late decode during export', () => {
   const helperStart = appSource.indexOf('function getMissingCharacterVisualCount(');
   const helperEnd = appSource.indexOf("$('makeFilm').addEventListener", helperStart);
   assert.ok(helperStart >= 0 && helperEnd > helperStart);
   const helper = appSource.slice(helperStart, helperEnd);
   assert.match(helper, /hasSceneVideo:\(scene,index\)=>Boolean\(sceneVideoCache\.get\(sceneVideoKey\(index,scene\)\)\?\.video\)/);
-  assert.doesNotMatch(helper, /hasSceneVideo:\(scene,index\)=>Boolean\(sceneVideoCache/);
+  assert.doesNotMatch(helper, /hasSceneVideo:\(scene,index\)=>isSceneVideoDecoded/);
   assert.match(appSource, /const hasGeneratedVideo=isSceneVideoDecoded\(generatedVideo\)/);
   assert.match(appSource, /const proceduralActors=\$\('videoGenerationMode'\)\.value==='local-canvas'&&!hasGeneratedVideo/);
 });
