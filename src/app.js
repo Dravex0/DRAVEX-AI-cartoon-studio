@@ -2392,8 +2392,8 @@ $('makeFilm').addEventListener('click',async()=>{
    ?'Для '+gate.missingImageCount+' сцен ещё нет изображений. Отдельно подтверди отправку только текстовых промптов в AI Horde либо добавь изображения вручную.'
    :' '+gate.missingImageCount+' scene image(s) are missing. Separately allow sending text prompts to AI Horde, or add scene images manually.');
   if(gate.blockers.includes('character-visual-assets-required'))messages.push(ru
-   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах нет изображений или видеоклипов персонажей. Добавь изображения/спрайты героев через инструменты генерации сцен и персонажей либо выбери Hugging Face или локальный ComfyUI. Фоновое видео вместо мультфильма создавать не будем.'
-   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes have no character images or video clips. Add character images/sprites with the scene and character tools, or choose Hugging Face or local ComfyUI. A background-only video will not be exported.');
+   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах не подтверждено присутствие нужных персонажей. Добавь видимые спрайты или проверенные риги; фоновое изображение или видеоклип сами по себе не доказывают, что герой присутствует.'
+   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes do not have verified visuals for the required characters. Add visible sprites or validated rigs; a background image or scene clip alone does not prove that a character is present.');
   $('status').textContent=messages.join(' ');
   if(mode==='huggingface')$('hfVideoPanel').open=true;
   if(mode==='comfyui')$('comfyPanel').open=true;
@@ -3819,8 +3819,8 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
   const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId);
   if(missingCharacterAssetCount>0){
     const message=uiLang==='ru'
-      ?'Экспорт остановлен: в '+missingCharacterAssetCount+' сценах нет изображения персонажа, рига или видеоклипа сцены. Добавь спрайты/риги либо сначала создай видеосцены; экспорт одного фона заблокирован.'
-      :'Export stopped: '+missingCharacterAssetCount+' scenes have no character image, rig or scene video. Add character sprites/rigs or generate scene videos first; background-only export is blocked.';
+      ?'Экспорт остановлен: в '+missingCharacterAssetCount+' сценах нет видимого спрайта или проверенного рига нужного персонажа. Видеоклип сам по себе не подтверждает присутствие героя; экспорт одного фона заблокирован.'
+      :'Export stopped: '+missingCharacterAssetCount+' scenes have no visible sprite or validated rig for the required character. A scene clip alone does not prove the character is present; background-only export is blocked.';
     $('status').textContent=message;
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Экспорт остановлен','Export stopped'),message);filmProgressTracking=false;}
     return {status:'failed',reason:message,missingCharacterAssetCount};
