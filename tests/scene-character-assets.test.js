@@ -87,8 +87,9 @@ test('direct export restores persisted scene clips before character readiness is
   const end = appSource.indexOf("$('export').onclick", start);
   assert.ok(start >= 0 && end > start, 'exportFilm must be present');
   const block = appSource.slice(start, end);
+  const lock = block.indexOf('button.disabled=true;');
   const restore = block.indexOf('await sceneVideoRestorePromise;');
   const gate = block.indexOf('const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId)');
-  assert.ok(restore >= 0 && gate > restore,
-    'a restored clip must be visible to the readiness gate before export can start');
+  assert.ok(lock >= 0 && restore > lock && gate > restore,
+    'the export must be locked while persisted clips restore and must evaluate readiness only afterward');
 });
