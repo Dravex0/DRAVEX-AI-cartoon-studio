@@ -92,4 +92,8 @@ test('direct export restores persisted scene clips before character readiness is
   const gate = block.indexOf('const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId)');
   assert.ok(lock >= 0 && restore > lock && gate > restore,
     'the export must be locked while persisted clips restore and must evaluate readiness only afterward');
+  assert.match(block, /catch\(error\)\{\s*button\.disabled=false;/,
+    'the export button must recover when persisted clip restoration fails');
+  assert.match(block, /if\(signal\?\.aborted\)\{\s*button\.disabled=false;/,
+    'the export button must recover when composition is cancelled during restoration');
 });
