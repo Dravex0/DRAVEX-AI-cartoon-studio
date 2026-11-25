@@ -3846,10 +3846,14 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     button.disabled=false;
     const message=uiLang==='ru'?'Не удалось восстановить сохранённые видеосцены. Экспорт остановлен.':'Could not restore saved scene videos. Export was stopped.';
     $('status').textContent=message;
+    if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка восстановления','Scene restore failed'),message);filmProgressTracking=false;}
     return {status:'failed',reason:String(error?.message||message).slice(0,500)};
   }
   if(signal?.aborted){
     button.disabled=false;
+    const message=uiLang==='ru'?'Создание отменено во время восстановления сцен.':'Film composition was cancelled while restoring scenes.';
+    $('status').textContent=message;
+    if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Создание отменено','Composition cancelled'),message);filmProgressTracking=false;}
     return {status:'cancelled',reason:'Full-film composition was cancelled.'};
   }
   const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId);
