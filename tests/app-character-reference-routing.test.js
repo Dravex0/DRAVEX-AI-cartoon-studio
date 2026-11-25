@@ -13,6 +13,7 @@ test('ComfyUI exposes four optional character-reference node bindings', () => {
     assert.ok(html.includes('id="comfyReference' + index + 'Input"'));
     assert.ok(html.includes('id="comfyCharacterReference' + index + '"'));
   }
+  assert.ok(app.includes("['comfyCharacterReference1','comfyCharacterReference2','comfyCharacterReference3','comfyCharacterReference4'].forEach"));
 });
 
 test('all ComfyUI generation paths share the four-reference limit', () => {
