@@ -132,17 +132,23 @@ test('uploads and binds only explicitly configured character reference images', 
   let submittedWorkflow;
   const references = [
     { name: 'alex.png', blob: new Blob(['alex-reference'], { type: 'image/png' }) },
-    { name: 'dragon.webp', blob: new Blob(['dragon-reference'], { type: 'image/webp' }) }
+    { name: 'dragon.webp', blob: new Blob(['dragon-reference'], { type: 'image/webp' }) },
+    { name: 'robot.png', blob: new Blob(['robot-reference'], { type: 'image/png' }) },
+    { name: 'bird.png', blob: new Blob(['bird-reference'], { type: 'image/png' }) }
   ];
   const referenceBindings = {
     ...nodeBindings,
     referenceImage1: { nodeId: '21', input: 'image' },
-    referenceImage2: { nodeId: '22', input: 'image' }
+    referenceImage2: { nodeId: '22', input: 'image' },
+    referenceImage3: { nodeId: '23', input: 'image' },
+    referenceImage4: { nodeId: '24', input: 'image' }
   };
   const referenceWorkflow = {
     ...workflow,
     '21': { class_type: 'LoadImage', inputs: { image: '' } },
-    '22': { class_type: 'LoadImage', inputs: { image: '' } }
+    '22': { class_type: 'LoadImage', inputs: { image: '' } },
+    '23': { class_type: 'LoadImage', inputs: { image: '' } },
+    '24': { class_type: 'LoadImage', inputs: { image: '' } }
   };
   const fetchImpl = async (url, options = {}) => {
     if (String(url).endsWith('/upload/image')) {
@@ -169,10 +175,12 @@ test('uploads and binds only explicitly configured character reference images', 
   const registry = createVideoProviderRegistry();
   registry.register(provider);
   await generateVideoWithProvider(registry, provider.id, { ...request, referenceImages: references });
-  assert.equal(uploadedForms.length, 3);
+  assert.equal(uploadedForms.length, 5);
   assert.equal(submittedWorkflow['20'].inputs.image, 'refs/upload-1.png');
   assert.equal(submittedWorkflow['21'].inputs.image, 'refs/upload-2.png');
   assert.equal(submittedWorkflow['22'].inputs.image, 'refs/upload-3.png');
+  assert.equal(submittedWorkflow['23'].inputs.image, 'refs/upload-4.png');
+  assert.equal(submittedWorkflow['24'].inputs.image, 'refs/upload-5.png');
 });
 
 test('passes a stable identity seed into an explicitly configured ComfyUI seed input', async () => {
