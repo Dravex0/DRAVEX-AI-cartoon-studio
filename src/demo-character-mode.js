@@ -6,7 +6,8 @@ export function hasRenderableCharacterLayer(scene, characterId = '') {
   const target = String(characterId ?? '').trim().toLocaleLowerCase();
   if (!target) return false;
   return normalizeCharacterLayers(scene?.characterLayers).some(layer =>
-    layer.visible && layer.imageUrl && layer.characterId.toLocaleLowerCase() === target
+    layer.visible && layer.opacity > 0 && layer.imageUrl
+      && layer.characterId.toLocaleLowerCase() === target
   );
 }
 
