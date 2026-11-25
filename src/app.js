@@ -3508,10 +3508,23 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
  fullFilmAbortController=controller;
  button.disabled=true;cancel.hidden=false;progressPanel.hidden=false;progress.value=0;
  filmProgressTracking=true;
- await sceneVideoRestorePromise;
- $('animateSceneComfy').disabled=true;$('checkComfyConnection').disabled=true;
- const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);
  try{
+  await sceneVideoRestorePromise;
+  if(controller.signal.aborted)throw new DOMException('Film generation was cancelled.','AbortError');
+  const exportProtagonistId=String(currentStoryboardPlan?.sourceCharacter||resolveStoryProtagonist($('idea').value,$('character').value.trim(),storyLanguage())).trim();
+  const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId);
+  if(missingCharacterAssetCount>0){
+   const message=uiLang==='ru'
+    ?'Генерация остановлена: в '+missingCharacterAssetCount+' сценах нет видимого спрайта или проверенного рига нужного персонажа. Сначала подготовь персонажей; один видеоклип не подтверждает их присутствие.'
+    :'Generation stopped: '+missingCharacterAssetCount+' scenes have no visible sprite or validated rig for the required cast. Prepare character visuals first; a scene clip alone does not prove character presence.';
+   $('status').textContent=message;
+   status.textContent=message;
+   setFilmProgress(0,filmProgressText('Нет визуальных персонажей','Character visuals required'),message);
+   filmProgressTracking=false;
+   return;
+  }
+  $('animateSceneComfy').disabled=true;$('checkComfyConnection').disabled=true;
+  const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);
   const provider=mode==='huggingface'
    ?createHuggingFaceZeroGPUVideoProvider({client:hfVideoClient,handleFile:hfHandleFile})
    :createComfyUIVideoProvider(comfyProviderOptions());
