@@ -55,7 +55,7 @@ test('blocks Hugging Face and ComfyUI generation when requested speech preparati
 });
 
 
-test('blocks local-canvas export when a scene background is present but character visuals are missing', () => {
+test('blocks one-click prompt-to-film in every mode when character visuals are missing', () => {
   const handler = appSource.indexOf("$('makeFilm').addEventListener");
   const gate = appSource.indexOf('const missingCharacterAssetCount=', handler);
   const evaluate = appSource.indexOf('const gate=evaluatePromptToFilmStart({', gate);
@@ -64,6 +64,8 @@ test('blocks local-canvas export when a scene background is present but characte
     'character visual readiness must be checked before local-canvas export starts');
   const readiness = appSource.slice(gate, evaluate);
   assert.ok(readiness.includes('getMissingCharacterVisualCount(requestedCharacter)'));
+  assert.doesNotMatch(readiness, /mode==='local-canvas'/,
+    'remote providers must not generate clips that the shared export gate will later reject');
   const helperStart = appSource.indexOf('function getMissingCharacterVisualCount(');
   const helperEnd = appSource.indexOf("$('makeFilm').addEventListener", helperStart);
   assert.ok(helperStart >= 0 && helperEnd > helperStart, 'shared character visual readiness helper must exist before the start handler');
