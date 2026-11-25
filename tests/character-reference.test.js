@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene, CHARACTER_REFERENCE_LIMIT } from '../src/character-reference.js';
+import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene, CHARACTER_REFERENCE_LIMIT, CHARACTER_REFERENCE_IMAGE_LIMIT } from '../src/character-reference.js';
 
 test('normalizes and bounds every visual identity field', () => {
   const result = normalizeCharacterReference({
@@ -121,11 +121,30 @@ test('does not leak character references into scenes with an empty or unrelated 
   assert.deepEqual(selectCharacterReferencesForScene(profiles, ['Unknown character']), []);
 });
 
-test('limits scene-specific reference profiles to the two provider input slots', () => {
-  const profiles = ['Foxy', 'Mira', 'Snowball'].map(characterId => ({ characterId }));
+test('selects up to four saved scene-specific image references for ComfyUI provider slots', () => {
+  const profiles = ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird'].map(characterId => ({
+    characterId,
+    referenceImageAssetId: characterId.toLowerCase() + '-image'
+  }));
+  assert.equal(CHARACTER_REFERENCE_IMAGE_LIMIT, 4);
   assert.deepEqual(
-    selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball']).map(profile => profile.characterId),
-    ['Foxy', 'Mira']
+    selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird']).map(profile => profile.characterId),
+    ['Foxy', 'Mira', 'Snowball', 'Robot']
+  );
+});
+
+test('skips cast profiles without saved images and fills later available reference slots', () => {
+  const profiles = [
+    { characterId: 'Foxy' },
+    { characterId: 'Mira', referenceImageAssetId: 'mira-image' },
+    { characterId: 'Snowball', referenceImageAssetId: 'snow-image' },
+    { characterId: 'Robot', referenceImageAssetId: 'robot-image' },
+    { characterId: 'Bird', referenceImageAssetId: 'bird-image' },
+    { characterId: 'Wolf', referenceImageAssetId: 'wolf-image' }
+  ];
+  assert.deepEqual(
+    selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird', 'Wolf']).map(profile => profile.characterId),
+    ['Mira', 'Snowball', 'Robot', 'Bird']
   );
 });
 
