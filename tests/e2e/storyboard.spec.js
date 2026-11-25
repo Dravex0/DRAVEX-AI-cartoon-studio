@@ -776,7 +776,7 @@ test('generates every ComfyUI scene but blocks video-only export without charact
   // character sprite or validated rig, so the full-film safety gate must block them.
   await page.locator('#generateFullFilmComfy').click();
   await expect(page.locator('#status')).toContainText(/no visible sprite or validated rig/i, { timeout: 90000 });
-  await expect(page.locator('#sceneMediaReport')).toContainText(/Generated video scenes:\\s*5\\/5/i);
+  await expect(page.locator('#sceneMediaReport')).toContainText(/Generated video scenes:\s*5\/5/i);
   await expect(page.locator('#finalFilmResult')).toBeHidden();
   expect(downloads, 'video-only scene clips must not trigger a final WebM download').toHaveLength(0);
 
