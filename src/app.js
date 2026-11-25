@@ -1091,6 +1091,7 @@ function renderCharacterSpriteAssets(){
     const updatedAssets=current.map(item=>item&&String(item.assetId||'')===assetId?{...item,transparencyStatus:status,transparencyCheck:check,verificationStatus:'not_verified',visualIdentityStatus:'not_verified'}:item);
     let updatedScene={...sceneMetadata[resolvedSceneIndex],characterSpriteAssets:updatedAssets};
     sceneMetadata[resolvedSceneIndex]=updatedScene;
+    if(typeof addButton!=='undefined')addButton.disabled=status!=='verified';
     if(status==='verified'){
      // Alpha-channel verification is the minimum safe gate before the sprite
      // becomes a visible character layer. Identity/anatomy remain unverified.
@@ -1139,12 +1140,19 @@ function renderCharacterSpriteAssets(){
   image.src=asset.imageUrl;
   verificationImage.src=asset.imageUrl;
   const addButton=document.createElement('button');addButton.type='button';addButton.className='secondary';
+  addButton.disabled=initialTransparency!=='verified';
   const alreadyAttached=(Array.isArray(sceneMetadata[sceneIndex]?.characterLayers)?sceneMetadata[sceneIndex].characterLayers:[]).some(layer=>String(layer?.characterId||'').toLocaleLowerCase()===String(asset.characterId||'').toLocaleLowerCase());
   addButton.textContent=alreadyAttached?(uiLang==='ru'?'Обновить на сцене':'Update on scene'):(uiLang==='ru'?'Добавить на сцену':'Add to scene');
   addButton.addEventListener('click',()=>{
    const resolvedSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===sceneId);
    if(resolvedSceneIndex<0)return;
-   const result=attachCharacterSpriteToSceneLayers(sceneMetadata[resolvedSceneIndex],asset);
+   const currentAssets=Array.isArray(sceneMetadata[resolvedSceneIndex]?.characterSpriteAssets)?sceneMetadata[resolvedSceneIndex].characterSpriteAssets:[];
+   const verifiedAsset=currentAssets.find(item=>item&&String(item.assetId||'')===assetId)||asset;
+   const result=attachVerifiedCharacterSpriteToSceneLayers(sceneMetadata[resolvedSceneIndex],verifiedAsset);
+   if(result.status==='verification-required'){
+    $('status').textContent=uiLang==='ru'?'Сначала проверь прозрачность спрайта; непроверенное изображение не добавляется на сцену.':'Verify sprite transparency before adding it to the scene.';
+    return;
+   }
    if(result.status==='invalid'){
     $('status').textContent=uiLang==='ru'?'Не удалось добавить спрайт: проверь имя персонажа и HTTPS-ссылку.':'Could not attach sprite: check character ID and HTTPS image URL.';
     return;
