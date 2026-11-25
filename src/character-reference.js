@@ -80,8 +80,8 @@ export function mergeCharacterReferences(existing = [], discovered = []) {
 
 
 /**
- * Return only character profiles explicitly named in a scene cast.
- * An empty or unknown cast must never inherit unrelated character references.
+ * Return only saved image references explicitly named in a scene cast.
+ * An empty or unknown cast must never inherit unrelated character reference images.
  */
 export function selectCharacterReferencesForScene(references = [], sceneCast = []) {
   const cast = (Array.isArray(sceneCast) ? sceneCast : String(sceneCast ?? '').split(','))
