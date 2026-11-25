@@ -7,7 +7,7 @@ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 test('ComfyUI exposes four optional character-reference node bindings', () => {
   for (const index of [1, 2, 3, 4]) {
-    assert.match(app, new RegExp('referenceImage' + index + ":\\['comfyReference" + index + "Node','comfyReference" + index + "Input'\\]"));
+    assert.ok(app.includes("referenceImage" + index + ":['comfyReference" + index + "Node','comfyReference" + index + "Input']"));
     assert.match(app, new RegExp("'comfyReference" + index + "Node','comfyReference" + index + "Input'"));
     assert.match(html, new RegExp('id="comfyReference' + index + 'Node"'));
     assert.match(html, new RegExp('id="comfyReference' + index + 'Input"'));
