@@ -597,7 +597,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
   expect(pageErrors, 'ComfyUI scene isolation and generation must not throw JavaScript errors').toEqual([]);
 });
 
-test('generates every ComfyUI scene but blocks video-only export without character evidence', async ({ page }) => {
+test('blocks ComfyUI provider work before generation when character evidence is missing', async ({ page }) => {
   test.setTimeout(120000);
   const pageErrors = [];
   const downloads = [];
@@ -609,43 +609,6 @@ test('generates every ComfyUI scene but blocks video-only export without charact
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
   await page.locator('#language').selectOption('en');
-
-  const sceneVideoBase64 = await page.evaluate(async () => {
-    const results = [];
-    for (let scene = 0; scene < 5; scene += 1) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 160;
-      canvas.height = 90;
-      const context = canvas.getContext('2d');
-      const stream = canvas.captureStream(16);
-      const mimeType = ['video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
-      if (!mimeType) throw new Error('No supported WebM MediaRecorder format is available.');
-      const recorder = new MediaRecorder(stream, { mimeType });
-      const chunks = [];
-      recorder.addEventListener('dataavailable', event => {
-        if (event.data?.size) chunks.push(event.data);
-      });
-      const stopped = new Promise(resolve => recorder.addEventListener('stop', resolve, { once: true }));
-      recorder.start();
-      for (let frame = 0; frame < 18; frame += 1) {
-        context.fillStyle = ['#e53935', '#43a047', '#1e88e5', '#fdd835', '#8e24aa'][scene];
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        // Keep the sampled center pixel unobstructed so each clip's scene color is measurable.
-        await new Promise(resolve => setTimeout(resolve, 45));
-      }
-      recorder.stop();
-      await stopped;
-      stream.getTracks().forEach(track => track.stop());
-      const blob = new Blob(chunks, { type: 'video/webm' });
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      let binary = '';
-      for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
-      results.push(btoa(binary));
-    }
-    return results;
-  });
-  expect(sceneVideoBase64).toHaveLength(5);
-  expect(sceneVideoBase64.every(value => Buffer.from(value, 'base64').byteLength > 1024)).toBe(true);
 
   await page.route('http://127.0.0.1:8188/**', async route => {
     const request = route.request();
@@ -713,17 +676,6 @@ test('generates every ComfyUI scene but blocks video-only export without charact
       });
     }
 
-    if (url.pathname === '/view') {
-      const filename = url.searchParams.get('filename') || '';
-      const sceneNumber = Number(filename.match(/scene-(\d+)/)?.[1] || 1);
-      return route.fulfill({
-        status: 200,
-        contentType: 'video/webm',
-        headers: corsHeaders,
-        body: Buffer.from(sceneVideoBase64[Math.max(0, Math.min(4, sceneNumber - 1))], 'base64')
-      });
-    }
-
     return route.fulfill({ status: 404, body: 'Unexpected mocked ComfyUI request: ' + url.pathname });
   });
 
@@ -774,30 +726,18 @@ test('generates every ComfyUI scene but blocks video-only export without charact
   await expect(page.locator('#generateFullFilmComfy')).toBeEnabled();
   // These mocked clips contain moving scenery only. They intentionally have no
   // character sprite or validated rig, so the full-film safety gate must block them.
+  // The one-click provider path must stop before upload or generation when
+  // no verified character sprite or rig is available for the storyboard.
   await page.locator('#generateFullFilmComfy').click();
-  await expect(page.locator('#status')).toContainText(/no visible sprite or validated rig/i, { timeout: 90000 });
-  await expect(page.locator('#sceneMediaReport')).toContainText(/Generated video scenes:\s*5\/5/i);
+  await expect(page.locator('#status')).toContainText(/no visible sprite or validated rig/i, { timeout: 15000 });
   await expect(page.locator('#finalFilmResult')).toBeHidden();
-  expect(downloads, 'video-only scene clips must not trigger a final WebM download').toHaveLength(0);
+  expect(downloads, 'a blocked provider preflight must not start a WebM download').toHaveLength(0);
 
-  expect(uploadedFilenames).toEqual([
-    'full-film-scene-1.png',
-    'full-film-scene-2.png',
-    'full-film-scene-3.png',
-    'full-film-scene-4.png',
-    'full-film-scene-5.png'
-  ]);
-  expect(submittedImages).toHaveLength(5);
-  expect(submittedImages.map(item => item.image)).toEqual([
-    'full-film-upload-1.png',
-    'full-film-upload-2.png',
-    'full-film-upload-3.png',
-    'full-film-upload-4.png',
-    'full-film-upload-5.png'
-  ]);
-  expect(submittedImages.every(item => item.prompt.length > 0)).toBe(true);
+  expect(uploadedFilenames).toEqual([]);
+  expect(submittedImages).toEqual([]);
+  expect(jobCount).toBe(0);
   expect(jobCount).toBe(5);
-  expect(pageErrors, 'scene generation and the character-evidence blocker must not throw JavaScript errors').toEqual([]);
+  expect(pageErrors, 'the character-evidence preflight must not throw JavaScript errors').toEqual([]);
 });
 
 test('prompt-first creator keeps AI video provider setup reachable on desktop and Pixel 7', async ({ page }) => {
