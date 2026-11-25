@@ -52,6 +52,22 @@ test('full-film export waits for character images before starting MediaRecorder'
 });
 
 
+
+
+test('full-film video export cannot bypass the character-evidence preflight', () => {
+  const start = appSource.indexOf('async function exportFilm(');
+  const end = appSource.indexOf("$('export').onclick", start);
+  assert.ok(start >= 0 && end > start, 'exportFilm must be present');
+  const block = appSource.slice(start, end);
+  const gate = block.indexOf('const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId)');
+  const allVideosSnapshot = block.indexOf('if(requireAllVideos)');
+  const recorder = block.indexOf('recorder.start(250);');
+  assert.ok(gate >= 0 && allVideosSnapshot > gate,
+    'full-film mode must pass character evidence before accepting the all-videos snapshot');
+  assert.match(block.slice(gate, allVideosSnapshot), /if\(missingCharacterAssetCount>0\)/,
+    'decoded scene clips alone must not bypass the character-evidence gate');
+  assert.ok(recorder > allVideosSnapshot, 'MediaRecorder must start only after both visual and video readiness checks');
+});
 test('direct WebM export applies the shared character-visual gate before MediaRecorder starts', () => {
   const start = appSource.indexOf('async function exportFilm(');
   const end = appSource.indexOf("$('export').onclick", start);
