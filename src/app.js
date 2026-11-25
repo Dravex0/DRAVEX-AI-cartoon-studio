@@ -3826,18 +3826,31 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     return {status:'failed',reason:'There are no storyboard scenes to export.'};
   }
   const exportProtagonistId=String(currentStoryboardPlan?.sourceCharacter||$('character').value||'').trim();
-  // Restore persisted clips before readiness: a restored clip can suppress local procedural actors.
-  await sceneVideoRestorePromise;
+  // Lock the export button while persisted clips are restored; otherwise two clicks
+  // could pass the initial busy check before the asynchronous readiness gate finishes.
+  button.disabled=true;
+  try{
+    await sceneVideoRestorePromise;
+  }catch(error){
+    button.disabled=false;
+    const message=uiLang==='ru'?'Не удалось восстановить сохранённые видеосцены. Экспорт остановлен.':'Could not restore saved scene videos. Export was stopped.';
+    $('status').textContent=message;
+    return {status:'failed',reason:String(error?.message||message).slice(0,500)};
+  }
+  if(signal?.aborted){
+    button.disabled=false;
+    return {status:'cancelled',reason:'Full-film composition was cancelled.'};
+  }
   const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId);
   if(missingCharacterAssetCount>0){
+    button.disabled=false;
     const message=uiLang==='ru'
       ?'Экспорт остановлен: в '+missingCharacterAssetCount+' сценах нет видимого спрайта или проверенного рига нужного персонажа. Видеоклип сам по себе не подтверждает присутствие героя; экспорт одного фона заблокирован.'
-      :'Export stopped: '+missingCharacterAssetCount+' scenes have no visible sprite or validated rig for the required character. A scene clip alone does not prove the character is present; background-only export is blocked.';
+      :'Export stopped: '+missingCharacterAssetCount+' scenes have no visible sprite or validated rig for the required characters. A scene clip alone does not prove the character is present; background-only export is blocked.';
     $('status').textContent=message;
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Экспорт остановлен','Export stopped'),message);filmProgressTracking=false;}
     return {status:'failed',reason:message,missingCharacterAssetCount};
   }
-  button.disabled=true;
   $('audioFile').disabled=true;
   $('audioVolume').disabled=true;
   const wasPlaying=playing;
@@ -3890,8 +3903,6 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
   try{
     checkAbort();
     await stopSceneVoicePreview();
-    checkAbort();
-    await sceneVideoRestorePromise;
     checkAbort();
     if(requireAllVideos){
       requiredSceneSnapshot=captureFilmSceneSnapshot(exportSceneMetadata(),getExportSceneVideo);
