@@ -2400,8 +2400,8 @@ $('makeFilm').addEventListener('click',async()=>{
    ?'Для '+gate.missingImageCount+' сцен ещё нет изображений. Отдельно подтверди отправку только текстовых промптов в AI Horde либо добавь изображения вручную.'
    :' '+gate.missingImageCount+' scene image(s) are missing. Separately allow sending text prompts to AI Horde, or add scene images manually.');
   if(gate.blockers.includes('character-visual-assets-required'))messages.push(ru
-   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах не подтверждено присутствие нужных персонажей. Добавь видимые спрайты или проверенные риги; фоновое изображение или видеоклип сами по себе не доказывают, что герой присутствует.'
-   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes do not have verified visuals for the required characters. Add visible sprites or validated rigs; a background image or scene clip alone does not prove that a character is present.');
+   ?'Создание остановлено: в '+gate.missingCharacterAssetCount+' сценах не подтверждено присутствие нужных персонажей. Добавь видимые спрайты или проверенные риги; фоновое изображение или видеоклип сами по себе не доказывают, что герой присутствует.'
+   :'Film creation stopped: '+gate.missingCharacterAssetCount+' scenes do not have verified visuals for the required characters. Add visible sprites or validated rigs; a background image or scene clip alone does not prove that a character is present.');
   $('status').textContent=messages.join(' ');
   if(mode==='huggingface')$('hfVideoPanel').open=true;
   if(mode==='comfyui')$('comfyPanel').open=true;
