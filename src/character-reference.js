@@ -1,6 +1,7 @@
 const clean = (value, max) => String(value ?? '').trim().slice(0, max);
 
 export const CHARACTER_REFERENCE_LIMIT = 20;
+export const CHARACTER_REFERENCE_IMAGE_LIMIT = 4;
 
 /** Normalize a character profile before it is stored or added to a generation prompt. */
 export function normalizeCharacterReference(input = {}) {
@@ -79,8 +80,8 @@ export function mergeCharacterReferences(existing = [], discovered = []) {
 
 
 /**
- * Return only character profiles explicitly named in a scene cast.
- * An empty or unknown cast must never inherit unrelated character references.
+ * Return only saved image references explicitly named in a scene cast.
+ * An empty or unknown cast must never inherit unrelated character reference images.
  */
 export function selectCharacterReferencesForScene(references = [], sceneCast = []) {
   const cast = (Array.isArray(sceneCast) ? sceneCast : String(sceneCast ?? '').split(','))
@@ -93,10 +94,10 @@ export function selectCharacterReferencesForScene(references = [], sceneCast = [
   for (const source of Array.isArray(references) ? references : []) {
     const profile = normalizeCharacterReference(source);
     const key = profile.characterId.toLocaleLowerCase();
-    if (!key || !allowed.has(key) || seen.has(key)) continue;
+    if (!key || !allowed.has(key) || seen.has(key) || !profile.referenceImageAssetId) continue;
     seen.add(key);
     selected.push(profile);
-    if (selected.length >= 2) break;
+    if (selected.length >= CHARACTER_REFERENCE_IMAGE_LIMIT) break;
   }
   return selected;
 }
