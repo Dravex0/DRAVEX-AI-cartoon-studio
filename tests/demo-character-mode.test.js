@@ -58,3 +58,19 @@ test('uses the shared offline Doodle renderer only in local-canvas mode and reus
   assert.match(appSource, /proceduralActors:\$\('videoGenerationMode'\)\.value==='local-canvas'/);
   assert.ok(appSource.includes('...(proceduralActors.layers||[])],rigAnimationProgress'));
 });
+
+
+test('does not treat a fully transparent sprite as renderable character evidence', () => {
+  const scene = { characterLayers: [{
+    characterId: 'Foxy',
+    imageUrl: 'https://example.com/transparent-fox.png',
+    visible: true,
+    opacity: 0
+  }] };
+  const hasLayer = hasRenderableCharacterLayer(scene, 'Foxy');
+  assert.equal(hasLayer, false);
+  assert.equal(shouldShowProceduralDemoCharacter({
+    storyUsesFallback: true,
+    hasCharacterLayers: hasLayer
+  }), false);
+});
