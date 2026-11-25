@@ -109,7 +109,7 @@ test('local canvas blocks a named-cast film when no character visuals exist', ()
   assert.equal(result.missingCharacterAssetCount, 5);
 });
 
-test('local canvas permits an explicitly marked procedural demo character fallback', () => {
+test('local canvas permits the deterministic procedural actor renderer when its fallback is available', () => {
   const result = evaluatePromptToFilmStart({
     mode: 'local-canvas',
     sceneCount: 5,
