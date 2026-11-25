@@ -724,10 +724,8 @@ test('blocks ComfyUI provider work before generation when character evidence is 
 
   await expect(page.locator('#generateFullFilmComfy')).toBeVisible();
   await expect(page.locator('#generateFullFilmComfy')).toBeEnabled();
-  // These mocked clips contain moving scenery only. They intentionally have no
-  // character sprite or validated rig, so the full-film safety gate must block them.
-  // The one-click provider path must stop before upload or generation when
-  // no verified character sprite or rig is available for the storyboard.
+  // This fixture intentionally has no character sprite or validated rig.
+  // Preflight must block before any image upload or ComfyUI prompt is submitted.
   await page.locator('#generateFullFilmComfy').click();
   await expect(page.locator('#status')).toContainText(/no visible sprite or validated rig/i, { timeout: 15000 });
   await expect(page.locator('#finalFilmResult')).toBeHidden();
@@ -736,7 +734,6 @@ test('blocks ComfyUI provider work before generation when character evidence is 
   expect(uploadedFilenames).toEqual([]);
   expect(submittedImages).toEqual([]);
   expect(jobCount).toBe(0);
-  expect(jobCount).toBe(5);
   expect(pageErrors, 'the character-evidence preflight must not throw JavaScript errors').toEqual([]);
 });
 
