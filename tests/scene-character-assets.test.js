@@ -80,3 +80,15 @@ test('direct WebM export applies the shared character-visual gate before MediaRe
   assert.ok(blockedMessage > gate, 'missing character visuals must produce an explicit blocker');
   assert.ok(recorder > blockedMessage, 'MediaRecorder must not start after a blocked visual preflight');
 });
+
+
+test('direct export restores persisted scene clips before character readiness is evaluated', () => {
+  const start = appSource.indexOf('async function exportFilm(');
+  const end = appSource.indexOf("$('export').onclick", start);
+  assert.ok(start >= 0 && end > start, 'exportFilm must be present');
+  const block = appSource.slice(start, end);
+  const restore = block.indexOf('await sceneVideoRestorePromise;');
+  const gate = block.indexOf('const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId)');
+  assert.ok(restore >= 0 && gate > restore,
+    'a restored clip must be visible to the readiness gate before export can start');
+});
