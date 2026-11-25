@@ -597,9 +597,11 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
   expect(pageErrors, 'ComfyUI scene isolation and generation must not throw JavaScript errors').toEqual([]);
 });
 
-test('generates every ComfyUI scene and exports one playable full-film WebM', async ({ page }) => {
+test('generates every ComfyUI scene but blocks video-only export without character evidence', async ({ page }) => {
   test.setTimeout(120000);
   const pageErrors = [];
+  const downloads = [];
+  page.on('download', download => downloads.push(download));
   const uploadedFilenames = [];
   const submittedImages = [];
   let jobCount = 0;
@@ -770,109 +772,14 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
 
   await expect(page.locator('#generateFullFilmComfy')).toBeVisible();
   await expect(page.locator('#generateFullFilmComfy')).toBeEnabled();
+  // These mocked clips contain moving scenery only. They intentionally have no
+  // character sprite or validated rig, so the full-film safety gate must block them.
   await page.locator('#generateFullFilmComfy').click();
+  await expect(page.locator('#status')).toContainText(/no visible sprite or validated rig/i, { timeout: 90000 });
+  await expect(page.locator('#sceneMediaReport')).toContainText(/Generated video scenes:\\s*5\\/5/i);
+  await expect(page.locator('#finalFilmResult')).toBeHidden();
+  expect(downloads, 'video-only scene clips must not trigger a final WebM download').toHaveLength(0);
 
-  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 90000 }).catch(async error => {
-    const status = await page.locator('#status').textContent().catch(() => '');
-    const voiceStatus = await page.locator('#sceneVoiceStatus').textContent().catch(() => '');
-    throw new Error('ComfyUI full-film export did not complete. status="' + status + '"; voice="' + voiceStatus + '". ' + error.message);
-  });
-  await expect(page.locator('#fullFilmProgress')).toHaveJSProperty('value', 100);
-  const finalVideo = await page.locator('#finalFilmPlayer').evaluate(async element => {
-    await element.play().catch(() => {});
-    const response = await fetch(element.currentSrc);
-    const blob = await response.blob();
-    return {
-      mimeType: blob.type,
-      byteLength: blob.size,
-      duration: element.duration,
-      width: element.videoWidth,
-      height: element.videoHeight,
-      readyState: element.readyState
-    };
-  });
-
-  expect(finalVideo.mimeType).toMatch(/^video\/webm/i);
-  expect(finalVideo.byteLength).toBeGreaterThan(1024);
-  expect(finalVideo.duration).toBeGreaterThan(0);
-  expect(finalVideo.width).toBe(1280);
-  expect(finalVideo.height).toBe(720);
-  expect(finalVideo.readyState).toBeGreaterThanOrEqual(2);
-  const expectedSceneColorBuckets = ['7,2,2', '2,5,2', '1,4,7', '8,7,2', '4,1,5'];
-  const observedSceneColors = await page.locator('#finalFilmPlayer').evaluate(async player => {
-    const video = document.createElement('video');
-    video.muted = true;
-    video.playsInline = true;
-    video.src = player.currentSrc;
-    await new Promise((resolve, reject) => {
-      video.addEventListener('loadedmetadata', resolve, { once: true });
-      video.addEventListener('error', () => reject(new Error('Could not decode final film for scene-order verification.')), { once: true });
-    });
-    const canvas = document.createElement('canvas');
-    canvas.width = 16;
-    canvas.height = 16;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    const colors = new Set();
-    const samples = [];
-    const sceneColorSequence = [];
-    let firstSceneFrameSeen = false;
-    let lastSceneColorBucket = null;
-    let characterOverlayFrames = 0;
-    let lastSampleAt = -1000;
-    await video.play();
-    const startedAt = performance.now();
-    while (!video.ended && performance.now() - startedAt < 30000) {
-      if (video.readyState >= 2) {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        // Use the dominant frame color instead of one corner pixel. Camera pans and the
-        // intentionally overlaid character can cover individual pixels, but the synthetic
-        // ComfyUI fixture keeps each scene's background color across most of the frame.
-        const framePixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-        const colorCounts = new Map();
-        for (let pixel = 0; pixel < framePixels.length; pixel += 4) {
-          if (framePixels[pixel + 3] < 128) continue;
-          const bucket = [
-            Math.round(framePixels[pixel] / 32),
-            Math.round(framePixels[pixel + 1] / 32),
-            Math.round(framePixels[pixel + 2] / 32)
-          ].join(',');
-          if (bucket !== '0,0,0') colorCounts.set(bucket, (colorCounts.get(bucket) || 0) + 1);
-        }
-        const colorBucket = [...colorCounts].sort((a, b) => b[1] - a[1])[0]?.[0] || '0,0,0';
-        const centerPixel = context.getImageData(8, 8, 1, 1).data;
-        const rgb = colorBucket.split(',').map(value => Number(value) * 32);
-        const centerRgb = [centerPixel[0], centerPixel[1], centerPixel[2]];
-        if (centerRgb[0] >= 160 && centerRgb[1] >= 60 && centerRgb[1] <= 190 && centerRgb[2] <= 120
-          && centerRgb[0] - centerRgb[1] >= 35 && centerRgb[0] - centerRgb[2] >= 60) characterOverlayFrames += 1;
-        // Ignore the recorder's initial black frame before the first scene frame is available.
-        if (colorBucket !== '0,0,0') {
-          firstSceneFrameSeen = true;
-          if (colorBucket !== lastSceneColorBucket) {
-            sceneColorSequence.push(colorBucket);
-            lastSceneColorBucket = colorBucket;
-          }
-        }
-        if (firstSceneFrameSeen) colors.add(colorBucket);
-        if (performance.now() - lastSampleAt >= 100) {
-          samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb, centerRgb });
-          lastSampleAt = performance.now();
-        }
-      }
-      await new Promise(resolve => requestAnimationFrame(resolve));
-    }
-    if (!video.ended) throw new Error('Timed out playing final WebM during scene-order verification.');
-    video.pause();
-    video.removeAttribute('src');
-    video.load();
-    return { colors: [...colors], sceneColorSequence, samples, characterOverlayFrames };
-  });
-  const expectedColorBuckets = [...expectedSceneColorBuckets].sort();
-  const observedColorBuckets = [...new Set(observedSceneColors.colors)].sort();
-  expect(observedColorBuckets, 'Final WebM should contain exactly the five generated scene color buckets; expected: '+JSON.stringify(expectedColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedColorBuckets);
-  expect(observedSceneColors.sceneColorSequence, 'Final WebM scene colors should follow storyboard order; expected: '+JSON.stringify(expectedSceneColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.sceneColorSequence)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedSceneColorBuckets);
-  // This ComfyUI fixture supplies background videos but no character artwork or rig.
-  // The removed hard-coded demo mascot must not be composited over generated footage.
-  expect(observedSceneColors.characterOverlayFrames).toBe(0);
   expect(uploadedFilenames).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
@@ -889,7 +796,8 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
     'full-film-upload-5.png'
   ]);
   expect(submittedImages.every(item => item.prompt.length > 0)).toBe(true);
-  expect(pageErrors, 'full-film generation and WebM export must not throw JavaScript errors').toEqual([]);
+  expect(jobCount).toBe(5);
+  expect(pageErrors, 'scene generation and the character-evidence blocker must not throw JavaScript errors').toEqual([]);
 });
 
 test('prompt-first creator keeps AI video provider setup reachable on desktop and Pixel 7', async ({ page }) => {
