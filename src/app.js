@@ -2375,9 +2375,7 @@ $('makeFilm').addEventListener('click',async()=>{
   const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
   return source.kind==='missing'&&!cachedVideo?.video;
  }).length;
- const missingCharacterAssetCount=mode==='local-canvas'
-  ?getMissingCharacterVisualCount(requestedCharacter)
-  :0;
+ const missingCharacterAssetCount=getMissingCharacterVisualCount(requestedCharacter);
  const gate=evaluatePromptToFilmStart({
   mode,
   sceneCount:sceneMetadata.length,
