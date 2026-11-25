@@ -87,3 +87,21 @@ test('one-click film waits for persisted scene videos before checking character 
   assert.ok(start >= 0 && restore > start && mode > restore && gate > mode,
     'persisted clips must be restored before the character-visual preflight');
 });
+
+
+test('full-film provider action restores clips and checks character evidence before any provider request', () => {
+  const start = appSource.indexOf("$('generateFullFilmComfy').addEventListener('click',async()=>{");
+  const end = appSource.indexOf("$('play').onclick", start);
+  assert.ok(start >= 0 && end > start, 'full-film provider handler must exist');
+  const block = appSource.slice(start, end);
+  const tryStart = block.indexOf('try{');
+  const restore = block.indexOf('await sceneVideoRestorePromise;');
+  const gate = block.indexOf('const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId)');
+  const providerWork = block.indexOf('generateStoryboardVideos({');
+  assert.ok(tryStart >= 0 && restore > tryStart && gate > restore && providerWork > gate,
+    'restore and character preflight must run inside the cleanup scope before provider work');
+  assert.match(block.slice(gate, providerWork), /if\(missingCharacterAssetCount>0\)/,
+    'missing character visuals must stop the provider before any scene generation');
+  assert.match(block, /finally\{\s*fullFilmAbortController=null;cancel\.hidden=true;button\.disabled=false;/,
+    'the provider button must recover when restore or preflight fails');
+});
