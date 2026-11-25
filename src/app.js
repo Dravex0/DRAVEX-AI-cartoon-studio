@@ -3826,6 +3826,8 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     return {status:'failed',reason:'There are no storyboard scenes to export.'};
   }
   const exportProtagonistId=String(currentStoryboardPlan?.sourceCharacter||$('character').value||'').trim();
+  // Restore persisted clips before readiness: a restored clip can suppress local procedural actors.
+  await sceneVideoRestorePromise;
   const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId);
   if(missingCharacterAssetCount>0){
     const message=uiLang==='ru'
