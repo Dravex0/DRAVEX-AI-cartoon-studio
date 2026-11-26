@@ -97,7 +97,6 @@ export function selectCharacterReferencesForScene(references = [], sceneCast = [
     if (!key || !allowed.has(key) || seen.has(key) || !profile.referenceImageAssetId) continue;
     seen.add(key);
     selected.push(profile);
-    if (selected.length >= CHARACTER_REFERENCE_IMAGE_LIMIT) break;
   }
   return selected;
 }

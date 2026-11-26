@@ -328,6 +328,7 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 <div class="field"><label for="comfyCharacterReference2">Character reference 2 / Референс персонажа 2</label><input id="comfyCharacterReference2" type="file" accept="image/png,image/jpeg,image/webp"><small>Optional. Supports workflows with a second Load Image input.</small></div>
 <div class="field"><label for="comfyCharacterReference3">Character reference 3 / Референс персонажа 3</label><input id="comfyCharacterReference3" type="file" accept="image/png,image/jpeg,image/webp"><small>Optional. Supports workflows with a third Load Image input.</small></div>
 <div class="field"><label for="comfyCharacterReference4">Character reference 4 / Референс персонажа 4</label><input id="comfyCharacterReference4" type="file" accept="image/png,image/jpeg,image/webp"><small>Optional. Supports workflows with a fourth Load Image input.</small></div>
+<small class="muted">Manual reference uploads are used first; saved Character Bible images fill remaining slots. References beyond configured workflow inputs are reported and not uploaded.</small>
 <div class="field"><strong>Text-to-video bindings / Настройки T2V</strong><small class="muted">Для сцен без картинки. Node IDs относятся только к T2V workflow.</small></div>
 <div class="comfy-grid">
 <div class="field"><label for="comfyTextPromptNode">T2V prompt node</label><input id="comfyTextPromptNode" value="6"></div>
@@ -340,6 +341,14 @@ button.secondary{background:#1a2941;color:#e8efff;border:1px solid #354866;box-s
 <div class="field"><label for="comfyTextFpsInput">T2V FPS input</label><input id="comfyTextFpsInput" value="fps"></div>
 <div class="field"><label for="comfyTextSeedNode">T2V seed node</label><input id="comfyTextSeedNode" placeholder="Optional"></div>
 <div class="field"><label for="comfyTextSeedInput">T2V seed input</label><input id="comfyTextSeedInput" value="seed"></div>
+<div class="field"><label for="comfyTextReference1Node">T2V reference 1 node ID</label><input id="comfyTextReference1Node" placeholder="Optional"></div>
+<div class="field"><label for="comfyTextReference1Input">T2V reference 1 input</label><input id="comfyTextReference1Input" value="image"></div>
+<div class="field"><label for="comfyTextReference2Node">T2V reference 2 node ID</label><input id="comfyTextReference2Node" placeholder="Optional"></div>
+<div class="field"><label for="comfyTextReference2Input">T2V reference 2 input</label><input id="comfyTextReference2Input" value="image"></div>
+<div class="field"><label for="comfyTextReference3Node">T2V reference 3 node ID</label><input id="comfyTextReference3Node" placeholder="Optional"></div>
+<div class="field"><label for="comfyTextReference3Input">T2V reference 3 input</label><input id="comfyTextReference3Input" value="image"></div>
+<div class="field"><label for="comfyTextReference4Node">T2V reference 4 node ID</label><input id="comfyTextReference4Node" placeholder="Optional"></div>
+<div class="field"><label for="comfyTextReference4Input">T2V reference 4 input</label><input id="comfyTextReference4Input" value="image"></div>
 <div class="field"><label for="comfyTextOutputNodes">T2V video output node IDs</label><input id="comfyTextOutputNodes" value="58"></div>
 <div class="field"><label for="comfyTextFrameStep">T2V frame step</label><input id="comfyTextFrameStep" type="number" min="1" max="120" value="8"></div>
 </div>

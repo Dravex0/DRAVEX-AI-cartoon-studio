@@ -5,31 +5,45 @@ import { readFileSync } from 'node:fs';
 const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
-test('ComfyUI exposes four optional character-reference node bindings', () => {
+test('ComfyUI exposes four optional character-reference bindings for both workflow types', () => {
   for (const index of [1, 2, 3, 4]) {
-    assert.ok(app.includes("referenceImage" + index + ":[\'comfyReference" + index + "Node\',\'comfyReference" + index + "Input\']"));
-    assert.ok(app.includes("'comfyReference" + index + "Node','comfyReference" + index + "Input'"));
-    assert.ok(html.includes('id="comfyReference' + index + 'Node"'));
-    assert.ok(html.includes('id="comfyReference' + index + 'Input"'));
-    assert.ok(html.includes('id="comfyCharacterReference' + index + '"'));
+    assert.ok(app.includes(`referenceImage${index}:[\'comfyReference${index}Node\',\'comfyReference${index}Input\']`));
+    assert.ok(app.includes(`referenceImage${index}:[\'comfyTextReference${index}Node\',\'comfyTextReference${index}Input\']`));
+    assert.ok(app.includes(`'comfyReference${index}Node','comfyReference${index}Input'`));
+    assert.ok(app.includes(`'comfyTextReference${index}Node','comfyTextReference${index}Input'`));
+    assert.ok(html.includes(`id="comfyReference${index}Node"`));
+    assert.ok(html.includes(`id="comfyReference${index}Input"`));
+    assert.ok(html.includes(`id="comfyTextReference${index}Node"`));
+    assert.ok(html.includes(`id="comfyTextReference${index}Input"`));
+    assert.ok(html.includes(`id="comfyCharacterReference${index}"`));
   }
-  assert.ok(app.includes("['comfyCharacterReference1','comfyCharacterReference2','comfyCharacterReference3','comfyCharacterReference4'].forEach"));
 });
 
-test('all ComfyUI generation paths share the four-reference limit', () => {
-  assert.ok(app.includes('if(images.length>=CHARACTER_REFERENCE_IMAGE_LIMIT)break;'));
-  assert.equal((app.match(/\.slice\(0,CHARACTER_REFERENCE_IMAGE_LIMIT\)/g) || []).length, 3);
-  assert.ok(app.includes('profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,CHARACTER_REFERENCE_IMAGE_LIMIT)'));
-  assert.ok(app.includes('profileReferenceImages.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,CHARACTER_REFERENCE_IMAGE_LIMIT)'));
+test('all three ComfyUI generation paths preserve manual-first references without truncating them', () => {
+  assert.match(app, /import \{ prioritizeCharacterReferenceImages \} from [\"']\.\/character-reference-selection\.js[\"']/);
+  assert.match(app, /async function buildCharacterReferenceImagesForScene\(scene\)[\s\S]*?return prioritizeCharacterReferenceImages\(comfyCharacterReferenceFiles,profileImages\)/);
+  assert.equal((app.match(/buildCharacterReferenceImagesForScene\(/g) || []).length, 4);
+  assert.doesNotMatch(app, /profileReferences\.concat\(comfyCharacterReferenceFiles\.filter\(Boolean\)\)/);
+  assert.doesNotMatch(app, /profileReferenceImages\.concat\(comfyCharacterReferenceFiles\.filter\(Boolean\)\)/);
 });
 
-test('reference 3 and 4 changes invalidate the ComfyUI connection just like the first two slots', () => {
+test('T2V reference bindings invalidate the local ComfyUI connection when changed', () => {
   const configStart = app.indexOf('const comfyConfigurationInputIds=[');
   const configEnd = app.indexOf('];', configStart);
   assert.ok(configStart >= 0 && configEnd > configStart);
   const config = app.slice(configStart, configEnd);
   for (const index of [1, 2, 3, 4]) {
-    assert.ok(config.includes("'comfyReference" + index + "Node'"));
-    assert.ok(config.includes("'comfyReference" + index + "Input'"));
+    assert.ok(config.includes(`'comfyTextReference${index}Node'`));
+    assert.ok(config.includes(`'comfyTextReference${index}Input'`));
   }
+});
+
+test('universal ComfyUI generation surfaces provider warnings instead of hiding skipped references', () => {
+  const start = app.indexOf('async function generateLocalSceneVideoForUniversal');
+  const end = app.indexOf('function setComfyStatus', start);
+  assert.ok(start >= 0 && end > start);
+  const body = app.slice(start, end);
+  assert.match(body, /stage==='warning'&&job\.message/);
+  assert.match(body, /\$\('status'\)\.textContent=warning/);
+  assert.match(body, /reportProgress\?\.\(warning\)/);
 });

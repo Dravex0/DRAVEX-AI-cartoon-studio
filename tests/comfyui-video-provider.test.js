@@ -134,7 +134,8 @@ test('uploads and binds only explicitly configured character reference images', 
     { name: 'alex.png', blob: new Blob(['alex-reference'], { type: 'image/png' }) },
     { name: 'dragon.webp', blob: new Blob(['dragon-reference'], { type: 'image/webp' }) },
     { name: 'robot.png', blob: new Blob(['robot-reference'], { type: 'image/png' }) },
-    { name: 'bird.png', blob: new Blob(['bird-reference'], { type: 'image/png' }) }
+    { name: 'bird.png', blob: new Blob(['bird-reference'], { type: 'image/png' }) },
+    { name: 'extra.png', blob: new Blob(['extra-reference'], { type: 'image/png' }) }
   ];
   const referenceBindings = {
     ...nodeBindings,
@@ -174,13 +175,87 @@ test('uploads and binds only explicitly configured character reference images', 
   });
   const registry = createVideoProviderRegistry();
   registry.register(provider);
-  await generateVideoWithProvider(registry, provider.id, { ...request, referenceImages: references });
+  const progress = [];
+  await provider.generate({ ...request, referenceImages: references }, { onProgress: event => progress.push(event) });
   assert.equal(uploadedForms.length, 5);
+  const overflowWarning = progress.find(event => event.stage === 'warning' && event.code === 'CHARACTER_REFERENCE_NOT_BOUND');
+  assert.deepEqual(overflowWarning?.skippedReferenceIndexes, [5]);
   assert.equal(submittedWorkflow['20'].inputs.image, 'refs/upload-1.png');
   assert.equal(submittedWorkflow['21'].inputs.image, 'refs/upload-2.png');
   assert.equal(submittedWorkflow['22'].inputs.image, 'refs/upload-3.png');
   assert.equal(submittedWorkflow['23'].inputs.image, 'refs/upload-4.png');
   assert.equal(submittedWorkflow['24'].inputs.image, 'refs/upload-5.png');
+});
+
+
+test('uploads and binds character references in a text-to-video workflow', async () => {
+  const uploadedForms = [];
+  let submittedWorkflow;
+  const textWorkflow = {
+    '10': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '20': { class_type: 'VideoSettings', inputs: { seconds: 0, frame_rate: 0, frames: 0 } },
+    '21': { class_type: 'LoadImage', inputs: { image: '' } },
+    '22': { class_type: 'LoadImage', inputs: { image: '' } },
+    '23': { class_type: 'LoadImage', inputs: { image: '' } },
+    '24': { class_type: 'LoadImage', inputs: { image: '' } },
+    '90': { class_type: 'SaveVideo', inputs: {} }
+  };
+  const textBindings = {
+    prompt: { nodeId: '10', input: 'text' },
+    durationSeconds: { nodeId: '20', input: 'seconds' },
+    fps: { nodeId: '20', input: 'frame_rate' },
+    frameCount: { nodeId: '20', input: 'frames' },
+    referenceImage1: { nodeId: '21', input: 'image' },
+    referenceImage2: { nodeId: '22', input: 'image' },
+    referenceImage3: { nodeId: '23', input: 'image' },
+    referenceImage4: { nodeId: '24', input: 'image' }
+  };
+  const references = ['fox.png', 'dragon.png', 'robot.png', 'bird.png'].map(name => ({
+    name,
+    blob: new Blob([name], { type: 'image/png' })
+  }));
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).endsWith('/upload/image')) {
+      uploadedForms.push(options.body);
+      return jsonResponse({ name: `t2v-${uploadedForms.length}.png`, subfolder: 'refs', type: 'input' });
+    }
+    if (String(url).endsWith('/prompt')) {
+      submittedWorkflow = JSON.parse(options.body).prompt;
+      return jsonResponse({ prompt_id: 't2v-reference-job' });
+    }
+    if (String(url).endsWith('/history/t2v-reference-job')) {
+      return jsonResponse({ 't2v-reference-job': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '90': { videos: [{ filename: 't2v-reference.mp4', type: 'output' }] } }
+      }});
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflows: {
+      'text-to-video': {
+        workflow: textWorkflow,
+        nodeBindings: textBindings,
+        outputNodeIds: ['90']
+      }
+    },
+    fetchImpl,
+    pollIntervalMs: 250
+  });
+  await provider.generate({
+    taskType: 'text-to-video',
+    prompt: 'Four distinct characters meet and wave.',
+    durationSeconds: 2,
+    fps: 16,
+    referenceImages: references
+  });
+  assert.equal(uploadedForms.length, 4);
+  assert.equal(submittedWorkflow['21'].inputs.image, 'refs/t2v-1.png');
+  assert.equal(submittedWorkflow['22'].inputs.image, 'refs/t2v-2.png');
+  assert.equal(submittedWorkflow['23'].inputs.image, 'refs/t2v-3.png');
+  assert.equal(submittedWorkflow['24'].inputs.image, 'refs/t2v-4.png');
 });
 
 test('passes a stable identity seed into an explicitly configured ComfyUI seed input', async () => {

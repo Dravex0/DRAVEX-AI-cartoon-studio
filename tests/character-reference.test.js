@@ -121,7 +121,7 @@ test('does not leak character references into scenes with an empty or unrelated 
   assert.deepEqual(selectCharacterReferencesForScene(profiles, ['Unknown character']), []);
 });
 
-test('selects up to four saved scene-specific image references for ComfyUI provider slots', () => {
+test('returns every saved scene-specific image reference so the provider can report capacity overflow', () => {
   const profiles = ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird'].map(characterId => ({
     characterId,
     referenceImageAssetId: characterId.toLowerCase() + '-image'
@@ -129,7 +129,7 @@ test('selects up to four saved scene-specific image references for ComfyUI provi
   assert.equal(CHARACTER_REFERENCE_IMAGE_LIMIT, 4);
   assert.deepEqual(
     selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird']).map(profile => profile.characterId),
-    ['Foxy', 'Mira', 'Snowball', 'Robot']
+    ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird']
   );
 });
 
@@ -144,7 +144,7 @@ test('skips cast profiles without saved images and fills later available referen
   ];
   assert.deepEqual(
     selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird', 'Wolf']).map(profile => profile.characterId),
-    ['Mira', 'Snowball', 'Robot', 'Bird']
+    ['Mira', 'Snowball', 'Robot', 'Bird', 'Wolf']
   );
 });
 
