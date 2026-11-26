@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { seedVoiceArtifactsForCurrentDraft } from './helpers/seed-voice-artifacts.js';
+import { seedCharacterLayersForCurrentDraft } from './helpers/seed-character-layers.js';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -596,6 +597,312 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
   expect(submittedImages.every(item => item.prompt.length > 0)).toBe(true);
   expect(pageErrors, 'ComfyUI scene isolation and generation must not throw JavaScript errors').toEqual([]);
 });
+
+test('generates every ComfyUI scene and exports a playable WebM with verified character layers', async ({ page }) => {
+  test.setTimeout(120000);
+  const pageErrors = [];
+  const uploadedFilenames = [];
+  const submittedImages = [];
+  let jobCount = 0;
+
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.goto('/');
+  await page.locator('#language').selectOption('en');
+
+  const sceneVideoBase64 = await page.evaluate(async () => {
+    const results = [];
+    for (let scene = 0; scene < 5; scene += 1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 90;
+      const context = canvas.getContext('2d');
+      const stream = canvas.captureStream(16);
+      const mimeType = ['video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
+      if (!mimeType) throw new Error('No supported WebM MediaRecorder format is available.');
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks = [];
+      recorder.addEventListener('dataavailable', event => {
+        if (event.data?.size) chunks.push(event.data);
+      });
+      const stopped = new Promise(resolve => recorder.addEventListener('stop', resolve, { once: true }));
+      recorder.start();
+      for (let frame = 0; frame < 18; frame += 1) {
+        context.fillStyle = ['#e53935', '#43a047', '#1e88e5', '#fdd835', '#8e24aa'][scene];
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        // Keep the sampled center pixel unobstructed so each clip's scene color is measurable.
+        await new Promise(resolve => setTimeout(resolve, 45));
+      }
+      recorder.stop();
+      await stopped;
+      stream.getTracks().forEach(track => track.stop());
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = '';
+      for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+      results.push(btoa(binary));
+    }
+    return results;
+  });
+  expect(sceneVideoBase64).toHaveLength(5);
+  expect(sceneVideoBase64.every(value => Buffer.from(value, 'base64').byteLength > 1024)).toBe(true);
+
+  await page.route('http://127.0.0.1:8188/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const corsHeaders = {
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-headers': 'Content-Type'
+    };
+
+    if (request.method() === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
+
+    if (url.pathname === '/system_stats') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ system: { comfyui_version: 'playwright-full-film-mock' } })
+      });
+    }
+
+    if (url.pathname === '/upload/image') {
+      const body = request.postDataBuffer()?.toString('latin1') || '';
+      const filename = body.match(/filename="([^"]+)"/)?.[1] || '';
+      uploadedFilenames.push(filename);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ name: 'full-film-upload-' + uploadedFilenames.length + '.png', subfolder: '', type: 'input' })
+      });
+    }
+
+    if (url.pathname === '/prompt') {
+      const requestBody = request.postDataJSON();
+      const workflow = requestBody.prompt;
+      submittedImages.push({
+        prompt: workflow['6']?.inputs?.text || '',
+        image: workflow['56']?.inputs?.image || null
+      });
+      jobCount += 1;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ prompt_id: 'full-film-mock-job-' + jobCount })
+      });
+    }
+
+    if (url.pathname.startsWith('/history/')) {
+      const jobId = url.pathname.split('/').pop();
+      const number = Number(jobId.replace('full-film-mock-job-', ''));
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({
+          [jobId]: {
+            status: { completed: true, status_str: 'success' },
+            outputs: { '58': { videos: [{ filename: 'full-film-scene-' + number + '.webm', type: 'output' }] } }
+          }
+        })
+      });
+    }
+
+    if (url.pathname === '/view') {
+      const filename = url.searchParams.get('filename') || '';
+      const sceneNumber = Number(filename.match(/scene-(\d+)/)?.[1] || 1);
+      return route.fulfill({
+        status: 200,
+        contentType: 'video/webm',
+        headers: corsHeaders,
+        body: Buffer.from(sceneVideoBase64[Math.max(0, Math.min(4, sceneNumber - 1))], 'base64')
+      });
+    }
+
+    return route.fulfill({ status: 404, body: 'Unexpected mocked ComfyUI request: ' + url.pathname });
+  });
+
+  await page.locator('#idea').fill(
+    'A young fox finds a glowing key in a forest, follows its light to a hidden gate, opens it, and discovers a peaceful garden. Duration: 1 second'
+  );
+  await page.locator('#make').click();
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await expect(page.locator('#scenes button.scene')).toHaveCount(5);
+  await seedVoiceArtifactsForCurrentDraft(page, { language: 'en', prepareStoryboard: false });
+  const characterFixtures = await seedCharacterLayersForCurrentDraft(page);
+  expect(characterFixtures.characterLayerCount).toBeGreaterThan(0);
+
+  await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
+  await page.locator('#videoGenerationMode').selectOption('comfyui');
+  await page.locator('#comfyPanel > summary').click();
+  const imageWorkflow = {
+    '6': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '7': { class_type: 'CLIPTextEncode', inputs: { text: '' } },
+    '55': { class_type: 'VideoSettings', inputs: { length: 0 } },
+    '56': { class_type: 'LoadImage', inputs: { image: '' } },
+    '57': { class_type: 'VideoSettings', inputs: { fps: 0 } },
+    '58': { class_type: 'SaveVideo', inputs: {} }
+  };
+  await page.locator('#comfyImageWorkflowFile').setInputFiles({
+    name: 'full-film-image-api.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(imageWorkflow))
+  });
+  await expect(page.locator('#comfyImageWorkflowStatus')).toContainText('Loaded full-film-image-api.json');
+  await page.locator('#checkComfyConnection').click();
+  await expect(page.locator('#comfyStatus')).toContainText(/connected to ComfyUI/i);
+
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pS8AAAAASUVORK5CYII=',
+    'base64'
+  );
+  for (let index = 0; index < 5; index += 1) {
+    await page.locator('#scenes button.scene').nth(index).click();
+    const filename = 'full-film-scene-' + (index + 1) + '.png';
+    await page.locator('#comfySourceImageFile').setInputFiles({
+      name: filename,
+      mimeType: 'image/png',
+      buffer: png
+    });
+    await expect(page.locator('#comfySourceImageStatus')).toContainText(filename);
+  }
+
+  await expect(page.locator('#generateFullFilmComfy')).toBeVisible();
+  await expect(page.locator('#generateFullFilmComfy')).toBeEnabled();
+  await page.locator('#generateFullFilmComfy').click();
+
+  await expect(page.locator('#finalFilmResult')).toBeVisible({ timeout: 90000 }).catch(async error => {
+    const status = await page.locator('#status').textContent().catch(() => '');
+    const voiceStatus = await page.locator('#sceneVoiceStatus').textContent().catch(() => '');
+    throw new Error('ComfyUI full-film export did not complete. status="' + status + '"; voice="' + voiceStatus + '". ' + error.message);
+  });
+  await expect(page.locator('#fullFilmProgress')).toHaveJSProperty('value', 100);
+  const finalVideo = await page.locator('#finalFilmPlayer').evaluate(async element => {
+    await element.play().catch(() => {});
+    const response = await fetch(element.currentSrc);
+    const blob = await response.blob();
+    return {
+      mimeType: blob.type,
+      byteLength: blob.size,
+      duration: element.duration,
+      width: element.videoWidth,
+      height: element.videoHeight,
+      readyState: element.readyState
+    };
+  });
+
+  expect(finalVideo.mimeType).toMatch(/^video\/webm/i);
+  expect(finalVideo.byteLength).toBeGreaterThan(1024);
+  expect(finalVideo.duration).toBeGreaterThan(0);
+  expect(finalVideo.width).toBe(1280);
+  expect(finalVideo.height).toBe(720);
+  expect(finalVideo.readyState).toBeGreaterThanOrEqual(2);
+  const expectedSceneColorBuckets = ['7,2,2', '2,5,2', '1,4,7', '8,7,2', '4,1,5'];
+  const observedSceneColors = await page.locator('#finalFilmPlayer').evaluate(async player => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.src = player.currentSrc;
+    await new Promise((resolve, reject) => {
+      video.addEventListener('loadedmetadata', resolve, { once: true });
+      video.addEventListener('error', () => reject(new Error('Could not decode final film for scene-order verification.')), { once: true });
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 72;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const colors = new Set();
+    const samples = [];
+    const sceneColorSequence = [];
+    let firstSceneFrameSeen = false;
+    let lastSceneColorBucket = null;
+    let characterOverlayFrames = 0;
+    let maxCharacterSpritePixels = 0;
+    let characterSpriteFrames = 0;
+    let lastSampleAt = -1000;
+    await video.play();
+    const startedAt = performance.now();
+    while (!video.ended && performance.now() - startedAt < 30000) {
+      if (video.readyState >= 2) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Use the dominant frame color instead of one corner pixel. Camera pans and the
+        // intentionally overlaid character can cover individual pixels, but the synthetic
+        // ComfyUI fixture keeps each scene's background color across most of the frame.
+        const framePixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        const colorCounts = new Map();
+        let cyanCharacterPixels = 0;
+        for (let pixel = 0; pixel < framePixels.length; pixel += 4) {
+          if (framePixels[pixel + 3] < 128) continue;
+          if (framePixels[pixel] < 70 && framePixels[pixel + 1] > 170 && framePixels[pixel + 2] > 190) cyanCharacterPixels += 1;
+          const bucket = [
+            Math.round(framePixels[pixel] / 32),
+            Math.round(framePixels[pixel + 1] / 32),
+            Math.round(framePixels[pixel + 2] / 32)
+          ].join(',');
+          if (bucket !== '0,0,0') colorCounts.set(bucket, (colorCounts.get(bucket) || 0) + 1);
+        }
+        const colorBucket = [...colorCounts].sort((a, b) => b[1] - a[1])[0]?.[0] || '0,0,0';
+        if (cyanCharacterPixels > 0) characterSpriteFrames += 1;
+        maxCharacterSpritePixels = Math.max(maxCharacterSpritePixels, cyanCharacterPixels);
+        const centerPixel = context.getImageData(64, 36, 1, 1).data;
+        const rgb = colorBucket.split(',').map(value => Number(value) * 32);
+        const centerRgb = [centerPixel[0], centerPixel[1], centerPixel[2]];
+        if (centerRgb[0] >= 160 && centerRgb[1] >= 60 && centerRgb[1] <= 190 && centerRgb[2] <= 120
+          && centerRgb[0] - centerRgb[1] >= 35 && centerRgb[0] - centerRgb[2] >= 60) characterOverlayFrames += 1;
+        // Ignore the recorder's initial black frame before the first scene frame is available.
+        if (colorBucket !== '0,0,0') {
+          firstSceneFrameSeen = true;
+          if (colorBucket !== lastSceneColorBucket) {
+            sceneColorSequence.push(colorBucket);
+            lastSceneColorBucket = colorBucket;
+          }
+        }
+        if (firstSceneFrameSeen) colors.add(colorBucket);
+        if (performance.now() - lastSampleAt >= 100) {
+          samples.push({ timeMs: Math.round(video.currentTime * 1000), rgb, centerRgb });
+          lastSampleAt = performance.now();
+        }
+      }
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    }
+    if (!video.ended) throw new Error('Timed out playing final WebM during scene-order verification.');
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    return { colors: [...colors], sceneColorSequence, samples, characterOverlayFrames, maxCharacterSpritePixels, characterSpriteFrames };
+  });
+  const expectedColorBuckets = [...expectedSceneColorBuckets].sort();
+  const observedColorBuckets = [...new Set(observedSceneColors.colors)].sort();
+  expect(observedColorBuckets, 'Final WebM should contain exactly the five generated scene color buckets; expected: '+JSON.stringify(expectedColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.colors)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedColorBuckets);
+  expect(observedSceneColors.sceneColorSequence, 'Final WebM scene colors should follow storyboard order; expected: '+JSON.stringify(expectedSceneColorBuckets)+'; observed: '+JSON.stringify(observedSceneColors.sceneColorSequence)+'; timed samples: '+JSON.stringify(observedSceneColors.samples)).toEqual(expectedSceneColorBuckets);
+  // This ComfyUI fixture supplies background videos but no character artwork or rig.
+  // The removed hard-coded demo mascot must not be composited over generated footage.
+  expect(observedSceneColors.characterOverlayFrames).toBe(0);
+  expect(observedSceneColors.maxCharacterSpritePixels, 'the downloaded film must contain the verified cyan character sprite, not only background video').toBeGreaterThan(20);
+  expect(observedSceneColors.characterSpriteFrames, 'the character sprite must remain visible across multiple decoded frames').toBeGreaterThan(5);
+  expect(uploadedFilenames).toEqual([
+    'full-film-scene-1.png',
+    'full-film-scene-2.png',
+    'full-film-scene-3.png',
+    'full-film-scene-4.png',
+    'full-film-scene-5.png'
+  ]);
+  expect(submittedImages).toHaveLength(5);
+  expect(submittedImages.map(item => item.image)).toEqual([
+    'full-film-upload-1.png',
+    'full-film-upload-2.png',
+    'full-film-upload-3.png',
+    'full-film-upload-4.png',
+    'full-film-upload-5.png'
+  ]);
+  expect(submittedImages.every(item => item.prompt.length > 0)).toBe(true);
+  expect(pageErrors, 'full-film generation and WebM export must not throw JavaScript errors').toEqual([]);
+});
+
 
 test('blocks ComfyUI provider work before generation when character evidence is missing', async ({ page }) => {
   test.setTimeout(120000);
