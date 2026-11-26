@@ -108,8 +108,21 @@ test('routes only the reference profiles explicitly present in a scene cast', ()
     { characterId: 'Snowball', referenceImageAssetId: 'snow-image' }
   ];
   const selected = selectCharacterReferencesForScene(profiles, ['mIrA', 'Foxy']);
-  assert.deepEqual(selected.map(profile => profile.characterId), ['Foxy', 'Mira']);
-  assert.deepEqual(selected.map(profile => profile.referenceImageAssetId), ['fox-image', 'mira-image']);
+  assert.deepEqual(selected.map(profile => profile.characterId), ['Mira', 'Foxy']);
+  assert.deepEqual(selected.map(profile => profile.referenceImageAssetId), ['mira-image', 'fox-image']);
+});
+
+test('keeps image slots in scene-cast order and uses only the first saved image for each character', () => {
+  const profiles = [
+    { characterId: 'Foxy', referenceImageAssetId: 'fox-first-image' },
+    { characterId: 'foxy', referenceImageAssetId: 'fox-duplicate-image' },
+    { characterId: 'Mira' },
+    { characterId: 'Snowball', referenceImageAssetId: 'snow-image' }
+  ];
+  const selected = selectCharacterReferencesForScene(profiles, ['Snowball', 'Foxy', 'Mira', 'FOXy']);
+
+  assert.deepEqual(selected.map(profile => profile.characterId), ['Snowball', 'Foxy']);
+  assert.deepEqual(selected.map(profile => profile.referenceImageAssetId), ['snow-image', 'fox-first-image']);
 });
 
 test('does not leak character references into scenes with an empty or unrelated cast', () => {
