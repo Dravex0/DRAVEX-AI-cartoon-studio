@@ -734,7 +734,8 @@ test('generates every ComfyUI scene and exports a playable WebM with verified ch
   await expect(page.locator('#scenes button.scene')).toHaveCount(5);
   await seedVoiceArtifactsForCurrentDraft(page, { language: 'en', prepareStoryboard: false });
   const characterFixtures = await seedCharacterLayersForCurrentDraft(page);
-  expect(characterFixtures.characterLayerCount).toBeGreaterThan(0);
+  expect(characterFixtures.sceneCount).toBe(5);
+  expect(characterFixtures.characterLayerCount).toBeGreaterThanOrEqual(characterFixtures.sceneCount);
 
   await page.locator('.advanced-video-settings').evaluate(element => { element.open = true; });
   await page.locator('#videoGenerationMode').selectOption('comfyui');
