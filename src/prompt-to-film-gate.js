@@ -31,7 +31,7 @@ export function evaluatePromptToFilmStart({
     blockers.push('remote-video-consent-required');
   }
   if (selectedMode !== 'local-canvas' && videoProviderReady !== true) blockers.push('video-provider-not-ready');
-  if (selectedMode === 'local-canvas' && missingCharacterAssets > 0) {
+  if (missingCharacterAssets > 0) {
     blockers.push('character-visual-assets-required');
   }
   if (selectedMode === 'huggingface' && missingImages > 0 && imagePromptConsent !== true) {

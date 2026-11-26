@@ -8,6 +8,7 @@ const ready = {
   videoProviderReady: true,
   remoteVideoConsent: true,
   missingImageCount: 3,
+  missingCharacterAssetCount: 0,
   imagePromptConsent: true
 };
 
@@ -42,7 +43,8 @@ test('local ComfyUI does not require remote Hugging Face consent', () => {
     sceneCount: 2,
     videoProviderReady: true,
     remoteVideoConsent: false,
-    missingImageCount: 0
+    missingImageCount: 0,
+    missingCharacterAssetCount: 0
   });
   assert.equal(result.ok, true);
 });
@@ -79,6 +81,7 @@ test('local ComfyUI can generate missing scenes directly from text without AI Ho
     videoProviderReady: true,
     remoteVideoConsent: false,
     missingImageCount: 3,
+    missingCharacterAssetCount: 0,
     imagePromptConsent: false
   });
   assert.equal(result.ok, true);
@@ -106,7 +109,7 @@ test('local canvas blocks a named-cast film when no character visuals exist', ()
   assert.equal(result.missingCharacterAssetCount, 5);
 });
 
-test('local canvas permits an explicitly marked procedural demo character fallback', () => {
+test('local canvas permits the deterministic procedural actor renderer when its fallback is available', () => {
   const result = evaluatePromptToFilmStart({
     mode: 'local-canvas',
     sceneCount: 5,
@@ -114,4 +117,21 @@ test('local canvas permits an explicitly marked procedural demo character fallba
   });
   assert.equal(result.ok, true);
   assert.deepEqual(result.blockers, []);
+});
+
+
+test('Hugging Face and ComfyUI do not start provider work without character visuals', () => {
+  for (const mode of ['huggingface', 'comfyui']) {
+    const result = evaluatePromptToFilmStart({
+      mode,
+      sceneCount: 3,
+      videoProviderReady: true,
+      remoteVideoConsent: true,
+      missingImageCount: 0,
+      missingCharacterAssetCount: 3
+    });
+    assert.equal(result.ok, false, mode);
+    assert.ok(result.blockers.includes('character-visual-assets-required'), mode);
+    assert.equal(result.missingCharacterAssetCount, 3);
+  }
 });

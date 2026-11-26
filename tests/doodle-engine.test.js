@@ -310,3 +310,27 @@ test('turns an acting procedural character toward its named target', () => {
   assert.ok(noah);
   assert.equal(noah.flipX, true);
 });
+
+
+test('keeps procedural actors visible when matching sprite layers are hidden or fully transparent', () => {
+  const hiddenScene = {
+    characters: ['Foxy'],
+    characterLayers: [{
+      characterId: 'Foxy',
+      imageUrl: 'https://example.test/hidden-fox.png',
+      visible: false,
+      opacity: 1
+    }]
+  };
+  const transparentScene = {
+    characters: ['Foxy'],
+    characterLayers: [{
+      characterId: 'Foxy',
+      imageUrl: 'https://example.test/transparent-fox.png',
+      visible: true,
+      opacity: 0
+    }]
+  };
+  assert.deepEqual(createProceduralActorLayers(hiddenScene).map(layer => layer.characterId), ['Foxy']);
+  assert.deepEqual(createProceduralActorLayers(transparentScene).map(layer => layer.characterId), ['Foxy']);
+});

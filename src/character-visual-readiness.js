@@ -13,13 +13,13 @@ const uniqueIds = values => {
 
 /**
  * Count scenes that cannot render every required cast member in local-canvas mode.
- * A scene background image is deliberately not character evidence: it may contain
- * only scenery. Full scene video, matching sprite layers, validated rigs, and the
- * explicitly enabled built-in protagonist fallback are accepted visual resources.
+ * A scene background image or cached video is not character evidence by itself.
+ * A cached clip may decode during export and suppress the local procedural-actor
+ * renderer, so require a matching sprite or validated rig whenever a clip is cached.
+ * Procedural actors count only when no cached scene clip can suppress their renderer.
  */
 export function countScenesMissingCharacterVisuals(scenes, {
   protagonistId = '',
-  proceduralFallback = false,
   proceduralActors = false,
   hasSceneVideo = () => false
 } = {}) {
@@ -29,14 +29,13 @@ export function countScenesMissingCharacterVisuals(scenes, {
     const cast = uniqueIds(scene?.characters);
     const requiredIds = cast.length ? cast : (protagonist ? [protagonist] : []);
     if (!requiredIds.length) return true;
-    if (typeof hasSceneVideo === 'function' && hasSceneVideo(scene, index) === true) return false;
+    const sceneHasVideo = typeof hasSceneVideo === 'function'
+      && hasSceneVideo(scene, index) === true;
 
     return requiredIds.some(characterId => {
-      if (proceduralActors === true) return false;
-      const isProceduralProtagonist = proceduralFallback === true
-        && protagonist
-        && characterId.toLocaleLowerCase() === protagonist.toLocaleLowerCase();
-      if (isProceduralProtagonist) return false;
+      // A cached video can become decoded during export. Treat it as a possible
+      // renderer suppressor now, but never as proof that the required character exists.
+      if (proceduralActors === true && !sceneHasVideo) return false;
       return !hasRenderableCharacterLayer(scene, characterId)
         && !hasRenderableCharacterRig(scene, characterId);
     });

@@ -21,3 +21,20 @@ test('unverified or failed sprites are not automatically attached', () => {
   assert.match(block, /if\(status==='verified'\)/);
   assert.ok(!block.includes('attachCharacterSpriteToSceneLayers(updatedScene'));
 });
+
+
+test('manual sprite attachment cannot bypass alpha-channel verification', () => {
+  const renderer = app.indexOf('function renderCharacterSpriteAssets()');
+  const buttonStart = app.indexOf("const addButton=document.createElement('button')", renderer);
+  const buttonEnd = app.indexOf("const link=document.createElement('a')", buttonStart);
+  assert.ok(renderer >= 0 && buttonStart > renderer && buttonEnd > buttonStart);
+  const buttonBlock = app.slice(buttonStart, buttonEnd);
+  assert.match(buttonBlock, /addButton\.disabled=initialTransparency!=='verified'/);
+  assert.match(buttonBlock, /attachVerifiedCharacterSpriteToSceneLayers\(sceneMetadata\[resolvedSceneIndex\],verifiedAsset\)/);
+  assert.match(buttonBlock, /result\.status==='verification-required'/);
+  assert.doesNotMatch(buttonBlock, /attachCharacterSpriteToSceneLayers\(sceneMetadata\[resolvedSceneIndex\],asset\)/);
+  const updateStart = app.indexOf('const updateTransparency=');
+  const updateEnd = app.indexOf('const verificationImage=', updateStart);
+  const updateBlock = app.slice(updateStart, updateEnd);
+  assert.match(updateBlock, /addButton\.disabled=status!=='verified'/);
+});

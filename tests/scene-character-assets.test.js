@@ -52,6 +52,22 @@ test('full-film export waits for character images before starting MediaRecorder'
 });
 
 
+
+
+test('full-film video export cannot bypass the character-evidence preflight', () => {
+  const start = appSource.indexOf('async function exportFilm(');
+  const end = appSource.indexOf("$('export').onclick", start);
+  assert.ok(start >= 0 && end > start, 'exportFilm must be present');
+  const block = appSource.slice(start, end);
+  const gate = block.indexOf('const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId)');
+  const allVideosSnapshot = block.indexOf('if(requireAllVideos)');
+  const recorder = block.indexOf('recorder.start(250);');
+  assert.ok(gate >= 0 && allVideosSnapshot > gate,
+    'full-film mode must pass character evidence before accepting the all-videos snapshot');
+  assert.match(block.slice(gate, allVideosSnapshot), /if\(missingCharacterAssetCount>0\)/,
+    'decoded scene clips alone must not bypass the character-evidence gate');
+  assert.ok(recorder > allVideosSnapshot, 'MediaRecorder must start only after both visual and video readiness checks');
+});
 test('direct WebM export applies the shared character-visual gate before MediaRecorder starts', () => {
   const start = appSource.indexOf('async function exportFilm(');
   const end = appSource.indexOf("$('export').onclick", start);
@@ -63,4 +79,21 @@ test('direct WebM export applies the shared character-visual gate before MediaRe
   assert.ok(gate >= 0, 'direct export must use the shared character-visual readiness check');
   assert.ok(blockedMessage > gate, 'missing character visuals must produce an explicit blocker');
   assert.ok(recorder > blockedMessage, 'MediaRecorder must not start after a blocked visual preflight');
+});
+
+
+test('direct export restores persisted scene clips before character readiness is evaluated', () => {
+  const start = appSource.indexOf('async function exportFilm(');
+  const end = appSource.indexOf("$('export').onclick", start);
+  assert.ok(start >= 0 && end > start, 'exportFilm must be present');
+  const block = appSource.slice(start, end);
+  const lock = block.indexOf('button.disabled=true;');
+  const restore = block.indexOf('await sceneVideoRestorePromise;');
+  const gate = block.indexOf('const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId)');
+  assert.ok(lock >= 0 && restore > lock && gate > restore,
+    'the export must be locked while persisted clips restore and must evaluate readiness only afterward');
+  assert.match(block, /catch\(error\)\{\s*button\.disabled=false;/,
+    'the export button must recover when persisted clip restoration fails');
+  assert.match(block, /if\(signal\?\.aborted\)\{\s*button\.disabled=false;/,
+    'the export button must recover when composition is cancelled during restoration');
 });

@@ -55,7 +55,7 @@ test('blocks Hugging Face and ComfyUI generation when requested speech preparati
 });
 
 
-test('blocks local-canvas export when a scene background is present but character visuals are missing', () => {
+test('blocks one-click prompt-to-film in every mode when character visuals are missing', () => {
   const handler = appSource.indexOf("$('makeFilm').addEventListener");
   const gate = appSource.indexOf('const missingCharacterAssetCount=', handler);
   const evaluate = appSource.indexOf('const gate=evaluatePromptToFilmStart({', gate);
@@ -64,14 +64,44 @@ test('blocks local-canvas export when a scene background is present but characte
     'character visual readiness must be checked before local-canvas export starts');
   const readiness = appSource.slice(gate, evaluate);
   assert.ok(readiness.includes('getMissingCharacterVisualCount(requestedCharacter)'));
+  assert.doesNotMatch(readiness, /mode==='local-canvas'/,
+    'remote providers must not generate clips that the shared export gate will later reject');
   const helperStart = appSource.indexOf('function getMissingCharacterVisualCount(');
   const helperEnd = appSource.indexOf("$('makeFilm').addEventListener", helperStart);
   assert.ok(helperStart >= 0 && helperEnd > helperStart, 'shared character visual readiness helper must exist before the start handler');
   const helper = appSource.slice(helperStart, helperEnd);
   assert.match(helper, /countScenesMissingCharacterVisuals/);
   assert.match(helper, /sceneVideoCache/);
-  assert.match(helper, /proceduralFallback/);
+  assert.doesNotMatch(helper, /proceduralFallback/, 'the disabled legacy demo character must not satisfy readiness');
   assert.doesNotMatch(helper, /generatedImageUrl/,
     'a generated scene background is not proof that a character is visible');
-  assert.match(appSource.slice(blocker, blocker + 900), /Фоновое видео вместо мультфильма создавать не будем/);
+  assert.match(appSource.slice(blocker, blocker + 900), /фоновое изображение или видеоклип сами по себе не доказывают/);
+});
+
+
+test('one-click film waits for persisted scene videos before checking character readiness', () => {
+  const start = appSource.indexOf("$('makeFilm').addEventListener('click',async()=>{");
+  const restore = appSource.indexOf('await sceneVideoRestorePromise;', start);
+  const mode = appSource.indexOf("const mode=$('videoGenerationMode').value;", start);
+  const gate = appSource.indexOf('const missingCharacterAssetCount=', start);
+  assert.ok(start >= 0 && restore > start && mode > restore && gate > mode,
+    'persisted clips must be restored before the character-visual preflight');
+});
+
+
+test('full-film provider action restores clips and checks character evidence before any provider request', () => {
+  const start = appSource.indexOf("$('generateFullFilmComfy').addEventListener('click',async()=>{");
+  const end = appSource.indexOf("$('play').onclick", start);
+  assert.ok(start >= 0 && end > start, 'full-film provider handler must exist');
+  const block = appSource.slice(start, end);
+  const tryStart = block.indexOf('try{');
+  const restore = block.indexOf('await sceneVideoRestorePromise;');
+  const gate = block.indexOf('const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId)');
+  const providerWork = block.indexOf('generateStoryboardVideos({');
+  assert.ok(tryStart >= 0 && restore > tryStart && gate > restore && providerWork > gate,
+    'restore and character preflight must run inside the cleanup scope before provider work');
+  assert.match(block.slice(gate, providerWork), /if\(missingCharacterAssetCount>0\)/,
+    'missing character visuals must stop the provider before any scene generation');
+  assert.match(block, /finally\{\s*fullFilmAbortController=null;cancel\.hidden=true;button\.disabled=false;/,
+    'the provider button must recover when restore or preflight fails');
 });

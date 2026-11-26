@@ -10,6 +10,7 @@ test.beforeEach(async ({ page }) => {
 });
 import { readFile } from 'node:fs/promises';
 import { seedVoiceArtifactsForCurrentDraft } from './helpers/seed-voice-artifacts.js';
+import { seedCharacterLayersForCurrentDraft } from './helpers/seed-character-layers.js';
 
 test.use({ video: 'on' });
 
@@ -203,6 +204,8 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
   await page.locator('#idea').fill('A small blue robot walks through a park, meets a little red bird, waves, and they become friends. Make a short animated film.');
   await page.locator('#language').selectOption('en');
   await seedVoiceArtifactsForCurrentDraft(page, { language: 'en' });
+  const characterFixtures = await seedCharacterLayersForCurrentDraft(page);
+  expect(characterFixtures.characterLayerCount).toBeGreaterThan(0);
 
   // Create real browser-decodable media fixtures. The provider response itself is mocked;
   // this test validates the app's integration and export, not the model's visual quality.
@@ -352,13 +355,30 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
         setTimeout(() => { clearTimeout(timer); resolve(); }, 350);
       }
     });
-    const result = { width: video.videoWidth, height: video.videoHeight, duration: video.duration, readyState: video.readyState };
+    const frameCanvas = document.createElement('canvas');
+    frameCanvas.width = video.videoWidth;
+    frameCanvas.height = video.videoHeight;
+    const frameContext = frameCanvas.getContext('2d', { willReadFrequently: true });
+    frameContext.drawImage(video, 0, 0, frameCanvas.width, frameCanvas.height);
+    const pixels = frameContext.getImageData(0, 0, frameCanvas.width, frameCanvas.height).data;
+    let characterPixelCount = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index] < 130 && pixels[index + 1] > 130 && pixels[index + 2] > 150) characterPixelCount += 1;
+    }
+    const result = {
+      width: video.videoWidth,
+      height: video.videoHeight,
+      duration: video.duration,
+      readyState: video.readyState,
+      characterPixelCount
+    };
     video.pause();
     return result;
   });
   expect(playback.width).toBeGreaterThan(0);
   expect(playback.height).toBeGreaterThan(0);
   expect(playback.readyState).toBeGreaterThanOrEqual(2);
+  expect(playback.characterPixelCount, 'the downloaded film must contain the explicit composited character sprite').toBeGreaterThan(200);
 
   await testInfo.attach('mocked-ai-video-pipeline-report.json', {
     body: Buffer.from(JSON.stringify({
@@ -369,6 +389,7 @@ test('DRAVEX AI video pipeline: storyboard → mocked Wan 2.2 clips → decoded 
       providerMode: 'huggingface',
       sceneReport: providerEvidence.sceneReport,
       finalFilm: playback,
+      characterFixture: characterFixtures,
       downloadedBytes: downloaded.byteLength,
       webmSignature: [...downloaded.subarray(0, 4)]
     }, null, 2)),

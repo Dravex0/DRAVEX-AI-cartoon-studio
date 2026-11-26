@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { countScenesMissingCharacterVisuals } from '../src/character-visual-readiness.js';
+import { readFileSync } from 'node:fs';
+
+const appSource = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
 
 test('does not treat a generated scene background as a character visual', () => {
   const scene = {
@@ -40,35 +43,79 @@ test('accepts a validated image-backed rig for the required character', () => {
   assert.equal(countScenesMissingCharacterVisuals([scene], { protagonistId: 'Foxy' }), 0);
 });
 
-test('the procedural fallback covers only the protagonist, not missing secondary cast members', () => {
-  const singleCharacterScene = { characters: ['Foxy'] };
-  const twoCharacterScene = { characters: ['Foxy', 'Owl'] };
-  assert.equal(countScenesMissingCharacterVisuals([singleCharacterScene], {
-    protagonistId: 'Foxy', proceduralFallback: true
-  }), 0);
-  assert.equal(countScenesMissingCharacterVisuals([twoCharacterScene], {
-    protagonistId: 'Foxy', proceduralFallback: true
+test('does not count the disabled legacy demo-protagonist fallback as visible character artwork', () => {
+  const scene = { characters: ['Foxy'] };
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy',
+    proceduralFallback: true
   }), 1);
 });
 
-test('accepts a cached full-scene video as the visual scene resource', () => {
+test('does not treat a cached scene video as proof that the required character is visible', () => {
   const scene = { characters: ['Foxy'], generatedImageUrl: 'blob:forest-background' };
   assert.equal(countScenesMissingCharacterVisuals([scene], {
     protagonistId: 'Foxy',
+    hasSceneVideo: () => true
+  }), 1);
+});
+
+test('does not count local procedural actors when a cached video may suppress their renderer during export', () => {
+  const scene = { characters: ['Foxy', 'Owl'] };
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy',
+    proceduralActors: true,
+    hasSceneVideo: () => true
+  }), 1);
+});
+
+test('does not accept a legacy demo-protagonist flag when a decoded clip suppresses that fallback', () => {
+  const scene = { characters: ['Foxy'] };
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy',
+    proceduralFallback: true,
+    hasSceneVideo: () => true
+  }), 1);
+});
+
+test('accepts matching authored character art even when a cached scene video is present', () => {
+  const scene = {
+    characters: ['Foxy'],
+    characterLayers: [{ characterId: 'Foxy', imageUrl: 'blob:fox-sprite', visible: true }]
+  };
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy',
+    proceduralActors: true,
     hasSceneVideo: () => true
   }), 0);
 });
 
 
-test('counts the explicit offline Doodle renderer as a visual resource for every named actor', () => {
+test('counts the explicit offline Doodle renderer only when no decoded video suppresses it', () => {
   const scene = { characters: ['Foxy', 'Owl', 'Robot'] };
   assert.equal(countScenesMissingCharacterVisuals([scene], {
     protagonistId: 'Foxy', proceduralActors: true
   }), 0);
+  assert.equal(countScenesMissingCharacterVisuals([scene], {
+    protagonistId: 'Foxy',
+    proceduralActors: true,
+    hasSceneVideo: () => true
+  }), 1);
 });
 
 test('still blocks a scene with no cast even when procedural actors are enabled', () => {
   assert.equal(countScenesMissingCharacterVisuals([{}], {
     protagonistId: '', proceduralActors: true
   }), 1);
+});
+
+
+test('uses cached scene-video presence to guard against late decode during export', () => {
+  const helperStart = appSource.indexOf('function getMissingCharacterVisualCount(');
+  const helperEnd = appSource.indexOf("$('makeFilm').addEventListener", helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart);
+  const helper = appSource.slice(helperStart, helperEnd);
+  assert.match(helper, /hasSceneVideo:\(scene,index\)=>Boolean\(sceneVideoCache\.get\(sceneVideoKey\(index,scene\)\)\?\.video\)/);
+  assert.doesNotMatch(helper, /hasSceneVideo:\(scene,index\)=>isSceneVideoDecoded/);
+  assert.match(appSource, /const hasGeneratedVideo=isSceneVideoDecoded\(generatedVideo\)/);
+  assert.match(appSource, /const proceduralActors=\$\('videoGenerationMode'\)\.value==='local-canvas'&&!hasGeneratedVideo/);
 });

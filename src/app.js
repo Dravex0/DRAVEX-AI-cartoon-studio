@@ -869,7 +869,7 @@ async function startSceneVoicePreview(index=sceneIndex){
 }
 function draw(){const animationTimeMs=animationClock.advance(performance.now(),playing),dimensions=getCanvasDimensions(activeCanvasFormat),w=dimensions.logicalWidth,h=dimensions.logicalHeight,t=animationTimeMs/1000;ctx.setTransform(canvas.width/w,0,0,canvas.height/h,0,0);ctx.clearRect(0,0,w,h);const g=ctx.createLinearGradient(0,0,0,h);const paletteSets={ 'Storybook':[['#29274d','#132b3b'],['#49304e','#192b46'],['#193f45','#102735'],['#4b3440','#20243c'],['#243c55','#102c38']], 'Anime-inspired':[['#40265f','#132b4c'],['#702f62','#172d52'],['#124e67','#172044'],['#713b48','#211c46'],['#3b3978','#12394a']], 'Flat 2D':[['#83c5be','#277da1'],['#ffafcc','#6d597a'],['#90be6d','#277da1'],['#f9c74f','#577590'],['#bde0fe','#5e548e']], 'Pixel art':[['#312e2e','#1d3557'],['#6a4c93','#1982c4'],['#386641','#1d3557'],['#bc4749','#283618'],['#3a506b','#0b132b']]};const scenePalettes=paletteSets[$('style').value]||paletteSets['Storybook'];const palette=scenePalettes[sceneIndex%scenePalettes.length];g.addColorStop(0,palette[0]);g.addColorStop(1,palette[1]);ctx.fillStyle=g;ctx.fillRect(0,0,w,h);for(let i=0;i<45;i++){let x=(i*97+25)%w,y=(i*53+17)%(h*.61);ctx.fillStyle='rgba(255,255,255,'+(0.25+0.45*Math.abs(Math.sin(t+i)))+')';ctx.fillRect(x,y,2,2)}ctx.fillStyle=sceneIndex===1?'#25434a':sceneIndex===2?'#244c3b':'#183b38';ctx.beginPath();ctx.ellipse(w/2,h*1.03,w*.453,h*.278,0,0,Math.PI*2);ctx.fill();for(let i=0;i<7;i++){let x=(i+.25)*w/7,baseY=h*.86,peakY=h*.43+(i%3)*h*.0694;ctx.fillStyle='#172d36';ctx.beginPath();ctx.moveTo(x,baseY);ctx.lineTo(x+w*.07,peakY);ctx.lineTo(x+w*.14,baseY);ctx.fill()}const currentSceneData=sceneMetadata[sceneIndex]||{title:titles[sceneIndex],visibleAction:descriptions[sceneIndex],prompt:descriptions[sceneIndex]};drawProceduralSceneEnvironment(ctx,currentSceneData,w,h,t);if(sceneMotionSceneIndex!==sceneIndex){sceneMotionSceneIndex=sceneIndex;sceneMotionStartTimeMs=animationTimeMs;rigPreviewProgress=null;if($('characterRigScrubber')){$('characterRigScrubber').value='0';$('characterRigScrubberValue').textContent='Scene clock'}syncSceneVideoPlayback({cache:sceneVideoCache,activeKey:String(currentSceneData.id||('scene-index-'+sceneIndex)),shouldPlay:playing,restart:exportMouthOriginTimeMs===null})}const sceneDurationRaw=Number(currentSceneData.durationSeconds??$('duration').value);const sceneDuration=Number.isFinite(sceneDurationRaw)&&sceneDurationRaw>=0.25&&sceneDurationRaw<=30?sceneDurationRaw:3;const sceneMotionProgress=Math.max(0,Math.min(1,(animationTimeMs-sceneMotionStartTimeMs)/(sceneDuration*1000)));const rigAnimationProgress=rigPreviewProgress===null?sceneMotionProgress:rigPreviewProgress;const previousSceneData=sceneIndex>0?(sceneMetadata[sceneIndex-1]||{title:titles[sceneIndex-1],visibleAction:descriptions[sceneIndex-1],prompt:descriptions[sceneIndex-1]}):null;const previousScale=previousSceneData?calculateCinematicShot({...previousSceneData,beatIndex:sceneIndex-1}).shotScale:null;const directorShot=calculateCinematicShot({...currentSceneData,beatIndex:sceneIndex},previousScale);const cameraPlan=directorShot.cameraTransform;const composition=getSceneComposition(activeCanvasFormat,sceneIndex);const starBase=[composition.star.x*w,composition.star.y*h];const foxBase=[composition.character.x*w,composition.character.y*h];const showDemoFox=shouldShowProceduralDemoCharacter({storyUsesFallback:currentStoryboardPlan?currentStoryboardPlan.proceduralDemoCharacter===true:!String($('character').value||'').trim(),hasCharacterLayers:hasRenderableCharacterLayer(currentSceneData,currentStoryboardPlan?.sourceCharacter||$('character').value),hasCharacterRig:hasRenderableCharacterRig(currentSceneData,currentStoryboardPlan?.sourceCharacter||$('character').value)});const sceneFocus=resolveSceneFocus({fallbackCharacterVisible:showDemoFox,actorPoint:{x:foxBase[0],y:foxBase[1]},propPoint:{x:starBase[0],y:starBase[1]},focusTarget:directorShot.focusTarget,viewportWidth:w,viewportHeight:h,requestedOffsetY:cameraPlan.offsetY});const focusX=sceneFocus.x,focusY=sceneFocus.y;const renderCameraPlan={...cameraPlan,offsetY:sceneFocus.offsetY};ctx.save();ctx.translate(w/2,h/2+renderCameraPlan.offsetY);ctx.scale(renderCameraPlan.zoom,renderCameraPlan.zoom);ctx.translate(-focusX,-focusY);const action=getSceneAction(sceneIndex,sceneMotionProgress);const activeMouthTracks=exportMouthOriginTimeMs!==null?exportMouthTracks:previewMouthTracks;const mouthClockOrigin=exportMouthOriginTimeMs!==null?exportMouthOriginTimeMs:previewMouthOriginTimeMs;const exportElapsedMs=mouthClockOrigin===null?-1:performance.now()-mouthClockOrigin;const facialLipSync=sampleCharacterFacialLipSync(activeMouthTracks,sceneIndex,exportElapsedMs);const activeMouthTrack=activeMouthTracks.find(track=>track.sceneIndex===sceneIndex&&exportElapsedMs>=track.startMs&&exportElapsedMs<track.startMs+track.envelope.durationMs);const mouthTrackTimeMs=activeMouthTrack?exportElapsedMs-activeMouthTrack.startMs:-1;const exportMouthOpenness=activeMouthTrack?sampleAudioMouthEnvelope(activeMouthTrack.envelope,mouthTrackTimeMs):0;const exportViseme=activeMouthTrack?sampleVisemeTimeline(activeMouthTrack.visemes,mouthTrackTimeMs):"neutral";let sx=320,sy=300;if(showDemoFox){sx=starBase[0]+Math.sin(t*1.5)*15;sy=starBase[1]+Math.cos(t*2)*12;if(action==='run'){sx+=Math.sin(t*2)*36;sy-=Math.abs(Math.sin(t*3))*10}else if(action==='float'){sy-=Math.abs(Math.sin(t*1.4))*24}else if(action==='vanish'){sx+=Math.sin(t)*4}const starPulse=1+Math.sin(t*3)*.08;const starScale=action==='magic'?1.35:action==='vanish'?Math.max(.08,1-((frame%45)/45)):action==='float'?.88:sceneIndex===1?1.18:sceneIndex===3?1.35:sceneIndex===4?.88:1; if(sceneIndex===3){ctx.save();ctx.translate(sx,sy);ctx.strokeStyle='rgba(255,229,138,'+(.35+.25*Math.abs(Math.sin(t*3)))+')';ctx.lineWidth=3;for(let ray=0;ray<8;ray++){const a=ray*Math.PI/4+t*.08;ctx.beginPath();ctx.moveTo(Math.cos(a)*34,Math.sin(a)*34);ctx.lineTo(Math.cos(a)*48,Math.sin(a)*48);ctx.stroke()}ctx.restore()}if(sceneIndex===4){for(let spark=0;spark<7;spark++){const a=spark*Math.PI*2/7+t*.35;const px=sx+Math.cos(a)*(24+Math.sin(t*2+spark)*5),py=sy+Math.sin(a)*(24+Math.sin(t*2+spark)*5);ctx.fillStyle='rgba(255,229,138,.8)';ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);ctx.fill()}}ctx.save();ctx.translate(sx,sy);ctx.scale(starScale*starPulse,starScale*starPulse);ctx.rotate(t*.25);ctx.shadowBlur=sceneIndex===3?38:25;ctx.shadowColor='#ffe58a';ctx.fillStyle='#ffe58a';ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?13:30;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.restore();}const generatedFrame=getLoadedSceneImage(currentSceneData.generatedImageUrl);
 const generatedVideo=sceneVideoCache.get(String(currentSceneData.id||('scene-index-'+sceneIndex)))?.video;
-const hasGeneratedVideo=Boolean(generatedVideo&&generatedVideo.readyState>=2&&generatedVideo.videoWidth>0);
+const hasGeneratedVideo=isSceneVideoDecoded(generatedVideo);
 const hasGeneratedMedia=hasGeneratedVideo||Boolean(generatedFrame);
 const motionTransform=getPromptCameraTransform(currentSceneData.motionPrompt||currentSceneData.visibleAction,sceneMotionProgress);
 if(hasGeneratedVideo){drawImageCover(ctx,generatedVideo,w,h,motionTransform)}
@@ -1091,6 +1091,7 @@ function renderCharacterSpriteAssets(){
     const updatedAssets=current.map(item=>item&&String(item.assetId||'')===assetId?{...item,transparencyStatus:status,transparencyCheck:check,verificationStatus:'not_verified',visualIdentityStatus:'not_verified'}:item);
     let updatedScene={...sceneMetadata[resolvedSceneIndex],characterSpriteAssets:updatedAssets};
     sceneMetadata[resolvedSceneIndex]=updatedScene;
+    if(typeof addButton!=='undefined')addButton.disabled=status!=='verified';
     if(status==='verified'){
      // Alpha-channel verification is the minimum safe gate before the sprite
      // becomes a visible character layer. Identity/anatomy remain unverified.
@@ -1139,12 +1140,19 @@ function renderCharacterSpriteAssets(){
   image.src=asset.imageUrl;
   verificationImage.src=asset.imageUrl;
   const addButton=document.createElement('button');addButton.type='button';addButton.className='secondary';
+  addButton.disabled=initialTransparency!=='verified';
   const alreadyAttached=(Array.isArray(sceneMetadata[sceneIndex]?.characterLayers)?sceneMetadata[sceneIndex].characterLayers:[]).some(layer=>String(layer?.characterId||'').toLocaleLowerCase()===String(asset.characterId||'').toLocaleLowerCase());
   addButton.textContent=alreadyAttached?(uiLang==='ru'?'Обновить на сцене':'Update on scene'):(uiLang==='ru'?'Добавить на сцену':'Add to scene');
   addButton.addEventListener('click',()=>{
    const resolvedSceneIndex=sceneMetadata.findIndex(item=>item&&String(item.id||'')===sceneId);
    if(resolvedSceneIndex<0)return;
-   const result=attachCharacterSpriteToSceneLayers(sceneMetadata[resolvedSceneIndex],asset);
+   const currentAssets=Array.isArray(sceneMetadata[resolvedSceneIndex]?.characterSpriteAssets)?sceneMetadata[resolvedSceneIndex].characterSpriteAssets:[];
+   const verifiedAsset=currentAssets.find(item=>item&&String(item.assetId||'')===assetId)||asset;
+   const result=attachVerifiedCharacterSpriteToSceneLayers(sceneMetadata[resolvedSceneIndex],verifiedAsset);
+   if(result.status==='verification-required'){
+    $('status').textContent=uiLang==='ru'?'Сначала проверь прозрачность спрайта; непроверенное изображение не добавляется на сцену.':'Verify sprite transparency before adding it to the scene.';
+    return;
+   }
    if(result.status==='invalid'){
     $('status').textContent=uiLang==='ru'?'Не удалось добавить спрайт: проверь имя персонажа и HTTPS-ссылку.':'Could not attach sprite: check character ID and HTTPS image URL.';
     return;
@@ -2275,7 +2283,6 @@ function prepareAutomaticCharacterMotion(){
 function getMissingCharacterVisualCount(protagonistId = currentStoryboardPlan?.sourceCharacter || $('character').value.trim()) {
  return countScenesMissingCharacterVisuals(sceneMetadata,{
   protagonistId,
-  proceduralFallback:currentStoryboardPlan?.proceduralDemoCharacter===true,
   proceduralActors:$('videoGenerationMode').value==='local-canvas',
   hasSceneVideo:(scene,index)=>Boolean(sceneVideoCache.get(sceneVideoKey(index,scene))?.video)
  });
@@ -2359,15 +2366,16 @@ $('makeFilm').addEventListener('click',async()=>{
  }else if(!localTextRuntime.status.loaded){
   $('status').textContent=uiLang==='ru'?'Локальная модель не загружена. Используем раскадровку DRAVEX; AI-режиссёр можно включить после загрузки модели.':'Local model is not loaded. Using the DRAVEX storyboard; load the model to enable AI direction.';
  }
+ // Restore IndexedDB scene clips before readiness checks: a late restore can suppress
+ // procedural actors in draw(), so the preflight must see the same cache as the renderer.
+ await sceneVideoRestorePromise;
  const mode=$('videoGenerationMode').value;
  const missingImageCount=sceneMetadata.filter((scene,index)=>{
   const source=resolveSceneImageSource({mode,sceneIndex:index,activeSceneIndex:index,localImage:comfySourceImageForScene(index),generatedImageUrl:scene?.generatedImageUrl});
   const cachedVideo=sceneVideoCache.get(sceneVideoKey(index,scene));
   return source.kind==='missing'&&!cachedVideo?.video;
  }).length;
- const missingCharacterAssetCount=mode==='local-canvas'
-  ?getMissingCharacterVisualCount(requestedCharacter)
-  :0;
+ const missingCharacterAssetCount=getMissingCharacterVisualCount(requestedCharacter);
  const gate=evaluatePromptToFilmStart({
   mode,
   sceneCount:sceneMetadata.length,
@@ -2392,8 +2400,8 @@ $('makeFilm').addEventListener('click',async()=>{
    ?'Для '+gate.missingImageCount+' сцен ещё нет изображений. Отдельно подтверди отправку только текстовых промптов в AI Horde либо добавь изображения вручную.'
    :' '+gate.missingImageCount+' scene image(s) are missing. Separately allow sending text prompts to AI Horde, or add scene images manually.');
   if(gate.blockers.includes('character-visual-assets-required'))messages.push(ru
-   ?'Экспорт остановлен: в '+gate.missingCharacterAssetCount+' сценах нет изображений или видеоклипов персонажей. Добавь изображения/спрайты героев через инструменты генерации сцен и персонажей либо выбери Hugging Face или локальный ComfyUI. Фоновое видео вместо мультфильма создавать не будем.'
-   :'Export stopped: '+gate.missingCharacterAssetCount+' scenes have no character images or video clips. Add character images/sprites with the scene and character tools, or choose Hugging Face or local ComfyUI. A background-only video will not be exported.');
+   ?'Создание остановлено: в '+gate.missingCharacterAssetCount+' сценах не подтверждено присутствие нужных персонажей. Добавь видимые спрайты или проверенные риги; фоновое изображение или видеоклип сами по себе не доказывают, что герой присутствует.'
+   :'Film creation stopped: '+gate.missingCharacterAssetCount+' scenes do not have verified visuals for the required characters. Add visible sprites or validated rigs; a background image or scene clip alone does not prove that a character is present.');
   $('status').textContent=messages.join(' ');
   if(mode==='huggingface')$('hfVideoPanel').open=true;
   if(mode==='comfyui')$('comfyPanel').open=true;
@@ -3500,10 +3508,23 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
  fullFilmAbortController=controller;
  button.disabled=true;cancel.hidden=false;progressPanel.hidden=false;progress.value=0;
  filmProgressTracking=true;
- await sceneVideoRestorePromise;
- $('animateSceneComfy').disabled=true;$('checkComfyConnection').disabled=true;
- const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);
  try{
+  await sceneVideoRestorePromise;
+  if(controller.signal.aborted)throw new DOMException('Film generation was cancelled.','AbortError');
+  const exportProtagonistId=String(currentStoryboardPlan?.sourceCharacter||resolveStoryProtagonist($('idea').value,$('character').value.trim(),storyLanguage())).trim();
+  const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId);
+  if(missingCharacterAssetCount>0){
+   const message=uiLang==='ru'
+    ?'Генерация остановлена: в '+missingCharacterAssetCount+' сценах нет видимого спрайта или проверенного рига нужного персонажа. Сначала подготовь персонажей; один видеоклип не подтверждает их присутствие.'
+    :'Generation stopped: '+missingCharacterAssetCount+' scenes have no visible sprite or validated rig for the required cast. Prepare character visuals first; a scene clip alone does not prove character presence.';
+   $('status').textContent=message;
+   status.textContent=message;
+   setFilmProgress(0,filmProgressText('Нет визуальных персонажей','Character visuals required'),message);
+   filmProgressTracking=false;
+   return;
+  }
+  $('animateSceneComfy').disabled=true;$('checkComfyConnection').disabled=true;
+  const quality=getImageGenerationDimensions(activeCanvasFormat,$('imageQuality').value);
   const provider=mode==='huggingface'
    ?createHuggingFaceZeroGPUVideoProvider({client:hfVideoClient,handleFile:hfHandleFile})
    :createComfyUIVideoProvider(comfyProviderOptions());
@@ -3816,16 +3837,35 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     return {status:'failed',reason:'There are no storyboard scenes to export.'};
   }
   const exportProtagonistId=String(currentStoryboardPlan?.sourceCharacter||$('character').value||'').trim();
+  // Lock the export button while persisted clips are restored; otherwise two clicks
+  // could pass the initial busy check before the asynchronous readiness gate finishes.
+  button.disabled=true;
+  try{
+    await sceneVideoRestorePromise;
+  }catch(error){
+    button.disabled=false;
+    const message=uiLang==='ru'?'Не удалось восстановить сохранённые видеосцены. Экспорт остановлен.':'Could not restore saved scene videos. Export was stopped.';
+    $('status').textContent=message;
+    if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Ошибка восстановления','Scene restore failed'),message);filmProgressTracking=false;}
+    return {status:'failed',reason:String(error?.message||message).slice(0,500)};
+  }
+  if(signal?.aborted){
+    button.disabled=false;
+    const message=uiLang==='ru'?'Создание отменено во время восстановления сцен.':'Film composition was cancelled while restoring scenes.';
+    $('status').textContent=message;
+    if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Создание отменено','Composition cancelled'),message);filmProgressTracking=false;}
+    return {status:'cancelled',reason:'Full-film composition was cancelled.'};
+  }
   const missingCharacterAssetCount=getMissingCharacterVisualCount(exportProtagonistId);
   if(missingCharacterAssetCount>0){
+    button.disabled=false;
     const message=uiLang==='ru'
-      ?'Экспорт остановлен: в '+missingCharacterAssetCount+' сценах нет изображения персонажа, рига или видеоклипа сцены. Добавь спрайты/риги либо сначала создай видеосцены; экспорт одного фона заблокирован.'
-      :'Export stopped: '+missingCharacterAssetCount+' scenes have no character image, rig or scene video. Add character sprites/rigs or generate scene videos first; background-only export is blocked.';
+      ?'Экспорт остановлен: в '+missingCharacterAssetCount+' сценах нет видимого спрайта или проверенного рига нужного персонажа. Видеоклип сам по себе не подтверждает присутствие героя; экспорт одного фона заблокирован.'
+      :'Export stopped: '+missingCharacterAssetCount+' scenes have no visible sprite or validated rig for the required characters. A scene clip alone does not prove the character is present; background-only export is blocked.';
     $('status').textContent=message;
     if(filmProgressTracking){setFilmProgress($('fullFilmProgress').value,filmProgressText('Экспорт остановлен','Export stopped'),message);filmProgressTracking=false;}
     return {status:'failed',reason:message,missingCharacterAssetCount};
   }
-  button.disabled=true;
   $('audioFile').disabled=true;
   $('audioVolume').disabled=true;
   const wasPlaying=playing;
@@ -3878,8 +3918,6 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
   try{
     checkAbort();
     await stopSceneVoicePreview();
-    checkAbort();
-    await sceneVideoRestorePromise;
     checkAbort();
     if(requireAllVideos){
       requiredSceneSnapshot=captureFilmSceneSnapshot(exportSceneMetadata(),getExportSceneVideo);

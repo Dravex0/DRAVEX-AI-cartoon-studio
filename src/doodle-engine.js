@@ -419,7 +419,8 @@ export function createProceduralActorLayers(scene = {}, progress = 0, runtime = 
     const characterId = key(layer?.characterId);
     const imageUrl = String(layer?.imageUrl || '').trim();
     if (!characterId || !imageUrl) return false;
-    if (layer?.visible === false || !resolveImage) return true;
+    if (layer?.visible === false || !(Number(layer?.opacity ?? 1) > 0)) return false;
+    if (!resolveImage) return true;
     const image = resolveImage(imageUrl, layer.characterId);
     return Number(image?.naturalWidth || image?.videoWidth || image?.width) > 0;
   }).map(layer => key(layer?.characterId)));
