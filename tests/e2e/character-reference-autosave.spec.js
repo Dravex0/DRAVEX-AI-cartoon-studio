@@ -111,3 +111,57 @@ test('preserves all Character Bible identity anchors across draft reload', async
     signatureAccessories: 'blue scarf and brass pendant'
   });
 });
+
+
+test('saving visible Character Bible fields preserves extended identity anchors', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#language').selectOption('en');
+  await page.locator('#idea').fill('Foxy is a small orange fox who finds a blue scarf.');
+  await page.locator('#make').click();
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await page.locator('#save').click();
+
+  await page.evaluate(() => {
+    const draft = JSON.parse(localStorage.getItem('dravex-cartoon-draft') || 'null');
+    if (!draft) throw new Error('The draft was not saved before Character Bible edit verification.');
+    draft.character = 'Foxy';
+    draft.characterBible = [{
+      characterId: 'Foxy',
+      visualDescription: 'Small orange fox with amber eyes',
+      clothing: 'Blue scarf',
+      colors: 'Orange and cream',
+      distinctiveFeatures: 'White tail tip',
+      species: 'fox',
+      ageRange: 'young adult',
+      bodyShape: 'small and agile',
+      hair: 'auburn',
+      eyeColor: 'amber',
+      silhouette: 'large ears and bushy tail',
+      signatureAccessories: 'blue scarf and brass pendant'
+    }];
+    localStorage.setItem('dravex-cartoon-draft', JSON.stringify(draft));
+  });
+
+  await page.reload();
+  await page.locator('details:has(#bibleCharacterId) > summary').click();
+  await expect(page.locator('#bibleCharacterId')).toHaveValue('Foxy');
+  await page.locator('#bibleVisualDescription').fill('Updated small orange fox with amber eyes');
+  await page.locator('#saveCharacterReference').click();
+  await page.locator('#save').click();
+
+  const saved = await page.evaluate(() => {
+    const draft = JSON.parse(localStorage.getItem('dravex-cartoon-draft') || 'null');
+    return draft?.characterBible?.find(profile => profile.characterId === 'Foxy') || null;
+  });
+  expect(saved).toMatchObject({
+    characterId: 'Foxy',
+    visualDescription: 'Updated small orange fox with amber eyes',
+    species: 'fox',
+    ageRange: 'young adult',
+    bodyShape: 'small and agile',
+    hair: 'auburn',
+    eyeColor: 'amber',
+    silhouette: 'large ears and bushy tail',
+    signatureAccessories: 'blue scarf and brass pendant'
+  });
+});

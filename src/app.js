@@ -100,6 +100,7 @@ import { verifySpriteTransparency } from "./character-sprite-verification.js";
 import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene } from "./character-reference.js";
 import { prepareStoryCharacterContext } from "./story-character-context.js";
 import { normalizeSceneCast } from "./scene-cast.js";
+import { findSceneIndexesUsingCharacterReference } from "./character-reference-scene-impact.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
 import { buildStoryEventChain } from "./story-event-chain.js";
 import { hasRenderableCharacterLayer, hasRenderableCharacterRig, resolveProceduralDemoCharacter, shouldShowProceduralDemoCharacter } from './demo-character-mode.js';
@@ -957,14 +958,18 @@ function renderCharacterBible(){
 }
 $('saveCharacterReference').addEventListener('click',()=>{
   try{
+    const characterId=$('bibleCharacterId').value.trim();
+    const currentProfile=characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase())||{};
     characterBible=upsertCharacterReference(characterBible,{
-      characterId:$('bibleCharacterId').value,
+      ...currentProfile,
+      characterId,
       visualDescription:$('bibleVisualDescription').value,
       clothing:$('bibleClothing').value,
       colors:$('bibleColors').value,
       distinctiveFeatures:$('bibleDistinctiveFeatures').value,
-      referenceImageAssetId:characterBible.find(entry=>entry.characterId.toLowerCase()===$('bibleCharacterId').value.trim().toLowerCase())?.referenceImageAssetId||''
+      referenceImageAssetId:currentProfile.referenceImageAssetId||''
     });
+    invalidateCharacterReferenceScenes(characterId);
     $('bibleCharacterId').dataset.loaded=String(sceneIndex);
     $('characterReferenceStatus').textContent=uiLang==='ru'?'Образ сохранён. Он будет добавляться в промпты сцен с этим персонажем. Нажми «Сохранить черновик», чтобы сохранить его в браузере.':'Reference saved. It will be included in prompts for scenes featuring this character. Save the draft to persist it in this browser.';
     updateProductionPreview();
@@ -997,6 +1002,7 @@ $('bibleReferenceImageFile').addEventListener('change',async()=>{
       distinctiveFeatures:$('bibleDistinctiveFeatures').value,
       referenceImageAssetId:assetId
     });
+    invalidateCharacterReferenceScenes(characterId);
     $('bibleCharacterId').dataset.loaded=String(sceneIndex);
     const draftSaved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({
       idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,
@@ -1018,6 +1024,7 @@ $('removeCharacterReferenceImage').addEventListener('click',async()=>{
  try{
   await characterReferenceImageStorage.delete(profile.referenceImageAssetId);
   characterBible=upsertCharacterReference(characterBible,{...profile,referenceImageAssetId:''});
+  invalidateCharacterReferenceScenes(characterId);
   const draftSaved=writeLocalStorage('dravex-cartoon-draft',JSON.stringify({idea:$('idea').value,character:$('character').value,style:$('style').value,canvasFormat:activeCanvasFormat,imageQuality:$('imageQuality').value,duration:$('duration').value,language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex}));
   $('bibleReferenceImageFile').value='';
   $('bibleReferenceImageStatus').textContent=uiLang==='ru'?'Фото удалено. Изменение '+(draftSaved?'автоматически сохранено в черновике.':'обновлено, но черновик не удалось сохранить.'):'Photo removed. Change '+(draftSaved?'was automatically saved to the draft.':'was updated, but the draft could not be saved.');
@@ -1478,6 +1485,48 @@ function invalidateCurrentSceneVideoForEdit(){
  })().catch(error=>console.warn('Could not invalidate the previous scene video:',error))
    .finally(()=>pendingSceneVideoInvalidations.delete(key));
  pendingSceneVideoInvalidations.set(key,pending);
+}
+function invalidateCharacterReferenceScenes(characterId){
+ const affectedIndexes=findSceneIndexesUsingCharacterReference(sceneMetadata,characterId);
+ for(const index of affectedIndexes){
+  const meta=sceneMetadata[index];
+  const key=meta?.id?String(meta.id):'';
+  if(!key)continue;
+  sceneGenerationGuard.invalidate(key);
+  const revision=sceneGenerationGuard.storageRevision(key);
+  const removeCached=()=>{
+   const entry=sceneVideoCache.get(key);
+   if(!entry)return false;
+   sceneVideoCache.delete(key);
+   disposeSceneVideoEntry(entry);
+   return true;
+  };
+  const refreshCurrentScene=()=>{
+   if(index!==sceneIndex)return;
+   renderComfySceneVideo();
+   updateFaceAnalysisControls();
+   if(!playing)draw();
+  };
+  if(removeCached())refreshCurrentScene();
+  void Promise.resolve(sceneVideoRestorePromise)
+   .catch(error=>console.warn('Could not wait for scene-video restore during Character Bible invalidation:',error))
+   .then(async()=>{
+    if(removeCached())refreshCurrentScene();
+    await sceneVideoStorage.deleteOlderThanRevision(key,revision);
+   })
+   .catch(error=>{
+    console.warn('Could not invalidate scene video after Character Bible change:',error);
+    if(index===sceneIndex)$('status').textContent=uiLang==='ru'
+     ?'Образ персонажа изменён, но старый видеоклип не удалось удалить из локального хранилища. Создай сцену заново.'
+     :'Character appearance changed, but the old scene clip could not be removed from local storage. Regenerate the scene.';
+   });
+ }
+ if(affectedIndexes.length){
+  $('status').textContent=uiLang==='ru'
+   ?'Образ «'+String(characterId||'')+'» изменён. Старые видеосцены с этим персонажем удалены; создай их заново.'
+   :'Character appearance "'+String(characterId||'')+'" changed. Cached scene clips were invalidated; regenerate those scenes.';
+ }
+ return affectedIndexes.length;
 }
 ['sceneCamera','sceneImagePrompt','sceneMotionPrompt','sceneStartState','sceneEndState','sceneNegativePrompt','sceneContinuityLock','sceneCharacters'].forEach(id=>$(id).addEventListener('input',()=>{
  invalidateCurrentSceneVideoForEdit();
@@ -3398,6 +3447,8 @@ $('animateSceneComfy').addEventListener('click',async()=>{
  if(!prompt.trim()){setComfyStatus('This scene has no usable visual or motion prompt. Add a scene description or motion instruction first.');return}
  button.disabled=true;$('checkComfyConnection').disabled=true;
  try{
+  await sceneVideoRestorePromise;
+  assertGenerationCurrent();
   let imageBlob=selectedSceneImage;
   if(!imageBlob&&taskType==='image-to-video'){
    status.textContent=uiLang==='ru'?'Получаем изображение сцены локально…':'Reading the generated scene image…';
