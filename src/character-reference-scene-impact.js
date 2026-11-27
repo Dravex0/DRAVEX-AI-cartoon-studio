@@ -11,11 +11,15 @@ export function findSceneIndexesUsingCharacterReference(scenes, characterId) {
   const indexes = [];
   scenes.forEach((scene, index) => {
     if (!scene || typeof scene !== 'object' || Array.isArray(scene)) return;
-    if (!Array.isArray(scene.characters)) {
+    if (!Array.isArray(scene.characters) && typeof scene.characters !== 'string') {
       indexes.push(index);
       return;
     }
-    const cast = normalizeSceneCast('', scene.characters);
+    const cast = normalizeSceneCast(scene.characters);
+    if (!cast.length && typeof scene.characters === 'string') {
+      indexes.push(index);
+      return;
+    }
     if (cast.some(name => name.toLocaleLowerCase() === target)) indexes.push(index);
   });
   return indexes;

@@ -959,13 +959,15 @@ function renderCharacterBible(){
 $('saveCharacterReference').addEventListener('click',()=>{
   try{
     const characterId=$('bibleCharacterId').value.trim();
+    const currentProfile=characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase())||{};
     characterBible=upsertCharacterReference(characterBible,{
+      ...currentProfile,
       characterId,
       visualDescription:$('bibleVisualDescription').value,
       clothing:$('bibleClothing').value,
       colors:$('bibleColors').value,
       distinctiveFeatures:$('bibleDistinctiveFeatures').value,
-      referenceImageAssetId:characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase())?.referenceImageAssetId||''
+      referenceImageAssetId:currentProfile.referenceImageAssetId||''
     });
     invalidateCharacterReferenceScenes(characterId);
     $('bibleCharacterId').dataset.loaded=String(sceneIndex);
