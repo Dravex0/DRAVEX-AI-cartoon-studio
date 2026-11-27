@@ -14,11 +14,15 @@ function normalizeReferenceImage(value, fallbackName) {
  * Character Bible images fill remaining workflow slots; the provider reports
  * any overflow or unconfigured inputs instead of silently losing references.
  */
-export function prioritizeCharacterReferenceImages(manualImages = [], profileImages = []) {
+export function prioritizeCharacterReferenceImages(manualImages = [], profileImages = [], { manualSceneId = '', sceneId = '' } = {}) {
   const manual = Array.isArray(manualImages) ? manualImages : [];
   const profiles = Array.isArray(profileImages) ? profileImages : [];
+  const manualBelongsToScene = cleanName(manualSceneId) !== ''
+    && cleanName(manualSceneId) === cleanName(sceneId);
   return [
-    ...manual.map((value, index) => normalizeReferenceImage(value, `manual-character-reference-${index + 1}.png`)).filter(Boolean),
+    ...(manualBelongsToScene
+      ? manual.map((value, index) => normalizeReferenceImage(value, `manual-character-reference-${index + 1}.png`)).filter(Boolean)
+      : []),
     ...profiles.map((value, index) => normalizeReferenceImage(value, `character-bible-reference-${index + 1}.png`)).filter(Boolean)
   ];
 }
