@@ -1039,7 +1039,10 @@ async function loadCharacterReferenceImagesForScene(scene){
 }
 async function buildCharacterReferenceImagesForScene(scene){
   const profileImages=await loadCharacterReferenceImagesForScene(scene);
-  return prioritizeCharacterReferenceImages(comfyCharacterReferenceFiles,profileImages);
+  return prioritizeCharacterReferenceImages(comfyCharacterReferenceFiles,profileImages,{
+    manualSceneId:comfyCharacterReferenceSceneId,
+    sceneId:String(scene?.id||'')
+  });
 }
 function updateProductionPreview(){
 const meta=sceneMetadata[sceneIndex]||{};
@@ -1774,6 +1777,7 @@ function renderSceneMediaReport(){
   target.dataset.totalScenes=String(report.totalScenes);
 }
 function renderScenes(){
+  clearComfyCharacterReferencesForSceneChange();
   const box=$('scenes');
   box.replaceChildren();
   titles.forEach((title,i)=>{
@@ -3072,6 +3076,19 @@ function syncComfySourceImageStatus({clearInput=true}={}){
   :'No local image selected for this scene; the generated scene image will be used if available.';
 }
 let comfyCharacterReferenceFiles=[];
+let comfyCharacterReferenceSceneId='';
+const comfyCharacterReferenceInputIds=['comfyCharacterReference1','comfyCharacterReference2','comfyCharacterReference3','comfyCharacterReference4'];
+function clearComfyCharacterReferencesForSceneChange(){
+ const activeSceneId=String(sceneMetadata[sceneIndex]?.id||'');
+ if(!comfyCharacterReferenceSceneId||!activeSceneId||activeSceneId===comfyCharacterReferenceSceneId)return;
+ comfyCharacterReferenceFiles=[];
+ comfyCharacterReferenceSceneId='';
+ comfyCharacterReferenceInputIds.forEach(id=>{const input=$(id);if(input)input.value='';});
+ const status=$('comfyStatus');
+ if(status)status.textContent=uiLang==='ru'
+  ?'Ручные референсы очищены после переключения сцены. Для каждой сцены используются её фото из Character Bible.'
+  :'Manual references were cleared after switching scenes. Each scene uses its matching Character Bible images.';
+}
 let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
 let filmProgressTracking=false;
 let filmProgressSceneStates=[];
@@ -3327,14 +3344,21 @@ function updateComfyAnimateAvailability(){
  $('generateFullFilmComfy').hidden=mode==='local-canvas';
  $('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController;
 }
-['comfyCharacterReference1','comfyCharacterReference2','comfyCharacterReference3','comfyCharacterReference4'].forEach((id,index)=>{
+comfyCharacterReferenceInputIds.forEach((id,index)=>{
  $(id).addEventListener('change',()=>{
   const file=$(id).files?.[0]||null;
+  const currentSceneId=String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex));
+  if(file&&comfyCharacterReferenceSceneId&&comfyCharacterReferenceSceneId!==currentSceneId){
+   comfyCharacterReferenceFiles=[];
+   comfyCharacterReferenceInputIds.forEach((otherId,otherIndex)=>{if(otherIndex!==index){const otherInput=$(otherId);if(otherInput)otherInput.value='';}});
+  }
+  if(file)comfyCharacterReferenceSceneId=currentSceneId;
   comfyCharacterReferenceFiles[index]=file;
   const count=comfyCharacterReferenceFiles.filter(Boolean).length;
+  if(!count)comfyCharacterReferenceSceneId='';
   setComfyStatus(count
-   ? (uiLang==='ru'?'Выбрано референсов: '+count+'. Они будут отправлены только в локальный ComfyUI при запуске анимации.':'Selected character references: '+count+'. They are sent only to local ComfyUI when animation starts.')
-   : (uiLang==='ru'?'Референсы персонажей не выбраны.':'No character references selected.'));
+   ? (uiLang==='ru'?'Выбрано референсов: '+count+' для сцены '+(sceneIndex+1)+'. Они используются только для этой сцены; при переключении ручные файлы очищаются.':'Selected '+count+' manual reference(s) for scene '+(sceneIndex+1)+'. They apply only to this scene and are cleared when switching scenes.')
+   : (uiLang==='ru'?'Ручные референсы для сцены не выбраны.':'No manual references selected for this scene.'));
  });
 });
 $('comfySourceImageFile').addEventListener('change',()=>{
