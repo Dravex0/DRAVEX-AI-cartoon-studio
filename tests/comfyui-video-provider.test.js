@@ -895,8 +895,9 @@ test('preserves explicit manual reference slots while filling remaining slots wi
   });
 
   assert.equal(result.status, 'completed');
-  assert.equal(uploadedNames.length, 2);
-  assert.equal(submittedWorkflow['21'].inputs.image, 'refs/reference-2.png');
+  assert.equal(uploadedNames.length, 3);
+  assert.equal(submittedWorkflow['20'].inputs.image, 'refs/reference-1.png');
+  assert.equal(submittedWorkflow['21'].inputs.image, 'refs/reference-3.png');
   assert.equal(submittedWorkflow['22'].inputs.image, '');
-  assert.equal(submittedWorkflow['23'].inputs.image, 'refs/reference-1.png');
+  assert.equal(submittedWorkflow['23'].inputs.image, 'refs/reference-2.png');
 });
