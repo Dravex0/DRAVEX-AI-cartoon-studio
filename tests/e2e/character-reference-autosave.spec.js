@@ -115,6 +115,9 @@ test('preserves all Character Bible identity anchors across draft reload', async
 
 test('manual ComfyUI character references are cleared when switching storyboard scenes', async ({ page }) => {
   await page.goto('/');
+  await page.locator('#idea').fill('Foxy walks through a forest and meets Mira.');
+  await page.locator('#make').click();
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
   await page.locator('details.advanced-video-settings > summary').click();
   await page.locator('#comfyPanel > summary').click();
 
@@ -128,7 +131,7 @@ test('manual ComfyUI character references are cleared when switching storyboard 
   });
   await expect(page.locator('#comfyStatus')).toContainText(/for scene 1/i);
 
-  await page.locator('#addScene').click();
+  await expect(page.locator('.scene').nth(1)).toBeVisible();
   await page.locator('.scene').nth(1).click();
 
   await expect(page.locator('#comfyCharacterReference3')).toHaveValue('');
