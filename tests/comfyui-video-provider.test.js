@@ -188,6 +188,115 @@ test('uploads and binds only explicitly configured character reference images', 
 });
 
 
+test('maps ordered references into sparse configured ComfyUI slots and reports only unused references', async () => {
+  const uploadedNames = [];
+  let submittedWorkflow;
+  const sparseWorkflow = {
+    ...workflow,
+    '22': { class_type: 'LoadImage', inputs: { image: '' } },
+    '24': { class_type: 'LoadImage', inputs: { image: '' } }
+  };
+  const sparseBindings = {
+    ...nodeBindings,
+    referenceImage2: { nodeId: '22', input: 'image' },
+    referenceImage4: { nodeId: '24', input: 'image' }
+  };
+  const references = ['fox.png', 'owl.png', 'robot.png'].map(name => ({
+    name,
+    blob: new Blob([name], { type: 'image/png' })
+  }));
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).endsWith('/upload/image')) {
+      const uploaded = options.body.get('image');
+      uploadedNames.push(uploaded.name);
+      return jsonResponse({ name: `upload-${uploadedNames.length}.png`, subfolder: 'refs', type: 'input' });
+    }
+    if (String(url).endsWith('/prompt')) {
+      submittedWorkflow = JSON.parse(options.body).prompt;
+      return jsonResponse({ prompt_id: 'sparse-reference-job' });
+    }
+    if (String(url).endsWith('/history/sparse-reference-job')) {
+      return jsonResponse({ 'sparse-reference-job': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '90': { videos: [{ filename: 'sparse-reference.mp4', type: 'output' }] } }
+      }});
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow: sparseWorkflow,
+    nodeBindings: sparseBindings,
+    outputNodeIds: ['90'],
+    fetchImpl,
+    pollIntervalMs: 250
+  });
+  const progress = [];
+  await provider.generate({ ...request, referenceImages: references }, {
+    onProgress: event => progress.push(event)
+  });
+
+  assert.equal(uploadedNames.length, 3, 'source plus two references should be uploaded');
+  assert.equal(submittedWorkflow['22'].inputs.image, 'refs/upload-2.png');
+  assert.equal(submittedWorkflow['24'].inputs.image, 'refs/upload-3.png');
+  const warning = progress.find(event => event.code === 'CHARACTER_REFERENCE_NOT_BOUND');
+  assert.deepEqual(warning?.configuredReferenceSlots, [2, 4]);
+  assert.deepEqual(warning?.skippedReferenceIndexes, [3]);
+});
+
+test('uses unique ComfyUI upload filenames when different characters share the same original filename', async () => {
+  const uploadedNames = [];
+  let submittedWorkflow;
+  const duplicateNameWorkflow = {
+    ...workflow,
+    '21': { class_type: 'LoadImage', inputs: { image: '' } },
+    '22': { class_type: 'LoadImage', inputs: { image: '' } }
+  };
+  const duplicateNameBindings = {
+    ...nodeBindings,
+    referenceImage1: { nodeId: '21', input: 'image' },
+    referenceImage2: { nodeId: '22', input: 'image' }
+  };
+  const references = ['fox', 'owl'].map(value => ({
+    name: 'character.png',
+    blob: new Blob([value], { type: 'image/png' })
+  }));
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).endsWith('/upload/image')) {
+      const uploaded = options.body.get('image');
+      uploadedNames.push(uploaded.name);
+      return jsonResponse({ name: uploaded.name, subfolder: 'refs', type: 'input' });
+    }
+    if (String(url).endsWith('/prompt')) {
+      submittedWorkflow = JSON.parse(options.body).prompt;
+      return jsonResponse({ prompt_id: 'unique-reference-job' });
+    }
+    if (String(url).endsWith('/history/unique-reference-job')) {
+      return jsonResponse({ 'unique-reference-job': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '90': { videos: [{ filename: 'unique-reference.mp4', type: 'output' }] } }
+      }});
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow: duplicateNameWorkflow,
+    nodeBindings: duplicateNameBindings,
+    outputNodeIds: ['90'],
+    fetchImpl,
+    pollIntervalMs: 250
+  });
+  await provider.generate({ ...request, referenceImages: references });
+
+  assert.equal(uploadedNames.length, 3);
+  assert.equal(new Set(uploadedNames).size, 3, 'source and both references must have distinct upload filenames');
+  assert.notEqual(submittedWorkflow['21'].inputs.image, submittedWorkflow['22'].inputs.image);
+  assert.ok(submittedWorkflow['21'].inputs.image.startsWith('refs/dravex-'));
+  assert.ok(submittedWorkflow['22'].inputs.image.startsWith('refs/dravex-'));
+});
 test('uploads and binds character references in a text-to-video workflow', async () => {
   const uploadedForms = [];
   let submittedWorkflow;
