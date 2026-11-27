@@ -50,9 +50,9 @@ test('universal ComfyUI generation surfaces provider warnings instead of hiding 
 
 
 test('manual ComfyUI references are scoped to the scene where they were selected', () => {
-  assert.match(app, /let comfyCharacterReferenceSceneId=''/);
-  assert.match(app, /function clearComfyCharacterReferencesForSceneChange\\(\\)/);
-  assert.match(app, /function renderScenes\\(\\)\\{\\s*clearComfyCharacterReferencesForSceneChange\\(\\)/);
-  assert.match(app, /if\\(file\\)comfyCharacterReferenceSceneId=currentSceneId/);
-  assert.match(html, /Manual reference uploads belong only to the currently selected scene/);
+  assert.ok(app.includes("let comfyCharacterReferenceSceneId=''"));
+  assert.ok(app.includes("function clearComfyCharacterReferencesForSceneChange(){"));
+  assert.ok(app.includes("function renderScenes(){\n  clearComfyCharacterReferencesForSceneChange();"));
+  assert.ok(app.includes("if(file)comfyCharacterReferenceSceneId=currentSceneId"));
+  assert.ok(html.includes("Manual reference uploads belong only to the currently selected scene"));
 });
