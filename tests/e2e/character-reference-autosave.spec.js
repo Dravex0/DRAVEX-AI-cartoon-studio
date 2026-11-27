@@ -115,6 +115,7 @@ test('preserves all Character Bible identity anchors across draft reload', async
 
 test('manual ComfyUI character references are cleared when switching storyboard scenes', async ({ page }) => {
   await page.goto('/');
+  await page.locator('details.advanced-video-settings > summary').click();
   await page.locator('#comfyPanel > summary').click();
 
   await page.locator('#comfyCharacterReference3').setInputFiles({
