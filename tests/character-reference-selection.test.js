@@ -67,3 +67,20 @@ test('manual references are never treated as film-wide references without a matc
     ['manual.png', 'saved.png']
   );
 });
+
+
+test('preserves the numbered slot of manually selected reference files', () => {
+  const manual = [];
+  manual[2] = image('manual-reference-3.png');
+  const saved = [image('character-bible-reference.png')];
+
+  const result = prioritizeCharacterReferenceImages(manual, saved, {
+    manualSceneId: 'scene-a',
+    sceneId: 'scene-a'
+  });
+
+  assert.equal(result[0].name, 'manual-reference-3.png');
+  assert.equal(result[0].slot, 3);
+  assert.equal(result[1].name, 'character-bible-reference.png');
+  assert.equal(Object.hasOwn(result[1], 'slot'), false);
+});
