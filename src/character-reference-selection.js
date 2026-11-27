@@ -1,12 +1,12 @@
 const cleanName = value => String(value ?? '').trim().slice(0, 180);
 
-function normalizeReferenceImage(value, fallbackName) {
+function normalizeReferenceImage(value, fallbackName, slot = null) {
   const blob = value?.blob || value?.image || value;
   if (!blob || typeof blob.arrayBuffer !== 'function' || !Number.isFinite(Number(blob.size)) || Number(blob.size) <= 0) {
     return null;
   }
   const name = cleanName(value?.name || blob?.name || fallbackName) || fallbackName;
-  return { name, blob };
+  return { name, blob, ...(Number.isInteger(slot) && slot >= 1 && slot <= 4 ? { slot } : {}) };
 }
 
 /**
@@ -21,7 +21,7 @@ export function prioritizeCharacterReferenceImages(manualImages = [], profileIma
     && cleanName(manualSceneId) === cleanName(sceneId);
   return [
     ...(manualBelongsToScene
-      ? manual.map((value, index) => normalizeReferenceImage(value, `manual-character-reference-${index + 1}.png`)).filter(Boolean)
+      ? manual.map((value, index) => normalizeReferenceImage(value, `manual-character-reference-${index + 1}.png`, index + 1)).filter(Boolean)
       : []),
     ...profiles.map((value, index) => normalizeReferenceImage(value, `character-bible-reference-${index + 1}.png`)).filter(Boolean)
   ];
