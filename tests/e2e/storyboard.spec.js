@@ -592,7 +592,7 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
 
   expect(uploadedFilenames).toHaveLength(2);
   expect(new Set(uploadedFilenames).size).toBe(2);
-  expect(uploadedFilenames.map(name => name.replace(/^dravex-\\d+-\\d+-/, ''))).toEqual(['fox-forest-scene.png', 'fox-garden-scene.png']);
+  expect(uploadedFilenames.map(name => name.replace(/^dravex-[0-9]+-[0-9]+-/, ''))).toEqual(['fox-forest-scene.png', 'fox-garden-scene.png']);
   expect(submittedImages).toHaveLength(2);
   expect(submittedImages.map(item => item.image)).toEqual(['uploaded-1.png', 'uploaded-2.png']);
   expect(submittedImages.every(item => item.prompt.length > 0)).toBe(true);
@@ -877,7 +877,7 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   expect(observedSceneColors.characterOverlayFrames).toBe(0);
   expect(uploadedFilenames).toHaveLength(5);
   expect(new Set(uploadedFilenames).size).toBe(5);
-  expect(uploadedFilenames.map(name => name.replace(/^dravex-\\d+-\\d+-/, ''))).toEqual([
+  expect(uploadedFilenames.map(name => name.replace(/^dravex-[0-9]+-[0-9]+-/, ''))).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
     'full-film-scene-3.png',
