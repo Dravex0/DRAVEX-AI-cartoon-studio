@@ -21,7 +21,7 @@ test('ComfyUI exposes four optional character-reference bindings for both workfl
 
 test('all three ComfyUI generation paths preserve manual-first references without truncating them', () => {
   assert.match(app, /import \{ prioritizeCharacterReferenceImages \} from [\"']\.\/character-reference-selection\.js[\"']/);
-  assert.match(app, /async function buildCharacterReferenceImagesForScene\(scene\)[\s\S]*?return prioritizeCharacterReferenceImages\(comfyCharacterReferenceFiles,profileImages\)/);
+  assert.match(app, /async function buildCharacterReferenceImagesForScene\(scene\)[\s\S]*?return prioritizeCharacterReferenceImages\(comfyCharacterReferenceFiles,profileImages,\{[\s\S]*?manualSceneId:comfyCharacterReferenceSceneId,[\s\S]*?sceneId:String\(scene\?\.id\|\|''\)/);
   assert.equal((app.match(/buildCharacterReferenceImagesForScene\(/g) || []).length, 4);
   assert.doesNotMatch(app, /profileReferences\.concat\(comfyCharacterReferenceFiles\.filter\(Boolean\)\)/);
   assert.doesNotMatch(app, /profileReferenceImages\.concat\(comfyCharacterReferenceFiles\.filter\(Boolean\)\)/);
@@ -46,4 +46,13 @@ test('universal ComfyUI generation surfaces provider warnings instead of hiding 
   assert.match(body, /stage==='warning'&&job\.message/);
   assert.match(body, /\$\('status'\)\.textContent=warning/);
   assert.match(body, /reportProgress\?\.\(warning\)/);
+});
+
+
+test('manual ComfyUI references are scoped to the scene where they were selected', () => {
+  assert.match(app, /let comfyCharacterReferenceSceneId=''/);
+  assert.match(app, /function clearComfyCharacterReferencesForSceneChange\\(\\)/);
+  assert.match(app, /function renderScenes\\(\\)\\{\\s*clearComfyCharacterReferencesForSceneChange\\(\\)/);
+  assert.match(app, /if\\(file\\)comfyCharacterReferenceSceneId=currentSceneId/);
+  assert.match(html, /Manual reference uploads belong only to the currently selected scene/);
 });
