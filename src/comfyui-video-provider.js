@@ -245,18 +245,31 @@ export function createComfyUIVideoProvider({
         : null;
       const referenceValues = {};
       const requestedReferences = Array.isArray(request.referenceImages) ? request.referenceImages : [];
-      const references = requestedReferences.filter(Boolean);
+      const references = requestedReferences
+        .map((reference, index) => ({ reference, index }))
+        .filter(item => Boolean(item.reference));
       const availableReferenceSlots = [1, 2, 3, 4].filter(index => Boolean(activeBindings[`referenceImage${index}`]));
-      const referenceAssignments = references
-        .slice(0, availableReferenceSlots.length)
-        .map((reference, index) => ({
-          reference,
-          referenceIndex: index + 1,
-          slot: availableReferenceSlots[index]
-        }));
-      const skippedReferenceIndexes = references
-        .slice(referenceAssignments.length)
-        .map((reference, index) => referenceAssignments.length + index + 1);
+      const assignedReferenceSlots = new Set();
+      const referenceAssignments = [];
+      const skippedReferenceIndexes = [];
+      for (const { reference, index } of references) {
+        const hasExplicitSlot = Object.prototype.hasOwnProperty.call(reference, 'slot');
+        const requestedSlot = Number(reference?.slot);
+        const referenceIndex = Number.isInteger(requestedSlot) && requestedSlot >= 1 && requestedSlot <= 4
+          ? requestedSlot
+          : index + 1;
+        const slot = hasExplicitSlot
+          ? (Number.isInteger(requestedSlot) && availableReferenceSlots.includes(requestedSlot) && !assignedReferenceSlots.has(requestedSlot)
+            ? requestedSlot
+            : null)
+          : (availableReferenceSlots.find(candidate => !assignedReferenceSlots.has(candidate)) || null);
+        if (slot === null) {
+          skippedReferenceIndexes.push(referenceIndex);
+          continue;
+        }
+        assignedReferenceSlots.add(slot);
+        referenceAssignments.push({ reference, referenceIndex, slot });
+      }
       if (skippedReferenceIndexes.length) {
         const configuredSlots = availableReferenceSlots.length
           ? `slot(s) ${availableReferenceSlots.join(', ')}`
