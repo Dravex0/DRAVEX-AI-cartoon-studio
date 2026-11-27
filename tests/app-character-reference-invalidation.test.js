@@ -13,21 +13,21 @@ test('Character Bible text, photo upload, and photo removal invalidate affected 
   const uploadBlock = app.slice(uploadStart, removeStart);
   const removeBlock = app.slice(removeStart, app.indexOf('async function loadCharacterReferenceImagesForScene', removeStart));
   for (const block of [saveBlock, uploadBlock, removeBlock]) {
-    assert.match(block, /invalidateCharacterReferenceScenes\\(characterId\\)/);
+    assert.ok(block.includes('invalidateCharacterReferenceScenes(characterId)'));
   }
   const helperStart = app.indexOf('function invalidateCharacterReferenceScenes(characterId)');
   const helperEnd = app.indexOf("['sceneCamera'", helperStart);
   assert.ok(helperStart >= 0 && helperEnd > helperStart);
   const helper = app.slice(helperStart, helperEnd);
-  assert.match(helper, /sceneGenerationGuard\\.invalidate\\(key\\)/);
-  assert.match(helper, /await sceneVideoStorage\\.deleteOlderThanRevision\\(key,revision\\)/);
-  assert.match(helper, /await sceneVideoRestorePromise/);
-  assert.match(helper, /disposeSceneVideoEntry\\(entry\\)/);
+  assert.ok(helper.includes('sceneGenerationGuard.invalidate(key)'));
+  assert.ok(helper.includes('await sceneVideoStorage.deleteOlderThanRevision(key,revision)'));
+  assert.ok(helper.includes('Promise.resolve(sceneVideoRestorePromise)'));
+  assert.ok(helper.includes('disposeSceneVideoEntry(entry)'));
 });
 
 test('direct ComfyUI scene generation waits for persisted video restoration before submitting a new job', () => {
   const start = app.indexOf("$('animateSceneComfy').addEventListener");
-  const end = app.indexOf("$('videoGenerationMode')", start);
+  const end = app.indexOf("$('videoGenerationMode').addEventListener", start);
   assert.ok(start >= 0 && end > start);
   const block = app.slice(start, end);
   const restore = block.indexOf('await sceneVideoRestorePromise;');
