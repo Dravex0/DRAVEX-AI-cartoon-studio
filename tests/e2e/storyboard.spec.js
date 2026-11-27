@@ -590,7 +590,9 @@ test('uploads the correct local image for each ComfyUI storyboard scene', async 
   await page.locator('#scenes button.scene').nth(1).click();
   await expect(page.locator('#comfySourceImageStatus')).toContainText('fox-garden-scene.png');
 
-  expect(uploadedFilenames).toEqual(['fox-forest-scene.png', 'fox-garden-scene.png']);
+  expect(uploadedFilenames).toHaveLength(2);
+  expect(new Set(uploadedFilenames).size).toBe(2);
+  expect(uploadedFilenames.map(name => name.replace(/^dravex-[0-9]+-[0-9]+-/, ''))).toEqual(['fox-forest-scene.png', 'fox-garden-scene.png']);
   expect(submittedImages).toHaveLength(2);
   expect(submittedImages.map(item => item.image)).toEqual(['uploaded-1.png', 'uploaded-2.png']);
   expect(submittedImages.every(item => item.prompt.length > 0)).toBe(true);
@@ -873,7 +875,9 @@ test('generates every ComfyUI scene and exports one playable full-film WebM', as
   // This ComfyUI fixture supplies background videos but no character artwork or rig.
   // The removed hard-coded demo mascot must not be composited over generated footage.
   expect(observedSceneColors.characterOverlayFrames).toBe(0);
-  expect(uploadedFilenames).toEqual([
+  expect(uploadedFilenames).toHaveLength(5);
+  expect(new Set(uploadedFilenames).size).toBe(5);
+  expect(uploadedFilenames.map(name => name.replace(/^dravex-[0-9]+-[0-9]+-/, ''))).toEqual([
     'full-film-scene-1.png',
     'full-film-scene-2.png',
     'full-film-scene-3.png',

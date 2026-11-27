@@ -7,6 +7,26 @@ const VIDEO_EXTENSIONS = new Map([
 
 const clean = (value, max = 500) => String(value ?? '').trim().slice(0, max);
 
+let uploadSequence = 0;
+
+function createUploadFilename(image, fallbackName) {
+  const sourceName = clean(image?.name, 180).replace(/[^a-z0-9._-]/gi, '_') || fallbackName;
+  const extensionMatch = sourceName.match(/\.([a-z0-9]{2,8})$/i);
+  const mimeType = clean(image?.type, 100).split(';')[0].toLowerCase();
+  const mimeExtensions = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+    'image/avif': '.avif'
+  };
+  const extension = extensionMatch ? `.${extensionMatch[1].toLowerCase()}` : (mimeExtensions[mimeType] || '.png');
+  const stem = (extensionMatch ? sourceName.slice(0, -extensionMatch[0].length) : sourceName)
+    .replace(/[^a-z0-9_-]/gi, '_')
+    .slice(0, 80) || 'image';
+  return `dravex-${Date.now()}-${++uploadSequence}-${stem}${extension}`;
+}
+
 export class ComfyUIAdapterError extends Error {
   constructor(message, code = 'COMFYUI_ERROR', details = null) {
     super(message);
@@ -205,7 +225,7 @@ export function createComfyUIVideoProvider({
           throw new ComfyUIAdapterError(`The ${label} must be a browser File or Blob.`, 'INVALID_REFERENCE_IMAGE');
         }
         const form = new FormData();
-        const filename = clean(image.name, 180).replace(/[^a-z0-9._-]/gi, '_') || fallbackName;
+        const filename = createUploadFilename(image, fallbackName);
         form.append('image', image, filename);
         form.append('overwrite', 'true');
         let response;
@@ -225,28 +245,47 @@ export function createComfyUIVideoProvider({
         : null;
       const referenceValues = {};
       const requestedReferences = Array.isArray(request.referenceImages) ? request.referenceImages : [];
-      const references = requestedReferences.slice(0, 4);
-      const skippedReferenceIndexes = requestedReferences
+      const references = requestedReferences
         .map((reference, index) => ({ reference, index }))
-        .filter(({ reference, index }) => reference && (
-          index >= 4 || !Object.prototype.hasOwnProperty.call(activeBindings, `referenceImage${index + 1}`)
-        ))
-        .map(({ index }) => index + 1);
+        .filter(item => Boolean(item.reference));
+      const availableReferenceSlots = [1, 2, 3, 4].filter(index => Boolean(activeBindings[`referenceImage${index}`]));
+      const assignedReferenceSlots = new Set();
+      const referenceAssignments = [];
+      const skippedReferenceIndexes = [];
+      for (const { reference, index } of references) {
+        const hasExplicitSlot = Object.prototype.hasOwnProperty.call(reference, 'slot');
+        const requestedSlot = Number(reference?.slot);
+        const referenceIndex = Number.isInteger(requestedSlot) && requestedSlot >= 1 && requestedSlot <= 4
+          ? requestedSlot
+          : index + 1;
+        const slot = hasExplicitSlot
+          ? (Number.isInteger(requestedSlot) && availableReferenceSlots.includes(requestedSlot) && !assignedReferenceSlots.has(requestedSlot)
+            ? requestedSlot
+            : null)
+          : (availableReferenceSlots.find(candidate => !assignedReferenceSlots.has(candidate)) || null);
+        if (slot === null) {
+          skippedReferenceIndexes.push(referenceIndex);
+          continue;
+        }
+        assignedReferenceSlots.add(slot);
+        referenceAssignments.push({ reference, referenceIndex, slot });
+      }
       if (skippedReferenceIndexes.length) {
+        const configuredSlots = availableReferenceSlots.length
+          ? `slot(s) ${availableReferenceSlots.join(', ')}`
+          : 'no reference-image slots';
         context.onProgress?.({
           stage: 'warning',
           code: 'CHARACTER_REFERENCE_NOT_BOUND',
           skippedReferenceIndexes,
-          message: `ComfyUI workflow has no configured input for character reference image(s) ${skippedReferenceIndexes.join(', ')}. Those images were not uploaded or used.`
+          configuredReferenceSlots: availableReferenceSlots,
+          message: `ComfyUI workflow has ${availableReferenceSlots.length} configured character-reference input(s) (${configuredSlots}). Reference image(s) ${skippedReferenceIndexes.join(', ')} were not uploaded or used.`
         });
       }
-      for (let index = 0; index < references.length; index += 1) {
-        const key = `referenceImage${index + 1}`;
-        if (!Object.prototype.hasOwnProperty.call(activeBindings, key)) continue;
-        const reference = references[index];
-        if (!reference) continue;
+      for (const { reference, referenceIndex, slot } of referenceAssignments) {
+        const key = `referenceImage${slot}`;
         const blob = reference?.blob || reference?.image || reference;
-        referenceValues[key] = await uploadImage(blob, `character reference ${index + 1}`, `dravex-character-reference-${index + 1}.png`);
+        referenceValues[key] = await uploadImage(blob, `character reference ${referenceIndex}`, `dravex-character-reference-${referenceIndex}.png`);
       }
 
       const graph = cloneWorkflow(taskConfig.template);

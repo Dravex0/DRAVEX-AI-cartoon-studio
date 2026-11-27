@@ -111,3 +111,29 @@ test('preserves all Character Bible identity anchors across draft reload', async
     signatureAccessories: 'blue scarf and brass pendant'
   });
 });
+
+
+test('manual ComfyUI character references are cleared when switching storyboard scenes', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#idea').fill('Foxy walks through a forest and meets Mira.');
+  await page.locator('#make').click();
+  await expect(page.locator('#status')).toContainText(/storyboard created/i);
+  await page.locator('details.advanced-video-settings > summary').click();
+  await page.locator('#comfyPanel > summary').click();
+
+  await page.locator('#comfyCharacterReference3').setInputFiles({
+    name: 'scene-one-character.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p1sAAAAASUVORK5CYII=',
+      'base64'
+    )
+  });
+  await expect(page.locator('#comfyStatus')).toContainText(/for scene 1/i);
+
+  await expect(page.locator('.scene').nth(1)).toBeVisible();
+  await page.locator('.scene').nth(1).click();
+
+  await expect(page.locator('#comfyCharacterReference3')).toHaveValue('');
+  await expect(page.locator('#comfyStatus')).toContainText(/cleared after switching scenes/i);
+});

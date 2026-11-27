@@ -1,6 +1,7 @@
 const clean = (value, max) => String(value ?? '').trim().slice(0, max);
 
 export const CHARACTER_REFERENCE_LIMIT = 20;
+export const CHARACTER_REFERENCE_IMAGE_LIMIT = 4;
 
 /** Normalize a character profile before it is stored or added to a generation prompt. */
 export function normalizeCharacterReference(input = {}) {
@@ -79,24 +80,26 @@ export function mergeCharacterReferences(existing = [], discovered = []) {
 
 
 /**
- * Return only character profiles explicitly named in a scene cast.
- * An empty or unknown cast must never inherit unrelated character references.
+ * Return only saved image references explicitly named in a scene cast.
+ * An empty or unknown cast must never inherit unrelated character reference images.
  */
 export function selectCharacterReferencesForScene(references = [], sceneCast = []) {
-  const cast = (Array.isArray(sceneCast) ? sceneCast : String(sceneCast ?? '').split(','))
-    .map(value => clean(value, 120).toLocaleLowerCase())
-    .filter(Boolean);
+  const cast = [...new Set(
+    (Array.isArray(sceneCast) ? sceneCast : String(sceneCast ?? '').split(','))
+      .map(value => clean(value, 120).toLocaleLowerCase())
+      .filter(Boolean)
+  )];
   if (!cast.length) return [];
-  const allowed = new Set(cast);
-  const selected = [];
-  const seen = new Set();
+
+  // Keep reference slot order aligned with the scene's cast order, not the
+  // order in which profiles happen to be stored in the Character Bible.
+  const profilesByCharacter = new Map();
   for (const source of Array.isArray(references) ? references : []) {
     const profile = normalizeCharacterReference(source);
     const key = profile.characterId.toLocaleLowerCase();
-    if (!key || !allowed.has(key) || seen.has(key)) continue;
-    seen.add(key);
-    selected.push(profile);
-    if (selected.length >= 2) break;
+    if (!key || !profile.referenceImageAssetId || profilesByCharacter.has(key)) continue;
+    profilesByCharacter.set(key, profile);
   }
-  return selected;
+
+  return cast.map(key => profilesByCharacter.get(key)).filter(Boolean);
 }

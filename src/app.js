@@ -98,6 +98,7 @@ import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './characte
 import { generateCharacterSpriteAsset } from "./character-sprite-generation.js";
 import { verifySpriteTransparency } from "./character-sprite-verification.js";
 import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene } from "./character-reference.js";
+import { prioritizeCharacterReferenceImages } from "./character-reference-selection.js";
 import { prepareStoryCharacterContext } from "./story-character-context.js";
 import { normalizeSceneCast } from "./scene-cast.js";
 import { inferStoryboardStateChanges } from "./scene-state-changes.js";
@@ -1003,8 +1004,8 @@ $('bibleReferenceImageFile').addEventListener('change',async()=>{
       language:$('language').value,uiLanguage:uiLang,titles,descriptions,sceneMetadata,characterBible,sceneIndex
     }));
     $('bibleReferenceImageStatus').textContent=uiLang==='ru'
-      ?'Фото сохранено на этом устройстве ('+Math.round(file.size/1024)+' КБ). Профиль персонажа '+(draftSaved?'автоматически сохранён в черновике.':'обновлён, но черновик не удалось сохранить — нажми «Сохранить черновик».')+' Фото передаётся только в локальный ComfyUI при настроенных входах Reference Image 1/2.'
-      :'Image saved on this device ('+Math.round(file.size/1024)+' KB). Character profile '+(draftSaved?'was saved to the draft automatically.':'was updated, but the draft could not be saved — use Save Draft.')+' The image is sent only to local ComfyUI when Reference Image 1/2 inputs are configured.';
+      ?'Фото сохранено на этом устройстве ('+Math.round(file.size/1024)+' КБ). Профиль персонажа '+(draftSaved?'автоматически сохранён в черновике.':'обновлён, но черновик не удалось сохранить — нажми «Сохранить черновик».')+' Фото передаётся только в локальный ComfyUI при настроенных входах Reference Image 1–4.'
+      :'Image saved on this device ('+Math.round(file.size/1024)+' KB). Character profile '+(draftSaved?'was saved to the draft automatically.':'was updated, but the draft could not be saved — use Save Draft.')+' The image is sent only to local ComfyUI when Reference Image 1–4 inputs are configured.';
     showCharacterReferenceImage(characterBible.find(entry=>entry.characterId.toLowerCase()===characterId.toLowerCase()));
     renderCharacterBible();
   }catch(error){
@@ -1030,12 +1031,18 @@ async function loadCharacterReferenceImagesForScene(scene){
   const profiles=selectCharacterReferencesForScene(characterBible,cast);
   const images=[];
   for(const profile of profiles){
-    if(images.length>=2)break;
     if(!profile.referenceImageAssetId)continue;
     const record=await characterReferenceImageStorage.get(profile.referenceImageAssetId);
     if(record?.blob?.size)images.push({name:record.filename||profile.characterId+'.png',blob:record.blob});
   }
   return images;
+}
+async function buildCharacterReferenceImagesForScene(scene){
+  const profileImages=await loadCharacterReferenceImagesForScene(scene);
+  return prioritizeCharacterReferenceImages(comfyCharacterReferenceFiles,profileImages,{
+    manualSceneId:comfyCharacterReferenceSceneId,
+    sceneId:String(scene?.id||'')
+  });
 }
 function updateProductionPreview(){
 const meta=sceneMetadata[sceneIndex]||{};
@@ -1770,6 +1777,7 @@ function renderSceneMediaReport(){
   target.dataset.totalScenes=String(report.totalScenes);
 }
 function renderScenes(){
+  clearComfyCharacterReferencesForSceneChange();
   const box=$('scenes');
   box.replaceChildren();
   titles.forEach((title,i)=>{
@@ -3068,6 +3076,19 @@ function syncComfySourceImageStatus({clearInput=true}={}){
   :'No local image selected for this scene; the generated scene image will be used if available.';
 }
 let comfyCharacterReferenceFiles=[];
+let comfyCharacterReferenceSceneId='';
+const comfyCharacterReferenceInputIds=['comfyCharacterReference1','comfyCharacterReference2','comfyCharacterReference3','comfyCharacterReference4'];
+function clearComfyCharacterReferencesForSceneChange(){
+ const activeSceneId=String(sceneMetadata[sceneIndex]?.id||'');
+ if(!comfyCharacterReferenceSceneId||!activeSceneId||activeSceneId===comfyCharacterReferenceSceneId)return;
+ comfyCharacterReferenceFiles=[];
+ comfyCharacterReferenceSceneId='';
+ comfyCharacterReferenceInputIds.forEach(id=>{const input=$(id);if(input)input.value='';});
+ const status=$('comfyStatus');
+ if(status)status.textContent=uiLang==='ru'
+  ?'Ручные референсы очищены после переключения сцены. Для каждой сцены используются её фото из Character Bible.'
+  :'Manual references were cleared after switching scenes. Each scene uses its matching Character Bible images.';
+}
 let hfVideoClient=null,hfHandleFile=null,hfVideoConnected=false;
 let filmProgressTracking=false;
 let filmProgressSceneStates=[];
@@ -3127,14 +3148,14 @@ function comfyText(id){return $(id).value.trim()}
 function comfyBindings(){
  const binding=(nodeId,input)=>nodeId&&input?{nodeId,input}:null;
  const result={prompt:binding(comfyText('comfyPromptNode'),comfyText('comfyPromptInput')),image:binding(comfyText('comfyImageNode'),comfyText('comfyImageInput'))};
- const optional={negativePrompt:['comfyNegativeNode','comfyNegativeInput'],frameCount:['comfyFramesNode','comfyFramesInput'],fps:['comfyFpsNode','comfyFpsInput'],seed:['comfySeedNode','comfySeedInput'],referenceImage1:['comfyReference1Node','comfyReference1Input'],referenceImage2:['comfyReference2Node','comfyReference2Input']};
+ const optional={negativePrompt:['comfyNegativeNode','comfyNegativeInput'],frameCount:['comfyFramesNode','comfyFramesInput'],fps:['comfyFpsNode','comfyFpsInput'],seed:['comfySeedNode','comfySeedInput'],referenceImage1:['comfyReference1Node','comfyReference1Input'],referenceImage2:['comfyReference2Node','comfyReference2Input'],referenceImage3:['comfyReference3Node','comfyReference3Input'],referenceImage4:['comfyReference4Node','comfyReference4Input']};
  Object.entries(optional).forEach(([key,ids])=>{const value=binding(comfyText(ids[0]),comfyText(ids[1]));if(value)result[key]=value});
  return result;
 }
 function comfyTextBindings(){
  const binding=(nodeId,input)=>nodeId&&input?{nodeId,input}:null;
  const result={prompt:binding(comfyText('comfyTextPromptNode'),comfyText('comfyTextPromptInput'))};
- const optional={negativePrompt:['comfyTextNegativeNode','comfyTextNegativeInput'],frameCount:['comfyTextFramesNode','comfyTextFramesInput'],fps:['comfyTextFpsNode','comfyTextFpsInput'],seed:['comfyTextSeedNode','comfyTextSeedInput']};
+ const optional={negativePrompt:['comfyTextNegativeNode','comfyTextNegativeInput'],frameCount:['comfyTextFramesNode','comfyTextFramesInput'],fps:['comfyTextFpsNode','comfyTextFpsInput'],seed:['comfyTextSeedNode','comfyTextSeedInput'],referenceImage1:['comfyTextReference1Node','comfyTextReference1Input'],referenceImage2:['comfyTextReference2Node','comfyTextReference2Input'],referenceImage3:['comfyTextReference3Node','comfyTextReference3Input'],referenceImage4:['comfyTextReference4Node','comfyTextReference4Input']};
  Object.entries(optional).forEach(([key,ids])=>{const value=binding(comfyText(ids[0]),comfyText(ids[1]));if(value)result[key]=value});
  return result;
 }
@@ -3269,17 +3290,23 @@ async function generateLocalSceneVideoForUniversal({signal,reportProgress,step}=
  const provider=createComfyUIVideoProvider(comfyProviderOptions());
  const registry=createVideoProviderRegistry();registry.register(provider);
  const duration=Math.max(0.25,Math.min(30,Number(originalMeta.durationSeconds??originalMeta.duration??$('duration').value)||3));
- const profileReferences=await loadCharacterReferenceImagesForScene(motionScene);
+ const referenceImages=await buildCharacterReferenceImagesForScene(motionScene);
  assertGenerationCurrent();
- const referenceImages=profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2);
  reportProgress?.('Submitting scene to local ComfyUI');
  const result=await generateVideoWithProvider(registry,provider.id,{
   taskType,prompt,negativePrompt:motionScene.negativePrompt,
   durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageBlob}:{}),
   seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages
  },{signal,onProgress:job=>{
+  const stage=String(job.stage||'processing');
+  if(stage==='warning'&&job.message){
+   const warning='ComfyUI · '+String(job.message);
+   $('status').textContent=warning;
+   reportProgress?.(warning);
+   return;
+  }
   const percent=readVideoProgressPercent(job);
-  reportProgress?.('ComfyUI '+String(job.stage||'processing')+(percent===null?'':' '+percent+'%'));
+  reportProgress?.('ComfyUI '+stage+(percent===null?'':' '+percent+'%'));
  }});
  if(signal?.aborted)throw new DOMException('Cancelled','AbortError');
  if(result.status!=='completed'||!result.video)throw new Error(result.error||'ComfyUI не вернул готовое видео.');
@@ -3317,14 +3344,21 @@ function updateComfyAnimateAvailability(){
  $('generateFullFilmComfy').hidden=mode==='local-canvas';
  $('generateFullFilmComfy').disabled=!ready||!!fullFilmAbortController;
 }
-['comfyCharacterReference1','comfyCharacterReference2'].forEach((id,index)=>{
+comfyCharacterReferenceInputIds.forEach((id,index)=>{
  $(id).addEventListener('change',()=>{
   const file=$(id).files?.[0]||null;
+  const currentSceneId=String(sceneMetadata[sceneIndex]?.id||('scene-index-'+sceneIndex));
+  if(file&&comfyCharacterReferenceSceneId&&comfyCharacterReferenceSceneId!==currentSceneId){
+   comfyCharacterReferenceFiles=[];
+   comfyCharacterReferenceInputIds.forEach((otherId,otherIndex)=>{if(otherIndex!==index){const otherInput=$(otherId);if(otherInput)otherInput.value='';}});
+  }
+  if(file)comfyCharacterReferenceSceneId=currentSceneId;
   comfyCharacterReferenceFiles[index]=file;
   const count=comfyCharacterReferenceFiles.filter(Boolean).length;
+  if(!count)comfyCharacterReferenceSceneId='';
   setComfyStatus(count
-   ? (uiLang==='ru'?'Выбрано референсов: '+count+'. Они будут отправлены только в локальный ComfyUI при запуске анимации.':'Selected character references: '+count+'. They are sent only to local ComfyUI when animation starts.')
-   : (uiLang==='ru'?'Референсы персонажей не выбраны.':'No character references selected.'));
+   ? (uiLang==='ru'?'Выбрано референсов: '+count+' для сцены '+(sceneIndex+1)+'. Они используются только для этой сцены; при переключении ручные файлы очищаются.':'Selected '+count+' manual reference(s) for scene '+(sceneIndex+1)+'. They apply only to this scene and are cleared when switching scenes.')
+   : (uiLang==='ru'?'Ручные референсы для сцены не выбраны.':'No manual references selected for this scene.'));
  });
 });
 $('comfySourceImageFile').addEventListener('change',()=>{
@@ -3354,11 +3388,14 @@ const comfyConfigurationInputIds=[
  'comfyBaseUrl',
  'comfyTextPromptNode','comfyTextPromptInput','comfyTextNegativeNode','comfyTextNegativeInput',
  'comfyTextFramesNode','comfyTextFramesInput','comfyTextFpsNode','comfyTextFpsInput',
- 'comfyTextSeedNode','comfyTextSeedInput','comfyTextOutputNodes','comfyTextFrameStep',
+ 'comfyTextSeedNode','comfyTextSeedInput',
+ 'comfyTextReference1Node','comfyTextReference1Input','comfyTextReference2Node','comfyTextReference2Input',
+ 'comfyTextReference3Node','comfyTextReference3Input','comfyTextReference4Node','comfyTextReference4Input',
+ 'comfyTextOutputNodes','comfyTextFrameStep',
  'comfyPromptNode','comfyPromptInput','comfyImageNode','comfyImageInput',
  'comfyNegativeNode','comfyNegativeInput','comfyFramesNode','comfyFramesInput',
  'comfyFpsNode','comfyFpsInput','comfySeedNode','comfySeedInput',
- 'comfyReference1Node','comfyReference1Input','comfyReference2Node','comfyReference2Input',
+ 'comfyReference1Node','comfyReference1Input','comfyReference2Node','comfyReference2Input','comfyReference3Node','comfyReference3Input','comfyReference4Node','comfyReference4Input',
  'comfyOutputNodes','comfyFrameStep'
 ];
 comfyConfigurationInputIds.forEach(id=>$(id).addEventListener('input',()=>{
@@ -3411,9 +3448,8 @@ $('animateSceneComfy').addEventListener('click',async()=>{
   const registry=createVideoProviderRegistry();registry.register(provider);
   const duration=Math.max(0.25,Math.min(30,Number($('duration').value)||3));
   let referenceWarning='';
-  const profileReferences=await loadCharacterReferenceImagesForScene(motionScene);
+  const referenceImages=await buildCharacterReferenceImagesForScene(motionScene);
   assertGenerationCurrent();
-  const referenceImages=profileReferences.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2);
   const result=await generateVideoWithProvider(registry,provider.id,{taskType,prompt,negativePrompt:motionScene.negativePrompt,durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageBlob}:{}),seed:buildSceneIdentitySeed(motionScene,characterBible,$('style').value),referenceImages},{onProgress:progress=>{
    if(progress.stage==='warning'&&progress.message){referenceWarning=String(progress.message);status.textContent='ComfyUI · Внимание: '+referenceWarning;return;}
    const elapsed=Math.round((progress.elapsedMs||0)/1000);
@@ -3649,8 +3685,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
     // Wan 2.2 generates at most five seconds. Retiming fills the storyboard scene.
     const duration=mode==='huggingface'?Math.max(0.5,Math.min(5,requestedDuration)):requestedDuration;
     updateFilmSceneProgress(index,{status:'generating',progress:null,label:filmProgressText('Отправка в видеодвижок','Submitting to video engine')});
-    const profileReferenceImages=mode==='comfyui'?await loadCharacterReferenceImagesForScene(meta):[];
-    const referenceImages=mode==='comfyui'?profileReferenceImages.concat(comfyCharacterReferenceFiles.filter(Boolean)).slice(0,2):[];
+    const referenceImages=mode==='comfyui'?await buildCharacterReferenceImagesForScene(meta):[];
     assertSceneIdentityCurrent();
     let referenceWarning='';
     const result=await generateVideoWithProvider(registry,provider.id,{taskType,prompt,negativePrompt:meta.negativePrompt||'',durationSeconds:duration,fps:16,aspectRatio:'source',...(taskType==='image-to-video'?{image:imageInput}:{}),seed:buildSceneIdentitySeed(meta,characterBible,$('style').value),referenceImages},{signal,onProgress:job=>{

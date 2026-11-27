@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene, CHARACTER_REFERENCE_LIMIT } from '../src/character-reference.js';
+import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene, CHARACTER_REFERENCE_LIMIT, CHARACTER_REFERENCE_IMAGE_LIMIT } from '../src/character-reference.js';
 
 test('normalizes and bounds every visual identity field', () => {
   const result = normalizeCharacterReference({
@@ -108,8 +108,21 @@ test('routes only the reference profiles explicitly present in a scene cast', ()
     { characterId: 'Snowball', referenceImageAssetId: 'snow-image' }
   ];
   const selected = selectCharacterReferencesForScene(profiles, ['mIrA', 'Foxy']);
-  assert.deepEqual(selected.map(profile => profile.characterId), ['Foxy', 'Mira']);
-  assert.deepEqual(selected.map(profile => profile.referenceImageAssetId), ['fox-image', 'mira-image']);
+  assert.deepEqual(selected.map(profile => profile.characterId), ['Mira', 'Foxy']);
+  assert.deepEqual(selected.map(profile => profile.referenceImageAssetId), ['mira-image', 'fox-image']);
+});
+
+test('keeps image slots in scene-cast order and uses only the first saved image for each character', () => {
+  const profiles = [
+    { characterId: 'Foxy', referenceImageAssetId: 'fox-first-image' },
+    { characterId: 'foxy', referenceImageAssetId: 'fox-duplicate-image' },
+    { characterId: 'Mira' },
+    { characterId: 'Snowball', referenceImageAssetId: 'snow-image' }
+  ];
+  const selected = selectCharacterReferencesForScene(profiles, ['Snowball', 'Foxy', 'Mira', 'FOXy']);
+
+  assert.deepEqual(selected.map(profile => profile.characterId), ['Snowball', 'Foxy']);
+  assert.deepEqual(selected.map(profile => profile.referenceImageAssetId), ['snow-image', 'fox-first-image']);
 });
 
 test('does not leak character references into scenes with an empty or unrelated cast', () => {
@@ -121,11 +134,30 @@ test('does not leak character references into scenes with an empty or unrelated 
   assert.deepEqual(selectCharacterReferencesForScene(profiles, ['Unknown character']), []);
 });
 
-test('limits scene-specific reference profiles to the two provider input slots', () => {
-  const profiles = ['Foxy', 'Mira', 'Snowball'].map(characterId => ({ characterId }));
+test('returns every saved scene-specific image reference so the provider can report capacity overflow', () => {
+  const profiles = ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird'].map(characterId => ({
+    characterId,
+    referenceImageAssetId: characterId.toLowerCase() + '-image'
+  }));
+  assert.equal(CHARACTER_REFERENCE_IMAGE_LIMIT, 4);
   assert.deepEqual(
-    selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball']).map(profile => profile.characterId),
-    ['Foxy', 'Mira']
+    selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird']).map(profile => profile.characterId),
+    ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird']
+  );
+});
+
+test('skips cast profiles without saved images and fills later available reference slots', () => {
+  const profiles = [
+    { characterId: 'Foxy' },
+    { characterId: 'Mira', referenceImageAssetId: 'mira-image' },
+    { characterId: 'Snowball', referenceImageAssetId: 'snow-image' },
+    { characterId: 'Robot', referenceImageAssetId: 'robot-image' },
+    { characterId: 'Bird', referenceImageAssetId: 'bird-image' },
+    { characterId: 'Wolf', referenceImageAssetId: 'wolf-image' }
+  ];
+  assert.deepEqual(
+    selectCharacterReferencesForScene(profiles, ['Foxy', 'Mira', 'Snowball', 'Robot', 'Bird', 'Wolf']).map(profile => profile.characterId),
+    ['Mira', 'Snowball', 'Robot', 'Bird', 'Wolf']
   );
 });
 
