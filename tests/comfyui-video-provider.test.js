@@ -840,3 +840,63 @@ test('cancels a ComfyUI job during history polling without downloading an output
   await assert.rejects(pending, error => error.name === 'AbortError');
   assert.equal(calls.some(url => url.includes('/view?')), false);
 });
+
+
+test('preserves explicit manual reference slots while filling remaining slots with Character Bible images', async () => {
+  const uploadedNames = [];
+  let submittedWorkflow;
+  const referenceWorkflow = {
+    ...workflow,
+    '21': { class_type: 'LoadImage', inputs: { image: '' } },
+    '22': { class_type: 'LoadImage', inputs: { image: '' } },
+    '23': { class_type: 'LoadImage', inputs: { image: '' } }
+  };
+  const referenceBindings = {
+    ...nodeBindings,
+    referenceImage1: { nodeId: '21', input: 'image' },
+    referenceImage2: { nodeId: '22', input: 'image' },
+    referenceImage3: { nodeId: '23', input: 'image' }
+  };
+  const references = [
+    { name: 'manual-reference-3.png', slot: 3, blob: new Blob(['manual-third'], { type: 'image/png' }) },
+    { name: 'character-bible-first.png', blob: new Blob(['profile-first'], { type: 'image/png' }) }
+  ];
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).endsWith('/upload/image')) {
+      const uploaded = options.body.get('image');
+      uploadedNames.push(uploaded.name);
+      return jsonResponse({ name: `reference-${uploadedNames.length}.png`, subfolder: 'refs', type: 'input' });
+    }
+    if (String(url).endsWith('/prompt')) {
+      submittedWorkflow = JSON.parse(options.body).prompt;
+      return jsonResponse({ prompt_id: 'explicit-slot-job' });
+    }
+    if (String(url).endsWith('/history/explicit-slot-job')) {
+      return jsonResponse({ 'explicit-slot-job': {
+        status: { completed: true, status_str: 'success' },
+        outputs: { '90': { videos: [{ filename: 'explicit-slot.mp4', type: 'output' }] } }
+      }});
+    }
+    if (String(url).includes('/view?')) return new Response(new Blob(['video'], { type: 'video/mp4' }));
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const provider = createComfyUIVideoProvider({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow: referenceWorkflow,
+    nodeBindings: referenceBindings,
+    outputNodeIds: ['90'],
+    fetchImpl,
+    pollIntervalMs: 250
+  });
+
+  const result = await provider.generate({
+    ...request,
+    referenceImages: references
+  });
+
+  assert.equal(result.status, 'completed');
+  assert.equal(uploadedNames.length, 2);
+  assert.equal(submittedWorkflow['21'].inputs.image, 'refs/reference-2.png');
+  assert.equal(submittedWorkflow['22'].inputs.image, '');
+  assert.equal(submittedWorkflow['23'].inputs.image, 'refs/reference-1.png');
+});
