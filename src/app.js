@@ -4141,6 +4141,19 @@ async function exportFilm({signal=null,requireAllVideos=false,download=true,onPr
     return {status:signal?.aborted?'cancelled':'failed',reason:String(error?.message||'Film export failed').slice(0,500)};
   }
 }
-$('export').onclick=()=>{void exportFilm().catch(error=>{console.error('DRAVEX export failed:',error);$('status').textContent=tr('exportFailed');})};
+$('export').onclick=()=>{
+ persistCurrentSceneDialogueToMetadata(storyLanguage());
+ const hasDialogue=sceneMetadata.some(scene=>Array.isArray(scene?.dialogue)&&scene.dialogue.length>0);
+ if(hasDialogue){
+  const speechPlan=resolveAutomaticSpeechTasks({request:'',scenes:sceneMetadata,language:storyLanguage()});
+  if(speechPlan.scenesMissingVoice.length){
+   $('status').textContent=uiLang==='ru'
+    ?'Экспорт остановлен: после изменения диалогов нет актуальных голосовых дорожек. Сначала создай голоса или используй «Создать готовое видео».'
+    :'Export stopped: edited dialogue has no matching voice tracks. Generate voices first or use Create film.';
+   return;
+  }
+ }
+ void exportFilm().catch(error=>{console.error('DRAVEX export failed:',error);$('status').textContent=tr('exportFailed');});
+};
 try{const saved=JSON.parse(readLocalStorage('dravex-cartoon-draft')||'null');if(saved){$('idea').value=saved.idea||$('idea').value;activeCanvasFormat=normalizeCanvasFormat(saved.canvasFormat||activeCanvasFormat);$('uiLanguage').value=saved.uiLanguage||uiLang;uiLang=saved.uiLanguage||uiLang;$('character').value=saved.character||'';$('style').value=saved.style||'Storybook';$('imageQuality').value=saved.imageQuality||'standard';$('duration').value=saved.duration||'3';$('language').value=saved.language||'en';if(Array.isArray(saved.titles)&&Array.isArray(saved.descriptions)&&saved.titles.length===saved.descriptions.length&&saved.titles.length>0&&saved.titles.length<=12){titles=saved.titles.map(v=>String(v).slice(0,80));descriptions=saved.descriptions.map(v=>String(v).slice(0,500));sceneMetadata=ensureSceneIds(Array.isArray(saved.sceneMetadata)&&saved.sceneMetadata.length===titles.length?saved.sceneMetadata.map(item=>item&&typeof item==='object'?{...item}:{}):titles.map((title,index)=>({title,description:descriptions[index],prompt:descriptions[index],visibleAction:descriptions[index],camera:''})));characterBible=Array.isArray(saved.characterBible)?saved.characterBible.filter(entry=>entry&&typeof entry==='object').slice(0,20).map(normalizeCharacterReference):[];if(!characterBible.length)characterBible=upsertCharacterReference([],{characterId:$('character').value.trim()||''});sceneIndex=Math.min(Math.max(0,Number(saved.sceneIndex)||0),titles.length-1);currentStoryboardPlan={sourceText:String(saved.idea||'').trim(),sourceLanguage:String(saved.language||$('language').value),sourceCharacter:resolveStoryProtagonist(String(saved.idea||''),$('character').value.trim(),String(saved.language||$('language').value)),proceduralDemoCharacter:saved.proceduralDemoCharacter===true,scenes:sceneMetadata,titles,descriptions,eventChain:buildStoryEventChain(sceneMetadata),automaticDirectionApplied:true}}$('status').textContent=tr('restored')}}catch(e){}
 applyCanvasFormat();applyLanguage();renderScenes();applySceneEditorLanguage();syncSceneEditor();draw();sceneVideoRestorePromise=restorePersistedSceneVideos();

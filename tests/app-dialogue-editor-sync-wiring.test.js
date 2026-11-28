@@ -25,3 +25,15 @@ test("direct full-film provider action also synchronizes the active dialogue edi
   assert.ok(handlerStart >= 0 && sync > handlerStart && plan > sync,
     "direct provider generation must not ignore unsaved dialogue in the active scene editor");
 });
+
+test("standalone WebM export synchronizes dialogue and blocks stale or missing voice tracks", () => {
+  const exportStart = app.indexOf("$('export').onclick=()=>{");
+  const sync = app.indexOf("persistCurrentSceneDialogueToMetadata(storyLanguage());", exportStart);
+  const speechPlan = app.indexOf("const speechPlan=resolveAutomaticSpeechTasks({request:'',scenes:sceneMetadata", exportStart);
+  const exportCall = app.indexOf("void exportFilm().catch", exportStart);
+  assert.ok(exportStart >= 0 && sync > exportStart && speechPlan > sync && exportCall > speechPlan,
+    "standalone export must synchronize dialogue and validate voice tracks before recording");
+  const handler = app.slice(exportStart, app.indexOf("try{const saved=JSON.parse", exportStart));
+  assert.match(handler, /speechPlan\.scenesMissingVoice\.length/);
+  assert.match(handler, /после изменения диалогов нет актуальных голосовых дорожек/);
+});
