@@ -1028,7 +1028,14 @@ $('removeCharacterReferenceImage').addEventListener('click',async()=>{
  }catch(error){$('bibleReferenceImageStatus').textContent=error.message||'Could not remove reference image.';}
 });
 async function loadCharacterReferenceImagesForScene(scene){
-  return loadCharacterReferenceImagesFromStorage({scene,characterBible,storage:characterReferenceImageStorage});
+  try{
+    return await loadCharacterReferenceImagesFromStorage({scene,characterBible,storage:characterReferenceImageStorage});
+  }catch(error){
+    if(error?.code==='CHARACTER_REFERENCE_IMAGE_MISSING'&&uiLang==='ru'){
+      error.message='Не найдены или повреждены сохранённые фото персонажей: '+(error.characterIds||[]).join(', ')+'. Повторно загрузи фото в Character Bible перед генерацией сцены.';
+    }
+    throw error;
+  }
 }
 async function buildCharacterReferenceImagesForScene(scene){
   const profileImages=await loadCharacterReferenceImagesForScene(scene);
