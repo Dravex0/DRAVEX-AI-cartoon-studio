@@ -48,6 +48,7 @@ import { getLocalTtsModel } from "./local-tts-model-registry.js";
 import { createTimestampedKokoroEngine } from "./timestamped-kokoro-engine.js";
 import { createVoiceAudioStorage } from "./voice-audio-storage.js";
 import { assignCharacterVoices, buildSceneVoiceTimeline, normalizeSpeakerKey } from "./scene-voice-workflow.js";
+import { syncSceneDialogueDraft } from "./scene-dialogue-sync.js";
 import { createVoiceGenerationCheckpoint, restoreVoiceGenerationCheckpoint } from "./voice-generation-checkpoint.js";
 import { resolvePromptVoiceModelLoad } from "./prompt-voice-model-load.js";
 import { createSceneVideoStorage, persistSceneVideoBestEffort } from "./scene-video-storage.js";
@@ -1850,7 +1851,14 @@ function persistCurrentSceneDialogueToMetadata(locale=storyLanguage()){
  const currentSceneId=String(sceneMetadata[sceneIndex]?.id||'');
  const currentIndex=sceneMetadata.findIndex(scene=>scene&&String(scene.id||'')===currentSceneId);
  const currentLines=parseDialogueLines($('sceneDialogue').value,locale);
- if(currentIndex>=0&&currentLines.length)sceneMetadata[currentIndex]={...sceneMetadata[currentIndex],dialogue:currentLines};
+ if(currentIndex>=0){
+  const previous=sceneMetadata[currentIndex];
+  const synchronized=syncSceneDialogueDraft(previous,currentLines);
+  if(synchronized!==previous){
+   sceneMetadata[currentIndex]=synchronized;
+   if(currentIndex===sceneIndex)void renderSceneVoiceAudio();
+  }
+ }
  return currentIndex;
 }
 
@@ -2404,6 +2412,7 @@ $('makeFilm').addEventListener('click',async()=>{
   }
   return;
  }
+ persistCurrentSceneDialogueToMetadata(storyLanguage());
  const speechPlan=resolveAutomaticSpeechTasks({request,scenes:sceneMetadata,language:storyLanguage()});
  let speechController=null;
  const speechPreparation=await runOptionalSpeechPreparation({
@@ -3511,6 +3520,7 @@ $('generateFullFilmComfy').addEventListener('click',async()=>{
   let scenes=titles.map((title,index)=>({...sceneMetadata[index],title,description:descriptions[index]||sceneMetadata[index]?.description||''}));
   // Prepare requested dialogue and speech before spending time/quota on video generation.
   // Existing user dialogue and matching voice artifacts are preserved by the workflow.
+  persistCurrentSceneDialogueToMetadata(storyLanguage());
   const speechTasks=resolveAutomaticSpeechTasks({request:$('idea').value,scenes:sceneMetadata,language:storyLanguage()});
   const needsDialogue=(speechTasks.dialogueRequested||speechTasks.voiceRequested)
    &&selectScenesMissingDialogue(sceneMetadata).length>0;
