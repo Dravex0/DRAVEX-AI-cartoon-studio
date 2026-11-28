@@ -97,7 +97,8 @@ import { generateCharacterRigParts } from "./character-rig-part-generation.js";
 import { reviewCharacterRigPart, assembleApprovedCharacterRig } from './character-rig-part-review.js';
 import { generateCharacterSpriteAsset } from "./character-sprite-generation.js";
 import { verifySpriteTransparency } from "./character-sprite-verification.js";
-import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences, selectCharacterReferencesForScene } from "./character-reference.js";
+import { normalizeCharacterReference, upsertCharacterReference, mergeCharacterReferences } from "./character-reference.js";
+import { loadCharacterReferenceImagesFromStorage } from "./character-reference-image-load.js";
 import { prioritizeCharacterReferenceImages } from "./character-reference-selection.js";
 import { prepareStoryCharacterContext } from "./story-character-context.js";
 import { normalizeSceneCast } from "./scene-cast.js";
@@ -1027,15 +1028,14 @@ $('removeCharacterReferenceImage').addEventListener('click',async()=>{
  }catch(error){$('bibleReferenceImageStatus').textContent=error.message||'Could not remove reference image.';}
 });
 async function loadCharacterReferenceImagesForScene(scene){
-  const cast=normalizeSceneCast('',scene?.characters);
-  const profiles=selectCharacterReferencesForScene(characterBible,cast);
-  const images=[];
-  for(const profile of profiles){
-    if(!profile.referenceImageAssetId)continue;
-    const record=await characterReferenceImageStorage.get(profile.referenceImageAssetId);
-    if(record?.blob?.size)images.push({name:record.filename||profile.characterId+'.png',blob:record.blob});
+  try{
+    return await loadCharacterReferenceImagesFromStorage({scene,characterBible,storage:characterReferenceImageStorage});
+  }catch(error){
+    if(error?.code==='CHARACTER_REFERENCE_IMAGE_MISSING'&&uiLang==='ru'){
+      error.message='Не найдены или повреждены сохранённые фото персонажей: '+(error.characterIds||[]).join(', ')+'. Повторно загрузи фото в Character Bible перед генерацией сцены.';
+    }
+    throw error;
   }
-  return images;
 }
 async function buildCharacterReferenceImagesForScene(scene){
   const profileImages=await loadCharacterReferenceImagesForScene(scene);
