@@ -11,5 +11,7 @@ test('ComfyUI Character Bible loading uses the fail-closed IndexedDB reference l
   assert.ok(start >= 0 && end > start);
   const block = app.slice(start, end);
   assert.match(block, /loadCharacterReferenceImagesFromStorage\(\{scene,characterBible,storage:characterReferenceImageStorage\}\)/);
+  assert.match(block, /error\?\.code==='CHARACTER_REFERENCE_IMAGE_MISSING'&&uiLang==='ru'/);
+  assert.match(block, /Повторно загрузи фото в Character Bible/);
   assert.doesNotMatch(block, /if\(record\?\.blob\?\.size\)images\.push/);
 });
